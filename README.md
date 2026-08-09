@@ -144,5 +144,5 @@ agreement.
 
 ## License
 
-Not yet chosen. Intended to be permissive enough that any toolchain can
-implement against it without friction.
+[MIT](LICENSE) — covering the specification text and any code in this
+repository, so any toolchain can implement against it without friction.
