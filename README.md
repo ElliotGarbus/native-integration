@@ -59,7 +59,7 @@ java = ["java"]
 uses = ["INTERNET", "ACCESS_NETWORK_STATE"]
 ```
 
-The app author's `pyproject.toml` gains nothing:
+The app author's `pyproject.toml` simplifies to:
 
 ```toml
 dependencies = ["kivmob"]
