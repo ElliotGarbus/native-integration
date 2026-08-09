@@ -21,7 +21,7 @@ when the package is a **transitive** dependency, the person on the hook may not
 know it is in the tree at all.
 
 The package knows what it needs. The app author is the one obliged to say it.
-That inversion is the whole problem.
+That inversion **is** the problem.
 
 ## The shape of the fix
 
