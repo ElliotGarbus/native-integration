@@ -345,6 +345,29 @@ name = "android.hardware.bluetooth_le"
 > required would silently remove the application from devices lacking that
 > hardware.
 
+**Application-side suppression.** A consumer **MUST** provide a means for the
+application to suppress any contributed permission. A suppressed permission
+**MUST** be omitted from the generated manifest, together with any feature it
+alone implied, and the suppression **MUST** appear in the record and report of
+§9 (e.g. `− ACCESS_FINE_LOCATION (suppressed by application)`). Suppression is
+global per permission — the merged manifest either carries the permission or it
+does not — and this specification does not define the application-side syntax,
+only the capability; the application's configuration format is the consumer's
+concern.
+
+Suppression is **at the application's own risk**: the producer's code may fail
+at runtime, or degrade silently, when a permission it declared is withheld. A
+consumer **SHOULD** make an active suppression visible in its standing
+diagnostics so the failure remains traceable to the application's choice rather
+than being reported against the producer.
+
+> Rationale: this completes the authority model — a producer requests, the
+> application grants or refuses — and it is the recourse the platform itself
+> provides for the equivalent case: Android's manifest merger removes an
+> AAR-merged permission via `tools:node="remove"`. Without it, a contributed
+> permission that violates a store policy (e.g. `QUERY_ALL_PACKAGES`) would
+> leave the application no remedy short of forking the producer.
+
 ### 6.8 Manifest components: `[[android.contributes.components]]`
 
 ```toml
@@ -516,26 +539,28 @@ A conforming consumer **MUST**:
 5. Never promote a feature to `required` (§6.7), never register a component as
    exported without explicit application approval (§6.8), and never write a
    required entitlement (§7.3).
-6. Fail when a producer's `requires` exceeds the application's configuration
+6. Provide application-side permission suppression, honor it in the generated
+   manifest, and report it (§6.7).
+7. Fail when a producer's `requires` exceeds the application's configuration
    (§6.2, §7.2), or when a required application value is absent (§6.3).
-7. Record each distribution's resolved contribution durably and in reviewable
+8. Record each distribution's resolved contribution durably and in reviewable
    form; **report the delta** wherever that record changes, naming the
    distribution and how it entered the dependency tree; and fail the build when
    the effective set drifts from the record (§9).
-8. Report repository contributions with distinct prominence (§6.6).
-9. Validate shrinker keep patterns against owned namespaces (§6.9).
-10. Enforce reproducible native dependency resolution (§6.5, §7.4).
-11. Exclude sidecar directories from any Python payload it assembles.
-12. Read declarations without importing the producing package, and without
+9. Report repository contributions with distinct prominence (§6.6).
+10. Validate shrinker keep patterns against owned namespaces (§6.9).
+11. Enforce reproducible native dependency resolution (§6.5, §7.4).
+12. Exclude sidecar directories from any Python payload it assembles.
+13. Read declarations without importing the producing package, and without
     executing any declared content (§2.1, §3.2).
-13. Name the contributing distribution in every diagnostic.
+14. Name the contributing distribution in every diagnostic.
 
 A conforming consumer **SHOULD** warn on unrecognized keys within a supported
 major version (§4.4).
 
 ## 9. Recording and review
 
-Requirement 8.7 is about **disclosure**, not integrity.
+Requirement 8.8 is about **disclosure**, not integrity.
 
 Integrity needs no new mechanism: a sidecar ships inside its wheel, and any
 consumer that pins wheels by hash already pins the declaration transitively. What
@@ -609,6 +634,48 @@ Info.plist structures.
 | Xcode build settings, compiler/linker flags | Arbitrary build mutation; revisit only with a concrete, bounded need |
 | Application configuration | The application's own build settings are the consumer's concern |
 
+## 12. Producer guidance
+
+A producer **SHOULD** declare only what it **unconditionally** requires. A
+declaration is unconditional when every application that imports the package
+needs it; anything needed only when a particular feature is used does not belong
+in the package's own sidecar.
+
+The corollary matters most for **facade packages** — libraries exposing many
+optional platform features behind one API (the [Plyer](https://github.com/kivy/plyer)
+shape). A facade declaring the union of every permission any feature *might*
+use hands every application its worst-case manifest, and no amount of
+disclosure repairs that; per-permission suppression (§6.7) becomes each
+application's cleanup chore rather than a rare override.
+
+Feature-conditional native surface **SHOULD** instead ship as **optional
+distributions**, each carrying its own sidecar, with extras as the opt-in
+mechanism:
+
+```toml
+# the facade's pyproject.toml
+[project.optional-dependencies]
+gps = ["plyer-gps"]
+camera = ["plyer-camera"]
+```
+
+`pip install plyer[gps]` then installs `plyer-gps`, whose sidecar contributes
+exactly `ACCESS_FINE_LOCATION` — nothing else. An extra cannot vary the
+facade's *own* sidecar (extras select dependencies; they do not change a
+distribution's contents), but it can select a distribution that carries one,
+which is all that is needed.
+
+This is why the specification defines no conditional-contribution syntax (§10):
+**the dependency graph is the conditionality mechanism.** Sidecars are
+per-distribution, applications opt in by depending on the piece they use, and
+the record of §9 attributes each contribution to the smallest meaningful unit.
+
+The honest cost falls on the producer: splitting a facade into optional
+distributions is real packaging work (separate releases, an import layout that
+tolerates missing pieces). The guidance is **SHOULD**, not MUST, for exactly
+that reason — and §6.7's suppression exists in part as the application's
+recourse when a producer declares more than its applications want.
+
 ## Appendix A: why contributions stay per-distribution
 
 The tempting implementation is to let every distribution write its material into
@@ -618,7 +685,7 @@ less code, and it forecloses most of this specification.
 A merged tree **destroys provenance at install time**. Once files are overlaid,
 nothing can determine which distribution contributed which file — so collision
 detection, per-distribution attribution, the review record of §9, and every
-diagnostic required by 8.13 all become impossible.
+diagnostic required by 8.14 all become impossible.
 
 It also makes a shared source tree last-writer-wins by construction, which is the
 substitution path §6.1 exists to close.
