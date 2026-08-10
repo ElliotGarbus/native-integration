@@ -46,18 +46,29 @@ and ships `kivmob/_native/native.toml`:
 ```toml
 contract = "1"
 
-[android]
-java_namespace = "org.kivmob"
+[android.owns]
+java_namespaces = ["org.kivmob"]
 
-[android.gradle]
-dependencies = ["com.google.android.gms:play-services-ads:25.2.0"]
+[[android.contributes.gradle_dependencies]]
+coordinate = "com.google.android.gms:play-services-ads:25.2.0"
 
-[android.src]
+[android.contributes.src]
 java = ["java"]
 
-[android.permissions]
-uses = ["INTERNET", "ACCESS_NETWORK_STATE"]
+[[android.contributes.permissions]]
+name = "INTERNET"
+reason = "Ad delivery"
+
+[[android.contributes.permissions]]
+name = "ACCESS_NETWORK_STATE"
+reason = "Connectivity checks before ad requests"
 ```
+
+Everything a package declares falls into one of three categories: **`owns`**
+(exclusive claims, like a Java namespace — collision-checked across all
+packages), **`requires`** (conditions the app must satisfy — SDK floors,
+entitlements, app-supplied values), and **`contributes`** (material the build
+tool stages on the package's behalf).
 
 The app author's `pyproject.toml` simplifies to:
 
