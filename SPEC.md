@@ -224,11 +224,18 @@ resolve any conflict by file or copy order:
 1. Every contributed source file's path **and** its declared `package` **MUST**
    fall under an owned namespace.
 2. Every manifest component name (§6.8) **MUST** fall under an owned namespace.
-3. Every shrinker keep pattern (§6.9) **MUST** fall under an owned namespace.
+3. Every shrinker keep pattern (§6.9) **MUST** fall within one of its
+   permitted scopes: an owned namespace, or the group of a Gradle coordinate
+   the same sidecar declares.
 4. An owned namespace under a reserved prefix **MUST** be rejected. Reserved
-   prefixes are `org.kivy.android`, `org.libsdl.app`, `org.jnius`,
-   `org.renpy.android`, and any namespace the consumer's own generated bootstrap
-   occupies.
+   prefixes are the bootstrap/runtime namespaces of the known Python-mobile
+   toolchains — `org.kivy.android`, `org.libsdl.app`, `org.jnius`,
+   `org.renpy.android` (Kivy / python-for-android), `com.chaquo.python`
+   (Chaquopy), `org.beeware.android` (Briefcase) — plus any namespace the
+   consumer's own generated bootstrap occupies. The shared portion of the list
+   is deliberately consumer-independent: a distribution must not be able to
+   clobber one toolchain's runtime just because a different toolchain built the
+   application.
 5. Two distributions claiming overlapping namespaces **MUST** fail, naming both.
 
 > Rationale: without rule 4, a distribution shipping
@@ -257,10 +264,14 @@ name = "com.google.android.gms.ads.APPLICATION_ID"
 reason = "Your AdMob application ID, from the AdMob console"
 ```
 
-Values a producer needs but cannot supply. A consumer **MUST** report these as
-prerequisites and **MUST** fail when the application has not provided one,
-naming the distribution and the `reason`. A consumer **MUST NOT** invent a
-value.
+Values a producer needs but cannot supply. `reason` is **REQUIRED**.
+
+The requirement is satisfied when the application's own configuration supplies a
+manifest `<meta-data>` entry with that `name`; the consumer emits nothing on the
+producer's behalf (a *requires* is checked, never auto-satisfied — §2.1). A
+consumer **MUST** report these as prerequisites and **MUST** fail when the
+application has not provided one, naming the distribution and the `reason`. A
+consumer **MUST NOT** invent a value.
 
 ### 6.4 Source: `[android.contributes.src]`
 
@@ -318,7 +329,7 @@ a contributed repository to resolution.
 > approval, for consistency with §9's model. Consumers with stricter
 > supply-chain postures are expected to use the policy latitude above.
 
-### 6.7 Permissions and features: `[android.contributes]`
+### 6.7 Permissions and features: `[[android.contributes.permissions]]`, `[[android.contributes.features]]`
 
 ```toml
 [[android.contributes.permissions]]
@@ -382,8 +393,10 @@ exported_required = true
 reason = "Receives the OAuth redirect URI from the browser"
 ```
 
-`name` **MUST** refer to a class the distribution contributes (§6.4) or that its
-declared Gradle dependencies supply, and is subject to §6.1 rule 2.
+`name` **MUST** refer to a class the distribution contributes (§6.4) and
+**MUST** fall under an owned namespace (§6.1 rule 2). To register a class
+supplied by a Gradle dependency, subclass it in an owned namespace — the
+standard Android idiom — so ownership and attribution stay intact.
 
 Components are registered `android:exported="false"` by default. A producer
 **MUST NOT** declare `exported = true` directly. A producer **MAY** declare
@@ -407,9 +420,21 @@ keep_classes = ["org.example.mypkg.**"]
 
 `keep_classes` is a list of class patterns, **not** raw ProGuard/R8 directives.
 The consumer generates the corresponding `-keep class <pattern> { *; }` rules
-itself. Each pattern **MUST** fall under an owned namespace (§6.1 rule 3); a
-consumer **MUST** reject a pattern that does not, naming the distribution and
-the pattern.
+itself. Each pattern **MUST** fall within one of two scopes (§6.1 rule 3); a
+consumer **MUST** reject a pattern matching neither, naming the distribution
+and the pattern:
+
+1. an **owned namespace** — protecting the distribution's own
+   reflectively-reached classes; or
+2. the **group** of a Gradle coordinate **the same sidecar declares** (§6.5) —
+   e.g. declaring `com.google.android.gms:play-services-ads:…` permits patterns
+   under `com.google.android.gms.**`. Reflective access to a declared
+   dependency's classes is the dominant JNI-bridge pattern, and those classes
+   are otherwise invisible to the shrinker. This scope permits *keeping*, not
+   contributing, and is not exclusive: any distribution declaring the
+   coordinate may keep under its group. The bounded worst case is a producer
+   exempting its own dependency from shrinking — a size cost confined to a
+   library it added, not an application-wide shrink-disable.
 
 A consumer **MUST** apply these only when the application has enabled
 shrinking.
@@ -456,8 +481,8 @@ key = "aps-environment"
 reason = "Push notification delivery"
 ```
 
-A consumer **MUST** report these as prerequisites and **MUST NOT** write them
-into the application's entitlements.
+`reason` is **REQUIRED**. A consumer **MUST** report these as prerequisites and
+**MUST NOT** write them into the application's entitlements.
 
 > Rationale: entitlements are bound to the App ID and provisioning profile.
 > `codesign` requires the application's entitlements to be a subset of the
@@ -521,7 +546,9 @@ Two contribution modes, by shape:
   that collides with one it manages itself, and on two distributions setting the
   same key to different values, naming the distributions.
 - **`append`** — array-valued keys. Contributions from all distributions and the
-  application are concatenated and de-duplicated.
+  application are concatenated and de-duplicated in a deterministic order: the
+  application's entries first, then each distribution's in normalized
+  distribution-name order.
 
 Dictionary-valued keys (e.g. `NSAppTransportSecurity`) are not expressible in
 version 1; typed contributions for specific structures may be added in a minor
@@ -548,7 +575,7 @@ A conforming consumer **MUST**:
    distribution and how it entered the dependency tree; and fail the build when
    the effective set drifts from the record (§9).
 9. Report repository contributions with distinct prominence (§6.6).
-10. Validate shrinker keep patterns against owned namespaces (§6.9).
+10. Validate shrinker keep patterns against their permitted scopes (§6.9).
 11. Enforce reproducible native dependency resolution (§6.5, §7.4).
 12. Exclude sidecar directories from any Python payload it assembles.
 13. Read declarations without importing the producing package, and without

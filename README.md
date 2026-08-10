@@ -94,8 +94,9 @@ Three properties follow from that, and they are the reason for the design:
   any review gate.
 - **The app keeps authority.** A package may *request* a permission or register a
   component, but only the app may mark a feature `required` or a component
-  `exported`. A dependency cannot silently shrink your Play device reach or open
-  an IPC surface.
+  `exported` — and the app can refuse any contributed permission outright. A
+  dependency cannot silently shrink your Play device reach or open an IPC
+  surface.
 - **Changes are never invisible.** A conforming tool records each package's
   resolved contribution and reports the delta, so a version bump surfaces as
   `+ ACCESS_FINE_LOCATION` in a diff rather than as an opaque hash change.
