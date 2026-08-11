@@ -527,6 +527,18 @@ accepted. A consumer **SHOULD** record a checksum per resolved artifact.
 > consulting the record. A range trades that legibility for maintenance, and the
 > producer should make that trade knowingly.
 
+**Cross-artifact alignment is not expressible**, and producers of SDK families
+should know it. Every rule here governs **one dependency at a time**. A vendor
+BOM — Gradle's `platform(...)`, as Firebase publishes — is a constraint over a
+*set*, asserting that a group of versions was tested together, and neither form
+above can state that. A family split across several distributions (§12) pins its
+artifacts independently, and nothing makes those choices agree.
+
+The failure is at least honest: Gradle resolves one version per artifact, the
+result is locked, and §8.16 requires a resolution conflict to name the
+distributions that declared the conflicting versions. Producers publishing such
+a family **SHOULD** pin compatible versions deliberately and release together.
+
 This is the **RECOMMENDED** channel for anything larger than a few glue
 classes. Note that a coordinate may resolve to an Android library (`.aar`)
 whose own manifest AGP merges into the application's; see §9 and §11.
@@ -687,9 +699,43 @@ the intent-filter grammar:
   (`exported activity, matching scheme ${oauth_redirect_scheme}`).
 - **Not expressible in v1**: verified App Links (`android:autoVerify` — requires
   `assetlinks.json` on the application's domain, which is application
-  infrastructure), mimeTypes, path patterns, and filters on non-activity
-  components. Anticipated as minor revisions (§10); per §4.3 a producer needing
-  them declares the contract that provides them.
+  infrastructure), mimeTypes, and path patterns. Anticipated as minor revisions
+  (§10); per §4.3 a producer needing them declares the contract that provides
+  them.
+
+**Vendor actions: `intent_filters`.** A component that an SDK dispatches to
+needs to be registered for a **vendor-defined action**. Firebase Cloud
+Messaging's `FirebaseMessagingService` on `com.google.firebase.MESSAGING_EVENT`
+is the archetype, and the pattern is how most Android push, work-scheduling and
+install-referrer SDKs bind to a host application:
+
+```toml
+[[android.contributes.components]]
+kind = "service"
+name = "org.example.mypkg.MessagingService"
+
+  [[android.contributes.components.intent_filters]]
+  action = "com.google.firebase.MESSAGING_EVENT"
+```
+
+- Exactly one `action` per filter. **No categories and no data element**: those
+  belong to `view_links`, which models the browser-reachable case.
+- Valid **only on a component that is not exported**. A consumer **MUST** reject
+  `intent_filters` on an entry that declares `exported_required`, or that also
+  declares `view_links`.
+- The record and report of §9 **MUST** show the action alongside the component.
+
+> Rationale, and why this is not the intent-filter grammar §6.8 otherwise
+> declines to model. `view_links` exists because the classic failure is a
+> hand-written browser filter missing `DEFAULT`, so the consumer generates the
+> filter and the producer cannot spell one. This is the opposite shape: a single
+> vendor-defined action on a component no other application can reach, with no
+> categories and no data — nothing to get subtly wrong, and no externally
+> reachable surface opened, since the export rules above are untouched.
+>
+> The exported case is deliberately still excluded. A filter on an exported
+> component is an IPC entry point, which is a different security question and
+> has no motivating example yet.
 
 ### 6.9 Shrinker keep patterns: `[android.contributes.r8]`
 
@@ -860,6 +906,32 @@ consumer **MUST** reject any attempt to set one as an `info_plist` value (§7.6)
 `NSLocationTemporaryUsageDescriptionDictionary` — whose keys are
 application-defined purpose keys — is declared here like any other, and never
 spelled by the producer.
+
+**Application files are stated, not contributed.** Some SDKs read a
+configuration file from the built application bundle:
+
+```toml
+[[ios.requires.application_files]]
+name = "GoogleService-Info.plist"
+reason = "Download from the Firebase console; Analytics reads it from the bundle and has no programmatic alternative"
+```
+
+`name` is the file's name in the bundle. A consumer **MUST** report the
+requirement and **MUST NOT** create, fetch, or synthesize the file — these are
+account-specific, sometimes credential-adjacent, and always the application's.
+
+> Rationale, and the narrowness is deliberate. Most application-supplied
+> configuration reaches a producer through the application's **Python** code,
+> which is why §6.3 is scoped to values the build must embed and why no
+> platform-neutral value table exists. This table is for the residual case: a
+> file the SDK itself reads at runtime, where no programmatic alternative is
+> offered. Firebase is the motivating example — most of its services accept
+> `FirebaseOptions` programmatically, but Analytics on Apple platforms requires
+> the static file. Without this, an application that omits it gets a runtime
+> failure inside the SDK with nothing naming the distribution that needed it.
+>
+> A producer **SHOULD NOT** declare a file here when the SDK offers a
+> programmatic path. Ask for the file only when the vendor leaves no choice.
 
 **App extensions are stated, not contributed.** `kind` is a closed vocabulary:
 `notification_service` and `location_push` in this revision. A producer declares
@@ -1107,6 +1179,10 @@ A conforming consumer **MUST**:
     target to satisfy one (§7.3).
 22. Record an unsatisfied conditional prerequisite in the integration record,
     attributed to its distribution, without failing the build (§7.3).
+23. Report required application files as prerequisites, and never create or
+    fetch one (§7.3).
+24. Generate `intent_filters` only on components that are neither exported nor
+    declaring `view_links`, and show each action in the record (§6.8).
 
 > Rationale for 16. Every other rule here assumes native resolution *succeeds*.
 > It need not: two distributions in one closure can declare native dependencies
@@ -1269,6 +1345,20 @@ those arrive through the platform's own dependency channel, locked by §6.5/§7.
 and surfaced by §9's effective-delta reporting, rather than hidden inside a
 Python artifact. What this specification excludes is native binaries smuggled in
 the wheel itself, where no resolver, lock, or manifest tooling ever sees them.
+
+**One category of SDK is excluded by that principle in its entirety, and is
+worth naming.** Any SDK whose value depends on **uploading build artifacts** —
+symbol files, mapping files, source maps — requires build-time execution by
+construction. Firebase Crashlytics is the canonical case: on Android its Gradle
+plugin uploads the R8 mapping file, and on Apple platforms a run-script build
+phase uploads dSYMs. Sentry, Bugsnag, Instabug and Datadog share the shape.
+
+Such an SDK can be *linked* through §6.5 or §7.4, and the result will build.
+It will also be useless: crash reports arrive unsymbolicated, which is the part
+nobody wants. **This is a permanent exclusion, not a deferral**, and a producer
+in that category should learn it here rather than from a sidecar that succeeds
+and under-delivers. Applications needing such an SDK must configure it in their
+own build, outside this convention.
 
 The extension-module rows are qualified the same way: they exclude extension
 modules **carried as binaries in a wheel**, which the platform-tagged wheel PEPs

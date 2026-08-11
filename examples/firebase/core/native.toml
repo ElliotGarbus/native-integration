@@ -1,0 +1,82 @@
+# pyfirebase-core — HYPOTHETICAL. No such package exists; this is a clean-sheet
+# example written to test the specification against Firebase Core/Analytics.
+#
+# Firebase matters here for a reason beyond its ubiquity: every earlier example
+# came from one toolchain lineage (PyPlatformPackages). This one is derived from
+# Google's own documented integration, so it exercises the spec against
+# requirements nobody in that lineage designed around.
+#
+# What is *absent* below is the finding. See ../NOTES.md.
+
+contract = "1"
+platforms = ["android", "ios"]
+
+# ---------------------------------------------------------------- Android ---
+
+[android.owns]
+java_namespaces = ["org.pyfirebase.core"]
+
+[android.requires]
+min_sdk = 23        # Firebase Android SDK floor
+compile_sdk = 34
+
+[android.contributes.src]
+# A small helper that builds FirebaseOptions and calls
+# FirebaseApp.initializeApp(context, options) — see finding F1. Assembling a
+# builder chain through pyjnius is possible but miserable, and this is the
+# glue-sized case §6.4 is for.
+java = ["java"]
+
+[[android.contributes.gradle_dependencies]]
+# Firebase documents `platform("com.google.firebase:firebase-bom:34.17.0")`
+# followed by unversioned artifacts. §6.5 cannot express a BOM, so each artifact
+# is pinned independently — see finding F2, which is not the friction it looks
+# like at first glance.
+module = "com.google.firebase:firebase-analytics"
+version = { at_least = "22.0.0", below = "23.0.0" }
+
+[android.contributes.r8]
+keep_classes = ["org.pyfirebase.core.**", "com.google.firebase.**"]
+
+# -------------------------------------------------------------------- iOS ---
+
+[ios.requires]
+deployment_target = "15.0"
+
+[[ios.requires.application_files]]
+# Finding F3. Most Firebase services accept FirebaseOptions programmatically —
+# which is the escape hatch the Android half above takes — but Analytics on
+# Apple platforms reads the static file and offers no alternative. Without this
+# declaration, an application that omits the file fails inside the SDK with
+# nothing naming the distribution that needed it.
+name = "GoogleService-Info.plist"
+reason = """\
+Download from the Firebase console and add it to your app bundle. Analytics \
+reads it directly and cannot be configured programmatically."""
+
+[[ios.contributes.swift_packages]]
+name = "Firebase"
+url = "https://github.com/firebase/firebase-ios-sdk"
+requirement = { from = "11.0.0" }
+products = ["FirebaseAnalytics"]
+
+# ------------------------------------------------------------ NOT EXPRESSIBLE
+#
+# F1  The `com.google.gms.google-services` Gradle plugin. Mandatory per Google:
+#     it reads google-services.json and generates the string resources the SDK
+#     reads at runtime. §11 excludes build plugins on principle (§2.1). This
+#     sidecar therefore takes the documented escape hatch — programmatic
+#     FirebaseOptions — which is why it ships Java at all.
+#
+# F2  The BOM. Independent ranges give per-artifact flexibility; a BOM gives
+#     cross-artifact *alignment*. Nothing per-entry can express a constraint
+#     over a set.
+#
+# F3  google-services.json on Android — but only for the plugin path this file
+#     does not take. With programmatic FirebaseOptions the Android file is not
+#     needed at all, so no Android counterpart to the iOS declaration above is
+#     required. The gap turned out to be narrower than first recorded.
+#
+# F7  FirebaseApp.configure() on iOS, which must run before any other Firebase
+#     API and ideally before the interpreter starts. P1 territory, still
+#     deferred — and Firebase does not reopen it, for the reason in NOTES.md.

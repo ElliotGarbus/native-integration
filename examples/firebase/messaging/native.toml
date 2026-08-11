@@ -1,0 +1,81 @@
+# pyfirebase-messaging — HYPOTHETICAL. FCM, the privileged-capability case.
+#
+# This one splits cleanly by platform, which is itself informative: the iOS half
+# is nearly complete under contract 1, and the Android half cannot be expressed
+# at all. See ../NOTES.md, finding F5.
+
+contract = "1"
+platforms = ["android", "ios"]
+
+# ---------------------------------------------------------------- Android ---
+
+[android.owns]
+java_namespaces = ["org.pyfirebase.messaging"]
+
+[android.requires]
+min_sdk = 23
+compile_sdk = 34
+
+[android.contributes.src]
+# PyFirebaseMessagingService extends FirebaseMessagingService and forwards
+# onMessageReceived / onNewToken to Python. Contributing the class works; the
+# manifest registration it needs does not — see below.
+java = ["java"]
+
+[[android.contributes.gradle_dependencies]]
+module = "com.google.firebase:firebase-messaging"
+version = { at_least = "24.0.0", below = "25.0.0" }
+
+[[android.contributes.components]]
+# Finding F5, and the whole Android integration. §6.8 could declare the
+# component but not the intent filter it is useless without; `intent_filters`
+# now takes the single-action, non-exported case FCM needs.
+kind = "service"
+name = "org.pyfirebase.messaging.PyFirebaseMessagingService"
+
+  [[android.contributes.components.intent_filters]]
+  action = "com.google.firebase.MESSAGING_EVENT"
+
+[[android.contributes.permissions]]
+name = "android.permission.POST_NOTIFICATIONS"
+reason = "Displaying received messages as notifications on Android 13+"
+
+[android.contributes.r8]
+keep_classes = ["org.pyfirebase.messaging.**", "com.google.firebase.**"]
+
+# -------------------------------------------------------------------- iOS ---
+
+[ios.requires]
+deployment_target = "15.0"
+
+[[ios.requires.entitlements]]
+key = "aps-environment"
+reason = "APNs delivery; FCM sends through APNs on Apple platforms"
+
+[[ios.requires.app_extensions]]
+kind = "notification_service"
+conditional = true
+reason = """\
+Required only if you send notifications with image attachments. Link \
+FirebaseMessaging into the extension and call \
+Messaging.serviceExtension().populateNotificationContent()."""
+
+[[ios.contributes.swift_packages]]
+name = "Firebase"
+url = "https://github.com/firebase/firebase-ios-sdk"
+requirement = { from = "11.0.0" }
+products = ["FirebaseMessaging"]
+
+[ios.contributes.info_plist.append]
+UIBackgroundModes = ["remote-notification"]
+
+# ------------------------------------------------------------ NOT EXPRESSIBLE
+#
+# F8  Notification appearance meta-data:
+#       com.google.firebase.messaging.default_notification_icon  = @drawable/…
+#       com.google.firebase.messaging.default_notification_color = @color/…
+#       com.google.firebase.messaging.default_notification_channel_id = "…"
+#     Needs producer-contributed <meta-data> (deferred, P3) and, for the first
+#     two, Android resources (excluded, §11). The channel ID is arguably the
+#     application's to choose; the icon is arguably the application's branding.
+#     Not obviously the spec's problem — recorded, not claimed.

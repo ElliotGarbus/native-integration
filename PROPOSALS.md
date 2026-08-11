@@ -19,9 +19,14 @@ example set stops changing it.
 > full (§12.1 and §7.3's `conditional`). P3 split — the resources half landed
 > as an §11 exclusion, the `meta_data` half is deferred. **P1 is deferred.**
 >
-> **Nothing outstanding.** **Withdrawn:** P2. **Deferred:** P1, P3's
-> `meta_data` half, P4's contribution form — each with a stated trigger for
-> reopening it.
+> **Withdrawn:** P2. **Deferred:** P1, P3's `meta_data` half, P4's contribution
+> form — each with a stated trigger for reopening it.
+>
+> **Reopened by Firebase, and decided.** The list was closed after four
+> examples, all from one toolchain lineage. Three clean-sheet Firebase sidecars
+> ([examples/firebase/](examples/firebase/)) produced **P21–P24**. Landed:
+> **P21** (narrowed), **P22**, **P23**, and P24's documentation half.
+> **Deferred:** P24's BOM form. P1's deferral was sharpened, not reversed.
 >
 > Nothing landed adds a capability a producer must adopt, with two exceptions
 > worth noting: §6.5's bounded range form and §7.3's `usage_descriptions` are
@@ -55,12 +60,17 @@ motivating example is a hypothesis; a proposal with several is a finding.
 | P18 | Define namespace containment | G3 | PyGMA |
 | P19 | Sharpen §6.3 to build-time values | G1 | PyGMA |
 | P20 | Reconsider §9's effective-delta SHOULD | G5 | PyGMA |
+| P21 | Application-supplied **files** | F3 | Firebase |
+| P22 | Single-action intent filters on services | F5 | Firebase (FCM) |
+| P23 | Name the build-script SDK class as permanently excluded | F4 | Firebase (Crashlytics) |
+| P24 | Cross-artifact version alignment (BOM) | F2 | Firebase |
 
 Gap identifiers refer to the NOTES.md beside each example:
 [PyOneSignal](examples/pyonesignal/NOTES.md) (A*, B*, C*),
 [PyCoreLocation](examples/pycorelocation/NOTES.md) (L*),
 [PyWebViews](examples/pywebviews/NOTES.md) (W*),
-[PyGMA](examples/pygma/NOTES.md) (G*).
+[PyGMA](examples/pygma/NOTES.md) (G*),
+[Firebase](examples/firebase/NOTES.md) (F*).
 
 P6 and P11 each gained a second example from PyGMA (G2, G4).
 
@@ -934,6 +944,201 @@ Worth deciding deliberately rather than inheriting.
 
 ---
 
+## P21 — Application-supplied files *(DECIDED: landed, narrowed to iOS bundle files)*
+
+> **Decision.** Landed as `[[ios.requires.application_files]]` in §7.3 —
+> disclosure only, consumer never creates or fetches the file. Two corrections
+> to the reasoning below, both narrowing it.
+>
+> **Most of the gap dissolves.** Firebase accepts `FirebaseOptions`
+> programmatically on both platforms, so a producer can initialize without any
+> config file — which is exactly what the Android sidecar does, since the
+> plugin path is excluded anyway. What survives is one hard case:
+> **Analytics on Apple platforms** reads the static `GoogleService-Info.plist`
+> and offers no programmatic alternative. That has no escape hatch, and an
+> application that omits the file fails inside the SDK with nothing naming the
+> distribution. §7.3 carries a **SHOULD NOT** against declaring a file when the
+> vendor offers a programmatic path.
+>
+> **It does not reframe P1, and the claim below is withdrawn.** A file
+> prerequisite is disclosure: the application puts the file in its bundle and
+> the SDK reads it directly, so the producer's initialization code receives no
+> values. P1's blocker is untouched.
+>
+> The durable finding is the one underneath that claim, and it is stronger:
+> across six packages from two unrelated ecosystems, **application
+> configuration reaches producers through Python, not through the build.** That
+> is consistent with P2's withdrawal and P19's narrowing of §6.3, and it is why
+> no platform-neutral value table exists.
+
+**Problem.** Firebase needs `google-services.json` in the Android module root
+and `GoogleService-Info.plist` in the iOS app bundle. §6.3's application values
+are **scalars**; there is no file-shaped prerequisite anywhere. An application
+that omits the plist crashes inside `FirebaseApp.configure()` with nothing
+pointing back at the distribution that needed it.
+
+**Proposal.** A prerequisite in the §7.3 mould — declared, reported, never
+satisfied by the consumer, and platform-neutral because both platforms have the
+same shape:
+
+```toml
+[[requires.application_files]]
+name = "GoogleService-Info.plist"
+location = "bundle"      # closed vocabulary: bundle | android_module_root
+reason = "Download from the Firebase console; FirebaseApp.configure() reads it"
+```
+
+The consumer never supplies the file. It reports the requirement and fails when
+the application has not provided one, exactly as for entitlements.
+
+**This is the most important item on the list, because it reframes P1.** P1 was
+deferred partly because withdrawing P2 removed the channel by which
+application-supplied values reach producer code, with the reopening trigger:
+*"a producer needs native initialization and has a channel for the values that
+initialization needs."*
+
+Firebase appears to trip that trigger — `FirebaseApp.configure()` takes no
+arguments — and does not, which is the more useful result. The values did not
+disappear; they moved into a **file** the specification also cannot describe.
+OneSignal needed a scalar, Firebase needs a file, and both are the same missing
+thing in different clothes. The initialization hook is downstream of it in both
+cases.
+
+So the deferral of P1 stands and is now better understood: **the blocker was
+never the hook's signature.** It is that this specification has no vocabulary
+for what the application must provide *to the producer*, beyond a scalar form
+P19 narrowed nearly out of use. P21 is the prerequisite for reconsidering P1,
+not merely adjacent to it.
+
+## P22 — Single-action intent filters on services *(DECIDED: landed)*
+
+> **Decision.** Landed in §6.8, scoped to components that are neither exported
+> nor declaring `view_links`, with exactly one action and no categories or data.
+>
+> **The evidence is clean-sheet, and it lands anyway** — which needs
+> justification given P4 was deferred on weaker-than-claimed evidence. The
+> distinguishing test is whether the requirement has an escape hatch:
+>
+> - **P4** — the application can author the extension, and in the only working
+>   integration it does. Deferred.
+> - **P21** — most services accept programmatic configuration. Landed only for
+>   the residue with no alternative.
+> - **P22** — `FirebaseMessagingService` **must** be registered with that
+>   intent filter. No programmatic registration, no swizzling, no app-authored
+>   alternative: without it the service is never invoked, messages arrive, and
+>   nothing runs. The question is not whether a producer would *want* this but
+>   whether FCM works any other way, and it does not.
+>
+> The capability is also small: one vendor-defined action on a component no
+> other application can reach. §6.8's export rules are untouched, so nothing
+> externally reachable is opened. Compare P4's separate signed executable.
+
+**Problem.** FCM's entire Android integration is a service registration with one
+intent filter:
+
+```xml
+<service android:name="…MessagingService" android:exported="false">
+  <intent-filter><action android:name="com.google.firebase.MESSAGING_EVENT"/></intent-filter>
+</service>
+```
+
+§6.8 declares the component but not the filter. `view_links` is activity-only,
+export-gated, and generates a fixed VIEW/DEFAULT/BROWSABLE shape. §6.8 already
+lists "filters on non-activity components" as a v1 exclusion — FCM is the
+canonical instance, and without the filter the service is never invoked:
+messages arrive, nothing runs, and the build reported no problem.
+
+**Proposal.**
+
+```toml
+[[android.contributes.components.intent_filters]]
+action = "com.google.firebase.MESSAGING_EVENT"
+```
+
+**Why this is narrower than what §6.8 declined to model.** `view_links` exists
+because the classic failure is a hand-written browser filter missing `DEFAULT`,
+so the spec generates the filter and refuses to let producers spell one. This is
+the opposite shape: a single vendor-defined action on a **non-exported** service,
+with no categories and no data element — nothing to get subtly wrong, and no
+externally reachable surface opened, since the export rules of §6.8 are
+untouched.
+
+Constrain it accordingly: one `action`, no categories, no data, and invalid on
+any component that is exported or that declares `view_links`.
+
+**Evidence.** One producer-side instance so far (FCM), but the pattern —
+vendor-defined action on a non-exported service — is how most Android push,
+work-scheduling and installer-referrer SDKs register. Worth a second instance
+before landing, on the standard applied to P1 and P4.
+
+## P23 — Name the build-script SDK class as permanently excluded *(DECIDED: landed)*
+
+> **Decision.** Landed in §11. No new capability — §2.1's principle does not
+> bend — but the category is now named, with Crashlytics as the canonical case
+> and Sentry, Bugsnag, Instabug and Datadog as the shape. The text says plainly
+> that such an SDK will link and build and then be useless, that the exclusion
+> is permanent rather than deferred, and that the application must configure it
+> outside this convention.
+>
+> This was the one proposal recommended without qualification, and it costs
+> nothing.
+
+**Problem.** Crashlytics cannot be integrated at all: the Android mapping-file
+upload is a Gradle plugin, the iOS dSYM upload is a Run Script build phase with
+five specific Input Files, and `DEBUG_INFORMATION_FORMAT = dwarf-with-dsym` is
+an Xcode build setting. All three are §11 exclusions, two on principle.
+
+The resulting sidecar links the SDK and delivers unsymbolicated crashes — the
+part of Crashlytics nobody wants.
+
+**This is a category, not a product.** Any SDK whose value depends on uploading
+build artifacts — symbol files, mapping files, source maps — requires build-time
+execution by construction. Sentry, Bugsnag, Instabug and Datadog share the
+shape.
+
+**Proposal.** No new capability; §2.1's principle should not bend for it. But
+§11 should name the category explicitly rather than leaving it as an inference
+from "scripts, hooks, build plugins." A producer in that class should learn from
+the specification that this convention will never integrate it, instead of from
+a sidecar that builds and under-delivers.
+
+## P24 — Cross-artifact version alignment *(DECIDED: BOM form deferred; documentation landed)*
+
+> **Decision.** Split. §6.5 now states that every version rule governs one
+> dependency at a time, that a vendor BOM is a constraint over a *set* which
+> neither form can express, and that producers publishing an SDK family
+> **SHOULD** pin compatible versions deliberately and release together.
+>
+> The BOM form itself does not land. The failure mode is already honest —
+> Gradle resolves one version per artifact, §6.5 locks it, and §8.16 requires a
+> resolution conflict to name the declaring distributions — so the
+> specification degrades correctly and merely cannot prevent the conflict. A
+> BOM is also a genuinely new *kind* of declaration, the first that would
+> constrain a set rather than an entry.
+>
+> **Reopen when** a producer demonstrates that the honest degradation bites in
+> practice: an SDK family where independent pinning produces resolution
+> conflicts that the per-distribution model cannot reasonably avoid.
+
+**Problem.** Firebase documents a BOM: `platform("com.google.firebase:firebase-bom:34.17.0")`
+followed by unversioned artifacts. §6.5 has no BOM form, so each sidecar pins
+independently — and here the set spans three distributions, with nothing making
+their choices agree.
+
+**The bounded range landed in P5 solves the wrong half.** A range gives
+*per-artifact* flexibility; a BOM gives *cross-artifact alignment*, asserting
+that a set of versions was tested together. Nothing expressible per entry can
+state a constraint over a set, and every version rule in the specification so
+far governs one dependency at a time.
+
+**Do not land yet.** The failure mode is already honest: Gradle resolves one
+version per artifact, §6.5 locks the result, and §8.16 requires a resolution
+conflict to name the declaring distributions. The specification degrades
+correctly; it simply cannot express the constraint that would prevent the
+conflict. A BOM form is also a genuinely new *kind* of declaration, and it
+should wait for evidence that the honest degradation is not good enough in
+practice.
+
 ## Sequencing
 
 **Land now** — corrections and statements of existing intent, not new
@@ -955,10 +1160,18 @@ producers to do the wrong thing, or leaving a load-bearing assumption unsaid:
 (Android half promoted to MUST, scoped to per-artifact manifests). Both entries
 above record why the reasoning changed.
 
-**Nothing held.** Every proposal in this file has been decided.
+**Nothing outstanding.** P21–P24 have been decided: **P23** landed as
+documentation, **P22** landed in full, **P21** landed narrowed to iOS bundle
+files, and **P24** split — its guidance landed, its BOM form did not.
+
+The suggested order recorded here before deciding put P21 first as "the pivotal
+one, and the prerequisite for reconsidering P1." Both halves of that were wrong
+and are corrected on P21's own section: the gap is narrower than it looked, and
+a file prerequisite hands producer code no values, so P1 is untouched.
 
 **Withdrawn**: **P2**. **Deferred**, each with a reopening trigger stated on its
-section: **P1**, **P3**'s `meta_data` half, **P4**'s contribution form.
+section: **P1**, **P3**'s `meta_data` half, **P4**'s contribution form. P1's
+trigger is now understood to depend on P21.
 
 Status after all four examples and the decisions above:
 
@@ -988,7 +1201,16 @@ hypothesis/finding rule at the top of this file was the right test; the failure
 mode was applying it to the wrong noun, counting integrations rather than
 producers.
 
-The example set is now exhausted in the sense that matters: it has said
-everything it can, and the deferred items name what would have to appear before
-they are reconsidered. All four packages share one toolchain lineage, so a
-producer from outside it remains worth more than a fifth from inside.
+**Firebase was the outside producer this file kept asking for**, and it behaved
+like one. It did not challenge the shape — nothing wanted an executable hook in
+a sidecar, nothing wanted out of owns/requires/contributes — and its two hardest
+blockers are cases where the specification is **correctly refusing** rather than
+failing. But it found one gap (P21) that the first four examples had only shown
+in fragments, and it did so by approaching it from the opposite direction:
+OneSignal needed a scalar the application supplies, Firebase needs a file. That
+the same hole shows up from two unrelated vendors is the strongest single signal
+in this file.
+
+It also confirmed the value of the standard applied throughout: of the four new
+proposals, only P23 is recommended without qualification, and it adds no
+capability at all.

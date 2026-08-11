@@ -1,0 +1,55 @@
+# pyfirebase-crashlytics — HYPOTHETICAL, and the shortest sidecar in the
+# example set for a reason: almost nothing about Crashlytics is expressible.
+#
+# This file is the finding. Everything below is valid contract "1" and none of
+# it is sufficient — an application built from this declaration links the SDK
+# and then reports crashes that cannot be symbolicated, which is most of what
+# Crashlytics is for. See ../NOTES.md, findings F4 and F6.
+
+contract = "1"
+platforms = ["android", "ios"]
+
+# ---------------------------------------------------------------- Android ---
+
+[android.requires]
+min_sdk = 23
+compile_sdk = 34
+
+[[android.contributes.gradle_dependencies]]
+module = "com.google.firebase:firebase-crashlytics"
+version = { at_least = "19.0.0", below = "20.0.0" }
+
+# -------------------------------------------------------------------- iOS ---
+
+[ios.requires]
+deployment_target = "15.0"
+
+[[ios.contributes.swift_packages]]
+name = "Firebase"
+url = "https://github.com/firebase/firebase-ios-sdk"
+requirement = { from = "11.0.0" }
+products = ["FirebaseCrashlytics"]
+
+# ------------------------------------------------------------ NOT EXPRESSIBLE
+#
+# F4a The `com.google.firebase.crashlytics` Gradle plugin, which uploads the R8
+#     mapping file at build time. Without it, every Android stack trace stays
+#     obfuscated. §11, build plugins.
+#
+# F4b The iOS run-script build phase — the Crashlytics `run` script from the
+#     resolved SwiftPM checkout, with five specific Input Files covering the
+#     dSYM bundle, GoogleService-Info.plist and the built executable. Without
+#     it, no dSYMs are uploaded and every iOS crash report is addresses.
+#     §11, "Scripts, hooks, build plugins" and "Xcode build settings".
+#
+# F4c DEBUG_INFORMATION_FORMAT = dwarf-with-dsym on release builds. An Xcode
+#     build setting; §11 excludes those too.
+#
+# F6  -keepattributes SourceFile,LineNumberTable — Crashlytics' documented R8
+#     configuration, needed for line numbers in deobfuscated traces. §6.9
+#     accepts class-keep patterns only, and its rationale names -keepattributes
+#     as a form it deliberately does not accept.
+#
+# Note what is *not* claimed here: no [android.contributes.r8] keep at all.
+# Crashlytics' need is an attribute directive, not a class pattern, so there is
+# nothing valid to write — the omission is forced, not chosen.

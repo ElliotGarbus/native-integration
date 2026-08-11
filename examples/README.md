@@ -11,13 +11,21 @@ primitives **before** a consumer implements it.
 | [PyCoreLocation](pycorelocation/) | native Swift, permissions, privacy | **blocked** — no module registration; usage descriptions in the wrong category |
 | [PyWebViews](pywebviews/) | substantial package-owned Swift | **blocked** — not a Python distribution at all |
 | [PyGMA](pygma/) | cross-platform third-party SDK | **clean** on Android; iOS unimplemented upstream |
+| [Firebase](firebase/) | a vendor outside this ecosystem | **blocked** — build plugins, build scripts, service intent filters |
+
+The first four are existing packages from one toolchain lineage. The Firebase
+set is **clean-sheet**: three sidecars written against Google's own documented
+integration for a vendor that has never heard of this convention. It was run
+after the corrections and decisions below had landed, as an independent check on
+"is the declaration set right."
 
 Proposed remedies live in [PROPOSALS.md](../PROPOSALS.md). Gap identifiers are
 per-example: `A*`/`B*`/`C*` (PyOneSignal), `L*` (PyCoreLocation), `W*`
-(PyWebViews), `G*` (PyGMA).
+(PyWebViews), `G*` (PyGMA), `F*` (Firebase).
 
 > **Reading these after the fact.** Each `NOTES.md` describes SPEC.md **as it
-> stood when that example was run**. The corrections group has since landed, so
+> stood when that example was run** — which for Firebase is the current text,
+> and for the other four is the text before the corrections landed. The corrections group has since landed, so
 > several findings recorded there as defects — §7.6's usage-description example,
 > §6.5's range ban, §7.4's ungoverned transitive graph, the undefined
 > containment rules — are fixed in the current text. The `native.toml` files
