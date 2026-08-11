@@ -48,6 +48,18 @@ keep_classes = ["org.pystripe.**", "com.stripe.**"]
 [ios.requires]
 deployment_target = "15.0"
 
+[[ios.requires.url_schemes]]
+# Finding T2. The counterpart of the Android view_links above — but a
+# prerequisite rather than a contribution, because iOS binds URL registration to
+# the bundle rather than to a component, and the application must forward the
+# callback either way. Conditional because the native 3DS flow needs no scheme;
+# only the webview fallback does.
+conditional = true
+reason = """\
+Required only if the 3D Secure webview fallback is reached, which happens on \
+older client versions. Register a custom URL scheme and forward it from \
+application(_:open:options:) to StripeAPI.handleURLCallback(with:)."""
+
 [[ios.contributes.swift_packages]]
 name = "StripeIOS"
 url = "https://github.com/stripe/stripe-ios"
@@ -56,19 +68,13 @@ products = ["StripePaymentSheet"]
 
 # ------------------------------------------------------------ NOT EXPRESSIBLE
 #
-# T2  The iOS return URL. Stripe requires a custom URL scheme registered in
-#     CFBundleURLTypes — the direct counterpart of the view_links declaration
-#     above, on the platform where Stripe's own documentation says it is
-#     required. §7.6 has no form for it: CFBundleURLTypes is an array of
-#     dictionaries, and P16 concluded dictionaries were excluded by design
-#     because every case found dissolved into a narrower primitive. This one
-#     does not dissolve — it *is* the narrower primitive, missing.
-#
 # T3  Forwarding the callback. StripeAPI.handleURLCallback(with:) must be
 #     called from application(_:open:options:). Not launch-time init (P1) but
 #     participation in an app-delegate lifecycle method — a shape nothing in
 #     the specification addresses. Firebase sidesteps the equivalent by
-#     swizzling; Stripe requires the explicit forward.
+#     swizzling; Stripe requires the explicit forward. The prerequisite above
+#     reports it; nothing generates it, because naming a producer symbol to
+#     receive the URL is the startup-hook shape §10 deliberately excludes.
 #
 # T4  Google Pay. <meta-data android:name="com.google.android.gms.wallet.api.enabled"
 #     android:value="true"/> is a *fixed* entry, identical for every

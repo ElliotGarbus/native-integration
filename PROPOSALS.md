@@ -1179,6 +1179,40 @@ conflict. A BOM form is also a genuinely new *kind* of declaration, and it
 should wait for evidence that the honest degradation is not good enough in
 practice.
 
+## P25 — iOS URL schemes *(DECIDED: `requires` form landed; contribution form rejected)*
+
+> **Decision.** `[[ios.requires.url_schemes]]` landed in §7.3, carrying
+> `conditional` like the other prerequisites there. The `contributes` form
+> proposed below **does not land, and is rejected rather than deferred** — the
+> reasoning changed on inspection, twice.
+>
+> **The side-effect claim below is wrong.** It says a consumer-generated app
+> delegate could forward URL callbacks to any producer declaring a scheme,
+> "because the scheme *is* the registration." It is not. A scheme tells the
+> consumer that a URL will arrive; it says nothing about **which producer symbol
+> should receive it**. Generating `StripeAPI.handleURLCallback(with:)` requires
+> naming a Swift symbol in the sidecar, which is precisely the startup-hook
+> shape P1 proposes and §10 excludes. T3 is not closed as a side effect of
+> anything.
+>
+> **And the Android parallel does not hold.** `view_links` is a *contribution*
+> because an intent filter is attached to **the producer's own component** — the
+> producer knows its shape, and an application could not sensibly write a filter
+> for a class it does not own. iOS has no equivalent attachment:
+> `CFBundleURLTypes` is bundle-level, bound to no class, and routing is decided
+> at runtime in the application's delegate. The asymmetry is the platform's, not
+> a hole in this specification.
+>
+> So a contribution form would register half of a two-part requirement and leave
+> the application to do the other half — which is worse than reporting both,
+> because it looks finished. The prerequisite form reports both.
+>
+> **P16 is untouched.** This was offered as the fourth dictionary case that
+> "does not dissolve." It dissolves — into a prerequisite, not into dictionary
+> support. P16's conclusion is now four-for-four.
+>
+> Original proposal follows.
+
 ## P25 — iOS URL schemes, a `view_links` counterpart
 
 **Problem.** Stripe's 3D Secure return requires a custom URL scheme registered
@@ -1276,7 +1310,9 @@ producers to do the wrong thing, or leaving a load-bearing assumption unsaid:
 (Android half promoted to MUST, scoped to per-artifact manifests). Both entries
 above record why the reasoning changed.
 
-**Outstanding**: **P25** and **P26**, from Stripe. Neither is decided.
+**Outstanding**: **P26**. **P25** has been decided — its `requires` form landed
+in §7.3, its contribution form was rejected on the platform asymmetry, and its
+claim to close T3 as a side effect turned out to be false.
 
 P21–P24 have been decided: **P23** landed as documentation, **P22** landed in
 full, **P21** landed narrowed to iOS bundle files, and **P24** split — its

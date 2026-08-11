@@ -979,6 +979,37 @@ bundle identifier, entitlements, and `Info.plist`.
 > then quietly lacks confirmed delivery — into a reported prerequisite, which is
 > the part that can be justified today.
 
+**URL schemes are stated, not contributed.** An SDK whose flow leaves the
+application and returns through a browser needs a custom URL scheme:
+
+```toml
+[[ios.requires.url_schemes]]
+conditional = true
+reason = """\
+Required only if the 3D Secure webview fallback is reached. Register a custom \
+URL scheme and forward it from application(_:open:options:) to \
+StripeAPI.handleURLCallback(with:)."""
+```
+
+The application chooses the scheme, registers it in its own `CFBundleURLTypes`,
+and forwards the callback. A consumer **MUST** report the requirement and
+**MUST NOT** register a scheme on the producer's behalf.
+
+> Rationale, and why this is not the iOS half of §6.8's `view_links`. On Android
+> an intent filter is **attached to the producer's own component**, so the
+> producer knows the filter's shape and the application could not write it
+> sensibly — which is what makes `view_links` a contribution. iOS has no
+> equivalent attachment: `CFBundleURLTypes` is a bundle-level declaration bound
+> to no class, and the routing decision happens at runtime in the application's
+> delegate.
+>
+> That asymmetry is the platform's, not this specification's. A consumer that
+> wrote the plist entry would still leave the application to forward the
+> callback, because nothing in the declaration says **which producer symbol
+> should receive it** — naming one is the startup-hook shape, and that is
+> deliberately absent (§10). Registering half of a two-part requirement is worse
+> than reporting both, since it looks done.
+
 ### 7.4 Swift packages: `[[ios.contributes.swift_packages]]`
 
 ```toml
@@ -1199,8 +1230,8 @@ A conforming consumer **MUST**:
     target to satisfy one (§7.3).
 22. Record an unsatisfied conditional prerequisite in the integration record,
     attributed to its distribution, without failing the build (§7.3).
-23. Report required application files as prerequisites, and never create or
-    fetch one (§7.3).
+23. Report required application files and URL schemes as prerequisites, and
+    never create, fetch, or register one (§7.3).
 24. Generate `intent_filters` only on components that are neither exported nor
     declaring `view_links`, and show each action in the record (§6.8).
 
