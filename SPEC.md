@@ -421,11 +421,18 @@ whatever it does declare, and leaves the setting to the application.
 
 ```toml
 [[android.requires.application_values]]
-name = "com.google.android.gms.ads.APPLICATION_ID"
-reason = "Your AdMob application ID, from the AdMob console"
+name = "io.sentry.dsn"
+reason = "Your Sentry project DSN, from Settings → Projects → Client Keys"
 ```
 
 Values a producer needs but cannot supply. `reason` is **REQUIRED**.
+
+`name` is the **manifest `<meta-data>` key the SDK itself reads** — not a
+logical label. In the example, Sentry's `SentryInitProvider` — a
+`ContentProvider` shipped in its own library and merged into the application —
+reads `io.sentry.dsn` during provider initialization, which happens before
+`Application.onCreate` and long before any Python runs. Nothing at runtime can
+supply a value the SDK has already consumed.
 
 **A value belongs here only when the *build* must embed it** — a manifest entry,
 intent-filter data, anything baked into generated XML that no runtime call can
@@ -433,20 +440,33 @@ reach. A value an SDK accepts at runtime is the application's to pass in its own
 Python code, and a producer **SHOULD NOT** route one through build configuration
 merely because it can.
 
-The example above is deliberately specific. The *legacy* Google Mobile Ads SDK
-reads its application ID from a manifest `<meta-data>` entry and fails at
+The contrast that shows where the line falls is Google Mobile Ads. The *legacy*
+SDK reads its application ID from a manifest `<meta-data>` entry and fails at
 startup without it, so the build must embed it. The Next-Gen SDK takes the same
 value programmatically, through `InitializationConfig.Builder(appId)` — a
 wrapper for that SDK declares nothing here and passes the ID from Python
 instead. Same value, same vendor; only one of the two is this table's business.
 
 **Satisfaction.** The application supplies these through the consumer's own
-configuration. How a consumer then *delivers* a value depends on where it is
-used — a manifest `<meta-data>` entry, substitution into a generated intent
-filter (below), or another mechanism the consumer defines. This specification
-does not fix the delivery mechanism. It fixes that the consumer emits nothing on
-the producer's behalf until the application has supplied the value (a *requires*
-is checked, never auto-satisfied — §2.1).
+configuration — never by hand-editing a manifest. The consumer then emits
+`<meta-data android:name="<name>" android:value="<the supplied value>"/>` into
+the generated manifest, and emits **nothing** until the application has supplied
+it (a *requires* is checked, never auto-satisfied — §2.1).
+
+> **Why this table is Android-only, and why a platform-neutral form does not
+> work.** The obvious tidying is a top-level table with a logical name, so one
+> declaration covers both platforms. It cannot: `name` carries the **vendor's
+> own platform-specific key**, which is the only thing that makes delivery
+> possible. A consumer given a logical `sentry_dsn` has no way to learn that
+> Android wants `io.sentry.dsn` — that is producer knowledge about a particular
+> SDK on a particular platform. A "neutral" table would have to carry
+> per-platform key mappings inside it, which is two tables with extra steps.
+>
+> The iOS counterpart is therefore not this table moved upward, but the same
+> shape aimed at whatever build-embedded surface an iOS SDK reads — an
+> `Info.plist` key, most plausibly. No example has needed one yet; iOS SDKs in
+> the set either take configuration at runtime or read a whole file (§7.3's
+> `application_files`).
 
 A contribution **MAY** also reference an application value **inline** —
 `{ application_value = "<name>" }`, as in §6.8's `view_links` — which implicitly

@@ -190,7 +190,43 @@ therefore narrower than first drafted — it covers launch-time initialization
 only, and it keeps the fixed signature and the ordering rule, both of which P8
 does not need.
 
-## P2 — Platform-neutral application values *(WITHDRAWN by PyGMA)*
+## P2 — Platform-neutral application values *(WITHDRAWN — reasoning replaced after Sentry)*
+
+> **Revisited after S1, and the withdrawal stands on a different footing.**
+>
+> The original ground — quoted below — was that `application_values` had **zero
+> live use cases**. **That is now false.** Sentry Android is configured through
+> `io.sentry.dsn`, a manifest `<meta-data>` entry read by a `ContentProvider` in
+> its own library before `Application.onCreate` and long before Python. Nothing
+> at runtime can supply a value the SDK has already consumed. §6.3 as narrowed
+> by P19 describes that requirement exactly, and §6.3's example is now Sentry's
+> rather than a superseded AdMob mechanism.
+>
+> So the premise is gone. The proposal still does not come back, for a reason
+> that is about the design rather than the evidence, and which should have been
+> visible at the time:
+>
+> **A platform-neutral logical name cannot carry the delivery key.** `name` in
+> this table is the **vendor's own platform-specific manifest key**, and that is
+> the only thing that makes delivery possible — the consumer writes
+> `<meta-data android:name="io.sentry.dsn" …/>`. A consumer handed a logical
+> `sentry_dsn` has no way to learn what Android calls it; that is producer
+> knowledge about one SDK on one platform. A neutral table would need
+> per-platform key mappings inside it, which is two tables with extra steps.
+>
+> **What the iOS gap actually is.** Sentry's DSN *is* needed on iOS, where
+> `SentrySDK.start` is a runtime call — so the missing piece there is not this
+> table promoted upward. It is either initialization from Python (which works,
+> and costs the crashes that happen before the interpreter starts) or the P1
+> hook. A platform-neutral value table would not have closed it either way.
+>
+> The genuine iOS counterpart would be this same shape aimed at an `Info.plist`
+> key an SDK reads at launch. No example has needed one: the iOS SDKs in the set
+> take configuration at runtime or read a whole file (§7.3's
+> `application_files`, from P21). Recorded as the shape to reach for if one
+> appears — **not** as P2 revived.
+>
+> Original reasoning follows.
 
 **Withdrawn.** After four examples, `application_values` has **zero live use
 cases**, so there is nothing to make platform-neutral.
@@ -1253,11 +1289,12 @@ and the movement is recorded on each:
   achieves pre-application initialisation with no producer code at all, using a
   `ContentProvider` in its AAR plus manifest meta-data. The vendor solved
   declaratively what P1 proposed a hook for (S2).
-- **P2** (platform-neutral application values) — withdrawn on the claim that
-  four examples produced *zero* live uses of §6.3. **That claim is now false**:
-  Sentry's `io.sentry.dsn` is a live use, and it needs the same value on iOS
-  where no counterpart exists (S1, S4). Two vendors now sit on the P1/P2
-  coupling. A third should reopen both together; they were never separable.
+- **P2** (platform-neutral application values) — revisited and **still
+  withdrawn**, on replaced reasoning. The "zero live uses" premise is false;
+  Sentry's `io.sentry.dsn` is a live use, and §6.3's example is now Sentry's.
+  But the proposal fails on design rather than evidence: a logical name cannot
+  carry the vendor's platform-specific manifest key, which is the only thing
+  that makes delivery possible. See P2's section.
 - **P3**'s deferred `meta_data` half — Google Pay's
   `com.google.android.gms.wallet.api.enabled` is a fixed entry identical for
   every application, which is exactly the reopening trigger recorded for it

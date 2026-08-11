@@ -116,11 +116,21 @@ Two things temper this:
   crash before the interpreter starts. For a crash reporter that is a large
   fraction of the crashes worth having.
 
-**Recommendation, not a decision:** this is now two independent vendors
-(OneSignal, Sentry) needing "initialise natively, with an application-supplied
-value," and one live §6.3 instance where there were none. That moves P1 and P2
-from "deferred, thin evidence" to "deferred, evidence accumulating." A third
-instance should reopen both together — they were never separable.
+> **Decided since.** P2 was revisited on this finding and **stays withdrawn**,
+> on replaced reasoning. The premise it was withdrawn on — zero live uses of
+> §6.3 — is indeed false, and §6.3's example is now Sentry's. But promoting the
+> table to a platform-neutral logical name fails on design: `name` carries the
+> **vendor's platform-specific manifest key**, which is the only thing that
+> makes delivery work. A consumer handed a logical `sentry_dsn` cannot know
+> Android calls it `io.sentry.dsn`.
+>
+> The iOS gap here is therefore not a missing *value table*. `SentrySDK.start`
+> is a runtime call, so what iOS lacks is a caller — P1, or Python-init at the
+> cost of pre-interpreter crashes. A neutral table would not have closed it.
+>
+> The residual observation stands: two independent vendors (OneSignal, Sentry)
+> now want "initialise natively, with an application-supplied value." That is
+> P1's territory, not P2's.
 
 ## Verdict
 
