@@ -30,17 +30,20 @@ url = "https://github.com/PyPlatformPackages/PyCoreLocation"
 requirement = { revision = "fd5fd803339e3d3161011c26de53326d54766c84" }
 products = ["PyCoreLocation"]
 
-[ios.contributes.info_plist.values]
-# This is what §7.6 currently sanctions, and its own example does the same
-# thing. It is wrong: a purpose string is user-facing, localized, App Store
-# reviewed text that belongs to the application, not to a library that cannot
-# know what the application does with location. See NOTES.md, finding L3.
-NSLocationWhenInUseUsageDescription = "This app uses your location."
+[[ios.requires.usage_descriptions]]
+# Finding L3: version 1 originally had no home for this but
+# [ios.contributes.info_plist.values], which made the *producer* write a
+# user-facing, localized, App Store reviewed sentence about what the
+# application does with location. §7.3 now takes it as a prerequisite: the
+# producer states the need, the application writes the words, and §7.6 rejects
+# any UsageDescription key offered as a contribution.
+key = "NSLocationWhenInUseUsageDescription"
+reason = "requestWhenInUseAuthorization() traps if this key is absent"
 
-# Deliberately absent, though version 1 would accept them:
+# Deliberately absent, though the spec would accept them:
 #
-#   UIBackgroundModes = ["location"]                     (append)
-#   NSLocationAlwaysAndWhenInUseUsageDescription         (values)
+#   UIBackgroundModes = ["location"]                (contributes.info_plist.append)
+#   NSLocationAlwaysAndWhenInUseUsageDescription    (requires.usage_descriptions)
 #
 # Both are needed only by applications that use a subset of this package's API.
 # §12 says feature-conditional surface belongs in optional distributions — but

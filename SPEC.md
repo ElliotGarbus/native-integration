@@ -8,7 +8,12 @@ Android or iOS application build must provide on its behalf, and by which a buil
 tool discovers, validates, and stages that material.
 
 > **Status: draft.** Not implemented. Breaking changes are expected until this
-> line is removed.
+> line is removed, and this revision makes some — the draft is amended in place
+> rather than by contract minor.
+>
+> This revision incorporates the corrections found by expressing four real
+> packages against the previous text; see [`examples/`](examples/) for the
+> worked cases and [`PROPOSALS.md`](PROPOSALS.md) for the changes not yet made.
 
 ---
 
@@ -60,7 +65,7 @@ script.
 | Category | Meaning | Examples |
 | --- | --- | --- |
 | **`owns`** | An exclusive claim, enforced across all distributions | a Java namespace |
-| **`requires`** | A condition the application or build environment must satisfy; the consumer checks it but never satisfies it | an SDK floor, an entitlement, an application-supplied value |
+| **`requires`** | A condition the application or build environment must satisfy; the consumer checks it but never satisfies it | an SDK floor, an entitlement, a purpose string, an application-supplied value |
 | **`contributes`** | Material the consumer stages into the generated project on the producer's behalf | source files, dependency coordinates, permissions, manifest components |
 
 The categories carry the security model: ownership claims are exclusive and
@@ -164,6 +169,30 @@ name. A consumer **MUST NOT** look the entry up by name.
 
 A distribution declaring more than one entry in the group is invalid. A consumer
 **MUST** fail, naming the distribution. It **MUST NOT** select one or merge them.
+
+### 3.5 The distribution is the carrier
+
+A declaration reaches a consumer **only** by riding on an installed Python
+distribution in the application's dependency closure. There is no other channel:
+no path, no registry, no configuration key by which a consumer can be pointed at
+a sidecar belonging to something the closure does not contain.
+
+A project whose material is entirely native — a Swift package, a Maven artifact
+— therefore **MUST** publish a Python distribution to participate, however thin.
+A distribution carrying nothing but a sidecar and the package data it references
+is a legitimate and expected shape.
+
+> This is a real obligation, not a formality. It asks projects that have no
+> other reason to build a wheel to build one, and the reason it is worth the
+> cost is §3.2: the dependency closure is what bounds the set of things allowed
+> to configure the application. A declaration that could arrive from outside the
+> closure would be a declaration nobody chose to depend on.
+
+Note also that the closure is resolved for a target platform **and a Python
+version**, and that both are properties of the closure rather than of any
+sidecar. A sidecar **MUST NOT** restate an interpreter requirement; `Requires-Python`
+already carries it, and a closure correctly resolved for one interpreter cannot
+contain a distribution built for another.
 
 ## 4. The sidecar file
 
@@ -300,6 +329,24 @@ resolve any conflict by file or copy order:
    application.
 5. Two distributions claiming overlapping namespaces **MUST** fail, naming both.
 
+**Containment is computed on dot-separated segments, never on raw strings.** A
+namespace *A* contains a namespace *B* when *B* equals *A*, or when *B* begins
+with *A* followed by a `.`. The same rule governs rule 4's reserved prefixes and
+§6.9's group check. So `org.kivy.android` contains `org.kivy.android.helpers`
+and does **not** contain `org.kivy.androidx`; `PyGMA` does not contain
+`PyGMAKit`.
+
+> Rationale: a raw string-prefix test produces false collisions that block
+> legitimate distributions, and — in §6.9, where the test widens a keep scope
+> rather than narrowing a claim — false *acceptances*. It is the most likely
+> point of divergence between two conforming implementations, so it is stated
+> once and referenced.
+
+An owned namespace **SHOULD** be reverse-DNS. A consumer **SHOULD** warn on a
+single-label namespace (`PyGMA`): it is ownable and collision-checked like any
+other, but it claims a top-level name on behalf of one distribution and makes
+accidental overlap with a sibling project markedly more likely.
+
 > Rationale: without rule 4, a distribution shipping
 > `org/kivy/android/PythonActivity.java` replaces the application's own entry
 > point — unauthenticated, reachable through any transitive dependency. The
@@ -318,6 +365,14 @@ These are **floors**, not settings. A consumer **MUST** fail, naming the
 distribution, when the application's configured value is lower. A consumer
 **MUST NOT** raise the application's configuration to satisfy them.
 
+`compile_sdk` and `min_sdk` are the only floors defined. **`target_sdk` is
+deliberately absent**: it selects the platform behaviours the application opts
+into — runtime permission prompts, background execution limits, storage
+semantics — across the whole application, not merely the producer's surface. A
+producer that could raise it would change how unrelated code behaves. A producer
+whose material depends on a `targetSdk` behaviour states that in the `reason` of
+whatever it does declare, and leaves the setting to the application.
+
 ### 6.3 Application-supplied values: `[[android.requires.application_values]]`
 
 ```toml
@@ -328,10 +383,26 @@ reason = "Your AdMob application ID, from the AdMob console"
 
 Values a producer needs but cannot supply. `reason` is **REQUIRED**.
 
-A declared application value is satisfied when the application's own
-configuration supplies a manifest `<meta-data>` entry with that `name`; the
-consumer emits nothing on the producer's behalf (a *requires* is checked, never
-auto-satisfied — §2.1).
+**A value belongs here only when the *build* must embed it** — a manifest entry,
+intent-filter data, anything baked into generated XML that no runtime call can
+reach. A value an SDK accepts at runtime is the application's to pass in its own
+Python code, and a producer **SHOULD NOT** route one through build configuration
+merely because it can.
+
+The example above is deliberately specific. The *legacy* Google Mobile Ads SDK
+reads its application ID from a manifest `<meta-data>` entry and fails at
+startup without it, so the build must embed it. The Next-Gen SDK takes the same
+value programmatically, through `InitializationConfig.Builder(appId)` — a
+wrapper for that SDK declares nothing here and passes the ID from Python
+instead. Same value, same vendor; only one of the two is this table's business.
+
+**Satisfaction.** The application supplies these through the consumer's own
+configuration. How a consumer then *delivers* a value depends on where it is
+used — a manifest `<meta-data>` entry, substitution into a generated intent
+filter (below), or another mechanism the consumer defines. This specification
+does not fix the delivery mechanism. It fixes that the consumer emits nothing on
+the producer's behalf until the application has supplied the value (a *requires*
+is checked, never auto-satisfied — §2.1).
 
 A contribution **MAY** also reference an application value **inline** —
 `{ application_value = "<name>" }`, as in §6.8's `view_links` — which implicitly
@@ -368,9 +439,25 @@ coordinate = "com.google.android.gms:play-services-ads:25.2.0"
 configuration = "implementation"    # optional; default and only v1 value
 ```
 
-- `coordinate` **MUST** be exactly versioned. Dynamic versions (`+`, ranges) and
-  **changing versions** (`-SNAPSHOT`) are invalid — a coordinate whose content
-  can change under a fixed spelling defeats the record of §9.
+A dependency **MUST** be spelled in exactly one of two forms. The exact form
+above is **RECOMMENDED**. The second is a **bounded** range:
+
+```toml
+[[android.contributes.gradle_dependencies]]
+module = "com.onesignal:OneSignal"
+version = { at_least = "5.6.1", below = "6.0.0" }
+```
+
+- `coordinate` is `group:artifact:version` and **MUST** be exactly versioned.
+- `module` is `group:artifact` and **MUST** be accompanied by `version`, in
+  which **both** `at_least` (inclusive) and `below` (exclusive) are
+  **REQUIRED**. A range open at either end is invalid.
+- `coordinate` and `module` are mutually exclusive; a consumer **MUST** reject
+  an entry declaring both or neither.
+- **Changing versions (`-SNAPSHOT`) are invalid in either form**, as are
+  unbounded dynamic versions (`+`, `latest.release`) and any range spelled
+  inside `coordinate`. A version whose content can change under a fixed spelling
+  defeats the record of §9, and no lock can repair it.
 - `configuration` defaults to `implementation`, the only value defined in
   version 1. Other Gradle configurations (`api`, `compileOnly`, `runtimeOnly`,
   annotation processors) may be added in a minor revision; per §4.4 a consumer
@@ -382,6 +469,19 @@ itself make resolution reproducible: transitive versions can float. A consumer
 version, including transitives — in the integration record (§9), and **MUST**
 resolve from that record on subsequent builds until a new resolution is
 accepted. A consumer **SHOULD** record a checksum per resolved artifact.
+
+> Why a bounded range is permitted at all: the lock is what delivers
+> reproducibility, and it delivers it identically for both forms. §7.4 has
+> always permitted `{ from = "1.2.0" }` — an up-to-next-major range — on the
+> same reasoning, so forbidding the construct here was the specification
+> disagreeing with itself. The cost of the ban was real: several SDK vendors
+> document a range as the supported coordinate, and a producer forced to pin
+> must cut a release for every upstream patch.
+>
+> The exact form remains RECOMMENDED for a reason the lock does not cover: it
+> tells a reviewer what the build will use from the sidecar alone, without
+> consulting the record. A range trades that legibility for maintenance, and the
+> producer should make that trade knowingly.
 
 This is the **RECOMMENDED** channel for anything larger than a few glue
 classes. Note that a coordinate may resolve to an Android library (`.aar`)
@@ -497,8 +597,8 @@ states which:
   the distribution contributes (§6.4) and **MUST** fall under an owned namespace
   (§6.1 rule 2).
 - **A declared dependency** (`from_dependency = "group:artifact"`): the value
-  **MUST** match the group and artifact of a coordinate the same sidecar
-  declares (§6.5). The owned-namespace rule does not apply — the class is the
+  **MUST** match the group and artifact of a dependency the same sidecar
+  declares (§6.5), in either the `coordinate` or the `module` form. The owned-namespace rule does not apply — the class is the
   dependency's. A consumer **SHOULD** verify the class exists in the resolved
   artifact. Two distributions registering the same component class **MUST**
   fail, naming both.
@@ -562,17 +662,22 @@ and the pattern:
 
 1. an **owned namespace** — protecting the distribution's own
    reflectively-reached classes; or
-2. the **group** of a Gradle coordinate **the same sidecar declares** (§6.5) —
+2. the **group** of a Gradle dependency **the same sidecar declares** (§6.5) —
    reflective access to a declared dependency's classes is the dominant
    JNI-bridge pattern, and those classes are otherwise invisible to the
    shrinker. This scope permits *keeping*, not contributing, and is not
    exclusive.
 
-The group-prefix check is a declaration-time gate, and Maven group IDs only
+Both scopes are containment tests, computed on dot-separated segments per §6.1 —
+the group `com.google.android.libraries.ads` does not admit a pattern under
+`com.google.android.libraries.adsx`. Here a raw string-prefix test would widen a
+keep scope rather than narrow a claim, which is the more dangerous direction.
+
+The group check is a declaration-time gate, and Maven group IDs only
 conventionally match Java package names. A consumer **SHOULD** therefore verify
 at build time that every class a pattern matches on the compilation classpath
 belongs to an owned namespace or to the resolved artifacts of the sidecar's
-declared coordinates — a listing of the resolved `.jar`/`.aar` contents, not a
+declared dependencies — a listing of the resolved `.jar`/`.aar` contents, not a
 parser — and reject patterns that reach beyond them.
 
 A consumer **MUST** apply these only when the application has enabled
@@ -606,10 +711,24 @@ not live in an `owns` table: Swift source compiled into the application target
 shares one module, and `@objc` runtime names are global across modules, so a
 consumer cannot enforce exclusivity the way §6.1 does for Java. A consumer
 **SHOULD** use declared prefixes to attribute a redeclaration or duplicate-name
-error to the contributing distribution. Compiling each producer's Swift into a
-separate module would give Swift-level symbols real ownership and is anticipated
-hardening (§10) — but it would still not police `@objc` runtime names, which are
-the namespace this tier actually exercises.
+error to the contributing distribution.
+
+**What this guidance does not reach.** Prefixing covers type names and `@objc`
+runtime names. It does nothing for file-scope functions, global constants, or
+extension members — a contributed file declaring `let ui_scale`,
+`func invertedHeight(_:)`, or `extension Double { var retinaScaled }` puts all
+three into the application target's scope under exactly the names it wrote, and
+the extension member becomes visible to the application's own code. Producers
+**SHOULD** confine contributed Swift's declarations to prefixed types, and
+consumers cannot check this.
+
+That limit is the strongest argument for §7.5's scope restriction rather than
+for more guidance here. **A producer that follows §7.4 has none of this
+problem**: a Swift package is its own module, so its symbols are already
+separated. The per-producer module separation once anticipated as future work
+therefore already exists for anything large enough to want it, and the remedy
+for §7.5 is the narrower scope stated there. `@objc` runtime names remain global
+in either case, and remain unpoliced.
 
 ### 7.2 Build requirements: `[ios.requires]`
 
@@ -620,22 +739,45 @@ deployment_target = "15.0"
 
 A floor, with the same semantics as §6.2.
 
-### 7.3 Required entitlements: `[[ios.requires.entitlements]]`
+### 7.3 Application prerequisites: `[[ios.requires.entitlements]]`, `[[ios.requires.usage_descriptions]]`
 
 ```toml
 [[ios.requires.entitlements]]
 key = "aps-environment"
 reason = "Push notification delivery"
+
+[[ios.requires.usage_descriptions]]
+key = "NSLocationWhenInUseUsageDescription"
+reason = "requestWhenInUseAuthorization() traps if this key is absent"
 ```
 
-`reason` is **REQUIRED**. A consumer **MUST** report these as prerequisites and
-**MUST NOT** write them into the application's entitlements.
+`reason` is **REQUIRED** on both. A consumer **MUST** report these as
+prerequisites and **MUST NOT** write either into the application's entitlements
+or `Info.plist`.
 
-> Rationale: entitlements are bound to the App ID and provisioning profile.
-> `codesign` requires the application's entitlements to be a subset of the
-> profile's, so writing one the developer has not enabled produces a signing
-> failure with no trace back to the distribution that caused it. This is a
-> declaration a consumer cannot satisfy on its own.
+> Rationale for entitlements: they are bound to the App ID and provisioning
+> profile. `codesign` requires the application's entitlements to be a subset of
+> the profile's, so writing one the developer has not enabled produces a signing
+> failure with no trace back to the distribution that caused it. Some cannot be
+> granted locally at all — `com.apple.developer.location.push` requires approval
+> from Apple — so the gap between "declared" and "grantable" can be weeks long.
+> This is a declaration a consumer cannot satisfy on its own.
+
+> Rationale for usage descriptions: a purpose string is **user-facing,
+> localized, and read by App Store review**, and it is a claim about what *the
+> application* does with the data. A library cannot know it. A framework binding
+> that wrote one would give every application the same unhelpful sentence, which
+> is both useless to users and a rejection risk — and the application, not the
+> producer, answers for it. The producer states the need; the application writes
+> the words.
+
+A usage description is therefore a `requires` and never a contribution; a
+consumer **MUST** reject any attempt to set one as an `info_plist` value (§7.6).
+
+**Dictionary-valued usage descriptions are covered by the same rule.**
+`NSLocationTemporaryUsageDescriptionDictionary` — whose keys are
+application-defined purpose keys — is declared here like any other, and never
+spelled by the producer.
 
 ### 7.4 Swift packages: `[[ios.contributes.swift_packages]]`
 
@@ -658,11 +800,41 @@ products = ["Shim"]
 A `branch` requirement **MUST NOT** appear in a distribution published to a
 package index; a consumer **MUST** reject it, naming the distribution.
 
-Reproducibility (§2.1) applies across platforms. When a Swift package uses
-`from`, the consumer **MUST** record the version actually resolved in the
-integration record (§9) **and resolve from that record on subsequent builds**
-until a new resolution is accepted — the semantics SwiftPM itself implements
-with `Package.resolved`.
+Reproducibility (§2.1) applies across platforms, and — as on the Android side —
+**the whole graph is locked, not only what the sidecar names.** A consumer
+**MUST** record the fully resolved Swift package graph, every package and
+version **including transitives**, in the integration record (§9), and **MUST**
+resolve from that record on subsequent builds until a new resolution is
+accepted. This is the semantics SwiftPM itself implements with
+`Package.resolved`.
+
+**The declaration rules above bind the sidecar; the resolved graph is where they
+are enforced.** A declared package's own `Package.swift` may name anything — a
+branch, a local filesystem path, an arbitrary URL — and nothing in the
+declaration reveals it. A consumer **MUST** therefore reject a resolved graph
+containing a **branch** requirement or a **path** dependency, naming the
+declaring distribution and the offending package. A branch dependency pins a
+revision after first resolution but that revision has no stable meaning; a path
+dependency does not resolve on another machine at all.
+
+**A producer MAY declare its own repository here.** A distribution whose native
+half lives in a Swift package it also publishes is an expected shape, and
+nothing above forbids it. Two consequences a producer **MUST** understand:
+
+- The declared package **MUST** be resolvable in the form declared — a
+  repository with no tags cannot use `exact` or `from`, leaving `revision` as
+  the only valid option.
+- The distribution's own version does **not** pin the native half, and §9's
+  per-file hashing does not reach it. The record identifies what the wheel
+  carries; a self-declared package arrives from the index its URL names, and
+  only the recorded resolution pins it. A consumer's record **MUST** make that
+  distinction visible rather than implying the distribution's version covers
+  both.
+
+> This specification does not require the two version lines to agree, and
+> deliberately so: a Swift package's version may encode something other than the
+> distribution's release history — an ABI generation, for instance — in which
+> case no correspondence exists to require.
 
 Swift Package Manager is the **RECOMMENDED** channel for anything larger than a
 few glue files. Note that a Swift package may vend prebuilt binary targets; see
@@ -679,11 +851,25 @@ Path rules per §4.1; the consumer stages `.swift` files recursively and ignores
 other files. Intended for small `@objc` shims whose value is versioning
 atomically with the Python half; it **SHOULD NOT** be used for a library.
 
+**The scope restriction is narrow and load-bearing.** Contributed files are
+compiled into the application target, so every declaration they make at file
+scope — free functions, global constants, protocols, and extension members on
+types the producer does not own — lands in the application's own compilation
+scope under the name it was written with. §7.1's prefix guidance does not reach
+any of them. A file declaring `let ui_scale` and `func invertedHeight(_:)` is a
+collision waiting for a second producer or for the application itself, and
+`extension Double { … }` is visible to everything the target compiles.
+
+A producer whose Swift declares anything at file scope beyond prefixed types
+**SHOULD** ship a Swift package (§7.4) instead, where those declarations are
+confined to its own module. In practice this is nearly every producer with more
+than a shim, which is what the SHOULD NOT above intends.
+
 ### 7.6 Info.plist: `[ios.contributes.info_plist]`
 
 ```toml
 [ios.contributes.info_plist.values]
-NSBluetoothAlwaysUsageDescription = "Connects to your fitness tracker."
+CADisableMinimumFrameDurationOnPhone = true
 
 [ios.contributes.info_plist.append]
 LSApplicationQueriesSchemes = ["examplescheme"]
@@ -699,9 +885,20 @@ Two contribution modes, by shape:
   application's entries first, then each distribution's in normalized
   distribution-name order.
 
-Dictionary-valued keys (e.g. `NSAppTransportSecurity`) are not expressible in
-version 1; typed contributions for specific structures may be added in a minor
-revision.
+**Usage descriptions are not contributable.** A consumer **MUST** reject any
+`values` key whose name ends in `UsageDescription`, or which is otherwise a
+purpose string, naming the distribution and directing the producer to §7.3.
+These are application-authored text, and a `values` entry is the one place a
+producer could write it by accident.
+
+**Dictionary-valued keys are excluded by design, not deferred.** Every
+structured case encountered so far is better served by a narrower primitive than
+by general dictionary support: `NSExtension` is generated from a declared
+extension type, `NSLocationTemporaryUsageDescriptionDictionary` is a §7.3
+prerequisite the application supplies, and `NSAppTransportSecurity` depends on
+what the application loads and is not the producer's to declare at all. A
+general form would hand producers the ability to write arbitrary structured
+application configuration for cases that keep turning out to be something else.
 
 ## 8. Consumer requirements
 
@@ -718,7 +915,8 @@ A conforming consumer **MUST**:
 5. Enforce ownership and fail on collision, never resolving by order (§6.1).
 6. Never promote a feature to `required` (§6.7), never register a component as
    exported without explicit application approval (§6.8), and never write a
-   required entitlement (§7.3).
+   required entitlement or usage description (§7.3) — including rejecting a
+   usage description offered as an `info_plist` value (§7.6).
 7. Provide application-side permission suppression, honor it in the generated
    manifest, and report it (§6.7).
 8. Fail when a producer's `requires` exceeds the application's configuration
@@ -730,13 +928,30 @@ A conforming consumer **MUST**:
 10. Restrict contributed repositories to their declared groups/modules and
     report them with distinct prominence (§6.6).
 11. Validate shrinker keep patterns against their permitted scopes (§6.9).
-12. Enforce reproducible native dependency resolution: reject dynamic and
-    changing versions, lock the resolved Gradle graph, and pin resolved Swift
-    package versions in the record (§6.5, §7.4).
+12. Enforce reproducible native dependency resolution: reject unbounded and
+    changing versions, and lock the **fully resolved graph, transitives
+    included** — Gradle and SwiftPM alike — in the record, resolving from it
+    thereafter (§6.5, §7.4). Reject a resolved Swift graph containing a branch
+    or path dependency (§7.4).
 13. Validate `view_links` (activity-only, export-gated) and generate their
     filters (§6.8).
 14. Exclude sidecar directories from any Python payload it assembles.
 15. Name the contributing distribution in every diagnostic.
+16. When native dependency resolution **fails**, report every declared
+    coordinate, module, and Swift package **with the distribution that declared
+    it** (§6.5, §7.4).
+17. Compute every namespace, prefix, and group containment test on
+    dot-separated segments (§6.1).
+
+> Rationale for 16. Every other rule here assumes native resolution *succeeds*.
+> It need not: two distributions in one closure can declare native dependencies
+> that cannot coexist — incompatible majors of a shared transitive package, two
+> versions of one SDK. That failure is correct, but it surfaces as a Gradle or
+> SwiftPM resolver error naming an artifact neither application author has heard
+> of, with nothing connecting it back to the Python distributions that asked for
+> it. The mapping from native coordinate to declaring distribution is the one
+> thing the consumer knows and the underlying resolver does not, which is what
+> makes requirement 15 meetable in the case that needs it most.
 
 A conforming consumer **SHOULD**:
 
@@ -831,8 +1046,13 @@ Anticipated minor-revision work, deliberately excluded from version 1: verified
 App Links (`autoVerify`) and further filter forms beyond `view_links`;
 conditional contributions (a `when` key with a **closed vocabulary** of
 conditions such as ABI or simulator/device — not an expression language);
-further Gradle configurations; further namespace-scoped shrinker rule forms;
-typed Info.plist structures; and per-producer Swift modules (§7.1).
+further Gradle configurations; and further namespace-scoped shrinker rule forms.
+
+Two items previously listed here have been **removed rather than deferred**.
+Typed Info.plist dictionary structures are now excluded by design (§7.6).
+Per-producer Swift modules are unnecessary for their motivating case: a producer
+that follows §7.4 already compiles into its own module, and the remedy for §7.5
+is the narrower scope stated there rather than new machinery (§7.1).
 
 ## 11. Out of scope
 

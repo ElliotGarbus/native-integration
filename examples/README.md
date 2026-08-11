@@ -16,6 +16,14 @@ Proposed remedies live in [PROPOSALS.md](../PROPOSALS.md). Gap identifiers are
 per-example: `A*`/`B*`/`C*` (PyOneSignal), `L*` (PyCoreLocation), `W*`
 (PyWebViews), `G*` (PyGMA).
 
+> **Reading these after the fact.** Each `NOTES.md` describes SPEC.md **as it
+> stood when that example was run**. The corrections group has since landed, so
+> several findings recorded there as defects — §7.6's usage-description example,
+> §6.5's range ban, §7.4's ungoverned transitive graph, the undefined
+> containment rules — are fixed in the current text. The `native.toml` files
+> beside them **are** kept current and valid against the specification as it is
+> now. PROPOSALS.md marks what landed and what did not.
+
 ## What held up
 
 The **Android half of contract 1 is in good shape.** PyGMA exercises it end to

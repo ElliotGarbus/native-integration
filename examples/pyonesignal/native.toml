@@ -17,9 +17,11 @@ min_sdk = 23
 compile_sdk = 34
 
 [[android.contributes.gradle_dependencies]]
-# Upstream documents this as the range "[5.6.1, 5.9.99]". §6.5 forbids dynamic
-# versions, so the producer pins and re-releases. See NOTES.md, finding A1.
-coordinate = "com.onesignal:OneSignal:5.6.1"
+# Upstream documents this as the range "[5.6.1, 5.9.99]". Finding A1 argued the
+# ban on ranges contradicted §7.4, which permits `from`; §6.5 now takes the
+# bounded form, so the producer no longer has to pin and re-release per patch.
+module = "com.onesignal:OneSignal"
+version = { at_least = "5.6.1", below = "6.0.0" }
 
 [[android.contributes.permissions]]
 name = "android.permission.INTERNET"

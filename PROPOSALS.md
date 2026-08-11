@@ -5,6 +5,20 @@ records design work driven by the worked examples under `examples/`, so it
 survives while more examples are run. It moves into SPEC.md only after the
 example set stops changing it.
 
+> **Landed.** The corrections group — **P5, P6, P7, P9, P10, P13, P14, P15,
+> P16, P17, P18, P19**, plus the §6.3 satisfaction correction recorded under
+> P2 — is now in SPEC.md. Those sections below are kept as the reasoning
+> behind the change, not as outstanding work.
+>
+> **Still outstanding:** P1, P3, P4, P8, P11, P12, P20. **Withdrawn:** P2.
+>
+> Nothing landed adds a capability a producer must adopt, with two exceptions
+> worth noting: §6.5's bounded range form and §7.3's `usage_descriptions` are
+> both new spellings. Because the specification is still a draft amended in
+> place, no contract minor was allocated for them, and the restriction that
+> §7.6 now rejects usage-description keys would otherwise have required a new
+> major under §10.
+
 Each proposal names the example that produced it. A proposal with exactly one
 motivating example is a hypothesis; a proposal with several is a finding.
 
