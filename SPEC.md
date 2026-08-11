@@ -331,7 +331,7 @@ platforms = ["android", "ios"]   # optional — §4.5, where the distribution wo
 
 [ios]                  # §7.1 — symbol-prefix guidance (no ownership claims in v1)
 [ios.requires]         # §7.2–7.3
-[ios.contributes]      # §7.4–7.6
+[ios.contributes]      # §7.4–7.7
 ```
 
 A sidecar declaring no platform table is valid and contributes nothing — which
@@ -783,7 +783,7 @@ deployment_target = "15.0"
 
 A floor, with the same semantics as §6.2.
 
-### 7.3 Application prerequisites: `[[ios.requires.entitlements]]`, `[[ios.requires.usage_descriptions]]`
+### 7.3 Application prerequisites: entitlements, usage descriptions, extensions
 
 ```toml
 [[ios.requires.entitlements]]
@@ -793,11 +793,18 @@ reason = "Push notification delivery"
 [[ios.requires.usage_descriptions]]
 key = "NSLocationWhenInUseUsageDescription"
 reason = "requestWhenInUseAuthorization() traps if this key is absent"
+
+[[ios.requires.app_extensions]]
+kind = "notification_service"
+reason = """\
+Without it, confirmed delivery, badge counts and image attachments are \
+unavailable. The extension must share an app group with the application."""
 ```
 
-`reason` is **REQUIRED** on both. A consumer **MUST** report these as
-prerequisites and **MUST NOT** write either into the application's entitlements
-or `Info.plist`.
+`reason` is **REQUIRED** on all three. A consumer **MUST** report these as
+prerequisites and **MUST NOT** satisfy any of them: not by writing an
+entitlement, not by writing an `Info.plist` key, and not by creating a build
+target.
 
 > Rationale for entitlements: they are bound to the App ID and provisioning
 > profile. `codesign` requires the application's entitlements to be a subset of
@@ -822,6 +829,32 @@ consumer **MUST** reject any attempt to set one as an `info_plist` value (§7.6)
 `NSLocationTemporaryUsageDescriptionDictionary` — whose keys are
 application-defined purpose keys — is declared here like any other, and never
 spelled by the producer.
+
+**App extensions are stated, not contributed.** `kind` is a closed vocabulary:
+`notification_service` and `location_push` in this revision. A producer declares
+that its functionality depends on the application providing an extension of that
+kind; the application creates the target, writes its source, and configures its
+bundle identifier, entitlements, and `Info.plist`.
+
+> Rationale for the `requires` form. An app extension is a separate signed
+> executable with its own bundle identifier and its own entitlements, launched
+> by the operating system when the application itself may not be running. That
+> is a larger thing for a transitive dependency to introduce than anything else
+> in this specification, and it warrants evidence that producers actually want
+> to ship one.
+>
+> That evidence does not yet exist. In the only working integration of this
+> shape available, the notification service extension is **application-authored**
+> — configured in the application's own project file, with its source in the
+> application's tree — even though its body is boilerplate the vendor documents
+> verbatim. No package examined ships an extension of any kind.
+>
+> A contribution form is a reasonable future addition, and the argument for it
+> is good: identical boilerplate written once per application is exactly what a
+> package should own. But it needs a producer that wants to own it. Until then,
+> this table converts a silent capability loss — an application that builds and
+> then quietly lacks confirmed delivery — into a reported prerequisite, which is
+> the part that can be justified today.
 
 ### 7.4 Swift packages: `[[ios.contributes.swift_packages]]`
 
@@ -944,6 +977,51 @@ what the application loads and is not the producer's to declare at all. A
 general form would hand producers the ability to write arbitrary structured
 application configuration for cases that keep turning out to be something else.
 
+### 7.7 Python modules: `[[ios.contributes.python_modules]]`
+
+```toml
+[[ios.contributes.python_modules]]
+name = "web_views"
+swift_package = "PyWebViews"
+init = "PyInit_WebViews"      # optional; defaults to PyInit_<name>
+```
+
+A declared Swift package (§7.4) may **implement a Python extension module
+directly**, compiled into the application target rather than loaded from a
+shared object. Such a module is invisible to the import system until it is
+registered with the interpreter, and this table is that registration — a name
+and a symbol, nothing executed at build time.
+
+- `swift_package` **MUST** name a package the same sidecar declares (§7.4). A
+  module cannot be registered without the code that implements it.
+- `name` is the name Python imports. Two distributions registering the same
+  `name` **MUST** fail, naming both.
+- `init` names the module's initialization function and defaults to
+  `PyInit_<name>`. It exists because the three names need not agree: a package
+  `PyWebViews` may implement a module whose Swift type is `WebViews` and whose
+  Python name is `web_views`.
+- A consumer **MUST** make the module importable from first use — in practice,
+  registering it before interpreter initialization.
+
+**A consumer MUST exclude from the Python payload any module whose name this
+table registers.** Producers ship stubs of the same name for type checking off
+device, and such a stub would otherwise sit on `sys.path` as a silent fallback:
+a registration that failed or was skipped would surface not as `ImportError`
+but as an application that imports successfully and does nothing. This is the
+same reasoning as requirement 8.14.
+
+> Rationale, and why this is not the case §11 excludes. §11 excludes extension
+> modules **carried as binaries in wheels**, which are solved by platform-tagged
+> wheels ([PEP 730](https://peps.python.org/pep-0730/),
+> [PEP 738](https://peps.python.org/pep-0738/)) and are loaded by the ordinary
+> import machinery. This is a different shape: no binary is in the wheel, the
+> code arrives as source through a declared Swift package, and it is compiled
+> into the application target against the application's own interpreter. That is
+> precisely why `dlopen` is not involved and why registration is needed at all.
+>
+> The table is iOS-only because that is where the shape occurs. On Android the
+> §11 answer holds.
+
 ## 8. Consumer requirements
 
 A conforming consumer **MUST**:
@@ -991,6 +1069,11 @@ A conforming consumer **MUST**:
 19. Record and report the permissions, features, and components declared by
     resolved Android artifacts' own manifests, attributed to the artifact
     (§9).
+20. Register declared Python modules against a Swift package the same sidecar
+    declares, fail on a duplicate module name, and exclude every registered
+    name from the Python payload (§7.7).
+21. Report required app extensions as prerequisites, and never create a build
+    target to satisfy one (§7.3).
 
 > Rationale for 16. Every other rule here assumes native resolution *succeeds*.
 > It need not: two distributions in one closure can declare native dependencies
@@ -1152,6 +1235,13 @@ those arrive through the platform's own dependency channel, locked by §6.5/§7.
 and surfaced by §9's effective-delta reporting, rather than hidden inside a
 Python artifact. What this specification excludes is native binaries smuggled in
 the wheel itself, where no resolver, lock, or manifest tooling ever sees them.
+
+The extension-module rows are qualified the same way: they exclude extension
+modules **carried as binaries in a wheel**, which the platform-tagged wheel PEPs
+solve and the ordinary import machinery loads. An extension module implemented
+by a **declared Swift package** — arriving as source, compiled into the
+application target against the application's own interpreter, with no binary in
+the wheel — is in scope, and §7.7 registers it.
 
 The distinction is only as good as the surfacing, which is why §9 makes the
 Android half of that reporting a **MUST**. An embedded `.aar` and a

@@ -11,9 +11,12 @@ example set stops changing it.
 > behind the change, not as outstanding work.
 >
 > **P11 and P20 have since been decided and landed**, both with amended
-> reasoning; see the notes on those sections.
+> reasoning; see the notes on those sections. **P8 has been adopted** as §7.7.
+> **P4 has been decided against for now** — its contribution form is deferred
+> and a minimal `requires` form landed in its place.
 >
-> **Still outstanding:** P1, P3, P4, P8, P12. **Withdrawn:** P2.
+> **Still outstanding:** P1, P3, P12. **Withdrawn:** P2. **Deferred:** P4's
+> contribution form.
 >
 > Nothing landed adds a capability a producer must adopt, with two exceptions
 > worth noting: §6.5's bounded range form and §7.3's `usage_descriptions` are
@@ -228,7 +231,41 @@ reason = "Registers the notification-modifying class with the OneSignal SDK"
   consumer **MUST** report the override.
 - Recorded and attributed per §9.
 
-## P4 — iOS app extensions
+## P4 — iOS app extensions *(DECIDED: contribution form deferred; `requires` form landed)*
+
+> **Decision.** The contribution form does not land. A minimal
+> `[[ios.requires.app_extensions]]` did, in §7.3, with a closed `kind`
+> vocabulary of `notification_service` and `location_push`.
+>
+> **The evidence for this proposal was miscounted, and the error was mine.**
+> It was recorded above as having "two independent examples," which promoted it
+> from hypothesis to finding. Checking the repositories directly:
+>
+> - **No package in the set ships an app extension of any kind.**
+> - PyOneSignal's notification service extension is **application-authored** in
+>   the only working integration that exists — the target is configured in
+>   `YourProject/pyproject.toml` and `NotificationService.swift` lives in
+>   `YourProject/project_dist/xcode/`, both the application's, not the
+>   package's.
+> - PyCoreLocation merely *exposes* `startMonitoringLocationPushes` in its
+>   binding. It ships no extension, and the one an application would need has an
+>   app-specific principal class and an entitlement Apple must approve.
+>
+> So the count of producer-side instances is zero. What the two examples
+> actually demonstrate is that **applications** build these, which is an
+> argument for stating the requirement, not for contributing the target.
+>
+> **The size of the capability argues the same way.** An app extension is a
+> separate signed executable with its own bundle identifier and entitlements,
+> launched by the OS when the application may not be running. That is a larger
+> thing for a transitive Python dependency to introduce than anything else here,
+> and it should not land on zero instances.
+>
+> The design below is not withdrawn and the argument for it remains good —
+> identical boilerplate written once per application is exactly what a package
+> should own. It needs a producer that wants to own it. The `requires` form
+> meanwhile converts a silent capability loss into a reported prerequisite,
+> which is the part today's evidence supports.
 
 **Problem.** The largest single gap. OneSignal's iOS integration requires a
 Notification Service Extension: a second build target with its own Swift source,
@@ -346,7 +383,33 @@ its absence from §6.2 is noticeable. It is almost certainly the right call —
 across the entire application, not just the producer's surface. One sentence of
 rationale in §6.2 prevents the question from being rediscovered.
 
-## P8 — Python module registration
+## P8 — Python module registration *(DECIDED: adopted, §7.7)*
+
+> **Decision.** Adopted essentially as drafted, with three additions the draft
+> did not have.
+>
+> **A payload-exclusion rule**, which turned out to matter more than the
+> registration itself. Producers ship a same-named stub for off-device type
+> checking — PyCoreLocation's says "do not try add this file to a real app" —
+> and inittab registration normally shadows it. But if registration fails or is
+> skipped, the stub is still on `sys.path`, so the failure surfaces as an
+> application that imports successfully and returns `None` from every call
+> rather than as `ImportError`. §7.7 requires consumers to exclude every
+> registered name from the payload, on the same reasoning as 8.14.
+>
+> **A duplicate-name check.** Module names are a global namespace in the
+> interpreter; two distributions registering one fails, naming both. This is not
+> an `owns` claim — the Python module namespace is packaging's, not this
+> specification's — but the collision is real and worth catching.
+>
+> **A §11 narrowing**, which the proposal called for and which is now written:
+> §11 excludes extension modules **carried as binaries in wheels**, which the
+> platform-tagged wheel PEPs solve and ordinary imports load. Source arriving
+> through a declared Swift package and compiled into the application target is a
+> different shape, and is in scope.
+>
+> Kept iOS-only. The shape occurs there; on Android §11's answer holds, and an
+> Android form with no examples would be speculative.
 
 **Problem.** PyCoreLocation is a SwiftPM library that *is* the Python extension
 module — `@PyModule struct PyCoreLocation: PyModuleProtocol`, with the wheel
@@ -799,17 +862,19 @@ producers to do the wrong thing, or leaving a load-bearing assumption unsaid:
 (Android half promoted to MUST, scoped to per-artifact manifests). Both entries
 above record why the reasoning changed.
 
-**Hold**: **P1**, **P4**, **P8**, **P12**, **P3**.
+**Hold**: **P1**, **P3**, **P12**.
 
-**Withdrawn**: **P2**.
+**Withdrawn**: **P2**. **Deferred**: P4's contribution form.
 
-Status after all four examples:
+Status after all four examples and the decisions above:
 
-- **P8** is ready in shape. Two independent examples, four distinct names for
-  one component confirming the name/package split, no unresolved questions. Held
-  only because it is new capability.
-- **P4** has two independent examples and a settled `kind` vocabulary
-  (`notification_service`, `location_push`).
+- **P8** landed as §7.7, with a payload-exclusion rule the draft lacked.
+- **P4** landed only as a `requires`. Its contribution form was recorded here as
+  having two examples; it has **zero producer-side instances**, and the
+  correction is written up under that proposal. This is the one place the
+  hypothesis/finding distinction at the top of this file was applied wrongly,
+  and it is worth remembering that the error ran toward *over*-counting a
+  large capability.
 - **P12**'s `conditional` flag has two examples (PyCoreLocation's authorization
   variants, PyWebViews' ATS and `getUserMedia` keys). Likely, not certain.
 - **P1 is the weakest remaining proposal.** It still rests on PyOneSignal alone.
@@ -820,7 +885,9 @@ Status after all four examples:
 - **P3**'s `meta_data` half is unexercised by any of the four. It rests on the
   fact that ksp-builder already has the key, not on a demonstrated need.
 
-The example set is exhausted. The next thing that would move these is either a
-consumer implementation of the "land now" group, or a producer outside this
-organization — every example here shares one toolchain lineage, and P1/P3 are
-precisely the proposals that lineage does not test.
+The example set is exhausted, and what remains outstanding is exactly what it
+cannot settle. The next thing that would move P1, P3, or P12 is either a
+consumer implementation or a producer outside this organization — every example
+here shares one toolchain lineage. P4's deferred contribution form needs
+something more specific: a package that wants to *ship* an app extension rather
+than tell an application to build one.

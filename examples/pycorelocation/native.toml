@@ -36,6 +36,19 @@ url = "https://github.com/PyPlatformPackages/PyCoreLocation"
 requirement = { revision = "fd5fd803339e3d3161011c26de53326d54766c84" }
 products = ["PyCoreLocation"]
 
+[[ios.contributes.python_modules]]
+# Finding L2, the blocking one: `@PyModule struct PyCoreLocation` *is* the
+# Python module, compiled into the app target rather than loaded from a shared
+# object, so nothing could make it importable. §7.7 registers it.
+#
+# The registration also retires src/py_core_location.py from the payload — the
+# generated stub whose header says "do not try add this file to a real app".
+# Left on sys.path it would turn a failed registration into an app that imports
+# fine and returns None from every call.
+name = "py_core_location"
+swift_package = "PyCoreLocation"
+init = "PyInit_PyCoreLocation"
+
 [[ios.requires.usage_descriptions]]
 # Finding L3: version 1 originally had no home for this but
 # [ios.contributes.info_plist.values], which made the *producer* write a
