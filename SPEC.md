@@ -806,6 +806,37 @@ prerequisites and **MUST NOT** satisfy any of them: not by writing an
 entitlement, not by writing an `Info.plist` key, and not by creating a build
 target.
 
+**Conditional prerequisites.** Any entry in these three tables **MAY** declare
+`conditional = true`, meaning *the producer cannot determine whether this
+applies; the application can*:
+
+```toml
+[[ios.requires.usage_descriptions]]
+key = "NSLocationAlwaysAndWhenInUseUsageDescription"
+conditional = true
+reason = "Required only if your application calls requestAlwaysAuthorization()"
+```
+
+- The `reason` **MUST** state the condition that makes the prerequisite apply.
+- A consumer **MUST NOT** fail the build for an unsatisfied conditional
+  prerequisite, and **MUST** record it in the integration record (§9) as an
+  unresolved prerequisite attributed to its distribution — not merely emit a
+  build-log line, which scrolls past.
+- Unconditional prerequisites fail closed, unchanged.
+
+> Rationale: a framework binding cannot be split along its API, so it cannot
+> follow §12's guidance to move feature-conditional surface into optional
+> distributions (§12.1). Without this it must choose between declaring the union
+> — forcing every application to write an "Always" location purpose string that
+> App Store review scrutinizes, whether or not it ever requests Always — and
+> declaring the minimum, which leaves the caller of anything else to discover
+> the requirement as a runtime trap. Neither is acceptable, and the second is
+> the silent failure this specification exists to prevent.
+>
+> This is disclosure rather than enforcement, which §9 already treats as a
+> legitimate mode. It is also the one mechanism here a producer can misuse to
+> downgrade a real requirement into prose; §12.1 says so plainly.
+
 > Rationale for entitlements: they are bound to the App ID and provisioning
 > profile. `codesign` requires the application's entitlements to be a subset of
 > the profile's, so writing one the developer has not enabled produces a signing
@@ -1074,6 +1105,8 @@ A conforming consumer **MUST**:
     name from the Python payload (§7.7).
 21. Report required app extensions as prerequisites, and never create a build
     target to satisfy one (§7.3).
+22. Record an unsatisfied conditional prerequisite in the integration record,
+    attributed to its distribution, without failing the build (§7.3).
 
 > Rationale for 16. Every other rule here assumes native resolution *succeeds*.
 > It need not: two distributions in one closure can declare native dependencies
@@ -1225,6 +1258,7 @@ is the narrower scope stated there rather than new machinery (§7.1).
 | Prebuilt iOS binaries **carried by the wheel** | Forces a platform tag onto an otherwise pure-Python wheel; unauditable |
 | Native `.so`, extension modules | Solved by `android_<api>_<abi>`-tagged wheels ([PEP 738](https://peps.python.org/pep-0738/)) |
 | iOS frameworks in wheels | Solved by `ios_*`-tagged wheels ([PEP 730](https://peps.python.org/pep-0730/)) |
+| Android resources (`res/`) | Resource names are a flat global namespace per type, so no ownership rule can be built for them (§6.1 needs dots to compute containment). A producer shipping `values/strings.xml` with `app_name` renames the application. Resources reach an application through an `.aar` from a declared coordinate, where AGP merges them and §9 reports them |
 | Scripts, hooks, build plugins | Excluded on principle (§2.1), not as a deferral |
 | Xcode build settings, compiler/linker flags | Arbitrary build mutation; revisit only with a concrete, bounded need |
 | Application configuration | The application's own build settings are the consumer's concern |
@@ -1291,6 +1325,37 @@ distributions is real packaging work (separate releases, an import layout that
 tolerates missing pieces). The guidance is **SHOULD**, not MUST, for exactly
 that reason — and §6.7's suppression exists in part as the application's
 recourse when a producer declares more than its applications want.
+
+### 12.1 Framework bindings, where the guidance does not apply
+
+The advice above assumes a **facade**: features that are independent
+implementations behind one dispatcher, with a seam to split along. A **1:1
+binding of a platform framework** has no such seam. Its API surface is the
+platform vendor's, it is typically one native module and one Python module, and
+its requirements vary per method rather than per feature:
+
+| A `CLLocationManager` binding | pulls in |
+| --- | --- |
+| `requestWhenInUseAuthorization` | `NSLocationWhenInUseUsageDescription` |
+| `requestAlwaysAuthorization` | `NSLocationAlwaysAndWhenInUseUsageDescription` |
+| `allowsBackgroundLocationUpdates` | `UIBackgroundModes = ["location"]` |
+| `startMonitoringLocationPushes` | a location push extension and an Apple-approved entitlement |
+
+Splitting that into optional distributions would mean splitting the class, which
+is not packaging work but a worse API. So a binding cannot follow the guidance
+above, and it faces the union problem it exists to prevent: declare everything
+and every application carries the worst case, or declare the minimum and callers
+of everything else fail at runtime.
+
+**Conditional prerequisites are the answer for this shape** — see §7.3. A
+binding declares its unconditional needs normally, and marks the rest
+`conditional = true` with the triggering condition in the `reason`. Nothing is
+imposed on applications that do not use the feature, and nothing is silent for
+applications that do.
+
+Producers **SHOULD NOT** reach for that mechanism to avoid stating an
+unconditional requirement. A requirement wrongly marked conditional converts a
+build failure that names the problem into a line in a report.
 
 ## Appendix A: why contributions stay per-distribution
 

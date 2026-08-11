@@ -44,8 +44,21 @@ init = "PyInit_WebViews"
 # dependencies and resolve transitively. Correctly not the sidecar's business —
 # but §7.4 does not record them either, unlike §6.5 on the Android side.
 
-# Nothing else. WKWebView requires no permission, no entitlement, and no
-# Info.plist key of its own. The conditional ones — NSAppTransportSecurity for
-# cleartext URLs, NSCameraUsageDescription / NSMicrophoneUsageDescription for
-# getUserMedia inside the web view — depend on what the *application* loads, so
-# a web view binding cannot honestly declare any of them. See NOTES.md, W6.
+# WKWebView requires no permission, no entitlement, and no Info.plist key of
+# its own. What it *may* require depends entirely on what the application
+# chooses to load, which the binding cannot know — finding W6, and the second
+# example behind §7.3's conditional prerequisites.
+
+[[ios.requires.usage_descriptions]]
+key = "NSCameraUsageDescription"
+conditional = true
+reason = "Required only if pages you load call getUserMedia() for camera access"
+
+[[ios.requires.usage_descriptions]]
+key = "NSMicrophoneUsageDescription"
+conditional = true
+reason = "Required only if pages you load call getUserMedia() for microphone access"
+
+# NSAppTransportSecurity stays absent even as a conditional prerequisite. It is
+# dictionary-valued and, more to the point, it is a policy decision about which
+# origins the application trusts — not a requirement this package imposes.

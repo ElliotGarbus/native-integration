@@ -15,8 +15,13 @@ example set stops changing it.
 > **P4 has been decided against for now** — its contribution form is deferred
 > and a minimal `requires` form landed in its place.
 >
-> **Still outstanding:** P1, P3, P12. **Withdrawn:** P2. **Deferred:** P4's
-> contribution form.
+> **P1, P3 and P12 have since been decided**, closing the list. P12 landed in
+> full (§12.1 and §7.3's `conditional`). P3 split — the resources half landed
+> as an §11 exclusion, the `meta_data` half is deferred. **P1 is deferred.**
+>
+> **Nothing outstanding.** **Withdrawn:** P2. **Deferred:** P1, P3's
+> `meta_data` half, P4's contribution form — each with a stated trigger for
+> reopening it.
 >
 > Nothing landed adds a capability a producer must adopt, with two exceptions
 > worth noting: §6.5's bounded range form and §7.3's `usage_descriptions` are
@@ -61,7 +66,46 @@ P6 and P11 each gained a second example from PyGMA (G2, G4).
 
 ---
 
-## P1 — Startup hooks
+## P1 — Startup hooks *(DECIDED: deferred)*
+
+> **Decision.** Deferred, on the standard applied to P4, plus a design problem
+> that only became visible after P2 was withdrawn.
+>
+> **The evidence is one instance, and half of it evaporates on inspection.**
+> PyOneSignal genuinely ships an `Application` subclass, so the Android side is
+> a real producer-side artifact — unlike P4, this is not zero. But the iOS side
+> is not: `OneSignal.initialize(_:withLaunchOptions:)` lives in
+> `YourProject/project_dist/xcode/Sources/IphoneOS/main.swift`, which is the
+> **application's** file in the only working integration available. The other
+> three packages need no launch hook at all — the two Swift packages register
+> callbacks from Python at runtime, and PyGMA initializes from Python by SDK
+> design.
+>
+> **Withdrawing P2 broke the design.** The proposed signature carried a
+> `values` map, which was how an application-supplied value reached producer
+> code without coupling it to a consumer. P2 was withdrawn because application
+> values have zero live uses — so the map goes too. But then PyOneSignal's hook
+> cannot obtain the OneSignal App ID: not from a resource (§11 now excludes
+> them), not from an application value (withdrawn), and if it comes from Python
+> then initialization can happen from Python and the hook is unnecessary.
+> **P1 does not close its own motivating case.** That is a design that has not
+> converged, not one waiting on nerve.
+>
+> **The capability is the largest here.** Contributed Java and Swift already run
+> in the application, and a registered `service` or `receiver` already gets code
+> running — but those run when the OS routes an event to them. A startup hook
+> runs unconditionally, first, ahead of the application's own code, in every
+> application that transitively depends on the package. It is the closest thing
+> in this specification to "run my code," and it should not arrive on one
+> instance and an unresolved value channel.
+>
+> **No minimal form is offered**, deliberately. P4's `requires` form works
+> because an application can act on it — build an extension. There is no
+> comparable action here: "initialize me early" is a constraint on the
+> consumer's generated bootstrap, not a task an application performs.
+>
+> **Reopen when** a producer needs native initialization *and* has a channel for
+> the values that initialization needs. The two questions are one question.
 
 **Problem.** `<application android:name>` on Android and `main.swift` on iOS are
 the points where an SDK initializes, and version 1 can express neither.
@@ -191,7 +235,31 @@ This is also what dissolves gap A3: PyOneSignal's
 `getIdentifier("onesignal_app_id", "string", …)` becomes
 `values.get("onesignal_app_id")`.
 
-## P3 — No sidecar resources; add contributed `meta_data`
+## P3 — No sidecar resources; add contributed `meta_data` *(DECIDED: split)*
+
+> **Decision.** The two halves go opposite ways, which is why they should not
+> have shared a proposal number.
+>
+> **Resources: landed**, as a row in §11's out-of-scope table. This half costs
+> nothing — it is a decision *not* to add a primitive, and it forecloses a bad
+> future addition. Its argument is structural rather than evidential: resource
+> names are a flat global namespace per type, so §6.1's containment rule cannot
+> reach them, and a producer shipping `values/strings.xml` with `app_name`
+> renames the application. Resources arrive through an `.aar` from a declared
+> coordinate, where AGP merges them and §9 now reports them.
+>
+> **`meta_data`: deferred.** Zero examples use it, and its stated justification
+> — that ksp-builder already has the key, so migrating producers lose a
+> capability — is weaker than it looked. The one documented use of that existing
+> key is `com.google.android.gms.ads.APPLICATION_ID`, which P19 established is
+> the **legacy** Mobile Ads mechanism; PyGMA wraps the Next-Gen SDK and needs
+> nothing of the kind. A capability whose only cited use has been superseded by
+> its own ecosystem is not a migration loss worth pre-empting.
+>
+> **Reopen when** a producer needs a fixed manifest `<meta-data>` entry that is
+> not an application value in disguise — OneSignal Android's
+> notification-extender class registration is the plausible shape, if a package
+> ever implements it.
 
 **Two halves, opposite answers.**
 
@@ -566,7 +634,32 @@ and the consumer is already reading the sidecar at exactly the moment the
 question can be answered. One line converts a runtime mystery into a build-time
 diagnostic naming the distribution.
 
-## P12 — §12 covers facades, not framework bindings
+## P12 — §12 covers facades, not framework bindings *(DECIDED: adopted in full)*
+
+> **Decision.** Both halves landed: §12.1 states the limit of §12's guidance,
+> and §7.3 gained `conditional = true` on all three prerequisite tables.
+>
+> **The `conditional` flag stopped being speculative when P9 landed.** With
+> usage descriptions now a `requires` that fails closed, a framework binding was
+> left with two bad options: declare the union, and every application writes an
+> "Always" location purpose string that App Store review scrutinizes whether or
+> not it ever requests Always; or declare the minimum, and the caller of
+> anything else meets a runtime trap with no build-time warning. PyCoreLocation's
+> sidecar took the second, with a comment admitting it. The flag is less a new
+> capability than the completion of one already adopted.
+>
+> Two independent examples, and they differ usefully: PyCoreLocation's
+> conditions are *which methods the application calls*, PyWebViews' are *what
+> content the application loads*. Both are facts the producer cannot know and
+> the application can.
+>
+> **The abuse risk from the original proposal is real and is addressed in the
+> text rather than by mechanism.** A producer can mark an unconditional
+> requirement conditional and convert a build failure into a line in a report.
+> §12.1 says so plainly, and §7.3 requires the `reason` to state the triggering
+> condition and requires the consumer to record the unresolved prerequisite in
+> §9 — durable and diffable — rather than emitting a build-log line that scrolls
+> past. That is the same enforcement `reason` itself has: none, and disclosed.
 
 **Problem.** §12 tells producers to split feature-conditional native surface
 into optional distributions, with Plyer as the model. That works for a facade
@@ -862,9 +955,10 @@ producers to do the wrong thing, or leaving a load-bearing assumption unsaid:
 (Android half promoted to MUST, scoped to per-artifact manifests). Both entries
 above record why the reasoning changed.
 
-**Hold**: **P1**, **P3**, **P12**.
+**Nothing held.** Every proposal in this file has been decided.
 
-**Withdrawn**: **P2**. **Deferred**: P4's contribution form.
+**Withdrawn**: **P2**. **Deferred**, each with a reopening trigger stated on its
+section: **P1**, **P3**'s `meta_data` half, **P4**'s contribution form.
 
 Status after all four examples and the decisions above:
 
@@ -875,19 +969,26 @@ Status after all four examples and the decisions above:
   hypothesis/finding distinction at the top of this file was applied wrongly,
   and it is worth remembering that the error ran toward *over*-counting a
   large capability.
-- **P12**'s `conditional` flag has two examples (PyCoreLocation's authorization
-  variants, PyWebViews' ATS and `getUserMedia` keys). Likely, not certain.
-- **P1 is the weakest remaining proposal.** It still rests on PyOneSignal alone.
-  Neither Swift package needs a launch hook — they register callbacks from
-  Python at runtime — and PyGMA initializes from Python by SDK design. The fixed
-  signature is the least-tested decision in this file, and P1's `values` map lost
-  its second justification when P2 was withdrawn.
-- **P3**'s `meta_data` half is unexercised by any of the four. It rests on the
-  fact that ksp-builder already has the key, not on a demonstrated need.
+- **P12** landed in full. Its `conditional` flag stopped being speculative once
+  P9 made usage descriptions fail closed — it completes that change rather than
+  extending it.
+- **P1** is deferred, and not only for thin evidence: withdrawing P2 removed the
+  value channel the hook's signature depended on, so it no longer closes its own
+  motivating case.
+- **P3** split. The half that removes a future primitive landed; the half that
+  adds one did not.
 
-The example set is exhausted, and what remains outstanding is exactly what it
-cannot settle. The next thing that would move P1, P3, or P12 is either a
-consumer implementation or a producer outside this organization — every example
-here shares one toolchain lineage. P4's deferred contribution form needs
-something more specific: a package that wants to *ship* an app extension rather
-than tell an application to build one.
+**A pattern worth naming.** Of six capability additions proposed, two landed
+(P8, P12), one landed in a reduced form (P4 as a `requires`), one was withdrawn
+outright (P2), and two were deferred (P1, P3's `meta_data`). Every proposal that
+survived contact had at least one producer-side artifact behind it. Every one
+that did not had a plausible story instead — a guide showing an *application*
+doing the thing, or a key an older tool happened to expose. The
+hypothesis/finding rule at the top of this file was the right test; the failure
+mode was applying it to the wrong noun, counting integrations rather than
+producers.
+
+The example set is now exhausted in the sense that matters: it has said
+everything it can, and the deferred items name what would have to appear before
+they are reconsidered. All four packages share one toolchain lineage, so a
+producer from outside it remains worth more than a fifth from inside.

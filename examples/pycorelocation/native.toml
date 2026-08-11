@@ -59,14 +59,34 @@ init = "PyInit_PyCoreLocation"
 key = "NSLocationWhenInUseUsageDescription"
 reason = "requestWhenInUseAuthorization() traps if this key is absent"
 
-# Deliberately absent, though the spec would accept them:
-#
-#   UIBackgroundModes = ["location"]                (contributes.info_plist.append)
-#   NSLocationAlwaysAndWhenInUseUsageDescription    (requires.usage_descriptions)
-#
-# Both are needed only by applications that use a subset of this package's API.
-# §12 says feature-conditional surface belongs in optional distributions — but
-# a 1:1 framework binding cannot be split that way (NOTES.md, finding L4), so
-# the choice here is between handing every application background-location
-# capability and handing applications that need it nothing. This file takes the
-# second option. Neither is right.
+# Finding L4: the rest of this binding's requirements vary per method, and a
+# 1:1 binding of CLLocationManager has no seam to split along — so §12's
+# "ship optional distributions" cannot apply. The choice used to be between
+# handing every application the union and leaving callers to trap at runtime.
+# §7.3's conditional prerequisites are the third option, and §12.1 now says so.
+
+[[ios.requires.usage_descriptions]]
+key = "NSLocationAlwaysAndWhenInUseUsageDescription"
+conditional = true
+reason = "Required only if your application calls requestAlwaysAuthorization()"
+
+[[ios.requires.usage_descriptions]]
+key = "NSLocationTemporaryUsageDescriptionDictionary"
+conditional = true
+reason = """\
+Required only if your application calls \
+requestTemporaryFullAccuracyAuthorization(purposeKey:); its keys are the \
+purpose keys your application passes."""
+
+[[ios.requires.app_extensions]]
+kind = "location_push"
+conditional = true
+reason = """\
+Required only if your application calls startMonitoringLocationPushes(). \
+Also needs com.apple.developer.location.push, which Apple must approve."""
+
+# Still absent, and correctly so: UIBackgroundModes = ["location"] is a
+# contribution, not a prerequisite, and §7.6 has no conditional form. A
+# producer cannot know whether an application wants background location, and
+# declaring it would hand the capability to every application. It stays the
+# application's to add.
