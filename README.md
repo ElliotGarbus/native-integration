@@ -75,13 +75,22 @@ reason = "Connectivity checks before ad requests"
 Everything a package declares falls into one of three categories: **`owns`**
 (exclusive claims, like a Java namespace — collision-checked across all
 packages), **`requires`** (conditions the app must satisfy — SDK floors,
-entitlements, iOS purpose strings, an app extension the package needs), and
-**`contributes`** (material the build tool stages on the package's behalf).
+entitlements, iOS purpose strings, a config file, an app extension, a
+credentialed Maven repository), and **`contributes`** (material the build tool
+stages on the package's behalf).
 
-The line between the last two is where most of the design lives. A package that
-binds a whole platform framework can also mark a prerequisite **conditional** —
-*"you need this only if you call `requestAlwaysAuthorization()`"* — so apps that
-never touch a feature are not made to carry it.
+The line between the last two is where most of the design lives, and it falls in
+a specific place: **when the application owns the artifact, the package states
+the need rather than writing it.** Your entitlements, your `Info.plist`, your
+bundle, your extra build targets — a package can say it needs them and the build
+tool reports it, but nothing reaches in. A contribution that writes half of a
+two-part requirement is worse than a prerequisite naming both, because it looks
+finished.
+
+A package that binds a whole platform framework can also mark a prerequisite
+**conditional** — *"you need this only if you call
+`requestAlwaysAuthorization()`"* — so apps that never touch a feature are not
+made to carry it.
 
 The app author's `pyproject.toml` simplifies to:
 

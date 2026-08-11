@@ -65,19 +65,37 @@ script.
 | Category | Meaning | Examples |
 | --- | --- | --- |
 | **`owns`** | An exclusive claim, enforced across all distributions | a Java namespace |
-| **`requires`** | A condition the application or build environment must satisfy; the consumer checks it but never satisfies it | an SDK floor, an entitlement, a purpose string, an application-supplied value |
+| **`requires`** | A condition the application or build environment must satisfy; the consumer verifies and reports it, and never invents a value to meet it | an SDK floor, an entitlement, a purpose string, an application-supplied value, a config file, a repository credential |
 | **`contributes`** | Material the consumer stages into the generated project on the producer's behalf | source files, dependency coordinates, permissions, manifest components |
 
 The categories carry the security model: ownership claims are exclusive and
 collision-checked; requirements are reported and verified, never auto-satisfied;
 contributions are staged, attributed, and disclosed per §9.
 
+A consumer may still *place* a value it was given — writing an
+application-supplied value into the manifest (§6.3), or a credential into
+repository configuration (§6.6). What it must never do is originate one. The
+distinction is between carrying the application's answer and inventing it.
+
+**When the application owns the artifact, state the need rather than
+contributing.** An application's entitlements, its `Info.plist`, its bundle, its
+extra build targets and its URL registrations belong to the application, and a
+producer's job for those is to declare what it requires and stop (§7.3). This is
+not a stylistic preference: a contribution that writes half of a two-part
+requirement is worse than a prerequisite reporting both, because it looks
+finished. Several capabilities that were first drafted as contributions belong
+here for exactly that reason.
+
 **Unrecognized declarations fail closed.** A consumer never silently ignores a
 contribution it does not understand (§4.4) — a build that omits declared native
 material produces a broken application that fails far from the cause.
 
 **Contributions stay per-distribution.** Provenance survives from declaration to
-diagnostic; see Appendix A.
+diagnostic; see Appendix A. Concretely, a consumer **MUST** name the
+contributing distribution in **every** diagnostic it emits about declared
+material — not only the ones this specification spells out individually.
+Attribution is the property that makes a transitive contribution reviewable at
+all, and a diagnostic that omits it sends the reader to the wrong repository.
 
 **Native dependency resolution MUST be reproducible.** Every dependency a
 producer contributes must resolve identically from the same integration record;
@@ -231,6 +249,13 @@ normalization and symlink resolution. Symlinked resources are not permitted in
 version 1; a consumer **MUST** reject one, naming the distribution. Contributed
 source files **MUST** be UTF-8 encoded.
 
+**The sidecar directory is build input, not application payload.** A consumer
+**MUST** exclude it — `native.toml` and every resource under it — from any
+Python payload it assembles for the device. Its contents have already been
+consumed at build time: contributed source is compiled by the application's own
+toolchain (§6.4, §7.5), and shipping a second copy inside the application would
+be dead weight at best and a stale duplicate at worst.
+
 ### 4.2 One file, all platforms
 
 A distribution **MUST** ship exactly one sidecar covering every platform it
@@ -322,16 +347,33 @@ indistinguishable, and the second is the one that breaks applications.
 ## 5. Structure
 
 ```toml
-contract = "1"
-platforms = ["android", "ios"]   # optional — §4.5, where the distribution works
+contract = "1"                   # §4.3 — required
+platforms = ["android", "ios"]   # §4.5 — optional; where the distribution works
 
-[android.owns]         # §6.1 — exclusive claims
-[android.requires]     # §6.2–6.3 — conditions the application must satisfy
-[android.contributes]  # §6.4–6.9 — material staged into the project
+[android.owns]                              # §6.1  java_namespaces
+[android.requires]                          # §6.2  compile_sdk, min_sdk
+  [[android.requires.application_values]]   # §6.3
+[android.contributes]
+  [android.contributes.src]                 # §6.4  java, kotlin
+  [[android.contributes.gradle_dependencies]]   # §6.5
+  [[android.contributes.gradle_repositories]]   # §6.6
+  [[android.contributes.permissions]]           # §6.7
+  [[android.contributes.features]]              # §6.7
+  [[android.contributes.components]]            # §6.8  + view_links, intent_filters
+  [android.contributes.r8]                      # §6.9  keep_classes
 
-[ios]                  # §7.1 — symbol-prefix guidance (no ownership claims in v1)
-[ios.requires]         # §7.2–7.3
-[ios.contributes]      # §7.4–7.7
+[ios]                                       # §7.1  swift_symbol_prefixes
+[ios.requires]                              # §7.2  deployment_target
+  [[ios.requires.entitlements]]             # §7.3 ─┐
+  [[ios.requires.usage_descriptions]]       # §7.3  │ prerequisites the
+  [[ios.requires.app_extensions]]           # §7.3  │ application supplies;
+  [[ios.requires.application_files]]        # §7.3  │ never satisfied by
+  [[ios.requires.url_schemes]]              # §7.3 ─┘ the consumer
+[ios.contributes]
+  [[ios.contributes.swift_packages]]        # §7.4
+  [ios.contributes.src]                     # §7.5  swift
+  [ios.contributes.info_plist]              # §7.6  values, append
+  [[ios.contributes.python_modules]]        # §7.7
 ```
 
 A sidecar declaring no platform table is valid and contributes nothing — which
@@ -555,7 +597,7 @@ above can state that. A family split across several distributions (§12) pins it
 artifacts independently, and nothing makes those choices agree.
 
 The failure is at least honest: Gradle resolves one version per artifact, the
-result is locked, and §8.16 requires a resolution conflict to name the
+result is locked, and requirement 8.16 requires a resolution conflict to name the
 distributions that declared the conflicting versions. Producers publishing such
 a family **SHOULD** pin compatible versions deliberately and release together.
 
@@ -1229,6 +1271,21 @@ same reasoning as requirement 8.14.
 
 ## 8. Consumer requirements
 
+The list below is numbered in the order the requirements were added, and stable
+numbering matters more than tidy grouping once implementations exist. This index
+gives the thematic reading:
+
+| Theme | Requirements |
+| --- | --- |
+| Discovery and the sidecar | 1, 2, 3, 4, 14 |
+| Exclusive claims and namespaces | 5, 17 |
+| **Never satisfy a prerequisite** | 6, 8, 21, 22, 23, 25 |
+| The application's authority | 7 |
+| Native dependency resolution | 10, 12, 16 |
+| Generated manifest and project material | 11, 13, 20, 24 |
+| Recording, disclosure, attribution | 9, 15, 19, 25 |
+| Platform applicability | 18 |
+
 A conforming consumer **MUST**:
 
 1. Enforce the contract version gate, including the minor (§4.3), and fail
@@ -1298,7 +1355,7 @@ A conforming consumer **MUST**:
 > of, with nothing connecting it back to the Python distributions that asked for
 > it. The mapping from native coordinate to declaring distribution is the one
 > thing the consumer knows and the underlying resolver does not, which is what
-> makes requirement 15 meetable in the case that needs it most.
+> makes requirement 8.15 meetable in the case that needs it most.
 
 A conforming consumer **SHOULD**:
 
@@ -1307,7 +1364,7 @@ A conforming consumer **SHOULD**:
   `from_dependency` classes against the resolved artifact (§6.8).
 - Record per-artifact checksums for the resolved Gradle graph (§6.5).
 - Report the delta of the **fully merged** Android manifest, beyond the
-  per-artifact declarations required by 8.19, and the native effects of Swift
+  per-artifact declarations required by requirement 8.19, and the native effects of Swift
   packages' binary targets (§9, §11).
 
 ## 9. Recording and review
@@ -1331,12 +1388,30 @@ dependency closure**, and the delta:
 
 ```
 analytics-shim 2.1.0  (via some-ui-lib)
-  + permission  android.permission.ACCESS_FINE_LOCATION  ("optional BLE device discovery")
-  + feature     android.hardware.location.gps  (required=false)
+  + permission   android.permission.ACCESS_FINE_LOCATION  ("optional BLE device discovery")
+  + feature      android.hardware.location.gps  (required=false)
+
+map-sdk 4.1.0  (direct dependency)
+  ! REPOSITORY  https://maven.example.com/releases  → groups: com.example.maps
+                authenticated — no credentials configured   ✗ BLOCKING
+  + dependency  com.example.maps:android:4.1.0
+  + from com.example.maps:android:4.1.0 (resolved artifact manifest):
+      + permission  com.example.permission.MAPS_ID
+  ! requires    NSLocationWhenInUseUsageDescription  ✗ not supplied by application
+  ~ requires    NSLocationAlwaysAndWhenInUseUsageDescription  (conditional, unresolved)
 ```
 
 The middle element matters most for the case that motivates the requirement — a
 transitive dependency the application author has never heard of.
+
+The shape of that second entry is normative in three respects, each required
+elsewhere in this specification: a repository contribution is set apart rather
+than folded into a list (§6.6); contributions arriving from a **resolved
+artifact's own manifest** are attributed to that artifact rather than to the
+distribution that declared the coordinate (below); and an unmet prerequisite is
+distinguished from an unresolved **conditional** one (§7.3), because the first
+blocks the build and the second is guidance. No format is mandated — only that a
+report which collapses these distinctions has not reported them.
 
 **Integration inputs are hashed for every producer** — not only path and
 editable installs. The record **MUST** include a SHA-256 per file, keyed by
@@ -1433,6 +1508,14 @@ consumer rejects a newer declaration visibly instead of mis-building it.
 Any change that would alter the meaning of an existing key, or make a previously
 valid sidecar invalid, requires a new major version and a new group name.
 
+**That rule binds from the moment the draft marker at the top of this document is
+removed, and not before.** While the specification is a draft it is amended in
+place, and this revision has twice done what the paragraph above forbids —
+§7.6 now rejects usage-description keys it once accepted, and §6.5's dependency
+forms changed shape. Both were corrections found by expressing real packages
+against the text. No contract minor was allocated for the capabilities added
+alongside them, because there is no released version to negotiate against yet.
+
 Anticipated minor-revision work, deliberately excluded from version 1: verified
 App Links (`autoVerify`) and further filter forms beyond `view_links`;
 conditional contributions (a `when` key with a **closed vocabulary** of
@@ -1456,7 +1539,15 @@ is the narrower scope stated there rather than new machinery (§7.1).
 | Android resources (`res/`) | Resource names are a flat global namespace per type, so no ownership rule can be built for them (§6.1 needs dots to compute containment). A producer shipping `values/strings.xml` with `app_name` renames the application. Resources reach an application through an `.aar` from a declared coordinate, where AGP merges them and §9 reports them |
 | Scripts, hooks, build plugins | Excluded on principle (§2.1), not as a deferral |
 | Xcode build settings, compiler/linker flags | Arbitrary build mutation; revisit only with a concrete, bounded need |
-| Application configuration | The application's own build settings are the consumer's concern |
+| Application configuration — *writing* it | The application's own build settings are the consumer's concern. **Declaring a requirement on it is in scope** and is most of §7.3; see below |
+
+**The application-configuration row is a boundary, not a silence.** A producer
+cannot write the application's entitlements, `Info.plist`, bundle contents,
+build targets or URL registrations — but it can and should *declare that it
+needs them*, and a consumer must report those requirements and fail when they
+are unmet. That is what §7.3 is, and it has grown to five kinds of prerequisite
+plus §6.6's repository credentials. The excluded thing is the producer reaching
+into the application's own configuration, not the producer having a say in it.
 
 The wheel-embedded qualifier is deliberate: a **declared Maven coordinate** may
 resolve to an `.aar`, and a **declared Swift package** may vend binary targets —
@@ -1587,7 +1678,7 @@ less code, and it forecloses most of this specification.
 A merged tree **destroys provenance at install time**. Once files are overlaid,
 nothing can determine which distribution contributed which file — so collision
 detection, per-distribution attribution, the review record of §9, and every
-diagnostic required by 8.15 all become impossible.
+diagnostic required by requirement 8.15 all become impossible.
 
 It also makes a shared source tree last-writer-wins by construction, which is the
 substitution path §6.1 exists to close.
