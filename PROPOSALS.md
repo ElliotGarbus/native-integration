@@ -66,6 +66,7 @@ motivating example is a hypothesis; a proposal with several is a finding.
 | P24 | Cross-artifact version alignment (BOM) | F2 | Firebase |
 | P25 | iOS URL schemes — a `view_links` counterpart | T2, T3 | Stripe |
 | P26 | Entitlements that carry values | T5, B3 | Stripe, PyOneSignal, PyCoreLocation |
+| P27 | Repository credentials, and keeping them out of the record | M2 | Mapbox |
 
 Gap identifiers refer to the NOTES.md beside each example:
 [PyOneSignal](examples/pyonesignal/NOTES.md) (A*, B*, C*),
@@ -1328,6 +1329,62 @@ this file has been applying — but each wants something slightly different, and
 mechanism that covers all three risks being a schema language for entitlement
 plists. Worth deciding deliberately rather than adopting the sketch above.
 
+## P27 — Repository credentials, and keeping them out of the record
+
+**Problem.** §6.6's repository contribution has `url`, `reason`, `groups` and
+`modules`. Mapbox's repository — the canonical custom-Maven case — requires HTTP
+basic authentication with a **secret** token scoped `DOWNLOADS:READ`. A consumer
+that reads the sidecar and does exactly what it says gets `401` on every
+artifact. The declaration is not terse; it is non-functional.
+
+**The reflex is to add a credential field, and that reflex is wrong.**
+
+- A sidecar is **package data inside a wheel**, readable by everyone who
+  installs the distribution and by anyone browsing the sdist. A secret cannot
+  live there under any spelling.
+- §9 compounds it. The integration record must hash `native.toml` and every
+  resource it references, and be durable and diffable — usually committed. A
+  credential in a sidecar would be laundered into the application's version
+  control **by a rule written to improve auditability**.
+
+So the specification is right to have no field, and wrong to have nothing: a
+producer cannot say the repository needs an application-supplied credential at
+all.
+
+**Proposal**, in the shape §7.3 has converged on four times — a prerequisite,
+with an inline reference mirroring §6.3's `application_value`:
+
+```toml
+[[android.contributes.gradle_repositories]]
+url = "https://api.mapbox.com/downloads/v2/releases/maven"
+reason = "Mapbox does not publish its Maps SDK artifacts to Maven Central"
+groups = ["com.mapbox"]
+credential = { username = "mapbox", password = { application_secret = "mapbox_downloads_token" } }
+```
+
+The application supplies the secret through the consumer's own configuration.
+The consumer **MUST NOT** write it into the generated project, the integration
+record, or any diagnostic, and an unsatisfied secret is a reported prerequisite
+like any other.
+
+**Why this is worth more than the usual one-instance proposal.** Two of the
+three arguments do not depend on the count:
+
+1. Without it the sidecar cannot be acted on at all — unlike every other gap
+   found so far, where the producer had a workaround or the application could
+   do the work.
+2. The §9 interaction is a **latent defect that exists today**. Nothing in the
+   specification warns an implementer against recording a secret, because
+   nothing in the specification knows credentials exist. The first producer to
+   try this — with any spelling, in any consumer — is likely to leak one.
+
+Argument (2) suggests that even if the `credential` form is deferred, §9 should
+gain a sentence: values the application supplies as secrets are never recorded.
+
+**Evidence.** One vendor, clean-sheet. But custom repositories are where secrets
+live — Mapbox, Huawei HMS, and most private enterprise Maven hosts share the
+shape, and §6.6 exists precisely because they do.
+
 ## Sequencing
 
 **Land now** — corrections and statements of existing intent, not new
@@ -1349,9 +1406,9 @@ producers to do the wrong thing, or leaving a load-bearing assumption unsaid:
 (Android half promoted to MUST, scoped to per-artifact manifests). Both entries
 above record why the reasoning changed.
 
-**Nothing outstanding.** P25 and P26 are decided: P25's `requires` form landed
-in §7.3 while its contribution form was rejected on the platform asymmetry, and
-P26 was rejected outright.
+**Outstanding**: **P27**, from Mapbox — the only one open. P25 and P26 are
+decided: P25's `requires` form landed in §7.3 while its contribution form was
+rejected on the platform asymmetry, and P26 was rejected outright.
 
 **Three of the last four decisions turned on the same defect in my own
 reasoning**, and it is worth naming rather than burying:

@@ -14,31 +14,42 @@ primitives **before** a consumer implements it.
 | [Firebase](firebase/) | a vendor outside this ecosystem | **blocked** — build plugins, build scripts, service intent filters |
 | [Sentry](pysentry/) | a check on §11's build-script exclusion | **mostly clean** — and the first live use of §6.3 |
 | [Stripe](pystripe/) | `view_links`, and a financial SDK's demands | **clean on Android**; iOS has no browser-return form |
+| [Mapbox](pymapbox/) | §6.6, the only table with no coverage | **§6.6 holds** — but cannot express the repository's credential |
 
 The first four are existing packages from one toolchain lineage. Firebase,
-Sentry and Stripe are **clean-sheet**: sidecars written against each vendor's
-own documentation, for vendors that have never heard of this convention. They
-were run after the corrections and decisions below had landed, as independent
-checks on "is the declaration set right."
+Sentry, Stripe and Mapbox are **clean-sheet**: sidecars written against each
+vendor's own documentation, for vendors that have never heard of this
+convention, and run after the corrections and decisions below had landed.
 
-Sentry and Stripe were chosen to test *conclusions* rather than to hunt for
-gaps — §11's build-script exclusion and §6.8's `view_links` respectively. Both
-conclusions largely held; Sentry corrected one sentence of §11 in the direction
-of more being possible, and produced the first live use of §6.3 in the whole
-set, validating a table two earlier decisions had nearly orphaned.
+They were also chosen differently. Firebase asked the open question — can this
+express an SDK nobody here designed around? The last three test **specific
+claims**:
+
+- **Sentry** — §11's assertion that build-script SDKs are one excluded
+  category. It half held: Sentry's plugin is optional where Crashlytics' is
+  load-bearing, so §11 now distinguishes SDKs that degrade from those that
+  fail. Sentry also produced the **first live use of §6.3** anywhere in the set,
+  validating a table two earlier decisions had nearly orphaned.
+- **Stripe** — §6.8's `view_links`, which nothing had exercised. It fits, and
+  the export gate reads better under a payment SDK than under the hypothetical
+  OAuth case it was designed for.
+- **Mapbox** — chosen from a **coverage audit** rather than a hunch. After nine
+  sidecars, §6.6 was the only declarable table nothing had used, and it carries
+  the strongest safety language in the specification.
 
 Proposed remedies live in [PROPOSALS.md](../PROPOSALS.md). Gap identifiers are
 per-example: `A*`/`B*`/`C*` (PyOneSignal), `L*` (PyCoreLocation), `W*`
-(PyWebViews), `G*` (PyGMA), `F*` (Firebase), `S*` (Sentry), `T*` (Stripe).
+(PyWebViews), `G*` (PyGMA), `F*` (Firebase), `S*` (Sentry), `T*` (Stripe), `M*` (Mapbox).
 
 > **Reading these after the fact.** Each `NOTES.md` describes SPEC.md **as it
-> stood when that example was run** — which for Firebase is the current text,
-> and for the other four is the text before the corrections landed. The corrections group has since landed, so
-> several findings recorded there as defects — §7.6's usage-description example,
-> §6.5's range ban, §7.4's ungoverned transitive graph, the undefined
-> containment rules — are fixed in the current text. The `native.toml` files
-> beside them **are** kept current and valid against the specification as it is
-> now. PROPOSALS.md marks what landed and what did not.
+> stood when that example was run**. For the four PyPlatformPackages examples
+> that is the text before the corrections group landed, so several findings
+> recorded there as defects — §7.6's usage-description example, §6.5's range
+> ban, §7.4's ungoverned transitive graph, the undefined containment rules —
+> are fixed in the current text. Where a later example overturned an earlier
+> conclusion, the correction is added **in place** rather than edited away.
+> The `native.toml` files **are** kept current and valid against the
+> specification as it is now. PROPOSALS.md marks what landed and what did not.
 
 ## What held up
 
