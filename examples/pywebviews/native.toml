@@ -12,6 +12,9 @@
 
 contract = "1"
 
+# Package.swift declares platforms: [.iOS(.v13)] and nothing else.
+platforms = ["ios"]
+
 # -------------------------------------------------------------------- iOS ---
 
 [ios.requires]

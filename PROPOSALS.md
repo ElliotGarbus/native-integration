@@ -10,7 +10,10 @@ example set stops changing it.
 > P2 — is now in SPEC.md. Those sections below are kept as the reasoning
 > behind the change, not as outstanding work.
 >
-> **Still outstanding:** P1, P3, P4, P8, P11, P12, P20. **Withdrawn:** P2.
+> **P11 and P20 have since been decided and landed**, both with amended
+> reasoning; see the notes on those sections.
+>
+> **Still outstanding:** P1, P3, P4, P8, P12. **Withdrawn:** P2.
 >
 > Nothing landed adds a capability a producer must adopt, with two exceptions
 > worth noting: §6.5's bounded range form and §7.3's `usage_descriptions` are
@@ -449,7 +452,32 @@ so a branch dependency is reproducible after first resolution but its recorded
 revision has no stable meaning, and a path dependency does not resolve on
 another machine at all.
 
-## P11 — Declaring an unsupported platform
+## P11 — Declaring an unsupported platform *(DECIDED: adopted, §4.5)*
+
+> **Decision.** Adopted. The counter-argument below — that this is packaging's
+> job — turned out to be weaker than it reads, and the reason is worth
+> recording, because the specification had just committed to the opposite
+> principle in §3.5: *a sidecar MUST NOT restate an interpreter requirement.*
+> Adding a platform key looked like an immediate contradiction of it.
+>
+> It is not, because the two cases are not symmetric. `Requires-Python` carries
+> the interpreter constraint **enforceably**; nothing carries platform support
+> enforceably for a distribution whose own content is pure Python. Wheel
+> platform tags require platform-specific content — a pure-Python distribution
+> would have to fabricate one to use them. Environment markers live on the
+> *depending* project's requirement, so they are the application author's to
+> write, and the application author is precisely the person who does not know.
+> `Classifier: Operating System :: Android` exists, and both PyOneSignal and
+> PyGMA set it, but it is informational and enforced by nothing.
+>
+> So the mechanism that ought to carry this does not exist, and §4.5 says so
+> explicitly, along with a **SHOULD** to deprecate the key if one ever arrives.
+>
+> One refinement came out of PyGMA. The key claims the distribution *functions*
+> on a platform, which is a stronger statement than "contributes native
+> material" — a package that works fine on iOS and simply needs nothing there
+> must not use it. PyGMA still should: a package whose entire purpose is ads,
+> whose iOS branch is a bare `pass`, is not working there.
 
 **Problem.** PyCoreLocation is iOS-only. Its sidecar declares `[ios]` and
 nothing else, which §5 blesses: *"A sidecar declaring no platform table is valid
@@ -691,7 +719,33 @@ genuinely cannot arrive any other way — and it is already in the text.
 This makes §6.3 smaller and better justified, and it removes an example that now
 teaches the wrong lesson.
 
-## P20 — Reconsider §9's effective-delta SHOULD
+## P20 — Reconsider §9's effective-delta SHOULD *(DECIDED: promoted in part, §9)*
+
+> **Decision.** The Android half is now a **MUST**, scoped to what resolved
+> artifacts declare in their own manifests. Merged-manifest fidelity and the
+> iOS binary-target case stay **SHOULD**.
+>
+> Two things changed the answer from the hedge written below.
+>
+> **§11 already depends on this being reliable.** A prebuilt `.aar` embedded in
+> a wheel is excluded there because its manifest merges "with no attribution,"
+> while a coordinate-resolved `.aar` is permitted because it is "surfaced by
+> §9's effective-delta reporting." Both merge identical manifests into the
+> application. If the surfacing is optional, the two cases differ only by
+> whether the consumer bothered — so §11's exclusion was resting on a SHOULD.
+>
+> **The cost objection was overstated, and it was mine.** "Running or emulating
+> AGP's merger" is the cost of reproducing the *merged* result. It is not the
+> cost of answering the question that matters: reading `AndroidManifest.xml`
+> out of each resolved `.aar` is unzip-and-parse over a graph §6.5 already
+> requires the consumer to record, and it catches the motivating case —
+> `com.google.android.gms.permission.AD_ID` is declared in the ads AAR's own
+> manifest. A consumer that drives Gradle can instead read AGP's merged
+> manifest and blame report, which supply the attribution directly.
+>
+> Splitting the requirement along that line is what makes the MUST affordable:
+> the hard part is merge *semantics* (`tools:node`, placeholders, ordering),
+> and nothing about the motivating case needs them.
 
 **Problem.** PyGMA's sidecar declares `INTERNET` and `ACCESS_NETWORK_STATE`. The
 GMA AAR merges in **`com.google.android.gms.permission.AD_ID`** — the Android
@@ -741,10 +795,9 @@ producers to do the wrong thing, or leaving a load-bearing assumption unsaid:
 - **P19** (§6.3's example now teaches the wrong lesson)
 - the §6.3 satisfaction correction recorded under **P2**, plus **P6**, **P7**, **P13**
 
-**Land as cheap additions**: **P11**.
-
-**Decide deliberately**: **P20** — a SHOULD that covers the case §9 says matters
-most. Not a straightforward promotion to MUST; the implementation cost is real.
+**Landed since, on their own decisions**: **P11** (adopted as §4.5) and **P20**
+(Android half promoted to MUST, scoped to per-artifact manifests). Both entries
+above record why the reasoning changed.
 
 **Hold**: **P1**, **P4**, **P8**, **P12**, **P3**.
 

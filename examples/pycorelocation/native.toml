@@ -8,6 +8,12 @@
 
 contract = "1"
 
+# Finding L6: the wheel is pure Python and installs anywhere, so an application
+# could depend on this and build for Android — getting a clean build and an
+# app that fails at import, or silently ships the typing stub. §4.5 now
+# distinguishes "contributes nothing here" from "does not work here".
+platforms = ["ios"]
+
 # -------------------------------------------------------------------- iOS ---
 
 [ios.requires]

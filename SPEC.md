@@ -189,10 +189,15 @@ is a legitimate and expected shape.
 > closure would be a declaration nobody chose to depend on.
 
 Note also that the closure is resolved for a target platform **and a Python
-version**, and that both are properties of the closure rather than of any
-sidecar. A sidecar **MUST NOT** restate an interpreter requirement; `Requires-Python`
-already carries it, and a closure correctly resolved for one interpreter cannot
-contain a distribution built for another.
+version**. A sidecar **MUST NOT** restate an interpreter requirement:
+`Requires-Python` already carries it enforceably, and a closure correctly
+resolved for one interpreter cannot contain a distribution built for another.
+
+Platform support is **not** symmetric with this, which is why §4.5 exists. No
+enforceable standard metadata carries "this distribution does not function on
+Android" for a distribution whose own content is pure Python: wheel platform
+tags require platform-specific content, and `Classifier: Operating System ::
+Android` is informational and enforced by nothing.
 
 ## 4. The sidecar file
 
@@ -277,10 +282,48 @@ misspelled one.
 > evolution is preserved by §4.3's contract minor, which converts "silently
 > ignored" into "visibly rejected with the version that would work."
 
+### 4.5 Platform support: `platforms`
+
+```toml
+platforms = ["ios"]
+```
+
+Optional. Names the platforms on which the distribution **functions at all**. A
+consumer building for a platform not listed **MUST** fail, naming the
+distribution and how it entered the dependency closure (§9).
+
+- Values **MUST** be platform names this specification defines (`android`,
+  `ios`). An empty list is invalid.
+- Declaring a platform table for a platform the key omits is a contradiction; a
+  consumer **MUST** reject it, naming the distribution.
+- **Omitting the key makes no claim**, and is the default.
+
+**This is not the same as declaring no platform table.** Absence of an `[ios]`
+table means *"I contribute no native material on iOS"* — which is true of a
+package that works fine there and simply needs nothing. `platforms` means *"I do
+not work there."* Version 1 could express only the first, so the two facts were
+indistinguishable, and the second is the one that breaks applications.
+
+> Rationale: a distribution binding a platform-specific framework installs
+> perfectly well on the wrong platform — its own content is pure Python, so
+> nothing in the wheel objects. The application builds, and the failure arrives
+> at `import`, or worse does not arrive at all: a facade whose unimplemented
+> branch is a bare `pass` produces an application that runs and silently does
+> nothing. That is the failure mode §4.4 exists to prevent, reaching the
+> application through a door §4.4 does not watch.
+>
+> This is deliberately a claim about the **distribution**, not about its native
+> material, which makes it the one key here that reaches beyond this
+> specification's usual scope. It earns that on the reasoning in §3.5: the
+> mechanism that ought to carry it does not exist. Should a future packaging
+> standard express platform support enforceably for pure-Python distributions,
+> this key becomes a restatement and **SHOULD** be deprecated in favour of it.
+
 ## 5. Structure
 
 ```toml
 contract = "1"
+platforms = ["android", "ios"]   # optional — §4.5, where the distribution works
 
 [android.owns]         # §6.1 — exclusive claims
 [android.requires]     # §6.2–6.3 — conditions the application must satisfy
@@ -291,8 +334,9 @@ contract = "1"
 [ios.contributes]      # §7.4–7.6
 ```
 
-A sidecar declaring no platform table is valid and contributes nothing. Within a
-platform table, each category is optional.
+A sidecar declaring no platform table is valid and contributes nothing — which
+is a statement about contributions, not about where the distribution works
+(§4.5). Within a platform table, each category is optional.
 
 ## 6. Android
 
@@ -942,6 +986,11 @@ A conforming consumer **MUST**:
     it** (§6.5, §7.4).
 17. Compute every namespace, prefix, and group containment test on
     dot-separated segments (§6.1).
+18. Fail when building for a platform a sidecar's `platforms` key omits, naming
+    the distribution (§4.5).
+19. Record and report the permissions, features, and components declared by
+    resolved Android artifacts' own manifests, attributed to the artifact
+    (§9).
 
 > Rationale for 16. Every other rule here assumes native resolution *succeeds*.
 > It need not: two distributions in one closure can declare native dependencies
@@ -959,10 +1008,9 @@ A conforming consumer **SHOULD**:
 - Verify keep patterns against resolved artifact contents (§6.9), and
   `from_dependency` classes against the resolved artifact (§6.8).
 - Record per-artifact checksums for the resolved Gradle graph (§6.5).
-- Report the **effective native delta** introduced by resolved dependencies —
-  permissions and components arriving via library manifests that no sidecar and
-  not the application declared — attributed to the resolved artifact where
-  determinable (§9, §11).
+- Report the delta of the **fully merged** Android manifest, beyond the
+  per-artifact declarations required by 8.19, and the native effects of Swift
+  packages' binary targets (§9, §11).
 
 ## 9. Recording and review
 
@@ -1003,12 +1051,44 @@ changed."
 
 **Resolved dependencies can carry native effects of their own.** A Maven
 coordinate can resolve to an `.aar` whose manifest AGP merges into the
-application's; a Swift package can vend binary targets. A consumer **SHOULD**
-include in the record and report the permissions and components the effective
-merged manifest contains beyond those declared by sidecars and the application,
-attributed to the resolved artifact where determinable. Where a consumer does
-not, the record's coverage is the declarations, not the full effective manifest
-— and its documentation **MUST** say so.
+application's; a Swift package can vend binary targets.
+
+For Android, a consumer **MUST** include in the record and report every
+`<uses-permission>`, `<uses-feature>`, and manifest component declared by the
+**manifests of the resolved artifacts themselves**, beyond those declared by
+sidecars and the application, attributed to the artifact that declares each one.
+The resolved graph is already required by §6.5, and this obligation is bounded
+by it: read each resolved `.aar`'s own `AndroidManifest.xml`.
+
+A consumer **SHOULD** additionally report the fully merged manifest's delta.
+That is a larger claim — it depends on merge semantics (`tools:node` overrides,
+placeholder substitution, library ordering) rather than on what each artifact
+declares — and where a consumer stops at the artifact manifests, its
+documentation **MUST** say that the record's coverage is per-artifact
+declarations rather than the merged result.
+
+For iOS, reporting the native effects of a Swift package's binary targets
+remains a **SHOULD**: there is no equivalent merge step, and no comparable
+manifest to read.
+
+> Why the Android half is a MUST. This is the case §9 says matters most — a
+> permission arriving through a transitive Python dependency the application
+> author has never heard of, and one that can carry obligations beyond the
+> build: `com.google.android.gms.permission.AD_ID` comes from an ads AAR and
+> pulls the application into a Play Console data-safety declaration.
+>
+> §11 also depends on it. A prebuilt `.aar` **embedded in a wheel** is excluded
+> there precisely because its manifest merges "with no attribution," while an
+> `.aar` reached through a **declared coordinate** is permitted on the grounds
+> that it is "locked by §6.5/§7.4 and surfaced by §9's effective-delta
+> reporting." That justification cannot rest on an optional feature: if the
+> surfacing is a SHOULD, the two cases differ only by whether anyone bothered.
+>
+> The cost objection was overstated. Reading `AndroidManifest.xml` out of each
+> resolved `.aar` is unzip-and-parse over a graph the consumer already records
+> — it requires no manifest merger, and a consumer that drives Gradle can
+> alternatively read AGP's own merged manifest and blame report, which supply
+> the attribution directly.
 
 Two concepts are worth distinguishing by name, though this specification
 mandates neither a file nor a format:
@@ -1072,6 +1152,13 @@ those arrive through the platform's own dependency channel, locked by §6.5/§7.
 and surfaced by §9's effective-delta reporting, rather than hidden inside a
 Python artifact. What this specification excludes is native binaries smuggled in
 the wheel itself, where no resolver, lock, or manifest tooling ever sees them.
+
+The distinction is only as good as the surfacing, which is why §9 makes the
+Android half of that reporting a **MUST**. An embedded `.aar` and a
+coordinate-resolved `.aar` merge identical manifests into the application; what
+separates them is that one is locked, attributable, and reported, and the other
+is not. Were the reporting optional, the two would differ only by whether the
+consumer bothered.
 
 ## 12. Producer guidance
 

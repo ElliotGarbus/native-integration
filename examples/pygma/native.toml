@@ -9,6 +9,13 @@
 
 contract = "1"
 
+# Finding G4: the package describes itself as cross-platform and its iOS branch
+# is a bare `pass`, so an iOS build previously succeeded and silently showed no
+# ads. For a package whose entire purpose is ads, that is not "works without
+# contributing" — it is not working. The producer withdraws the claim here and
+# adds "ios" in the same release that implements it.
+platforms = ["android"]
+
 # ---------------------------------------------------------------- Android ---
 
 [android.owns]
