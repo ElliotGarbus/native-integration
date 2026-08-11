@@ -144,6 +144,21 @@ untouched by this. What is missing is the ability to say what shape the
 application's entitlement must take, which currently survives only as prose in
 `reason`. That was acceptable at one instance. At three it is a gap with a name.
 
+> **Correction, added when P26 was decided and rejected.** The count above is
+> wrong, and the middle row says so in its own words: `com.apple.developer.location.push`
+> is **valueless**, so it is not an instance of "entitlements that carry values"
+> at all — and it is not declared as an entitlement in PyCoreLocation's sidecar,
+> only mentioned inside an app-extension `reason`. Stripe's is real but sits in
+> a comment for an optional Apple Pay path. One declared instance, two real
+> requirements.
+>
+> The decisive objection is not the count, though. Both fields the proposal
+> wanted are **unactionable**: a consumer never writes an entitlement, and after
+> P4's deferral it does not own the extension target either, so it can neither
+> generate a value nor check that two targets agree. `reason` — which is
+> REQUIRED — carries "must be `group.<your-bundle-id>.onesignal`, the same on
+> both targets" more usefully than any type tag would.
+
 ## T6 — the publishable key confirms the pattern
 
 Stripe's publishable key is per-application and reaches the SDK through

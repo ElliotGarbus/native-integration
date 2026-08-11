@@ -1255,6 +1255,45 @@ registration. The narrow primitive closes the broad problem.
 not a new capability but a missing half of one already adopted, tested, and
 exercised — §6.8's `view_links`, validated by this same example.
 
+## P26 — Entitlements that carry values *(DECIDED: rejected)*
+
+> **Decision.** Rejected, not deferred. §7.3 gains one paragraph recording why
+> an entitlement's value is not modelled, so the idea is not re-proposed.
+>
+> **The evidence was miscounted, for the third time in this exercise.** The
+> table below claims three instances across three vendors, which is past the
+> threshold this file applies. Checking the sidecars:
+>
+> - **PyOneSignal** — `com.apple.security.application-groups`. A real instance.
+> - **PyCoreLocation** — `com.apple.developer.location.push` is **valueless**.
+>   The row below says so in its own text and counts it anyway. It is not
+>   declared as an entitlement in that sidecar at all; it appears inside the
+>   `reason` of an app-extension prerequisite.
+> - **Stripe** — `com.apple.developer.in-app-payments` is real, but for an
+>   optional Apple Pay path, and appears in that sidecar as a comment rather
+>   than a declaration.
+>
+> So: one declared instance, two real requirements. Not three.
+>
+> **Both proposed fields are unactionable, which is the decisive objection.** A
+> consumer never writes an entitlement — §7.3's central rule, and the
+> best-validated one in the iOS half, with three vendors behind it including one
+> needing Apple's approval. So `value_kind` cannot generate anything. And
+> `shared_with_app` describes agreement between the application's entitlements
+> and an extension target that, after P4's contribution form was deferred, the
+> **application** owns too. The consumer manages neither and can check neither.
+>
+> **`reason` already carries it, better.** The useful sentence is "must be
+> `group.<your-bundle-id>.onesignal`, and the same on the extension" — not
+> `value_kind = "string_array"`. A type tag is ceremony around information the
+> required prose field states more precisely.
+>
+> **Anything actionable would push the wrong way.** To validate a value the
+> consumer would have to read, and plausibly write, the application's
+> entitlements — eroding the one rule §7.3 exists to protect.
+>
+> Original proposal follows.
+
 ## P26 — Entitlements that carry values
 
 **Problem.** §7.3 entitlements are `key` + `reason`. Three unrelated vendors now
@@ -1310,9 +1349,39 @@ producers to do the wrong thing, or leaving a load-bearing assumption unsaid:
 (Android half promoted to MUST, scoped to per-artifact manifests). Both entries
 above record why the reasoning changed.
 
-**Outstanding**: **P26**. **P25** has been decided — its `requires` form landed
-in §7.3, its contribution form was rejected on the platform asymmetry, and its
-claim to close T3 as a side effect turned out to be false.
+**Nothing outstanding.** P25 and P26 are decided: P25's `requires` form landed
+in §7.3 while its contribution form was rejected on the platform asymmetry, and
+P26 was rejected outright.
+
+**Three of the last four decisions turned on the same defect in my own
+reasoning**, and it is worth naming rather than burying:
+
+| Proposal | The overreach |
+| --- | --- |
+| P4 | counted an app-authored extension as a producer-side instance |
+| P25 | claimed a scheme registration would route a callback it cannot name |
+| P26 | counted a **valueless** entitlement toward "entitlements that carry values" |
+
+Every one ran the same direction — toward proposing more mechanism than the case
+needed — and every one was caught by re-reading the artifact rather than by new
+evidence. The hypothesis/finding rule at the top of this file is sound; the
+failure mode is applying it to a summary of the evidence instead of the evidence.
+
+**A structural result worth recording.** Four proposals were drafted as
+`contributes` and landed — or should have landed — as `requires`:
+
+| Drafted as | Landed as |
+| --- | --- |
+| P4 contributed app extensions | `[[ios.requires.app_extensions]]` |
+| P21 application config files | `[[ios.requires.application_files]]` |
+| P25 contributed URL schemes | `[[ios.requires.url_schemes]]` |
+| P26 structured entitlement values | nothing — `reason` already sufficed |
+
+§7.3 absorbed all four. The pattern behind it: when the **application** owns the
+artifact — its bundle, its entitlements, its extra targets — the producer's job
+is to state the need, and the consumer's job is to report it and stop. Reaching
+for a contribution in those cases consistently produced a mechanism that
+registered half a requirement and looked finished.
 
 P21–P24 have been decided: **P23** landed as documentation, **P22** landed in
 full, **P21** landed narrowed to iOS bundle files, and **P24** split — its

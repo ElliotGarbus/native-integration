@@ -911,6 +911,15 @@ reason = "Required only if your application calls requestAlwaysAuthorization()"
 > from Apple — so the gap between "declared" and "grantable" can be weeks long.
 > This is a declaration a consumer cannot satisfy on its own.
 
+An entitlement's **value** is not modelled, and deliberately. Several carry one
+— `com.apple.security.application-groups` takes a group identifier,
+`com.apple.developer.in-app-payments` takes merchant identifiers, and some must
+agree across targets. All of that belongs in `reason`, which is REQUIRED for
+exactly this purpose. A structured form would describe something the consumer
+can neither write (it must not) nor check (the application owns the entitlements
+file and any additional targets), and "must be `group.<your-bundle-id>.onesignal`,
+the same on both targets" is more useful to the reader than a type tag.
+
 > Rationale for usage descriptions: a purpose string is **user-facing,
 > localized, and read by App Store review**, and it is a claim about what *the
 > application* does with the data. A library cannot know it. A framework binding
