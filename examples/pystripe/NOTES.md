@@ -1,0 +1,162 @@
+# Stripe against the current spec
+
+Clean-sheet, from [Stripe's 3D Secure authentication guide](https://docs.stripe.com/payments/3d-secure/authentication-flow).
+No `pystripe` distribution exists.
+
+Stripe was picked to exercise **§6.8's `view_links`** — the redirect-scheme
+machinery the specification built for OAuth callbacks, which no example had yet
+used — and to see what a financial SDK asks of an application.
+
+`view_links` works. The finding is what happens on the other platform.
+
+## T1 — `view_links` exercised, and it fits *(a validation)*
+
+3D Secure hands control to the issuing bank in a browser and returns to the
+application through a custom scheme. The declaration reads exactly as §6.8
+designed it:
+
+```toml
+kind = "activity"
+exported_required = true
+reason = "Receives the 3D Secure redirect back from the issuing bank's browser flow"
+
+  [[android.contributes.components.view_links]]
+  scheme = { application_value = "stripe_return_scheme" }
+  host = "stripe-redirect"
+```
+
+Every part of the design earns itself here:
+
+- The scheme **is** per-application — registered in the Stripe dashboard — so
+  the inline `application_value` reference is not a convenience but the only
+  correct form.
+- The export gate is right. A payment-return activity is an IPC entry point, and
+  a payment SDK arriving as a transitive dependency is precisely the case where
+  the application should have to approve that explicitly.
+- The generated filter removes the classic `DEFAULT`-missing bug from a redirect
+  path where the failure would be a silently unfinishable payment.
+
+This is the second application-value case in the set, after Sentry's DSN — and
+unlike Sentry's it uses §6.3's **inline** form, which was the only part of §6.3
+with a demonstrated use before now.
+
+## T2 — the iOS counterpart does not exist *(the finding)*
+
+Stripe's iOS documentation is explicit: configure a custom URL scheme, and
+forward the callback. The scheme is registered in `CFBundleURLTypes` — an
+**array of dictionaries**.
+
+§7.6 has no form for it, and P16 closed that door deliberately, concluding that
+dictionary Info.plist support should never be added because every structured
+case found dissolved into a narrower primitive:
+
+| Case | Resolved by |
+| --- | --- |
+| `NSExtension` | generated from a declared extension `kind` |
+| `NSLocationTemporaryUsageDescriptionDictionary` | a §7.3 prerequisite |
+| `NSAppTransportSecurity` | not the producer's at all |
+
+**`CFBundleURLTypes` is the fourth case, and it does not dissolve** — or rather,
+it dissolves into a primitive the specification has on the other platform and
+never built here. The right form is not dictionary support; it is an iOS
+`view_links`:
+
+```toml
+[[ios.contributes.url_schemes]]
+scheme = { application_value = "stripe_return_scheme" }
+reason = "Receives the 3D Secure redirect; StripeAPI.handleURLCallback consumes it"
+```
+
+The consumer generates the `CFBundleURLTypes` entry, exactly as it generates the
+Android intent filter, and dictionaries stay excluded.
+
+P16's conclusion survives — no case yet wants *general* dictionary support — but
+its evidence was three-for-three and is now three-for-four. The asymmetry is the
+real defect: **the specification models browser-return on Android and not on
+iOS, and iOS is where Stripe's own documentation says it is required.**
+
+## T3 — lifecycle callback participation, a shape nothing addresses
+
+`StripeAPI.handleURLCallback(with:)` must be called from
+`application(_:open:options:)`. This is not launch-time initialisation (P1) — it
+is **participation in an app-delegate lifecycle method**, and nothing in the
+specification has a shape for it.
+
+Firebase sidesteps the equivalent by swizzling the app delegate, which is a
+choice a vendor can make and a specification cannot mandate. Stripe requires the
+explicit forward.
+
+Recorded, not proposed. A hook for one delegate method invites a hook for all of
+them, and that is a materially larger capability than P1 — which is deferred.
+The narrow observation is that a consumer-generated app delegate could forward
+URL callbacks to any producer declaring a `url_schemes` entry (T2), because the
+scheme *is* the registration. That would close this case as a side effect of
+closing T2, without a general lifecycle mechanism.
+
+## T4 — Google Pay trips P3's reopening trigger
+
+Google Pay requires a fixed manifest entry:
+
+```xml
+<meta-data android:name="com.google.android.gms.wallet.api.enabled" android:value="true"/>
+```
+
+It is **identical for every application** — not an application value in
+disguise, not branding, not a resource reference. P3's `meta_data` half was
+deferred with the trigger: *"a producer needs a fixed manifest `<meta-data>`
+entry that is not an application value in disguise."*
+
+This is that, exactly, and it is the first instance. One instance, from one
+vendor, for an optional feature — enough to record, not obviously enough to
+land, and the same standard that deferred P4 applies.
+
+Worth noting the earlier justification for `meta_data` remains dead: it rested
+on ksp-builder already having the key, whose only documented use was the legacy
+AdMob application ID. This is a better argument than that one.
+
+## T5 — entitlements that carry values, for the third time
+
+Apple Pay needs `com.apple.developer.in-app-payments`, whose value is the list
+of merchant identifiers the application registered with Apple. §7.3 entitlements
+are `key` + `reason`, with no way to say the entitlement takes values, or which.
+
+The count is now three:
+
+- **PyOneSignal** — `com.apple.security.application-groups`, where the value
+  must also match across two targets (B3).
+- **PyCoreLocation** — `com.apple.developer.location.push`, valueless but
+  requiring Apple's approval.
+- **Stripe** — `com.apple.developer.in-app-payments`, carrying merchant IDs.
+
+§7.3's rule that a consumer must never *write* an entitlement is correct and
+untouched by this. What is missing is the ability to say what shape the
+application's entitlement must take, which currently survives only as prose in
+`reason`. That was acceptable at one instance. At three it is a gap with a name.
+
+## T6 — the publishable key confirms the pattern
+
+Stripe's publishable key is per-application and reaches the SDK through
+`PaymentConfiguration.init(context, key)` / `StripeAPI.defaultPublishableKey` —
+plain runtime calls a Python wrapper makes directly. No sidecar declaration, no
+build involvement.
+
+That is the seventh package in a row to configure itself this way, and it is
+the pattern behind P2's withdrawal and P19's narrowing: **application
+configuration reaches producers through Python unless the build must embed it.**
+Sentry's DSN is the exception that defines the rule — the build must embed it
+because a ContentProvider consumes it before Python exists.
+
+## Verdict
+
+`view_links` is validated by its first real use, and the export gate around it
+looks better under a payment SDK than it did under a hypothetical OAuth one.
+
+The findings are one gap and two accumulations:
+
+- **T2 is a genuine asymmetry** — browser-return is modelled on Android and
+  absent on iOS, and the fix is a typed `url_schemes` table rather than the
+  dictionary support P16 correctly refused. It would close T3 as a side effect.
+- **T4** gives P3's deferred `meta_data` half its first instance, and a better
+  one than the argument it was deferred on.
+- **T5** brings entitlement values to three instances across three unrelated
+  vendors, which is past the threshold this repository has been applying.

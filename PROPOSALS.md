@@ -64,13 +64,17 @@ motivating example is a hypothesis; a proposal with several is a finding.
 | P22 | Single-action intent filters on services | F5 | Firebase (FCM) |
 | P23 | Name the build-script SDK class as permanently excluded | F4 | Firebase (Crashlytics) |
 | P24 | Cross-artifact version alignment (BOM) | F2 | Firebase |
+| P25 | iOS URL schemes — a `view_links` counterpart | T2, T3 | Stripe |
+| P26 | Entitlements that carry values | T5, B3 | Stripe, PyOneSignal, PyCoreLocation |
 
 Gap identifiers refer to the NOTES.md beside each example:
 [PyOneSignal](examples/pyonesignal/NOTES.md) (A*, B*, C*),
 [PyCoreLocation](examples/pycorelocation/NOTES.md) (L*),
 [PyWebViews](examples/pywebviews/NOTES.md) (W*),
 [PyGMA](examples/pygma/NOTES.md) (G*),
-[Firebase](examples/firebase/NOTES.md) (F*).
+[Firebase](examples/firebase/NOTES.md) (F*),
+[Sentry](examples/pysentry/NOTES.md) (S*),
+[Stripe](examples/pystripe/NOTES.md) (T*).
 
 P6 and P11 each gained a second example from PyGMA (G2, G4).
 
@@ -1139,6 +1143,82 @@ conflict. A BOM form is also a genuinely new *kind* of declaration, and it
 should wait for evidence that the honest degradation is not good enough in
 practice.
 
+## P25 — iOS URL schemes, a `view_links` counterpart
+
+**Problem.** Stripe's 3D Secure return requires a custom URL scheme registered
+in `CFBundleURLTypes` on iOS — the direct counterpart of the `view_links`
+declaration §6.8 provides on Android, on the platform where Stripe's own
+documentation says it is required. Nothing expresses it.
+
+`CFBundleURLTypes` is an array of dictionaries, and P16 closed that door
+deliberately: dictionary Info.plist support should never be added, because every
+structured case found dissolved into a narrower primitive (three for three).
+
+**This is the fourth case, and it does not dissolve** — or rather it dissolves
+into a primitive the specification already has on the other platform and never
+built here.
+
+**Proposal.**
+
+```toml
+[[ios.contributes.url_schemes]]
+scheme = { application_value = "stripe_return_scheme" }
+reason = "Receives the 3D Secure redirect; StripeAPI.handleURLCallback consumes it"
+```
+
+The consumer generates the `CFBundleURLTypes` entry exactly as it generates the
+Android intent filter, and dictionaries stay excluded. **P16's conclusion
+survives** — no case yet wants *general* dictionary support — but its evidence
+is now three-for-four, and the real defect is the asymmetry rather than the
+dictionary question.
+
+**It would also close T3 as a side effect.** Stripe requires
+`StripeAPI.handleURLCallback(with:)` to be called from
+`application(_:open:options:)` — lifecycle-callback participation, which nothing
+in the specification addresses and which should not get a general mechanism (a
+hook for one delegate method invites hooks for all of them, a larger capability
+than the deferred P1). But a consumer-generated app delegate can forward URL
+callbacks to any producer that declared a scheme, because the scheme *is* the
+registration. The narrow primitive closes the broad problem.
+
+**Evidence.** One vendor, clean-sheet. The mitigating argument is that this is
+not a new capability but a missing half of one already adopted, tested, and
+exercised — §6.8's `view_links`, validated by this same example.
+
+## P26 — Entitlements that carry values
+
+**Problem.** §7.3 entitlements are `key` + `reason`. Three unrelated vendors now
+need to say more:
+
+| Example | Entitlement | What cannot be said |
+| --- | --- | --- |
+| PyOneSignal | `com.apple.security.application-groups` | the value, and that it must match across two targets (B3) |
+| PyCoreLocation | `com.apple.developer.location.push` | valueless, but needs Apple's approval |
+| Stripe | `com.apple.developer.in-app-payments` | it carries merchant identifiers |
+
+Each currently survives only as prose in `reason`.
+
+**Constraint that must not be weakened.** §7.3's rule that a consumer **never
+writes** an entitlement is correct and untouched by this — the values are the
+application's, bound to its provisioning profile. What is missing is the ability
+to state the *shape* the application's entitlement must take, so the consumer
+can report a specific prerequisite rather than a sentence.
+
+**Proposal, deliberately minimal.**
+
+```toml
+[[ios.requires.entitlements]]
+key = "com.apple.security.application-groups"
+value_kind = "string_array"     # closed vocabulary: none | string | string_array
+shared_with_app = true          # cross-target agreement, from P4's draft
+reason = "…"
+```
+
+**Evidence.** Three instances across three vendors, which is past the threshold
+this file has been applying — but each wants something slightly different, and a
+mechanism that covers all three risks being a schema language for entitlement
+plists. Worth deciding deliberately rather than adopting the sketch above.
+
 ## Sequencing
 
 **Land now** — corrections and statements of existing intent, not new
@@ -1160,9 +1240,34 @@ producers to do the wrong thing, or leaving a load-bearing assumption unsaid:
 (Android half promoted to MUST, scoped to per-artifact manifests). Both entries
 above record why the reasoning changed.
 
-**Nothing outstanding.** P21–P24 have been decided: **P23** landed as
-documentation, **P22** landed in full, **P21** landed narrowed to iOS bundle
-files, and **P24** split — its guidance landed, its BOM form did not.
+**Outstanding**: **P25** and **P26**, from Stripe. Neither is decided.
+
+P21–P24 have been decided: **P23** landed as documentation, **P22** landed in
+full, **P21** landed narrowed to iOS bundle files, and **P24** split — its
+guidance landed, its BOM form did not.
+
+**Sentry and Stripe also moved three deferred items without reopening them**,
+and the movement is recorded on each:
+
+- **P1** (startup hooks) — Sentry is a **counter-example**, not evidence. It
+  achieves pre-application initialisation with no producer code at all, using a
+  `ContentProvider` in its AAR plus manifest meta-data. The vendor solved
+  declaratively what P1 proposed a hook for (S2).
+- **P2** (platform-neutral application values) — withdrawn on the claim that
+  four examples produced *zero* live uses of §6.3. **That claim is now false**:
+  Sentry's `io.sentry.dsn` is a live use, and it needs the same value on iOS
+  where no counterpart exists (S1, S4). Two vendors now sit on the P1/P2
+  coupling. A third should reopen both together; they were never separable.
+- **P3**'s deferred `meta_data` half — Google Pay's
+  `com.google.android.gms.wallet.api.enabled` is a fixed entry identical for
+  every application, which is exactly the reopening trigger recorded for it
+  (T4). First instance, and a better argument than the one it was deferred on.
+
+**One landed decision was corrected.** §11's build-script exclusion said such an
+SDK "will build. It will also be useless." True of Crashlytics, false of Sentry,
+whose Gradle plugin is optional and whose configuration is declarative. §11 now
+distinguishes SDKs that **degrade** from those that **fail** (S3) — a correction
+in the direction of more being possible.
 
 The suggested order recorded here before deciding put P21 first as "the pivotal
 one, and the prerequisite for reconsidering P1." Both halves of that were wrong

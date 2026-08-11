@@ -1354,11 +1354,23 @@ plugin uploads the R8 mapping file, and on Apple platforms a run-script build
 phase uploads dSYMs. Sentry, Bugsnag, Instabug and Datadog share the shape.
 
 Such an SDK can be *linked* through §6.5 or §7.4, and the result will build.
-It will also be useless: crash reports arrive unsymbolicated, which is the part
-nobody wants. **This is a permanent exclusion, not a deferral**, and a producer
-in that category should learn it here rather than from a sidecar that succeeds
-and under-delivers. Applications needing such an SDK must configure it in their
-own build, outside this convention.
+**This is a permanent exclusion, not a deferral**, and a producer in that
+category should learn it here rather than from a sidecar that succeeds and
+under-delivers. Applications needing the build-time step must configure it in
+their own build, outside this convention.
+
+The consequence is not uniform, and a producer should work out which case it is
+in before concluding anything:
+
+- **The SDK degrades.** The build-time step adds symbolication to something
+  that already captures and delivers events. Sentry is the example: its Gradle
+  plugin is optional, and the SDK is configured by manifest declarations this
+  specification can express. A wrapper is worth shipping, with a known
+  deficiency.
+- **The SDK fails.** The build-time step is load-bearing for the SDK's core
+  value. Firebase Crashlytics is the example: without its plugin and run-script
+  phase, every report is unsymbolicated, which is the part nobody wants. A
+  wrapper is not worth shipping.
 
 The extension-module rows are qualified the same way: they exclude extension
 modules **carried as binaries in a wheel**, which the platform-tagged wheel PEPs

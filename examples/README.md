@@ -12,16 +12,24 @@ primitives **before** a consumer implements it.
 | [PyWebViews](pywebviews/) | substantial package-owned Swift | **blocked** — not a Python distribution at all |
 | [PyGMA](pygma/) | cross-platform third-party SDK | **clean** on Android; iOS unimplemented upstream |
 | [Firebase](firebase/) | a vendor outside this ecosystem | **blocked** — build plugins, build scripts, service intent filters |
+| [Sentry](pysentry/) | a check on §11's build-script exclusion | **mostly clean** — and the first live use of §6.3 |
+| [Stripe](pystripe/) | `view_links`, and a financial SDK's demands | **clean on Android**; iOS has no browser-return form |
 
-The first four are existing packages from one toolchain lineage. The Firebase
-set is **clean-sheet**: three sidecars written against Google's own documented
-integration for a vendor that has never heard of this convention. It was run
-after the corrections and decisions below had landed, as an independent check on
-"is the declaration set right."
+The first four are existing packages from one toolchain lineage. Firebase,
+Sentry and Stripe are **clean-sheet**: sidecars written against each vendor's
+own documentation, for vendors that have never heard of this convention. They
+were run after the corrections and decisions below had landed, as independent
+checks on "is the declaration set right."
+
+Sentry and Stripe were chosen to test *conclusions* rather than to hunt for
+gaps — §11's build-script exclusion and §6.8's `view_links` respectively. Both
+conclusions largely held; Sentry corrected one sentence of §11 in the direction
+of more being possible, and produced the first live use of §6.3 in the whole
+set, validating a table two earlier decisions had nearly orphaned.
 
 Proposed remedies live in [PROPOSALS.md](../PROPOSALS.md). Gap identifiers are
 per-example: `A*`/`B*`/`C*` (PyOneSignal), `L*` (PyCoreLocation), `W*`
-(PyWebViews), `G*` (PyGMA), `F*` (Firebase).
+(PyWebViews), `G*` (PyGMA), `F*` (Firebase), `S*` (Sentry), `T*` (Stripe).
 
 > **Reading these after the fact.** Each `NOTES.md` describes SPEC.md **as it
 > stood when that example was run** — which for Firebase is the current text,

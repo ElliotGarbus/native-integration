@@ -1,0 +1,81 @@
+# pystripe — HYPOTHETICAL, clean-sheet. Stripe payments.
+#
+# Chosen to test §6.8's `view_links` — the redirect-scheme machinery the spec
+# built for OAuth callbacks and no example had yet exercised — and to see what
+# a financial SDK asks of an application.
+#
+# The result is an asymmetry: Android has the primitive and barely needs it,
+# iOS needs it and has nothing. See NOTES.md, findings T1 and T2.
+
+contract = "1"
+
+# ---------------------------------------------------------------- Android ---
+
+[android.owns]
+java_namespaces = ["org.pystripe"]
+
+[android.requires]
+min_sdk = 21
+compile_sdk = 34
+
+[[android.contributes.gradle_dependencies]]
+module = "com.stripe:stripe-android"
+version = { at_least = "21.0.0", below = "22.0.0" }
+
+[[android.contributes.permissions]]
+name = "android.permission.INTERNET"
+reason = "Stripe API calls and 3D Secure authentication"
+
+[[android.contributes.components]]
+# §6.8's view_links, finally exercised. The 3DS challenge hands control to the
+# issuing bank in a browser; the return lands here. The scheme is per
+# application — registered in the Stripe dashboard — so the producer cannot
+# know it, which is the case §6.3's inline form exists for.
+kind = "activity"
+name = "org.pystripe.PaymentReturnActivity"
+exported_required = true
+reason = "Receives the 3D Secure redirect back from the issuing bank's browser flow"
+
+  [[android.contributes.components.view_links]]
+  scheme = { application_value = "stripe_return_scheme" }
+  host = "stripe-redirect"
+
+[android.contributes.r8]
+keep_classes = ["org.pystripe.**", "com.stripe.**"]
+
+# -------------------------------------------------------------------- iOS ---
+
+[ios.requires]
+deployment_target = "15.0"
+
+[[ios.contributes.swift_packages]]
+name = "StripeIOS"
+url = "https://github.com/stripe/stripe-ios"
+requirement = { from = "24.0.0" }
+products = ["StripePaymentSheet"]
+
+# ------------------------------------------------------------ NOT EXPRESSIBLE
+#
+# T2  The iOS return URL. Stripe requires a custom URL scheme registered in
+#     CFBundleURLTypes — the direct counterpart of the view_links declaration
+#     above, on the platform where Stripe's own documentation says it is
+#     required. §7.6 has no form for it: CFBundleURLTypes is an array of
+#     dictionaries, and P16 concluded dictionaries were excluded by design
+#     because every case found dissolved into a narrower primitive. This one
+#     does not dissolve — it *is* the narrower primitive, missing.
+#
+# T3  Forwarding the callback. StripeAPI.handleURLCallback(with:) must be
+#     called from application(_:open:options:). Not launch-time init (P1) but
+#     participation in an app-delegate lifecycle method — a shape nothing in
+#     the specification addresses. Firebase sidesteps the equivalent by
+#     swizzling; Stripe requires the explicit forward.
+#
+# T4  Google Pay. <meta-data android:name="com.google.android.gms.wallet.api.enabled"
+#     android:value="true"/> is a *fixed* entry, identical for every
+#     application — not an application value in disguise. That is the exact
+#     reopening trigger recorded for P3's deferred meta_data half.
+#
+# T5  Apple Pay. com.apple.developer.in-app-payments carries the merchant
+#     identifiers the application registered with Apple. §7.3 entitlements are
+#     key + reason, with no way to say the entitlement takes values or which
+#     ones — the third example to hit that limit.

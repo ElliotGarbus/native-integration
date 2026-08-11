@@ -1,0 +1,56 @@
+# pysentry — HYPOTHETICAL, clean-sheet. Sentry error monitoring.
+#
+# Chosen to test P23's claim that build-artifact-uploading SDKs are a single
+# excluded category. Sentry turns out to be a *graceful* member of that class,
+# which Crashlytics is not — see NOTES.md, finding S3.
+#
+# It also produces the first live use of §6.3 in the whole example set.
+
+contract = "1"
+
+# ---------------------------------------------------------------- Android ---
+
+[android.requires]
+min_sdk = 21
+compile_sdk = 34
+
+[[android.requires.application_values]]
+# THE FIRST LIVE §6.3 CASE. Sentry's SentryInitProvider — a ContentProvider in
+# the AAR, merged automatically — reads this manifest entry and initialises the
+# SDK before any application code runs, Python included. The build must embed
+# it: no runtime call can supply a value the SDK has already consumed.
+#
+# This is precisely the "value the build must embed" that P19 narrowed §6.3 to,
+# and it arrived from a vendor with no knowledge of that narrowing.
+name = "io.sentry.dsn"
+reason = "Your Sentry project DSN, from Settings → Projects → Client Keys"
+
+[[android.contributes.gradle_dependencies]]
+module = "io.sentry:sentry-android"
+version = { at_least = "8.0.0", below = "9.0.0" }
+
+# -------------------------------------------------------------------- iOS ---
+
+[ios.requires]
+deployment_target = "15.0"
+
+[[ios.contributes.swift_packages]]
+name = "Sentry"
+url = "https://github.com/getsentry/sentry-cocoa"
+requirement = { from = "8.0.0" }
+products = ["Sentry"]
+
+# ------------------------------------------------------------ NOT EXPRESSIBLE
+#
+# S4  The iOS half of the DSN. `SentrySDK.start { $0.dsn = "…" }` must run at
+#     launch with the same value the Android side declares above — and §6.3
+#     lives under [android.requires] with no iOS counterpart. The value is
+#     expressible on one platform and not the other, which is exactly the case
+#     P2 was proposed for and withdrawn for lack of.
+#
+#     Initialising from Python is possible and costs the thing Sentry is for:
+#     crashes before the interpreter starts go unreported.
+#
+# S5  Deobfuscation. The Sentry Gradle plugin uploads R8 mappings; sentry-cli
+#     in a build phase uploads iOS dSYMs. Both are §11 exclusions. Unlike
+#     Crashlytics this degrades rather than fails — see S3.
