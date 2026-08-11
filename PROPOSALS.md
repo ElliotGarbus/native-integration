@@ -1329,6 +1329,52 @@ this file has been applying — but each wants something slightly different, and
 mechanism that covers all three risks being a schema language for entitlement
 plists. Worth deciding deliberately rather than adopting the sketch above.
 
+## P27 — Repository credentials *(DECIDED: minimal flag landed; inline secret rejected)*
+
+> **Decision.** Split, and both halves landed in reduced form.
+>
+> **§6.6 gains `credentials_required = true`** — a flag and nothing more. The
+> producer states that the repository is authenticated; `reason` says which
+> credential and where to get it; the application supplies it through the
+> consumer's own configuration. A consumer **MUST** fail when none is
+> configured, naming the distribution, rather than attempting resolution and
+> surfacing a bare `401`.
+>
+> **The `credential = { username, password = { application_secret = … } }` form
+> below is rejected.** Two reasons, and the second is the one that decides it:
+>
+> - **A sidecar must not name a secret in any spelling**, so `application_secret`
+>   is a reference rather than a value — but the username and the reference
+>   itself are things the consumer *passes through* rather than acts on, and
+>   `reason` carries them more precisely. This is P26's argument exactly: typed
+>   fields the consumer cannot act on are ceremony around a REQUIRED prose field.
+> - **Every field added here is a place a producer can put a secret by
+>   mistake.** A structured credential block invites exactly the error the
+>   section exists to prevent. A boolean cannot hold a token.
+>
+> §6.6 now also states the prohibition directly: a sidecar **MUST NOT** contain
+> a credential in any field, and a consumer **MUST** reject one.
+>
+> **§9 gains the secrets rule, and it was the more important half.** A consumer
+> **MUST NOT** write an application-supplied credential into the record, a
+> report, or a diagnostic. This is a latent defect that existed before this
+> proposal and would have outlived its rejection: §9 requires the record to be
+> durable, diffable and to hash every input, and it is normally committed — so
+> the machinery that exists to make contributions auditable is exactly the
+> machinery that would publish a credential to version control. Nothing else in
+> the specification would have prompted an implementer to think about it.
+>
+> **On the evidence.** One vendor, clean-sheet — but the escape-hatch test comes
+> out differently here than for P4 or P25. There the application could do the
+> work and the specification's job was to say so. Here the application *can*
+> also add the repository itself, but that is the pre-convention status quo the
+> whole document exists to abolish, and §6.6 already exists to do better. A
+> section built specifically for custom repositories that cannot express the
+> commonest reason one exists is an internal inconsistency, not a missing
+> feature.
+>
+> Original proposal follows.
+
 ## P27 — Repository credentials, and keeping them out of the record
 
 **Problem.** §6.6's repository contribution has `url`, `reason`, `groups` and
@@ -1406,9 +1452,10 @@ producers to do the wrong thing, or leaving a load-bearing assumption unsaid:
 (Android half promoted to MUST, scoped to per-artifact manifests). Both entries
 above record why the reasoning changed.
 
-**Outstanding**: **P27**, from Mapbox — the only one open. P25 and P26 are
-decided: P25's `requires` form landed in §7.3 while its contribution form was
-rejected on the platform asymmetry, and P26 was rejected outright.
+**Nothing outstanding.** P27 is decided — §6.6 gained a `credentials_required`
+flag, §9 gained a rule against recording secrets, and the structured credential
+form was rejected. P25's `requires` form landed in §7.3 while its contribution
+form was rejected on the platform asymmetry, and P26 was rejected outright.
 
 **Three of the last four decisions turned on the same defect in my own
 reasoning**, and it is worth naming rather than burying:

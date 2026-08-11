@@ -90,7 +90,19 @@ non-functional. And the §9 interaction means a naive implementer *will* leak th
 secret into a committed artifact unless the specification says not to — which it
 currently has no occasion to say, because it does not know credentials exist.
 
-Recorded as **P27**. Not decided here.
+Recorded as **P27**.
+
+> **Decided since.** §6.6 gained `credentials_required = true` — the flag and
+> nothing more — plus an explicit prohibition on a sidecar containing a
+> credential in any field. The structured `credential = { username, password }`
+> form sketched above was **rejected**: the username and the secret reference
+> are things a consumer passes through rather than acts on, so `reason` carries
+> them better, and every field added there is somewhere a producer could put a
+> token by mistake. A boolean cannot hold a secret.
+>
+> §9 gained the rule against recording secrets, and that was the more important
+> half — it fixes a defect that existed before this proposal and would have
+> outlived its rejection.
 
 ## M3 — two tokens, and only one of them is a build concern
 

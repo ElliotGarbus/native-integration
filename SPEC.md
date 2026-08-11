@@ -590,6 +590,48 @@ and **SHOULD** surface them in any standing diagnostic (e.g. a doctor check). A
 consumer **MAY**, as its own policy, require explicit application approval
 before adding a contributed repository to resolution.
 
+**Authenticated repositories: `credentials_required`.** Many private
+repositories need credentials, and the commonest reason a vendor hosts its own
+is precisely that access is gated:
+
+```toml
+[[android.contributes.gradle_repositories]]
+url = "https://api.mapbox.com/downloads/v2/releases/maven"
+reason = """\
+Mapbox does not publish to Maven Central. Access needs a Mapbox token scoped \
+DOWNLOADS:READ, used as the password with username "mapbox"."""
+groups = ["com.mapbox"]
+credentials_required = true
+```
+
+- **A sidecar MUST NOT contain a credential, in any field, under any spelling.**
+  A consumer **MUST** reject one. A sidecar is package data inside a wheel: it
+  is readable by everyone who installs the distribution and by anyone browsing
+  the archive.
+- `credentials_required = true` declares only that the repository is
+  authenticated. The application supplies the credentials through the
+  consumer's own configuration, whose form is the consumer's concern; `reason`
+  **MUST** say what credential is needed and where to obtain it.
+- A consumer **MUST** report an authenticated repository as a prerequisite and
+  **MUST** fail when no credentials are configured for it, naming the
+  distribution — rather than attempting resolution and surfacing a bare `401`.
+- A consumer **MUST NOT** write supplied credentials into the generated
+  project in any persisted form, into the integration record (§9), or into any
+  diagnostic.
+
+> Rationale for the shape. This is `exported_required`'s pattern (§6.8): a
+> requires-flavoured flag on a contribution, where the producer states a need
+> and the application decides. The credential itself is never named because
+> there is nowhere safe to name it — and §9 makes that sharper than it first
+> appears, since the record must be durable and diffable, and is usually
+> committed. A credential reaching a sidecar would be laundered into the
+> application's version control **by a rule written to improve auditability**.
+>
+> Only the flag is modelled, not the credential's shape or username, because
+> everything past "this repository is authenticated" is something the consumer
+> passes through rather than acts on, and `reason` carries it more precisely
+> than a field would.
+
 ### 6.7 Permissions and features: `[[android.contributes.permissions]]`, `[[android.contributes.features]]`
 
 ```toml
@@ -1210,8 +1252,9 @@ A conforming consumer **MUST**:
 9. Record each distribution's resolved contribution durably and in reviewable
    form, per the lifecycle of §9, and fail the build when the effective set
    drifts from the last accepted record.
-10. Restrict contributed repositories to their declared groups/modules and
-    report them with distinct prominence (§6.6).
+10. Restrict contributed repositories to their declared groups/modules, report
+    them with distinct prominence, and reject a sidecar containing a credential
+    (§6.6).
 11. Validate shrinker keep patterns against their permitted scopes (§6.9).
 12. Enforce reproducible native dependency resolution: reject unbounded and
     changing versions, and lock the **fully resolved graph, transitives
@@ -1243,6 +1286,9 @@ A conforming consumer **MUST**:
     never create, fetch, or register one (§7.3).
 24. Generate `intent_filters` only on components that are neither exported nor
     declaring `view_links`, and show each action in the record (§6.8).
+25. Fail when a repository declaring `credentials_required` has no credentials
+    configured, and never write a supplied credential into the generated
+    project, the record, or a diagnostic (§6.6, §9).
 
 > Rationale for 16. Every other rule here assumes native resolution *succeeds*.
 > It need not: two distributions in one closure can declare native dependencies
@@ -1341,6 +1387,19 @@ manifest to read.
 > — it requires no manifest merger, and a consumer that drives Gradle can
 > alternatively read AGP's own merged manifest and blame report, which supply
 > the attribution directly.
+
+**Secrets are never recorded.** A consumer **MUST NOT** write an
+application-supplied credential — or any value the application supplies as a
+secret — into the integration record, into a report, or into a diagnostic. Where
+a record must refer to one, it refers to the *requirement* (that a repository is
+authenticated, §6.6) and never to the value.
+
+> This is the one place where the rest of this section works against itself. The
+> record is required to be durable, diffable, and to hash every input, and it is
+> normally committed — so the machinery that exists to make contributions
+> auditable is exactly the machinery that would publish a credential to version
+> control. The rule is stated here rather than left to implementers' judgement
+> because nothing else in this specification would prompt the thought.
 
 Two concepts are worth distinguishing by name, though this specification
 mandates neither a file nor a format:

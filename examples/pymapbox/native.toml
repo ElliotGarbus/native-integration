@@ -22,8 +22,16 @@ compile_sdk = 34
 # anything else in the build, and Mapbox's own artifacts are the only thing it
 # should ever serve.
 url = "https://api.mapbox.com/downloads/v2/releases/maven"
-reason = "Mapbox does not publish its Maps SDK artifacts to Maven Central"
+reason = """\
+Mapbox does not publish its Maps SDK artifacts to Maven Central. Access needs a \
+Mapbox token scoped DOWNLOADS:READ, used as the password with username \
+"mapbox"; create one in the Mapbox account dashboard."""
 groups = ["com.mapbox"]
+# Finding M2. The flag says only that the repository is authenticated — the
+# token is never named here, because a sidecar is package data in a wheel and
+# §9 would hash it into a committed record. The application supplies it
+# through the consumer's own configuration.
+credentials_required = true
 
 [[android.contributes.gradle_dependencies]]
 module = "com.mapbox.maps:android"
@@ -48,22 +56,6 @@ requirement = { from = "11.0.0" }
 products = ["MapboxMaps"]
 
 # ------------------------------------------------------------ NOT EXPRESSIBLE
-#
-# M2  THE REPOSITORY CREDENTIAL — and this one is load-bearing.
-#
-#     The repository above is not anonymous. It requires HTTP basic auth with
-#     username "mapbox" and a password that is a *secret* Mapbox token scoped
-#     DOWNLOADS:READ, which Mapbox's own documentation says to keep in
-#     ~/.gradle/gradle.properties and out of source control.
-#
-#     §6.6 has `url`, `reason`, `groups` and `modules`. There is no way to say
-#     the repository needs credentials at all — so a consumer that reads this
-#     sidecar and does exactly what it says gets 401 on every com.mapbox
-#     artifact. The declaration is incomplete by necessity, not by oversight:
-#     a secret in a sidecar would ship inside a wheel, world-readable to
-#     everyone who installs it, and §9 would then hash it into a committed
-#     record. The specification is right to have no field here and wrong to
-#     have nothing.
 #
 # M3  The public access token. Different token, different purpose: `pk.`,
 #     runtime, per-application. Android reads it from a string resource
