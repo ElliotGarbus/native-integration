@@ -1,0 +1,50 @@
+# PyCoreLocation — https://github.com/PyPlatformPackages/PyCoreLocation
+#
+# Valid under contract "1". See NOTES.md — this example is less a success than
+# it looks. Two of the entries below are things version 1 permits that it
+# probably should not, and the package's central requirement (registering its
+# Swift-implemented Python module with the interpreter) is absent because there
+# is no way to say it.
+
+contract = "1"
+
+# -------------------------------------------------------------------- iOS ---
+
+[ios.requires]
+# Package.swift declares .iOS(.v13); PyLocationManager guards iOS 14 APIs with
+# #available.
+deployment_target = "13.0"
+
+[[ios.contributes.swift_packages]]
+# The producer declares *itself*. The wheel carries only a typing stub —
+# src/py_core_location.py is marked "do not try add this file to a real app" —
+# so the implementation arrives here, from git, not from the distribution.
+# See NOTES.md, finding L1.
+#
+# It has to be a revision, not a version: the repository carries no git tags at
+# all, so SwiftPM cannot resolve it by version and the only two forms left are
+# `revision` and `branch` — and §7.4 forbids `branch`. The distribution's own
+# version (0.1.0) therefore appears nowhere in the declaration.
+name = "PyCoreLocation"
+url = "https://github.com/PyPlatformPackages/PyCoreLocation"
+requirement = { revision = "fd5fd803339e3d3161011c26de53326d54766c84" }
+products = ["PyCoreLocation"]
+
+[ios.contributes.info_plist.values]
+# This is what §7.6 currently sanctions, and its own example does the same
+# thing. It is wrong: a purpose string is user-facing, localized, App Store
+# reviewed text that belongs to the application, not to a library that cannot
+# know what the application does with location. See NOTES.md, finding L3.
+NSLocationWhenInUseUsageDescription = "This app uses your location."
+
+# Deliberately absent, though version 1 would accept them:
+#
+#   UIBackgroundModes = ["location"]                     (append)
+#   NSLocationAlwaysAndWhenInUseUsageDescription         (values)
+#
+# Both are needed only by applications that use a subset of this package's API.
+# §12 says feature-conditional surface belongs in optional distributions — but
+# a 1:1 framework binding cannot be split that way (NOTES.md, finding L4), so
+# the choice here is between handing every application background-location
+# capability and handing applications that need it nothing. This file takes the
+# second option. Neither is right.

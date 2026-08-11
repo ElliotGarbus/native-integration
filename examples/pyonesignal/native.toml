@@ -1,0 +1,64 @@
+# PyOneSignal — https://github.com/PyPlatformPackages/PyOneSignal
+#
+# Everything in this file is valid under contract "1". It is NOT the whole
+# integration: the parts version 1 cannot express are listed in NOTES.md, and
+# the shape they would need is sketched there. Read that file before treating
+# this one as a worked example of a complete integration.
+
+contract = "1"
+
+# ---------------------------------------------------------------- Android ---
+
+[android.requires]
+# OneSignal Android SDK 5.x floor.
+min_sdk = 23
+# POST_NOTIFICATIONS is an API 33 constant; the AAR itself also compiles
+# against 34.
+compile_sdk = 34
+
+[[android.contributes.gradle_dependencies]]
+# Upstream documents this as the range "[5.6.1, 5.9.99]". §6.5 forbids dynamic
+# versions, so the producer pins and re-releases. See NOTES.md, finding A1.
+coordinate = "com.onesignal:OneSignal:5.6.1"
+
+[[android.contributes.permissions]]
+name = "android.permission.INTERNET"
+reason = "OneSignal REST API and FCM delivery"
+
+[[android.contributes.permissions]]
+name = "android.permission.POST_NOTIFICATIONS"
+reason = "Displaying push notifications on Android 13+"
+
+[android.contributes.r8]
+# The Python half reaches com.onesignal.* entirely through pyjnius: autoclass()
+# for OneSignal/Continue, and PythonJavaClass implementations of
+# com.onesignal.notifications.INotificationClickListener and
+# INotificationLifecycleListener. None of it is visible to the shrinker.
+# Permitted by §6.9 scope 2 — the group of a coordinate this sidecar declares.
+keep_classes = ["com.onesignal.**"]
+
+# -------------------------------------------------------------------- iOS ---
+
+[ios.requires]
+deployment_target = "12.0"
+
+[[ios.requires.entitlements]]
+key = "aps-environment"
+reason = "APNs push delivery"
+
+[[ios.requires.entitlements]]
+key = "com.apple.security.application-groups"
+reason = """\
+Shared container between the app and the OneSignal notification service \
+extension, required for confirmed delivery, badges, and image attachments. \
+OneSignal expects group.<main-app-bundle-id>.onesignal, and the same group \
+must be set on both targets."""
+
+[[ios.contributes.swift_packages]]
+name = "OneSignal"
+url = "https://github.com/OneSignal/OneSignal-XCFramework"
+requirement = { from = "5.4.1" }
+products = ["OneSignalFramework"]
+
+[ios.contributes.info_plist.append]
+UIBackgroundModes = ["remote-notification"]

@@ -1,0 +1,69 @@
+# PyGMA — https://github.com/PyPlatformPackages/PyGMA
+#
+# Valid under contract "1", and the closest thing to a clean fit in the example
+# set: this is the first sidecar that exercises the Android half of the
+# specification end to end — owns, requires, src, dependencies, permissions, and
+# shrinker scopes — with no workaround.
+#
+# The two interesting findings are things that are *absent*. See NOTES.md.
+
+contract = "1"
+
+# ---------------------------------------------------------------- Android ---
+
+[android.owns]
+# The package's Java is `package PyGMA;` — a single-label namespace, reached
+# from Python as autoclass("PyGMA.PyGMAManager"). Ownable under §6.1 and
+# collision-checked, but a poor claim; see NOTES.md, findings G2 and G3.
+java_namespaces = ["PyGMA"]
+
+[android.requires]
+# GMA Next-Gen SDK floors, per Google's setup guide.
+min_sdk = 24
+compile_sdk = 34
+
+[android.contributes.src]
+# Seven files: PyGMAManager, PyBannerAd, PyInterstitialAd, PyRewardedAd,
+# PyRewardedInterstitialAd, PyAppOpenAd, and the PyGMAListener interface.
+# In the repository today these live at src/java/PyGMA/ with a
+# [tool.pyjnius] java-paths pointer; under §4.1 they move inside the sidecar
+# directory, e.g. src/pygma/_native/java/PyGMA/.
+java = ["java"]
+
+[[android.contributes.gradle_dependencies]]
+# Already exactly versioned in the repository — no §6.5 friction here, in
+# contrast to PyOneSignal, whose vendor documents a range.
+coordinate = "com.google.android.libraries.ads.mobile.sdk:ads-mobile-sdk:1.2.1"
+
+[[android.contributes.permissions]]
+name = "android.permission.INTERNET"
+reason = "Ad request and creative delivery"
+
+[[android.contributes.permissions]]
+name = "android.permission.ACCESS_NETWORK_STATE"
+reason = "The SDK checks connectivity before requesting ads"
+
+[android.contributes.r8]
+# Both §6.9 scopes in one declaration, which no earlier example managed:
+#   PyGMA.**  — scope 1, an owned namespace. Required: listener.py implements
+#               PyGMA/PyGMAListener from Python via PythonJavaClass, so the
+#               interface and its implementors are reached only reflectively.
+#   com.google.…sdk.** — scope 2, the group of a coordinate declared above.
+keep_classes = ["PyGMA.**", "com.google.android.libraries.ads.mobile.sdk.**"]
+
+# No [[android.requires.application_values]].
+#
+# This is the finding. §6.3's own example is the AdMob application ID as a
+# manifest <meta-data> entry — but that is the *legacy* Mobile Ads SDK's
+# mechanism. The Next-Gen SDK this package wraps takes the app ID
+# programmatically, through InitializationConfig.Builder(appId), and PyGMA
+# passes it in from Python: GMAManager.initialize(app_id). Nothing needs to
+# reach the manifest. See NOTES.md, finding G1.
+
+# No [ios] table.
+#
+# PyGMA describes itself as a cross-platform wrapper and is architected for it —
+# platform_detection.py returns "ios", and manager.py has an iOS branch — but
+# the branch is commented out and there is no iOS implementation. Under §5 an
+# absent platform table is valid and contributes nothing, so an iOS build
+# succeeds and silently shows no ads. See NOTES.md, finding G4.

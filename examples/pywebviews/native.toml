@@ -1,0 +1,39 @@
+# PyWebViews — https://github.com/PyPlatformPackages/PyWebViews
+#
+# HYPOTHETICAL. PyWebViews is not a Python distribution: no pyproject.toml, no
+# wheel, no dist-info. It is a SwiftPM package, and the .py file it ships lives
+# under Sources/ as Swiftonize code-generation input, not as an importable
+# module. Under §3.2 it cannot be discovered at all — there is nothing for
+# importlib.metadata to find. See NOTES.md, finding W1.
+#
+# This file is what the sidecar would look like if the project shipped a thin
+# wheel to carry it, which is the only way it can participate. Everything below
+# is valid contract "1".
+
+contract = "1"
+
+# -------------------------------------------------------------------- iOS ---
+
+[ios.requires]
+# Package.swift: platforms: [.iOS(.v13)]
+deployment_target = "13.0"
+
+[[ios.contributes.swift_packages]]
+name = "PyWebViews"
+url = "https://github.com/PyPlatformPackages/PyWebViews"
+# The repository's tags are 311.0.0 … 311.1.3. The major encodes the CPython
+# ABI (3.11), not the package's own evolution, so `from` here means
+# "any 3.11-ABI build" — and a 3.13 application must never resolve it.
+# §7.4 cannot express that constraint. See NOTES.md, finding W3.
+requirement = { from = "311.1.3" }
+products = ["PyWebViews"]
+
+# UIViewRender, KivyTexture, PySwiftKit and PythonCore are Package.swift
+# dependencies and resolve transitively. Correctly not the sidecar's business —
+# but §7.4 does not record them either, unlike §6.5 on the Android side.
+
+# Nothing else. WKWebView requires no permission, no entitlement, and no
+# Info.plist key of its own. The conditional ones — NSAppTransportSecurity for
+# cleartext URLs, NSCameraUsageDescription / NSMicrophoneUsageDescription for
+# getUserMedia inside the web view — depend on what the *application* loads, so
+# a web view binding cannot honestly declare any of them. See NOTES.md, W6.
