@@ -70,7 +70,16 @@ reason = "Ad delivery"
 [[android.contributes.permissions]]
 name = "android.permission.ACCESS_NETWORK_STATE"
 reason = "Connectivity checks before ad requests"
+
+# The one thing the package cannot know: your own AdMob account's ID.
+[[android.requires.application_values]]
+name = "com.google.android.gms.ads.APPLICATION_ID"
+reason = "Your AdMob application ID, from the AdMob console"
 ```
+
+*(Illustrative. Today's KivMob also ships a separately-published bridge artifact
+from its own Maven repository; a package adopting this convention would put that
+Java in its own wheel via `contributes.src`, which is the shape shown here.)*
 
 Everything a package declares falls into one of three categories: **`owns`**
 (exclusive claims, like a Java namespace — collision-checked across all
@@ -92,11 +101,22 @@ A package that binds a whole platform framework can also mark a prerequisite
 `requestAlwaysAuthorization()`"* — so apps that never touch a feature are not
 made to carry it.
 
-The app author's `pyproject.toml` simplifies to:
+The app author's `pyproject.toml` then carries the dependency and the one value
+that is genuinely theirs:
 
 ```toml
 dependencies = ["kivmob"]
 ```
+
+plus the AdMob application ID, supplied once through the build tool's own
+configuration — the spec requires that the tool offer a way to supply it, and
+leaves the spelling to the tool.
+
+Not zero configuration — **no transcription**. What remains is the account
+identifier no package could know, and the build fails naming KivMob if it is
+missing. What disappears is the Maven coordinate, the repository, the
+permissions, the SDK floors and the Java, none of which the app author ever had
+a reason to be holding.
 
 Read the full [specification](SPEC.md).
 

@@ -569,12 +569,30 @@ version = { at_least = "5.6.1", below = "6.0.0" }
   annotation processors) may be added in a minor revision; per §4.4 a consumer
   **MUST** reject a value it does not implement, naming the distribution.
 
+**A declared version is a requirement, not a pin.** Gradle treats the version in
+a dependency declaration as the version that module *requires*, and its conflict
+resolution may select a **higher** one when something else in the graph requires
+it. This specification keeps that behaviour: a consumer **MUST NOT** silently
+convert a declaration into a `strictly` constraint, because doing so would make
+two producers that name different versions of one library unresolvable, and
+composing independently-authored packages is the point.
+
+The consequence is that **`coordinate = "g:a:1.2.3"` does not promise 1.2.3 will
+be used.** Where the selected version differs from the declared one, the record
+and report of §9 **MUST** show both:
+
+```
+  + dependency  com.example:widget   requested 1.2.3 → resolved 1.4.0
+```
+
 **Resolution is locked, not merely versioned.** An exact coordinate does not by
-itself make resolution reproducible: transitive versions can float. A consumer
-**MUST** record the fully resolved dependency graph — every artifact and
-version, including transitives — in the integration record (§9), and **MUST**
-resolve from that record on subsequent builds until a new resolution is
-accepted. A consumer **SHOULD** record a checksum per resolved artifact.
+itself make resolution reproducible: transitive versions can float, and — per the
+paragraph above — so can direct ones. A consumer **MUST** record the fully
+resolved dependency graph — every artifact and version, including transitives —
+in the integration record (§9), and **MUST** resolve from that record on
+subsequent builds until a new resolution is accepted. A consumer **SHOULD**
+record a checksum per resolved artifact, which is what makes "identical on every
+build" a claim about bytes rather than about version strings.
 
 > Why a bounded range is permitted at all: the lock is what delivers
 > reproducibility, and it delivers it identically for both forms. §7.4 has
@@ -706,13 +724,28 @@ name = "android.hardware.bluetooth_le"
 
 **Application-side suppression.** A consumer **MUST** provide a means for the
 application to suppress any contributed permission. A suppressed permission
-**MUST** be omitted from the generated manifest, together with any feature it
-alone implied, and the suppression **MUST** appear in the record and report of
-§9 (e.g. `− android.permission.ACCESS_FINE_LOCATION (suppressed by
+**MUST** be absent from the **effective merged manifest**, together with any
+feature it alone implied, and the suppression **MUST** appear in the record and
+report of §9 (e.g. `− android.permission.ACCESS_FINE_LOCATION (suppressed by
 application)`). Suppression is global per permission — the merged manifest
 either carries the permission or it does not — and this specification does not
 define the application-side syntax, only the capability; the application's
 configuration format is the consumer's concern.
+
+**Omitting it from the generated manifest is not sufficient.** A resolved `.aar`
+carries its own `AndroidManifest.xml`, which AGP merges into the application's,
+so a permission the consumer never wrote can still arrive from a dependency —
+and the permission a producer declares here is very often the same one its AAR
+declares. Where that happens the consumer **MUST** emit an explicit
+manifest-merger removal (`tools:node="remove"`) so the permission is absent from
+the merged result, and **MUST** report it as suppressed rather than silently
+losing the suppression.
+
+> Without this the authority model is aspirational rather than real: the
+> application's refusal would be honoured in the one file the consumer writes
+> and quietly overridden by the merger. `tools:node="remove"` is the mechanism
+> the platform provides for exactly this case, which is why §6.7's rationale
+> below cites it.
 
 Suppression is **at the application's own risk**: the producer's code may fail
 at runtime, or degrade silently, when a permission it declared is withheld. A
@@ -770,6 +803,13 @@ a consumer **MUST** treat that as an application prerequisite: it **MUST NOT**
 register the component as exported without explicit application approval, and
 **MUST** report the pending requirement, naming the distribution and the
 `reason`.
+
+Where approval is absent the consumer **MUST fail**. It **MUST NOT** fall back
+to registering the component unexported: the producer has said the component is
+useless unless reachable, so a non-exported registration produces an application
+that builds and then does not work — the silent-breakage case this specification
+exists to prevent. Approval is the application's to give or withhold; withholding
+it means the integration cannot proceed, not that it proceeds broken.
 
 > Rationale: an exported component is an IPC entry point reachable by any other
 > application on the device. Some integrations legitimately need one — OAuth
@@ -956,6 +996,14 @@ prerequisites and **MUST NOT** satisfy any of them: not by writing an
 entitlement, not by writing an `Info.plist` key, and not by creating a build
 target.
 
+**An unsatisfied prerequisite fails the build**, naming the distribution and the
+`reason`. Reporting alone is not enough: an entitlement the application has not
+enabled produces a `codesign` failure far from its cause, and a missing usage
+description terminates the application the first time the API is touched. The
+consumer fails early, where the diagnostic can still name the distribution that
+needed it. Prerequisites marked `conditional` are the sole exception, and are
+recorded rather than enforced (below).
+
 **Conditional prerequisites.** Any entry in these three tables **MAY** declare
 `conditional = true`, meaning *the producer cannot determine whether this
 applies; the application can*:
@@ -1126,11 +1174,23 @@ package index; a consumer **MUST** reject it, naming the distribution.
 
 Reproducibility (§2.1) applies across platforms, and — as on the Android side —
 **the whole graph is locked, not only what the sidecar names.** A consumer
-**MUST** record the fully resolved Swift package graph, every package and
-version **including transitives**, in the integration record (§9), and **MUST**
-resolve from that record on subsequent builds until a new resolution is
-accepted. This is the semantics SwiftPM itself implements with
-`Package.resolved`.
+**MUST** record the fully resolved Swift package graph, every package
+**including transitives**, in the integration record (§9), and **MUST** resolve
+from that record on subsequent builds until a new resolution is accepted.
+
+**Record the resolved revision, not only the resolved version.** A version is a
+tag, and a tag can be moved; the commit is what identifies the source that was
+built. `Package.resolved` records both, and the integration record **MUST**
+preserve both for every package in the graph — for `exact` and `revision`
+requirements as much as for `from`, since a locked graph that only remembers
+version strings does not pin what a later build will fetch.
+
+> Neither requirement form is inherently safer. `exact` looks stricter and is
+> the right choice when a vendor's components must move together, but it also
+> makes two packages that pin different versions of one dependency
+> unresolvable. `from` composes better and is pinned just as firmly once the
+> resolution is recorded. Choose on whether the dependency's versions are
+> independent, not on which spelling sounds stricter.
 
 **The declaration rules above bind the sidecar; the resolved graph is where they
 are enforced.** A declared package's own `Package.swift` may name anything — a
@@ -1208,6 +1268,24 @@ Two contribution modes, by shape:
   application are concatenated and de-duplicated in a deterministic order: the
   application's entries first, then each distribution's in normalized
   distribution-name order.
+
+**TOML-to-plist mapping.** "Set verbatim" is not enough for two implementations
+to agree, so the correspondence is fixed:
+
+| TOML type | plist type |
+| --- | --- |
+| string | `<string>` |
+| integer | `<integer>` |
+| float | `<real>` |
+| boolean | `<true/>` / `<false/>` |
+| array of the above, homogeneous | `<array>` |
+
+A consumer **MUST** reject any other TOML type — offset/local date-times, and
+inline or nested tables — naming the distribution and the key. Dictionary values
+are excluded by design (below), and dates have no motivating case; admitting
+either by inference is how two readers start producing different `Info.plist`
+files from one sidecar. An array **MUST** be homogeneous: a mixed-type array has
+no unambiguous plist form.
 
 **Usage descriptions are not contributable.** A consumer **MUST** reject any
 `values` key whose name ends in `UsageDescription`, or which is otherwise a
@@ -1301,11 +1379,15 @@ A conforming consumer **MUST**:
    exported without explicit application approval (§6.8), and never write a
    required entitlement or usage description (§7.3) — including rejecting a
    usage description offered as an `info_plist` value (§7.6).
-7. Provide application-side permission suppression, honor it in the generated
-   manifest, and report it (§6.7).
+7. Provide application-side permission suppression, ensure a suppressed
+   permission is absent from the **effective merged** manifest — emitting a
+   merger removal rule when a resolved dependency contributes it — and report
+   it (§6.7).
 8. Fail when a producer's `requires` exceeds the application's configuration
-   (§6.2, §7.2), or when a required application value — declared or referenced
-   inline — is absent (§6.3).
+   (§6.2, §7.2), when a required application value — declared or referenced
+   inline — is absent (§6.3), when an unconditional §7.3 prerequisite is
+   unsatisfied, or when a component declaring `exported_required` has no
+   application approval (§6.8).
 9. Record each distribution's resolved contribution durably and in reviewable
    form, per the lifecycle of §9, and fail the build when the effective set
    drifts from the last accepted record.
@@ -1315,9 +1397,11 @@ A conforming consumer **MUST**:
 11. Validate shrinker keep patterns against their permitted scopes (§6.9).
 12. Enforce reproducible native dependency resolution: reject unbounded and
     changing versions, and lock the **fully resolved graph, transitives
-    included** — Gradle and SwiftPM alike — in the record, resolving from it
-    thereafter (§6.5, §7.4). Reject a resolved Swift graph containing a branch
-    or path dependency (§7.4).
+    included** — Gradle and SwiftPM alike, recording the resolved *revision* for
+    Swift packages — in the record, resolving from it thereafter (§6.5, §7.4).
+    Never convert a declared Gradle version into a `strictly` constraint, and
+    show requested-versus-resolved where they differ (§6.5). Reject a resolved
+    Swift graph containing a branch or path dependency (§7.4).
 13. Validate `view_links` (activity-only, export-gated) and generate their
     filters (§6.8).
 14. Exclude sidecar directories from any Python payload it assembles.
@@ -1382,6 +1466,14 @@ The lifecycle is:
 4. **Fail, or require explicit acceptance** (a re-lock, a flag, a committed
    record — the consumer's workflow decides the form).
 5. **Update the record** only on acceptance.
+
+**The first build is step 4, not an exemption.** When no accepted record exists,
+every contribution is new, and a consumer **MUST** require the same explicit
+acceptance it would require for a change — reporting the whole effective set
+rather than silently writing a record and proceeding. A single bootstrap action
+covering the initial set satisfies this; treating "no record yet" as implicit
+approval does not, because the first build is the one where an application
+acquires *all* of its inherited native surface at once.
 
 A report **MUST** carry three things — the distribution, **how it entered the
 dependency closure**, and the delta:
@@ -1487,8 +1579,12 @@ A lockfile entry, a checksum file beside the generated project, or any other
 durable artifact satisfies the record. The normative property is that a change
 in what distributions contribute **MUST NOT** pass silently.
 
-> Disclosure is not enforcement. If nobody reads the diff, it ships. This is a
-> deliberate trade: a blocking prompt inside a build loop earns click-through
+> **What this does and does not guarantee.** The build *does* stop: an
+> unaccepted change fails, and that is requirement 8.9. What acceptance cannot
+> guarantee is that anyone read what they accepted — a reviewer can approve a
+> delta unexamined, and no mechanism in a build tool prevents that. So this is a
+> review gate whose *blocking* is enforced and whose *scrutiny* is not, which is
+> a deliberate trade: a blocking prompt inside a build loop earns click-through
 > quickly and then provides nothing, whereas a recorded delta stays attributable
 > before the fact in review and after the fact in history. The places this
 > specification goes beyond disclosure — exported components (§6.8),
@@ -1538,8 +1634,32 @@ is the narrower scope stated there rather than new machinery (§7.1).
 | iOS frameworks in wheels | Solved by `ios_*`-tagged wheels ([PEP 730](https://peps.python.org/pep-0730/)) |
 | Android resources (`res/`) | Resource names are a flat global namespace per type, so no ownership rule can be built for them (§6.1 needs dots to compute containment). A producer shipping `values/strings.xml` with `app_name` renames the application. Resources reach an application through an `.aar` from a declared coordinate, where AGP merges them and §9 reports them |
 | Scripts, hooks, build plugins | Excluded on principle (§2.1), not as a deferral |
+| **Native runtime lifecycle composition** | No way for a producer to run code at application start, or to participate in an app-delegate callback. Deliberate in version 1, and not on principle — see below |
 | Xcode build settings, compiler/linker flags | Arbitrary build mutation; revisit only with a concrete, bounded need |
 | Application configuration — *writing* it | The application's own build settings are the consumer's concern. **Declaring a requirement on it is in scope** and is most of §7.3; see below |
+
+**The lifecycle row is a deferral, not a principle**, and is the most
+consequential thing version 1 cannot express. Real SDKs want it: Firebase calls
+`FirebaseApp.configure()` from `application(_:didFinishLaunchingWithOptions:)`,
+OneSignal's Android integration is an `Application` subclass, and Stripe needs a
+URL callback forwarded from the app delegate. Each is currently the
+**application's** work to wire up, and a producer can only say it is needed.
+
+Two things argue for waiting rather than for closing the gap. Some vendors reach
+the same result declaratively — Sentry initializes before any application code
+through a `ContentProvider` in its own library plus manifest meta-data (§6.3),
+with no producer code at launch — so a hook is not the only shape the problem
+takes. And a startup hook is the largest runtime capability this specification
+could grant: unlike a `service` or `receiver`, which run when the platform
+routes an event to them, it would run unconditionally and first, in every
+application that acquires the package transitively.
+
+If it is added, the shape should be a **closed vocabulary of events plus a
+producer-owned typed handler**, with the consumer generating a static
+dispatcher — never a source snippet to splice in, which would breach §2.1. The
+singleton slots such a design depends on (`<application android:name>`, the
+generated entry point) are the consumer's, and a producer **MUST NOT** be able
+to claim one meanwhile.
 
 **The application-configuration row is a boundary, not a silence.** A producer
 cannot write the application's entitlements, `Info.plist`, bundle contents,
