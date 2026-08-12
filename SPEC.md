@@ -968,9 +968,6 @@ kind = "activity"
 name = "org.example.mypkg.RedirectActivity"
 exported_required = true
 reason = "Receives the OAuth redirect from the browser"
-
-  [[android.contributes.components.view_links]]
-  scheme = { application_value = "oauth_redirect_scheme" }
 ```
 
 **Provenance.** A component's class comes from one of two places, and the entry
@@ -996,10 +993,9 @@ register the component as exported without explicit application approval, and
 
 Where approval is absent the consumer **MUST fail**. It **MUST NOT** fall back
 to registering the component unexported: the producer has said the component is
-useless unless reachable, so a non-exported registration produces an application
-that builds and then does not work — the silent-breakage case this specification
-exists to prevent. Approval is the application's to give or withhold; withholding
-it means the integration cannot proceed, not that it proceeds broken.
+useless unless reachable, so a non-exported registration builds an application
+that does not work. Withholding approval means the integration cannot proceed,
+not that it proceeds broken.
 
 > Rationale: an exported component is an IPC entry point reachable by any other
 > application on the device. Some integrations legitimately need one — OAuth
@@ -1059,17 +1055,14 @@ name = "org.example.mypkg.MessagingService"
   declares `view_links`.
 - The record and report of §9 **MUST** show the action alongside the component.
 
-> Rationale, and why this is not the intent-filter grammar §6.8 otherwise
-> declines to model. `view_links` exists because the classic failure is a
-> hand-written browser filter missing `DEFAULT`, so the consumer generates the
-> filter and the producer cannot spell one. This is the opposite shape: a single
-> vendor-defined action on a component no other application can reach, with no
-> categories and no data — nothing to get subtly wrong, and no externally
-> reachable surface opened, since the export rules above are untouched.
->
-> The exported case is deliberately still excluded. A filter on an exported
-> component is an IPC entry point, which is a different security question and
-> has no motivating example yet.
+> Rationale: this is not the intent-filter grammar this section otherwise
+> declines to model. `view_links` is generated because a hand-written browser
+> filter missing `DEFAULT` is the classic silent failure. This is the opposite
+> shape — one vendor-defined action on a component no other application can
+> reach — so there is nothing subtle to get wrong and no externally reachable
+> surface opened. The exported case stays excluded: a filter on an exported
+> component is an IPC entry point, a different question with no motivating
+> example yet.
 
 ### 6.9 Shrinker keep patterns: `[android.contributes.r8]`
 
@@ -1270,41 +1263,37 @@ that it survives to be read later.
 > legitimate mode. It is also the one mechanism here a producer can misuse to
 > downgrade a real requirement into prose; §12.1 says so plainly.
 
-> Rationale for entitlements: they are bound to the App ID and provisioning
-> profile. `codesign` requires the application's entitlements to be a subset of
-> the profile's, so writing one the developer has not enabled produces a signing
-> failure with no trace back to the distribution that caused it. Some cannot be
-> granted locally at all — `com.apple.developer.location.push` requires approval
-> from Apple — so the gap between "declared" and "grantable" can be weeks long.
-> This is a declaration a consumer cannot satisfy on its own.
+**The five tables.** Each is a prerequisite under the common rules above; what
+follows is only what is specific to it.
 
-An entitlement's **value** is not modelled, and deliberately. Several carry one
-— `com.apple.security.application-groups` takes a group identifier,
+**`entitlements`** — an entitlement is bound to the App ID and provisioning
+profile, and `codesign` requires the application's entitlements to be a subset
+of the profile's. Writing one the developer has not enabled produces a signing
+failure with no trace back to the distribution that caused it, and some cannot
+be granted locally at all: `com.apple.developer.location.push` requires approval
+from Apple, so the gap between "declared" and "grantable" can be weeks.
+
+An entitlement's **value** is deliberately not modelled. Several carry one —
+`com.apple.security.application-groups` takes a group identifier,
 `com.apple.developer.in-app-payments` takes merchant identifiers, and some must
-agree across targets. All of that belongs in `reason`, which is REQUIRED for
-exactly this purpose. A structured form would describe something the consumer
-can neither write (it must not) nor check (the application owns the entitlements
-file and any additional targets), and "must be `group.<your-bundle-id>.onesignal`,
-the same on both targets" is more useful to the reader than a type tag.
+agree across targets — and all of it belongs in `reason`. A structured form
+would describe something the consumer can neither write nor check, and "must be
+`group.<your-bundle-id>.onesignal`, the same on both targets" tells a reader
+more than a type tag.
 
-> Rationale for usage descriptions: a purpose string is **user-facing,
-> localized, and read by App Store review**, and it is a claim about what *the
-> application* does with the data. A library cannot know it. A framework binding
-> that wrote one would give every application the same unhelpful sentence, which
-> is both useless to users and a rejection risk — and the application, not the
-> producer, answers for it. The producer states the need; the application writes
-> the words.
+**`usage_descriptions`** — a purpose string is **user-facing, localized, and
+read by App Store review**, and it is a claim about what *the application* does
+with the data. A library cannot know it, and a binding that wrote one would give
+every application the same unhelpful sentence: useless to users, and a rejection
+risk the application answers for. A consumer **MUST** reject any attempt to set
+one as an `info_plist` value (§7.6).
 
-A usage description is therefore a `requires` and never a contribution; a
-consumer **MUST** reject any attempt to set one as an `info_plist` value (§7.6).
+`NSLocationTemporaryUsageDescriptionDictionary` is declared here like any other
+despite being dictionary-valued: as a prerequisite it is never spelled by the
+producer, so §7.6's exclusion of dictionaries does not bite.
 
-**Dictionary-valued usage descriptions are covered by the same rule.**
-`NSLocationTemporaryUsageDescriptionDictionary` — whose keys are
-application-defined purpose keys — is declared here like any other, and never
-spelled by the producer.
-
-**Application files are stated, not contributed.** Some SDKs read a
-configuration file from the built application bundle:
+**`application_files`** — some SDKs read a configuration file from the built
+bundle:
 
 ```toml
 [[ios.requires.application_files]]
@@ -1312,51 +1301,32 @@ name = "GoogleService-Info.plist"
 reason = "Download from the Firebase console; Analytics reads it from the bundle and has no programmatic alternative"
 ```
 
-`name` is the file's name in the bundle. A consumer **MUST** report the
-requirement and **MUST NOT** create, fetch, or synthesize the file — these are
-account-specific, sometimes credential-adjacent, and always the application's.
+`name` is the file's name in the bundle. A consumer **MUST NOT** create, fetch,
+or synthesize one — these are account-specific, sometimes credential-adjacent,
+and always the application's.
 
-> Rationale, and the narrowness is deliberate. Most application-supplied
-> configuration reaches a producer through the application's **Python** code,
-> which is why §6.3 is scoped to values the build must embed and why no
-> platform-neutral value table exists. This table is for the residual case: a
-> file the SDK itself reads at runtime, where no programmatic alternative is
-> offered. Firebase is the motivating example — most of its services accept
-> `FirebaseOptions` programmatically, but Analytics on Apple platforms requires
-> the static file. Without this, an application that omits it gets a runtime
-> failure inside the SDK with nothing naming the distribution that needed it.
->
-> A producer **SHOULD NOT** declare a file here when the SDK offers a
-> programmatic path. Ask for the file only when the vendor leaves no choice.
+A producer **SHOULD NOT** declare a file here when the SDK offers a programmatic
+path. Most application configuration reaches a producer through the
+application's Python code; this table is for the residual case where the vendor
+leaves no choice. Firebase is the motivating example — most of its services
+accept `FirebaseOptions` programmatically, and Analytics on Apple platforms does
+not.
 
-**App extensions are stated, not contributed.** `kind` is a closed vocabulary:
-`notification_service` and `location_push` in this revision. A producer declares
-that its functionality depends on the application providing an extension of that
-kind; the application creates the target, writes its source, and configures its
-bundle identifier, entitlements, and `Info.plist`.
+**`app_extensions`** — `kind` is a closed vocabulary: `notification_service` and
+`location_push` in this revision. The application creates the target, writes its
+source, and configures its bundle identifier, entitlements and `Info.plist`.
 
 > Rationale for the `requires` form. An app extension is a separate signed
-> executable with its own bundle identifier and its own entitlements, launched
-> by the operating system when the application itself may not be running. That
-> is a larger thing for a transitive dependency to introduce than anything else
-> in this specification, and it warrants evidence that producers actually want
-> to ship one.
->
-> That evidence does not yet exist. In the only working integration of this
-> shape available, the notification service extension is **application-authored**
-> — configured in the application's own project file, with its source in the
-> application's tree — even though its body is boilerplate the vendor documents
-> verbatim. No package examined ships an extension of any kind.
->
-> A contribution form is a reasonable future addition, and the argument for it
-> is good: identical boilerplate written once per application is exactly what a
-> package should own. But it needs a producer that wants to own it. Until then,
-> this table converts a silent capability loss — an application that builds and
-> then quietly lacks confirmed delivery — into a reported prerequisite, which is
-> the part that can be justified today.
+> executable with its own bundle identifier and entitlements, launched by the
+> operating system when the application may not be running — a larger thing for
+> a transitive dependency to introduce than anything else here, and no package
+> examined ships one. A contribution form is a reasonable future addition, since
+> identical boilerplate written once per application is exactly what a package
+> should own; it needs a producer that wants to own it. Meanwhile this converts
+> a silent capability loss into a reported prerequisite.
 
-**URL schemes are stated, not contributed.** An SDK whose flow leaves the
-application and returns through a browser needs a custom URL scheme:
+**`url_schemes`** — an SDK whose flow leaves the application and returns through
+a browser needs a custom URL scheme:
 
 ```toml
 [[ios.requires.url_schemes]]
@@ -1368,29 +1338,21 @@ StripeAPI.handleURLCallback(with:)."""
 ```
 
 The application chooses the scheme, registers it in its own `CFBundleURLTypes`,
-and forwards the callback. A consumer **MUST** report the requirement and
-**MUST NOT** register a scheme on the producer's behalf.
-
-This table carries no identifier, because the producer names nothing — the
-scheme is the application's to choose. It is therefore joined to the
-application's acknowledgement by the **declaring distribution** (§2.2), and a
-sidecar **MUST NOT** declare more than one entry: two would be indistinguishable
-to whoever answers them, and the answer is a single acknowledgement either way.
+and forwards the callback; a consumer **MUST NOT** register one on the
+producer's behalf. This table carries no identifier — the producer names nothing
+— so it is joined to the acknowledgement by the **declaring distribution**
+(§2.2), and a sidecar **MUST NOT** declare more than one entry: two would be
+indistinguishable to whoever answers them.
 
 > Rationale, and why this is not the iOS half of §6.8's `view_links`. On Android
-> an intent filter is **attached to the producer's own component**, so the
-> producer knows the filter's shape and the application could not write it
-> sensibly — which is what makes `view_links` a contribution. iOS has no
-> equivalent attachment: `CFBundleURLTypes` is a bundle-level declaration bound
-> to no class, and the routing decision happens at runtime in the application's
-> delegate.
->
-> That asymmetry is the platform's, not this specification's. A consumer that
+> an intent filter is attached to the producer's own component, which is what
+> makes `view_links` a contribution. `CFBundleURLTypes` is bundle-level, bound to
+> no class, and routing happens at runtime in the application's delegate — an
+> asymmetry belonging to the platform, not to this specification. A consumer that
 > wrote the plist entry would still leave the application to forward the
-> callback, because nothing in the declaration says **which producer symbol
-> should receive it** — naming one is the startup-hook shape, and that is
-> deliberately absent (§11). Registering half of a two-part requirement is worse
-> than reporting both, since it looks done.
+> callback, because nothing says which producer symbol should receive it; naming
+> one is the startup-hook shape, deliberately absent (§11). Registering half a
+> requirement is worse than reporting both, because it looks done.
 
 ### 7.4 Swift packages: `[[ios.contributes.swift_packages]]`
 
