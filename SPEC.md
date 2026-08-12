@@ -142,34 +142,74 @@ application to commit.
 > credential never reaches the device, and is the only thing here that must not
 > come to rest in the repository.
 
-**Illustrative only** — no consumer is required to use these spellings, and a
-sidecar never contains any of it:
+**What joins the two halves.** A consumer's spelling is its own, but the *key*
+an application answers under is not: it comes from the declaration, so that an
+answer can be matched to the requirement that asked for it.
+
+| The producer declares | Joined by | The application answers with |
+| --- | --- | --- |
+| `[[android.requires.application_values]]` | `id` | the value |
+| a contributed permission (§6.7) | permission `name` | a suppression |
+| a component with `exported_required` (§6.8) | component `name` | approval |
+| a repository with `credentials_required` (§6.6) | repository `url` | credentials, by indirection |
+| `[[ios.requires.entitlements]]` | `key` | the entitlement, configured |
+| `[[ios.requires.usage_descriptions]]` | `key` | a non-empty string |
+| `[[ios.requires.application_files]]` | `name` | the file, in the bundle |
+| `[[ios.requires.app_extensions]]` | `kind` | an extension target |
+| `[[ios.requires.url_schemes]]` | **the declaring distribution** | acknowledgement |
+
+`url_schemes` is the one entry with no identifier of its own — it names no key,
+because the application chooses the scheme. It is therefore joined by
+distribution, and a sidecar **MUST NOT** declare more than one: two would be
+indistinguishable to the application answering them, and the answer is a single
+acknowledgement either way.
+
+**Illustrative only** — no consumer is required to use these spellings. The left
+column is the sidecar, which the producer ships; the right is the application's
+own `pyproject.toml`, which no sidecar ever contains.
+
+An application value (§6.3) — joined by `id`, and the consumer then writes
+`manifest_meta_data` into the manifest for you:
 
 ```toml
-# The application's own pyproject.toml, under some build tool's namespace.
-
-# Values the producer declared with `id` (§6.3). These ship inside the
-# application, so a committed file is the right home for them.
-[tool.examplebuild.android.application_values]
-sentry_dsn = "https://examplePublicKey@o0.ingest.sentry.io/0"
-admob_app_id = "ca-app-pub-3940256099942544~3347511713"
-
-# A build-time credential (§6.6). The *reference* is committed; the value is not.
-[tool.examplebuild.android.repository_credentials."api.mapbox.com"]
-username = "mapbox"
-password = { env = "MAPBOX_DOWNLOADS_TOKEN" }
-
-# Prerequisites the application answers (§7.3). `url_schemes` is satisfied by
-# acknowledgement, because forwarding cannot be verified.
-[tool.examplebuild.ios]
-usage_descriptions = { NSLocationWhenInUseUsageDescription = "Shows trails near you." }
-acknowledged_url_schemes = ["pystripe"]
+# producer's native.toml                 # the application's pyproject.toml
+[[android.requires.application_values]]  # [tool.examplebuild.android.application_values]
+id = "sentry_dsn"                        # sentry_dsn = "https://examplePublicKey@o0.ingest.sentry.io/0"
+reason = "Your Sentry project DSN"       #
+manifest_meta_data = "io.sentry.dsn"     # → <meta-data android:name="io.sentry.dsn" …/>
 ```
 
-with the secret itself supplied from the environment, never the file:
+A repository credential (§6.6) — joined by `url`. The reference is committed;
+the value never is:
+
+```toml
+# producer's native.toml
+[[android.contributes.gradle_repositories]]
+url = "https://api.mapbox.com/downloads/v2/releases/maven"
+reason = "Needs a Mapbox token scoped DOWNLOADS:READ, as password with username \"mapbox\""
+groups = ["com.mapbox"]
+credentials_required = true
+```
+
+```toml
+# the application's pyproject.toml
+[tool.examplebuild.android.repository_credentials."https://api.mapbox.com/downloads/v2/releases/maven"]
+username = "mapbox"
+password = { env = "MAPBOX_DOWNLOADS_TOKEN" }
+```
 
 ```bash
-export MAPBOX_DOWNLOADS_TOKEN=sk.ey...        # developer shell, CI secret store
+export MAPBOX_DOWNLOADS_TOKEN=sk.ey...        # developer shell, or a CI secret store
+```
+
+A usage description (§7.3) — joined by `key`, and the producer never writes the
+sentence:
+
+```toml
+# producer's native.toml                    # the application's pyproject.toml
+[[ios.requires.usage_descriptions]]         # [tool.examplebuild.ios.usage_descriptions]
+key = "NSLocationWhenInUseUsageDescription" # NSLocationWhenInUseUsageDescription = "Shows trails near you."
+reason = "requestWhenInUseAuthorization() traps without it"
 ```
 
 A consumer **MAY** accept a literal in place of a reference — a developer
@@ -1318,6 +1358,12 @@ The application chooses the scheme, registers it in its own `CFBundleURLTypes`,
 and forwards the callback. A consumer **MUST** report the requirement and
 **MUST NOT** register a scheme on the producer's behalf.
 
+This table carries no identifier, because the producer names nothing — the
+scheme is the application's to choose. It is therefore joined to the
+application's acknowledgement by the **declaring distribution** (§2.2), and a
+sidecar **MUST NOT** declare more than one entry: two would be indistinguishable
+to whoever answers them, and the answer is a single acknowledgement either way.
+
 > Rationale, and why this is not the iOS half of §6.8's `view_links`. On Android
 > an intent filter is **attached to the producer's own component**, so the
 > producer knows the filter's shape and the application could not write it
@@ -1628,9 +1674,10 @@ A conforming consumer **MUST**:
 25. Fail when a repository declaring `credentials_required` has no credentials
     configured, and never write a supplied credential into the generated
     project, the record, or a diagnostic (§6.6, §9).
-26. Provide a means for the application to answer every `requires`, and accept a
-    build-time credential **by indirection** rather than only as a literal in a
-    committed file (§2.2).
+26. Provide a means for the application to answer every `requires`, joined to
+    the declaration by the key §2.2 names, and accept a build-time credential
+    **by indirection** rather than only as a literal in a committed file (§2.2).
+    Reject a sidecar declaring more than one `url_schemes` entry (§7.3).
 
 > Rationale for 16. Every other rule here assumes native resolution *succeeds*.
 > It need not: two distributions in one closure can declare native dependencies
