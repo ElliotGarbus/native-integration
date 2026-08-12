@@ -1971,10 +1971,18 @@ cannot vary the facade's *own* sidecar (extras select dependencies; they do not
 change a distribution's contents), but it can select a distribution that
 carries one, which is all that is needed.
 
-This is why the specification defines no conditional-contribution syntax (§10):
-**the dependency graph is the conditionality mechanism.** Sidecars are
+This is why the specification defines no conditional **contribution** syntax
+(§10): **the dependency graph is the conditionality mechanism.** Sidecars are
 per-distribution, applications opt in by depending on the piece they use, and
 the record of §9 attributes each contribution to the smallest meaningful unit.
+
+**Prerequisites are the exception, and §7.3 does carry a `conditional` flag.**
+The asymmetry is deliberate. A contribution *imposes* — an application that
+acquires the distribution gets the permission whether or not it wanted it — so
+making one conditional needs a mechanism that can actually withhold it, and the
+dependency graph is that mechanism. A prerequisite imposes nothing; it asks.
+Marking one conditional changes only whether an unmet ask blocks the build, so a
+flag is sufficient where a contribution would need a whole opt-in channel.
 
 The honest cost falls on the producer: splitting a facade into optional
 distributions is real packaging work (separate releases, an import layout that
