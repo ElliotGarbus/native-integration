@@ -2035,22 +2035,22 @@ are summaries; where this table and the body differ, the body governs.
 | `contract` | **Required.** Major of this specification, optionally with a minor — `"1"` or `"1.1"`. §4.3 |
 | `platforms` | Optional. Where the distribution *functions*, not merely where it contributes; a build for an omitted platform fails. §4.5 |
 | **`[android.owns]`** §6.1 | |
-| `java_namespaces` | Exclusive, collision-checked claim. Required when contributing Java/Kotlin, producer-sourced components, or keep patterns under its own namespace |
+| `java_namespaces` | Java package namespaces this distribution claims exclusively; two distributions claiming overlapping ones fail the build. Required when contributing Java/Kotlin, producer-sourced components, or keep patterns |
 | **`[android.requires]`** §6.2 | |
 | `compile_sdk`, `min_sdk` | Floors. The build fails when the application is lower; the consumer never raises the application to match |
 | **`[[android.requires.application_values]]`** §6.3 | |
-| `id` | Logical identifier the application answers under, and what a contribution references inline |
+| `id` | A logical name for the value. The application supplies it under this name, and contributions reference it as `{ application_value = "…" }` |
 | `reason` | **Required.** What the value is and where to obtain it |
 | `manifest_meta_data` | Optional. The `<meta-data>` key the SDK reads; the consumer writes the supplied value there |
 | **`[android.contributes.src]`** §6.4 | |
 | `java`, `kotlin` | Directories whose `.java` / `.kt` files the application's own toolchain compiles |
 | **`[[android.contributes.gradle_dependencies]]`** §6.5 | |
-| `coordinate` | `group:artifact:version`, exactly versioned. **Recommended** — legible without consulting the record |
+| `coordinate` | `group:artifact:version` with an exact version. **Recommended**, because the version is visible here — with the range form below, finding what was actually used means opening the integration record (§9) |
 | `module` + `version` | `group:artifact` with a bounded `{ at_least, below }` range. Open-ended and changing versions are invalid |
 | `configuration` | Optional; `implementation` is the only value defined in version 1 |
 | **`[[android.contributes.gradle_repositories]]`** §6.6 | |
-| `url` | A repository added to the application's resolution — the highest-authority contribution here |
-| `reason` | **Required.** Why the artifacts are not on Maven Central |
+| `url` | A Maven repository to add to the application's resolution. The most powerful thing a sidecar can contribute, which is why the next two rows are mandatory |
+| `reason` | **Required.** Why the artifacts are not available from the default repositories, and — when authenticated — which credential is needed and where to get it |
 | `groups`, `modules` | **At least one required.** Bounds what the repository may serve |
 | `credentials_required` | Optional. Declares the repository authenticated. A sidecar **MUST NOT** contain the credential itself |
 | **`[[android.contributes.permissions]]`** §6.7 | |
@@ -2066,18 +2066,18 @@ are summaries; where this table and the body differ, the body governs.
 | `[[…view_links]]` — `scheme`, `host`, `path_prefix` | Generates the browser-return filter. Valid only on an exported activity; `scheme` is required |
 | `[[…intent_filters]]` — `action` | One vendor-defined action, on a component that is neither exported nor carrying `view_links` |
 | **`[android.contributes.r8]`** §6.9 | |
-| `keep_classes` | Patterns within an owned namespace |
-| `[[…r8.keep]]` — `pattern`, `from_dependency` | A declared dependency's classes, verified against its resolved archive rather than its Maven group |
+| `keep_classes` | Class patterns the shrinker must keep; the consumer generates the `-keep` rules itself. Each must fall within an owned namespace |
+| `[[…r8.keep]]` — `pattern`, `from_dependency` | Keeps a *dependency's* classes instead. Checked against what the resolved artifact actually contains, since a Maven group ID need not match the Java packages inside it |
 | **`[ios]`** §7.1 | |
-| `swift_symbol_prefixes` | Naming guidance, not an ownership claim; it does not reach file-scope declarations |
+| `swift_symbol_prefixes` | Prefixes the producer puts on its Swift type names. Guidance only — nothing enforces it, and it does not cover file-scope functions or extension members |
 | **`[ios.requires]`** §7.2 | |
-| `deployment_target` | A floor, with §6.2's semantics |
+| `deployment_target` | Minimum iOS version the producer needs. A floor: the build fails if the application targets lower, and the consumer never raises it |
 | **`[ios.requires.*]` — prerequisites** §7.3 | Every entry takes `reason` (**required**) and `conditional` (optional). Unconditional and unsatisfied fails the build; conditional and unsatisfied is recorded |
 | `[[…entitlements]]` — `key` | Satisfied by the key's presence; v1 does not model its value |
 | `[[…usage_descriptions]]` — `key` | The application writes the sentence; §7.6 rejects one offered as a contribution |
 | `[[…app_extensions]]` — `kind` | `notification_service` or `location_push`. The application builds the target |
 | `[[…application_files]]` — `name` | A file the SDK reads from the bundle. Declare only when no programmatic path exists |
-| `[[…url_schemes]]` | Carries no identifier — joined by distribution, so **at most one per sidecar** |
+| `[[…url_schemes]]` | Says the application must register a URL scheme and forward the callback. Names no key — the application chooses the scheme — so its answer is matched by distribution, and **at most one per sidecar** is allowed |
 | **`[[ios.contributes.swift_packages]]`** §7.4 | |
 | `name` | Local handle, unique within the sidecar; §7.7 and §7.3 refer to packages by it |
 | `url`, `products` | The repository, and which of its products to link |
