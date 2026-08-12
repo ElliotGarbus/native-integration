@@ -2024,6 +2024,62 @@ Producers **SHOULD NOT** reach for that mechanism to avoid stating an
 unconditional requirement. A requirement wrongly marked conditional converts a
 build failure that names the problem into a line in a report.
 
+## Appendix A: why contributions stay per-distribution
+
+The tempting implementation is to let every distribution write its material into
+one shared location under `site-packages` and let the installer merge them. It is
+less code, and it forecloses most of this specification.
+
+A merged tree **destroys provenance at install time**. Once files are overlaid,
+nothing can determine which distribution contributed which file — so collision
+detection, per-distribution attribution, the review record of §9, and every
+diagnostic required by requirement 8.15 all become impossible.
+
+It also makes a shared source tree last-writer-wins by construction, which is the
+substitution path §6.1 exists to close.
+
+Keeping contributions inside each distribution costs an explicit merge step in
+the consumer. That step is where validation, attribution, and collision detection
+live.
+
+## Appendix B: why not a build backend
+
+An alternative is a PEP 517 backend that transforms configuration in the
+producer's `pyproject.toml` into wheel payload. It reads well and it has been
+built.
+
+It requires one backend wrapper per existing backend, forever, and excludes every
+backend nobody wrote one for. The entry-point metadata and package data this
+convention relies on are standard wheel features every major backend can produce
+— though the *file-inclusion configuration* is backend-specific (setuptools
+`package-data`, with Hatchling, Flit, pdm, and maturin each having their own) —
+and none of them need to know this specification exists.
+
+The declaration cannot live in `pyproject.toml` directly: arbitrary `[tool.*]`
+tables do not survive into the wheel or into `site-packages`, so a consumer
+reading installed distributions never sees them. That constraint is what forces
+either a custom backend or static package data, and this specification chooses
+the latter.
+
+## Appendix C: prior art
+
+- **Cargo** — the `links` key gives a crate an exclusive claim on a native
+  library, enforced across the graph; §6.1's ownership model is the same idea.
+  Cargo's build scripts, by contrast, are exactly the capability §2.1 excludes:
+  powerful, and executable.
+- **pkg-config / SwiftPM system libraries** — the abstraction this specification
+  borrows: a dependency describes what consuming it requires; the consumer's
+  build system decides how to satisfy it. Declarative data, no executable hooks.
+- **Gradle dependency locking / SwiftPM `Package.resolved`** — the locked-graph
+  semantics §6.5 and §7.4 require: exact coordinates are not reproducibility;
+  recorded resolutions are.
+- **AGP manifest placeholders (e.g. AppAuth's redirect scheme)** — the
+  established mechanism behind §6.3's inline application values: the library
+  declares the filter shape, the application supplies the value.
+- **PEP 561** — the standardization shape: a marker shipped as package data, a
+  consumer that is not an installer, and normative obligations on that consumer,
+  written down after the practice existed.
+
 ## Appendix D: declaration reference
 
 Every key a sidecar may contain, with the section that defines it. Descriptions
@@ -2091,59 +2147,3 @@ are summaries; where this table and the body differ, the body governs.
 | `name` | The name Python imports. A single ASCII identifier, no dots |
 | `swift_package` | A package the same sidecar declares, which implements the module |
 | `init` | Optional initialization symbol; defaults to `PyInit_<name>` |
-
-## Appendix A: why contributions stay per-distribution
-
-The tempting implementation is to let every distribution write its material into
-one shared location under `site-packages` and let the installer merge them. It is
-less code, and it forecloses most of this specification.
-
-A merged tree **destroys provenance at install time**. Once files are overlaid,
-nothing can determine which distribution contributed which file — so collision
-detection, per-distribution attribution, the review record of §9, and every
-diagnostic required by requirement 8.15 all become impossible.
-
-It also makes a shared source tree last-writer-wins by construction, which is the
-substitution path §6.1 exists to close.
-
-Keeping contributions inside each distribution costs an explicit merge step in
-the consumer. That step is where validation, attribution, and collision detection
-live.
-
-## Appendix B: why not a build backend
-
-An alternative is a PEP 517 backend that transforms configuration in the
-producer's `pyproject.toml` into wheel payload. It reads well and it has been
-built.
-
-It requires one backend wrapper per existing backend, forever, and excludes every
-backend nobody wrote one for. The entry-point metadata and package data this
-convention relies on are standard wheel features every major backend can produce
-— though the *file-inclusion configuration* is backend-specific (setuptools
-`package-data`, with Hatchling, Flit, pdm, and maturin each having their own) —
-and none of them need to know this specification exists.
-
-The declaration cannot live in `pyproject.toml` directly: arbitrary `[tool.*]`
-tables do not survive into the wheel or into `site-packages`, so a consumer
-reading installed distributions never sees them. That constraint is what forces
-either a custom backend or static package data, and this specification chooses
-the latter.
-
-## Appendix C: prior art
-
-- **Cargo** — the `links` key gives a crate an exclusive claim on a native
-  library, enforced across the graph; §6.1's ownership model is the same idea.
-  Cargo's build scripts, by contrast, are exactly the capability §2.1 excludes:
-  powerful, and executable.
-- **pkg-config / SwiftPM system libraries** — the abstraction this specification
-  borrows: a dependency describes what consuming it requires; the consumer's
-  build system decides how to satisfy it. Declarative data, no executable hooks.
-- **Gradle dependency locking / SwiftPM `Package.resolved`** — the locked-graph
-  semantics §6.5 and §7.4 require: exact coordinates are not reproducibility;
-  recorded resolutions are.
-- **AGP manifest placeholders (e.g. AppAuth's redirect scheme)** — the
-  established mechanism behind §6.3's inline application values: the library
-  declares the filter shape, the application supplies the value.
-- **PEP 561** — the standardization shape: a marker shipped as package data, a
-  consumer that is not an installer, and normative obligations on that consumer,
-  written down after the practice existed.
