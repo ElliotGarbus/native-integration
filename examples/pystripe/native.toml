@@ -18,6 +18,15 @@ java_namespaces = ["org.pystripe"]
 min_sdk = 21
 compile_sdk = 34
 
+[[android.requires.application_values]]
+# Referenced inline by view_links below. §6.3 requires every inline reference to
+# resolve to a declared id — an implicit declaration would have no `reason`,
+# leaving the application told something is missing but not what.
+id = "stripe_return_scheme"
+reason = """\
+The URL scheme you registered with Stripe for 3D Secure returns; it must match \
+the return_url your server sends when confirming a PaymentIntent."""
+
 [[android.contributes.gradle_dependencies]]
 module = "com.stripe:stripe-android"
 version = { at_least = "21.0.0", below = "22.0.0" }

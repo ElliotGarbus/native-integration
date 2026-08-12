@@ -22,8 +22,13 @@ compile_sdk = 34
 #
 # This is precisely the "value the build must embed" that P19 narrowed §6.3 to,
 # and it arrived from a vendor with no knowledge of that narrowing.
-name = "io.sentry.dsn"
+#
+# `id` is what the application answers under; `manifest_meta_data` is the key
+# Sentry's own provider reads. Conflating the two was a schema bug caught in
+# external review — see P28.
+id = "sentry_dsn"
 reason = "Your Sentry project DSN, from Settings → Projects → Client Keys"
+manifest_meta_data = "io.sentry.dsn"
 
 [[android.contributes.gradle_dependencies]]
 module = "io.sentry:sentry-android"
