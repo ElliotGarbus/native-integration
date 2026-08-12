@@ -147,6 +147,11 @@ for label, text, base in (
     ("SPEC.md", SPEC, ROOT),
     ("examples/README.md", (ROOT / "examples/README.md").read_text(encoding="utf-8"), ROOT / "examples"),
     ("development/README.md", (ROOT / "development/README.md").read_text(encoding="utf-8"), ROOT / "development"),
+    ("development/PROPOSALS.md", (ROOT / "development/PROPOSALS.md").read_text(encoding="utf-8"), ROOT / "development"),
+    *(
+        (str(n.relative_to(ROOT)), n.read_text(encoding="utf-8"), n.parent)
+        for n in sorted(ROOT.glob("development/examples/**/NOTES.md"))
+    ),
 ):
     for target in sorted(set(re.findall(r"\]\((?!https?:)([^)#]+)\)", text))):
         if not (base / target).exists():

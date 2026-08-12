@@ -6,7 +6,6 @@ One integration, both halves.
 | --- | --- |
 | [`pystripe/native.toml`](pystripe/native.toml) | the **sidecar** — what the package declares |
 | [`pystripe/app-pyproject.toml`](pystripe/app-pyproject.toml) | the **application's reply** — what its author writes |
-| [`pystripe/NOTES.md`](pystripe/NOTES.md) | what expressing it found |
 
 Stripe was chosen because it exercises three different answer paths in one
 SDK most people recognise:

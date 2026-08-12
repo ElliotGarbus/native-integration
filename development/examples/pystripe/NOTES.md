@@ -1,5 +1,11 @@
 # Stripe against the current spec
 
+> The sidecar this describes is the curated example, at
+> [`examples/pystripe/`](../../../examples/pystripe/) — it is the one integration
+> kept out of this directory. These are the findings from expressing it, which
+> belong with the rest of the working record.
+
+
 Clean-sheet, from [Stripe's 3D Secure authentication guide](https://docs.stripe.com/payments/3d-secure/authentication-flow).
 No `pystripe` distribution exists.
 
