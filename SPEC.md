@@ -164,20 +164,28 @@ distribution, and a sidecar **MUST NOT** declare more than one: two would be
 indistinguishable to the application answering them, and the answer is a single
 acknowledgement either way.
 
-**Illustrative only** — no consumer is required to use these spellings. The left
-column is the sidecar, which the producer ships; the right is the application's
-own `pyproject.toml`, which no sidecar ever contains.
+**Illustrative only** — no consumer is required to use these spellings. Each
+pair shows the sidecar the producer ships, then the application's own
+`pyproject.toml`, which no sidecar ever contains.
 
-An application value (§6.3) — joined by `id`, and the consumer then writes
-`manifest_meta_data` into the manifest for you:
+An application value (§6.3) — joined by `id`:
 
 ```toml
-# producer's native.toml                 # the application's pyproject.toml
-[[android.requires.application_values]]  # [tool.examplebuild.android.application_values]
-id = "sentry_dsn"                        # sentry_dsn = "https://examplePublicKey@o0.ingest.sentry.io/0"
-reason = "Your Sentry project DSN"       #
-manifest_meta_data = "io.sentry.dsn"     # → <meta-data android:name="io.sentry.dsn" …/>
+# producer's native.toml
+[[android.requires.application_values]]
+id = "sentry_dsn"
+reason = "Your Sentry project DSN, from Settings → Projects → Client Keys"
+manifest_meta_data = "io.sentry.dsn"
 ```
+
+```toml
+# the application's pyproject.toml — answered under the producer's `id`
+[tool.examplebuild.android.application_values]
+sentry_dsn = "https://examplePublicKey@o0.ingest.sentry.io/0"
+```
+
+The consumer then emits `<meta-data android:name="io.sentry.dsn" …/>` into the
+generated manifest: the application never spells the vendor's key.
 
 A repository credential (§6.6) — joined by `url`. The reference is committed;
 the value never is:
@@ -206,10 +214,16 @@ A usage description (§7.3) — joined by `key`, and the producer never writes t
 sentence:
 
 ```toml
-# producer's native.toml                    # the application's pyproject.toml
-[[ios.requires.usage_descriptions]]         # [tool.examplebuild.ios.usage_descriptions]
-key = "NSLocationWhenInUseUsageDescription" # NSLocationWhenInUseUsageDescription = "Shows trails near you."
-reason = "requestWhenInUseAuthorization() traps without it"
+# producer's native.toml
+[[ios.requires.usage_descriptions]]
+key = "NSLocationWhenInUseUsageDescription"
+reason = "requestWhenInUseAuthorization() traps if this key is absent"
+```
+
+```toml
+# the application's pyproject.toml — the app supplies the user-facing text
+[tool.examplebuild.ios.usage_descriptions]
+NSLocationWhenInUseUsageDescription = "Shows trails near you."
 ```
 
 A consumer **MAY** accept a literal in place of a reference — a developer
