@@ -96,6 +96,6 @@ to watch the spec hit real boundaries.
 [Appendix D](https://github.com/ElliotGarbus/native-integration/blob/main/SPEC.md#appendix-d-declaration-reference)
 is a one-line description of every key if you'd rather scan the surface.
 
-Disagreement is more useful than agreement. Two rounds of external review both
-changed it substantially — the places it's wrong now are the places nobody has
-looked yet.
+Disagreement is more useful than agreement. Three rounds of external review have
+each changed it substantially — the places it's wrong now are the places nobody
+has looked yet.

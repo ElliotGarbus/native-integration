@@ -298,8 +298,8 @@ Issues are for concrete defects: a rule that contradicts another, an example
 that no longer matches the specification, a requirement you could not implement.
 
 Disagreement is more useful than agreement. The specification has been through
-two rounds of external review, and both changed it substantially; the places it
-is wrong now are the places nobody has looked yet.
+three rounds of external review, and each changed it substantially; the places
+it is wrong now are the places nobody has looked yet.
 
 ## Checks
 
