@@ -41,7 +41,11 @@ name = "android.permission.POST_NOTIFICATIONS"
 reason = "Displaying received messages as notifications on Android 13+"
 
 [android.contributes.r8]
-keep_classes = ["org.pyfirebase.messaging.**", "com.google.firebase.**"]
+keep_classes = ["org.pyfirebase.messaging.**"]
+
+[[android.contributes.r8.keep]]
+pattern = "com.google.firebase.messaging.**"
+from_dependency = "com.google.firebase:firebase-messaging"
 
 # -------------------------------------------------------------------- iOS ---
 

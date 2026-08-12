@@ -248,6 +248,32 @@ for rel, raw, doc in sidecar_sources():
         if ref not in ids:
             problems.append(f"{rel} inline reference `{ref}` matches no declared id")
 
+    # §6.9 — keep_classes is owned-namespace only; a dependency's classes need
+    #        an explicit [[r8.keep]] naming the dependency that owns them
+    r8 = android.get("contributes", {}).get("r8", {})
+    if isinstance(r8, dict):
+        owned = android.get("owns", {}).get("java_namespaces", [])
+        for pattern in r8.get("keep_classes", []) or []:
+            base = pattern.rstrip("*").rstrip(".")
+            if not any(base == o or base.startswith(o + ".") for o in owned):
+                problems.append(
+                    f"{rel} keep_classes `{pattern}` is not under an owned namespace "
+                    f"{owned or '[]'} — a dependency's classes need [[r8.keep]]"
+                )
+        declared_deps = {
+            d.get("coordinate", "").rsplit(":", 1)[0] or d.get("module")
+            for d in entries(android, "contributes", "gradle_dependencies")
+        }
+        for keep in r8.get("keep", []) or []:
+            if not isinstance(keep, dict):
+                continue
+            if not {"pattern", "from_dependency"} <= set(keep):
+                problems.append(f"{rel} [[r8.keep]] needs `pattern` and `from_dependency`: {keep}")
+            elif keep["from_dependency"] not in declared_deps:
+                problems.append(
+                    f"{rel} [[r8.keep]] names undeclared dependency `{keep['from_dependency']}`"
+                )
+
     # §6.8 — view_links is activity-only and export-gated; intent_filters neither
     for comp in entries(android, "contributes", "components"):
         if comp.get("view_links"):

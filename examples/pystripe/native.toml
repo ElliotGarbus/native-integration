@@ -50,7 +50,11 @@ reason = "Receives the 3D Secure redirect back from the issuing bank's browser f
   host = "stripe-redirect"
 
 [android.contributes.r8]
-keep_classes = ["org.pystripe.**", "com.stripe.**"]
+keep_classes = ["org.pystripe.**"]
+
+[[android.contributes.r8.keep]]
+pattern = "com.stripe.android.**"
+from_dependency = "com.stripe:stripe-android"
 
 # -------------------------------------------------------------------- iOS ---
 

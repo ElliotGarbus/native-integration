@@ -36,7 +36,15 @@ module = "com.google.firebase:firebase-analytics"
 version = { at_least = "22.0.0", below = "23.0.0" }
 
 [android.contributes.r8]
-keep_classes = ["org.pyfirebase.core.**", "com.google.firebase.**"]
+keep_classes = ["org.pyfirebase.core.**"]
+
+[[android.contributes.r8.keep]]
+# §6.9: a dependency's classes need explicit provenance, and the pattern is
+# checked against what the artifact actually ships — so it is scoped to the
+# analytics package rather than all of com.google.firebase.**, which other
+# Firebase artifacts also occupy.
+pattern = "com.google.firebase.analytics.**"
+from_dependency = "com.google.firebase:firebase-analytics"
 
 # -------------------------------------------------------------------- iOS ---
 

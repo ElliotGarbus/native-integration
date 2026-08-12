@@ -41,8 +41,12 @@ version = { at_least = "11.0.0", below = "12.0.0" }
 name = "android.permission.INTERNET"
 reason = "Downloading map tiles and styles"
 
-[android.contributes.r8]
-keep_classes = ["com.mapbox.**"]
+[[android.contributes.r8.keep]]
+# The package owns no Java namespace, so it has no keep_classes — only this
+# dependency keep, scoped to what the Maps artifact ships rather than all of
+# com.mapbox, which its sibling artifacts also occupy.
+pattern = "com.mapbox.maps.**"
+from_dependency = "com.mapbox.maps:android"
 
 # -------------------------------------------------------------------- iOS ---
 

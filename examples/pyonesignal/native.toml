@@ -37,7 +37,9 @@ reason = "Displaying push notifications on Android 13+"
 # com.onesignal.notifications.INotificationClickListener and
 # INotificationLifecycleListener. None of it is visible to the shrinker.
 # Permitted by §6.9 scope 2 — the group of a coordinate this sidecar declares.
-keep_classes = ["com.onesignal.**"]
+[[android.contributes.r8.keep]]
+pattern = "com.onesignal.**"
+from_dependency = "com.onesignal:OneSignal"
 
 # -------------------------------------------------------------------- iOS ---
 

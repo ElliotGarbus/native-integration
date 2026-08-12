@@ -51,12 +51,17 @@ name = "android.permission.ACCESS_NETWORK_STATE"
 reason = "The SDK checks connectivity before requesting ads"
 
 [android.contributes.r8]
-# Both §6.9 scopes in one declaration, which no earlier example managed:
-#   PyGMA.**  — scope 1, an owned namespace. Required: listener.py implements
-#               PyGMA/PyGMAListener from Python via PythonJavaClass, so the
-#               interface and its implementors are reached only reflectively.
-#   com.google.…sdk.** — scope 2, the group of a coordinate declared above.
-keep_classes = ["PyGMA.**", "com.google.android.libraries.ads.mobile.sdk.**"]
+# Both §6.9 forms in one sidecar, which no other example needs.
+# An owned namespace: listener.py implements PyGMA/PyGMAListener from Python via
+# PythonJavaClass, so the interface and its implementors are reached only
+# reflectively and are invisible to the shrinker.
+keep_classes = ["PyGMA.**"]
+
+[[android.contributes.r8.keep]]
+# A declared dependency's classes, which need explicit provenance and are
+# checked against the artifact's own contents rather than its Maven group.
+pattern = "com.google.android.libraries.ads.mobile.sdk.**"
+from_dependency = "com.google.android.libraries.ads.mobile.sdk:ads-mobile-sdk"
 
 # No [[android.requires.application_values]].
 #
