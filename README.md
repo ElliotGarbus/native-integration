@@ -7,9 +7,9 @@
 > from maintainers of other toolchains is the point — see
 > [Getting involved](#getting-involved).
 >
-> The spec has been stress-tested by expressing ten packages against it — four
-> existing ones, plus clean-sheet sidecars for Firebase, Sentry, Stripe and
-> Mapbox — which changed it substantially. See
+> The spec has been stress-tested against **ten integration cases** — four
+> existing Python packages, and six clean-sheet sidecars covering Firebase,
+> Sentry, Stripe and Mapbox — which changed it substantially. See
 > [Tested against real packages](#tested-against-real-packages).
 
 ## The problem
@@ -33,11 +33,11 @@ That inversion **is** the problem.
 ## The shape of the fix
 
 A package ships a small TOML file declaring its native requirements — Maven
-coordinates, permissions, manifest components, SPM packages, `Info.plist` keys,
+coordinates, permissions, manifest components, SwiftPM packages, `Info.plist` keys,
 any glue source it must contribute, and the prerequisites only the app can
 satisfy. A build tool discovers it through an entry point, reads it **without
-importing the package**, and stages it into the generated Gradle or Xcode
-project.
+importing the package**, validates its prerequisites, and stages its
+contributions into the generated Gradle or Xcode project.
 
 The package author adds two things to their own `pyproject.toml`:
 
@@ -72,21 +72,28 @@ reason = "Ad delivery"
 name = "android.permission.ACCESS_NETWORK_STATE"
 reason = "Connectivity checks before ad requests"
 
+# The floors the app author no longer has to look up.
+[android.requires]
+compile_sdk = 35
+min_sdk = 23
+
 # The one thing the package cannot know: your own AdMob account's ID.
+# `id` is what the app answers under; `manifest_meta_data` is the key the SDK reads.
 [[android.requires.application_values]]
-name = "com.google.android.gms.ads.APPLICATION_ID"
+id = "admob_app_id"
 reason = "Your AdMob application ID, from the AdMob console"
+manifest_meta_data = "com.google.android.gms.ads.APPLICATION_ID"
 ```
 
 *(Illustrative. Today's KivMob also ships a separately-published bridge artifact
 from its own Maven repository; a package adopting this convention would put that
 Java in its own wheel via `contributes.src`, which is the shape shown here.)*
 
-Everything a package declares falls into one of three categories: **`owns`**
+Its **native integration material** falls into three categories: **`owns`**
 (exclusive claims, like a Java namespace — collision-checked across all
 packages), **`requires`** (conditions the app must satisfy — SDK floors,
-entitlements, iOS purpose strings, a config file, an app extension, a
-credentialed Maven repository), and **`contributes`** (material the build tool
+entitlements, iOS purpose strings, a config file, an app extension, or
+credentials for an authenticated repository), and **`contributes`** (material the build tool
 stages on the package's behalf).
 
 The line between the last two is where most of the design lives, and it falls in
@@ -113,11 +120,16 @@ plus the AdMob application ID, supplied once through the build tool's own
 configuration — the spec requires that the tool offer a way to supply it, and
 leaves the spelling to the tool.
 
-Not zero configuration — **no transcription**. What remains is the account
-identifier no package could know, and the build fails naming KivMob if it is
-missing. What disappears is the Maven coordinate, the repository, the
-permissions, the SDK floors and the Java, none of which the app author ever had
-a reason to be holding.
+Not zero configuration — **no transcription of what the package owns**. Gone
+are the Maven coordinate, the repository, the permissions, the SDK floors and
+the Java, none of which the app author ever had a reason to be holding. What
+remains is the account identifier no package could know, and the build fails
+naming KivMob if it is missing.
+
+Toolchain settings stay where they are. KivMob's README also asks for an NDK
+version, SDK-licence acceptance and an AndroidX flag; this convention models
+neither those nor anything else that belongs to the build tool rather than to a
+package.
 
 Read the full [specification](SPEC.md).
 
@@ -125,8 +137,11 @@ Read the full [specification](SPEC.md).
 
 It **is** in a wheel — the package's ordinary one. No new artifact is published,
 and an otherwise pure-Python wheel can remain `py3-none-any`, because TOML and
-`.java` are text rather than platform binaries. What ships is a *declaration* plus optional *source*, never a
-compiled `.aar` or `.jar`.
+`.java` are text rather than platform binaries. **What the wheel carries** is a declaration plus optional source, never a
+compiled `.aar` or `.jar`. Native binaries may still enter the build through
+declared Maven or SwiftPM dependencies, where the platform's own resolver
+fetches them and the integration record attributes them — that is the
+distinction the out-of-scope table below draws.
 
 Three properties follow from that, and they are the reason for the design:
 
@@ -135,33 +150,45 @@ Three properties follow from that, and they are the reason for the design:
   destroys provenance at install time — afterwards nothing can say which package
   contributed which file, which forecloses collision detection, attribution, and
   any review gate.
-- **The app keeps authority.** A package may *request* a permission or register a
-  component, but only the app may mark a feature `required` or a component
-  `exported` — and the app can refuse any contributed permission outright. A
-  package can never write an entitlement, and never writes an iOS purpose
-  string: that text is user-facing, localized, and read by App Store review, so
-  it belongs to the app that answers for it. A dependency's *declaration* cannot
-  silently shrink your Play device reach or open an IPC surface.
-- **Changes are never invisible.** A conforming tool records each package's
-  resolved contribution and reports the delta, so a version bump surfaces as
-  `+ android.permission.ACCESS_FINE_LOCATION` in a diff rather than as an opaque
-  hash change. That extends to what your dependencies drag in: an Android
-  library's own manifest can add permissions no package declared —
+- **The app keeps authority over what a package declares.** A package may
+  *request* a permission or register a component, but only the app may mark a
+  feature `required` or a component `exported` — and the app can refuse any
+  contributed permission outright. A package can never write an entitlement, and
+  never writes an iOS purpose string: that text is user-facing, localized, and
+  read by App Store review, so it belongs to the app that answers for it.
+
+  Native artifacts resolved through Maven or SwiftPM carry their own manifests
+  and are a **second, weaker boundary**, stated plainly because it would
+  otherwise be a way around the first. A resolved Android library still cannot
+  silently make hardware `required` — the same rule applies whoever authored it.
+  Its exported components, however, are **reported with the same prominence as a
+  contributed one rather than approval-gated**: attribution and review, not
+  restriction. Policing arbitrary library code is not attempted.
+- **Native integration changes are review-gated.** A conforming tool records the
+  accepted native surface, reports any delta with provenance, and **does not
+  build through an unaccepted change** — including the first build, where an
+  application acquires all of its inherited native surface at once. A version
+  bump surfaces as `+ android.permission.ACCESS_FINE_LOCATION` attributed to the
+  package that brought it, not as an opaque hash change.
+
+  That extends to what your dependencies drag in: an Android library's own
+  manifest can add permissions no package declared —
   `com.google.android.gms.permission.AD_ID` arrives this way and pulls you into
-  a Play data-safety declaration — so reporting those is required too.
+  a Play data-safety declaration — so reporting those is required too. It is
+  closer to a lockfile you review than to better build logging.
 
 ## What is deliberately out of scope
 
 | Not covered | Because |
 | --- | --- |
 | Prebuilt `.aar` **embedded in the wheel** | Carries its own `AndroidManifest.xml`, which merges into the app's — a binary nobody reviews contributing permissions and exported components. (A *declared Maven coordinate* resolving to an `.aar` is in scope: it arrives through Gradle, locked and surfaced in the report.) |
-| Prebuilt iOS binaries **carried by the wheel** | Forces a platform tag onto an otherwise pure-Python wheel, and is unauditable |
+| Prebuilt iOS binaries **carried by the wheel** | Forces a platform tag onto an otherwise pure-Python wheel, and is opaque to this convention's source-and-provenance checks |
 | Extension modules and frameworks **shipped as binaries in wheels** | Already solved by platform-tagged wheels — [PEP 738](https://peps.python.org/pep-0738/) on Android, [PEP 730](https://peps.python.org/pep-0730/) on iOS |
 | Android resources (`res/`) | Resource names are one flat namespace per type, so no ownership rule can be built for them — a package shipping `values/strings.xml` with `app_name` would rename your app. They arrive through an `.aar` instead |
 
 Everything the Python packaging ecosystem already handles stays there. This
 convention covers only what wheels have no story for: the Gradle/JVM and
-Xcode/SPM side.
+Xcode/SwiftPM side.
 
 One qualifier on that third row, because it is the difference between "excluded"
 and "the main iOS use case": what is out of scope is a **binary in a wheel**. A
@@ -183,63 +210,47 @@ If it spreads, the precedent for writing it up is
 [PEP 561](https://peps.python.org/pep-0561/): a marker file, a consumer that is
 not an installer (there, a type checker), and normative obligations on that
 consumer — standardized *after* the practice existed. Entry points themselves
-followed the same path: invented by setuptools, adopted universally, documented
-afterward, never a PEP.
+followed the same path: invented by setuptools, widely adopted, and standardized later as a PyPA
+interoperability specification rather than a PEP.
 
 ## Tested against real packages
 
-Before asking anyone to implement a consumer, ten packages were expressed
-against this spec as `native.toml` sidecars.
+Before asking anyone to implement a consumer, **ten integration cases** were
+expressed against this spec as `native.toml` sidecars — four existing Python
+packages, and six clean-sheet sidecars written from vendor documentation.
 
-**Round one — four existing packages** from
-[PyPlatformPackages](https://github.com/PyPlatformPackages), chosen to pull in
-different directions: **PyOneSignal** (push, capabilities, components),
-**PyCoreLocation** (native Swift, permissions, privacy), **PyWebViews**
-(substantial package-owned Swift), and **PyGMA** (cross-platform third-party
-SDK).
+| Case | Pressure on the spec | Outcome |
+| --- | --- | --- |
+| **PyGMA** | cross-platform third-party SDK | **fit cleanly** — exercises the Android half end to end |
+| **PyOneSignal** | initialization, extensions, components | lifecycle deferred; app extensions became a prerequisite |
+| **PyCoreLocation** | Swift-implemented Python module, privacy | module registration; purpose strings moved to the app |
+| **PyWebViews** | SwiftPM-backed Python module | module registration confirmed; not a Python distribution at all |
+| **Firebase** ×3 | build plugins, config files, FCM filters | boundaries named; `application_files`, `intent_filters` |
+| **Sentry** | build-script exclusion, app values | first live use of application values; §11 corrected |
+| **Stripe** | browser return, payments | `view_links` validated; iOS URL prerequisite added |
+| **Mapbox** | private Maven repository | repository credentials, and a secrets rule for the record |
 
-**One of the four fit without a workaround.** The other three each needed either
-a change to the package or a capability that did not exist, and the spec changed
-as a result:
+**PyGMA was the one that fit without a workaround.** The other three round-one
+packages each needed either a change to the package or a capability that did not
+exist — most consequentially that a Swift package can now *be* the Python
+module, which is how most of that organization's iOS packages are built and
+which nothing could previously make importable.
 
-- **A Swift package can now *be* the Python module.** Most of that
-  organization's iOS packages are SwiftPM libraries that implement a Python
-  extension module directly. Nothing could make one importable — the build
-  succeeded and `import` failed.
-- **Purpose strings and required app extensions moved to the app.** The spec's
-  own example had a library writing the sentence App Store review reads.
-- **A package can say where it does *not* work.** "I contribute nothing on
-  Android" and "I do not run on Android" were the same declaration, so a
-  pure-Python wheel bound to an iOS framework would install, build, and fail at
-  `import`.
-- **A dozen corrections**, several of them the text disagreeing with itself —
-  version ranges forbidden on Android while permitted on iOS under the same
-  locking rule; three namespace-containment rules that never said whether they
-  compared strings or dotted segments.
+Round two exists because those four share one toolchain lineage and could
+plausibly have been fitting a spec written with them in view. The clean-sheet
+six could not, and two results are worth pulling out:
 
-**Round two — six clean-sheet sidecars**, written against the documentation of
-vendors who have never heard of this convention, because all four packages above
-share one toolchain lineage:
+- **The hardest failures are correct refusals.** Firebase's Gradle plugin and
+  Crashlytics' symbol upload are unreachable because the spec declines
+  build-time execution — not because something is missing. FCM's service intent
+  filter, by contrast, was a genuine gap and produced `intent_filters`.
+- **Examples caught claims this project had made too strongly** — that
+  build-script SDKs were one uniform category, and that application values had
+  no live use. Both were corrected by a vendor, not by argument.
 
-- **Firebase** (Core/Analytics, Crashlytics, FCM) — one of four halves came out
-  clean. Its Gradle plugin and Crashlytics' dSYM upload are permanently out of
-  scope, which is the spec **correctly refusing** rather than failing; FCM's
-  service intent filter was a real gap and is now `intent_filters`.
-- **Sentry** — chosen to test a claim rather than hunt gaps, and it corrected
-  one: build-script SDKs are not one category, since Sentry's plugin is optional
-  where Crashlytics' is load-bearing. It also produced the **first live use** of
-  application values, validating a table two earlier decisions had nearly
-  removed.
-- **Stripe** — validated `view_links` on its first real use, and showed iOS had
-  no browser-return counterpart.
-- **Mapbox** — chosen from a coverage audit: custom Maven repositories were the
-  only declarable table nothing had exercised. It works, and then hits a
-  credential requirement the section could not express at all.
-
-Each sidecar and the findings behind it are in [examples/](examples/).
-[PROPOSALS.md](PROPOSALS.md) records what was adopted, what was cut back, and
-what was deferred — with the reasoning, including the places the evidence turned
-out weaker than first claimed.
+The design history is in [PROPOSALS.md](PROPOSALS.md), including what was cut
+back, deferred, or withdrawn. Complete sidecars and per-case findings are in
+[examples/](examples/).
 
 ## Getting involved
 
