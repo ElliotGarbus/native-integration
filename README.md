@@ -275,6 +275,16 @@ Particularly wanted:
 Open an issue. Disagreement about the design is more useful right now than
 agreement.
 
+## Checks
+
+`python3 tools/check_spec.py` validates the specification against itself and
+against the ten worked examples: every `§` reference resolves, the consumer
+requirements are sequentially numbered and fully indexed, every TOML block
+parses, every documented sidecar obeys the rules the specification states, and
+no RFC 2119 keyword is left unmarked. It runs in CI.
+
+Each check exists because the corresponding mistake shipped at least once.
+
 ## Planned
 
 - A reference reader library — discovery, parsing, validation, and rule

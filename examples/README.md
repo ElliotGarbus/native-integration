@@ -41,6 +41,10 @@ claims**:
   sidecars, §6.6 was the only declarable table nothing had used, and it carries
   the strongest safety language in the specification.
 
+Running `python3 tools/check_spec.py` from the repository root validates every
+sidecar here against the specification — and the specification against itself.
+It runs in CI on every push and pull request.
+
 Proposed remedies live in [PROPOSALS.md](../PROPOSALS.md). Gap identifiers are
 per-example: `A*`/`B*`/`C*` (PyOneSignal), `L*` (PyCoreLocation), `W*`
 (PyWebViews), `G*` (PyGMA), `F*` (Firebase), `S*` (Sentry), `T*` (Stripe), `M*` (Mapbox).

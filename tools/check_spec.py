@@ -1,0 +1,313 @@
+#!/usr/bin/env python3
+"""Consistency checks for SPEC.md, README.md and the worked examples.
+
+These catch the failure mode this repository keeps hitting: a change that is
+locally correct invalidates its immediate neighbour, and the neighbour is the
+last thing anyone re-reads. Every check here corresponds to a defect that
+actually shipped at least once.
+
+Mechanical only. Nothing here can tell you a section contradicts itself; that
+still needs reading.
+
+    python3 tools/check_spec.py
+
+Exits non-zero on the first failing category, listing every failure in it.
+"""
+
+from __future__ import annotations
+
+import re
+import sys
+import tomllib
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+SPEC = (ROOT / "SPEC.md").read_text(encoding="utf-8")
+README = (ROOT / "README.md").read_text(encoding="utf-8")
+EXAMPLES = sorted(ROOT.glob("examples/**/native.toml"))
+
+RFC2119 = r"MUST NOT|MUST|SHOULD NOT|SHOULD|MAY"
+failures: list[str] = []
+
+
+def check(name: str, problems: list[str]) -> None:
+    print(f"{'FAIL' if problems else 'ok  '}  {name}")
+    for p in problems:
+        print(f"        {p}")
+    failures.extend(problems)
+
+
+def toml_blocks(text: str) -> list[tuple[int, str]]:
+    """Fenced ```toml blocks, with the 1-based line each starts on."""
+    return [
+        (text[: m.start()].count("\n") + 1, m.group(1))
+        for m in re.finditer(r"```toml\n(.*?)```", text, re.S)
+    ]
+
+
+def keys_of(obj: dict) -> set[str]:
+    out: set[str] = set()
+    for k, v in obj.items():
+        out.add(k)
+        if isinstance(v, dict):
+            out |= keys_of(v)
+        elif isinstance(v, list):
+            for item in v:
+                if isinstance(item, dict):
+                    out |= keys_of(item)
+    return out
+
+
+# --- 1. every § reference resolves ------------------------------------------
+sections = {
+    m.group(1) for m in re.finditer(r"^#{2,3}\s+(\d+(?:\.\d+)?)[.\s]", SPEC, re.M)
+}
+check(
+    "§ references resolve",
+    [f"§{r} referenced but no such section" for r in sorted(set(re.findall(r"§(\d+(?:\.\d+)?)", SPEC)) - sections)],
+)
+
+# --- 2. consumer requirements are sequential, and the index matches ----------
+problems = []
+try:
+    block = SPEC.split("A conforming consumer **MUST**:")[1].split(
+        "A conforming consumer **SHOULD**:"
+    )[0]
+    nums = [int(n) for n in re.findall(r"^(\d+)\.", block, re.M)]
+    if nums != list(range(1, len(nums) + 1)):
+        problems.append(f"requirement numbering is not 1..N: {nums}")
+    index = SPEC.split("| Theme | Requirements |")[1].split("A conforming consumer")[0]
+    listed = {int(n) for n in re.findall(r"\b(\d+)\b", index)}
+    for missing in sorted(set(nums) - listed):
+        problems.append(f"requirement {missing} is in no index theme")
+    for phantom in sorted(listed - set(nums)):
+        problems.append(f"index names requirement {phantom}, which does not exist")
+except IndexError:
+    problems.append("could not locate the §8 requirement list or its index table")
+check("§8 requirements sequential and fully indexed", problems)
+
+# --- 3. every TOML block parses ---------------------------------------------
+problems = []
+for label, text in (("SPEC.md", SPEC), ("README.md", README)):
+    for line, body in toml_blocks(text):
+        try:
+            tomllib.loads(body)
+        except tomllib.TOMLDecodeError as exc:
+            problems.append(f"{label}:{line} does not parse: {exc}")
+check("TOML blocks parse", problems)
+
+# --- 4. documented keys exist in the spec -----------------------------------
+# Catches an example or a README block drifting after a schema change.
+problems = []
+for path in EXAMPLES:
+    for key in keys_of(tomllib.loads(path.read_text(encoding="utf-8"))):
+        if key not in SPEC:
+            problems.append(f"{path.relative_to(ROOT)} uses `{key}`, absent from SPEC.md")
+for line, body in toml_blocks(README):
+    for key in keys_of(tomllib.loads(body)):
+        # pyproject.toml fragments legitimately name the producer's own package
+        if key not in SPEC and not key.startswith(("project", "tool")) and key != "kivmob":
+            problems.append(f"README.md:{line} uses `{key}`, absent from SPEC.md")
+check("keys used in examples and README exist in SPEC", problems)
+
+# --- 5. RFC 2119 keywords are marked ----------------------------------------
+# Bolded topic sentences (**… MUST …**) and prose about a keyword ("an
+# unsatisfiable MUST") are both legitimate; anything else should carry its own
+# emphasis. Code is masked first: R8 glob patterns such as `"okhttp3.**"` are
+# not markdown, and a keyword inside an example is not a normative use.
+def mask_code(text: str) -> str:
+    out = list(text)
+    for m in re.finditer(r"```.*?```", text, re.S):
+        out[m.start() : m.end()] = " " * (m.end() - m.start())
+    masked = "".join(out)
+    for m in re.finditer(r"`[^`\n]*`", masked):
+        out[m.start() : m.end()] = " " * (m.end() - m.start())
+    return "".join(out)
+
+
+prose = mask_code(SPEC)
+bold_spans = [(m.start(), m.end()) for m in re.finditer(r"\*\*.+?\*\*", prose, re.S)]
+problems = []
+for m in re.finditer(rf"(?<!\*\*)\b({RFC2119})\b(?!\*\*)", prose):
+    if any(a <= m.start() < b for a, b in bold_spans):
+        continue  # inside a bolded sentence
+    if re.search(r"\b(a|an|the|is|not|its)\s+(\w+\s+)?$", prose[max(0, m.start() - 40) : m.start()]):
+        continue  # prose *about* the keyword
+    line = SPEC[: m.start()].count("\n") + 1
+    context = " ".join(SPEC[max(0, m.start() - 60) : m.end() + 30].split())
+    problems.append(f"SPEC.md:{line} unmarked `{m.group(1)}`: …{context}…")
+check("RFC 2119 keywords are emphasised", problems)
+
+# --- 6. relative links resolve ----------------------------------------------
+problems = []
+for label, text, base in (
+    ("README.md", README, ROOT),
+    ("SPEC.md", SPEC, ROOT),
+    ("examples/README.md", (ROOT / "examples/README.md").read_text(encoding="utf-8"), ROOT / "examples"),
+):
+    for target in sorted(set(re.findall(r"\]\((?!https?:)([^)#]+)\)", text))):
+        if not (base / target).exists():
+            problems.append(f"{label} links to {target}, which does not exist")
+    headings = {
+        re.sub(r"[^a-z0-9 -]", "", h.lower()).replace(" ", "-")
+        for h in re.findall(r"^#{1,4} (.+)$", text, re.M)
+    }
+    for anchor in sorted(set(re.findall(r"\]\(#([a-z0-9-]+)\)", text))):
+        if anchor not in headings:
+            problems.append(f"{label} links to #{anchor}, which matches no heading")
+check("relative links and anchors resolve", problems)
+
+# --- 7. sidecars obey the rules the spec states ------------------------------
+# Applied to the worked examples *and* to every complete sidecar documented in
+# SPEC.md or README.md, because a documented example that drifts from the schema
+# is the same defect as an example file that does — and has shipped once.
+problems = []
+CREDENTIAL_SHAPED = re.compile(r"(password\s*=\s*\"|secret\s*=\s*\"|token\s*=\s*\"|sk\.[A-Za-z0-9]{8})", re.I)
+
+
+def entries(container: dict, *path: str) -> list[dict]:
+    """Array-of-tables at `path`, or [] — documented fragments are partial, and
+    a fragment showing only a nested sub-table parses its parent as a table."""
+    node = container
+    for part in path:
+        if not isinstance(node, dict):
+            return []
+        node = node.get(part)
+    return [e for e in node if isinstance(e, dict)] if isinstance(node, list) else []
+
+
+def is_skeleton(doc: dict) -> bool:
+    """True when every array-of-tables entry is empty, as in §5's schema map."""
+    found = []
+
+    def walk(node):
+        if isinstance(node, dict):
+            for v in node.values():
+                walk(v)
+        elif isinstance(node, list):
+            for item in node:
+                if isinstance(item, dict):
+                    found.append(item)
+                    walk(item)
+
+    walk(doc)
+    return bool(found) and all(not e for e in found)
+
+
+def sidecar_sources():
+    for path in EXAMPLES:
+        raw = path.read_text(encoding="utf-8")
+        yield str(path.relative_to(ROOT)), raw, tomllib.loads(raw)
+    for label, text in (("SPEC.md", SPEC), ("README.md", README)):
+        for line, body in toml_blocks(text):
+            doc = tomllib.loads(body)
+            # Only whole sidecars. §4.3 requires `contract`, so its presence is
+            # the claim to be one; the documented fragments elsewhere are
+            # deliberately partial and reference ids declared in other blocks.
+            # §5's structure block also carries `contract` but is a skeleton of
+            # empty tables — a map of the schema rather than a sidecar.
+            if "contract" in doc and not is_skeleton(doc):
+                yield f"{label}:{line}", body, doc
+
+
+for rel, raw, doc in sidecar_sources():
+    # §6.6 — a sidecar must never carry a credential
+    if CREDENTIAL_SHAPED.search(raw):
+        problems.append(f"{rel} contains something credential-shaped")
+
+    android = doc.get("android", {})
+    ios = doc.get("ios", {})
+
+    # §4.5 — a platform table for a platform `platforms` omits is a contradiction
+    declared = set(doc.get("platforms", ["android", "ios"]))
+    for table in {"android", "ios"} & set(doc):
+        if table not in declared:
+            problems.append(f"{rel} has [{table}] but platforms={sorted(declared)}")
+
+    # §6.5 — exactly one of coordinate/module, and a bounded range
+    for dep in entries(android, "contributes", "gradle_dependencies"):
+        if ("coordinate" in dep) == ("module" in dep):
+            problems.append(f"{rel} gradle dependency needs exactly one of coordinate/module: {dep}")
+        if "module" in dep and set(dep.get("version", {})) != {"at_least", "below"}:
+            problems.append(f"{rel} module form needs a bounded version: {dep}")
+
+    # §6.6 — reason required, and participation bounded
+    for repo in entries(android, "contributes", "gradle_repositories"):
+        if "reason" not in repo or not (repo.get("groups") or repo.get("modules")):
+            problems.append(f"{rel} repository needs `reason` and groups/modules: {repo.get('url')}")
+
+    # §6.3 — id + reason, and every inline reference resolves to a declared id
+    ids = set()
+    for value in entries(android, "requires", "application_values"):
+        if not {"id", "reason"} <= set(value):
+            problems.append(f"{rel} application value needs `id` and `reason`: {value}")
+        ids.add(value.get("id"))
+    for ref in set(re.findall(r'application_value\s*=\s*"([^"]+)"', raw)):
+        if ref not in ids:
+            problems.append(f"{rel} inline reference `{ref}` matches no declared id")
+
+    # §6.8 — view_links is activity-only and export-gated; intent_filters neither
+    for comp in entries(android, "contributes", "components"):
+        if comp.get("view_links"):
+            if comp.get("kind") != "activity" or not comp.get("exported_required"):
+                problems.append(f"{rel} view_links needs an exported activity: {comp.get('name')}")
+        if comp.get("intent_filters"):
+            if comp.get("exported_required") or comp.get("view_links"):
+                problems.append(f"{rel} intent_filters must not be exported or carry view_links: {comp.get('name')}")
+            for flt in comp["intent_filters"] if isinstance(comp["intent_filters"], list) else []:
+                if set(flt) != {"action"}:
+                    problems.append(f"{rel} intent filter takes only `action`: {flt}")
+
+    # §7.3 — reason on every prerequisite; conditional ones state the condition;
+    #        at most one url_schemes entry, since it carries no identifier
+    for table in ("entitlements", "usage_descriptions", "app_extensions", "application_files", "url_schemes"):
+        rows = entries(ios, "requires", table)
+        if table == "url_schemes" and len(rows) > 1:
+            problems.append(f"{rel} declares {len(rows)} url_schemes entries; at most one is allowed")
+        for entry in rows:
+            if "reason" not in entry:
+                problems.append(f"{rel} {table} entry needs a `reason`: {entry}")
+            elif entry.get("conditional") and "only if" not in entry["reason"].lower():
+                problems.append(f"{rel} conditional {table} `reason` must state the condition: {entry}")
+
+    # §7.7 — a plain identifier, bound to a package the same sidecar declares
+    packages = {p.get("name") for p in entries(ios, "contributes", "swift_packages")}
+    for mod in entries(ios, "contributes", "python_modules"):
+        if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", mod.get("name", "")):
+            problems.append(f"{rel} python module name must be a plain identifier: {mod.get('name')}")
+        if mod.get("swift_package") not in packages:
+            problems.append(f"{rel} python module names undeclared package: {mod.get('swift_package')}")
+
+# module names are unique across the whole set, per §7.7
+seen: dict[str, str] = {}
+for path in EXAMPLES:
+    doc = tomllib.loads(path.read_text(encoding="utf-8"))
+    for mod in entries(doc.get("ios", {}), "contributes", "python_modules"):
+        name = mod.get("name")
+        if name in seen:
+            problems.append(f"module `{name}` declared by both {seen[name]} and {path.name}")
+        seen[name] = path.name
+check("sidecars and documented examples obey the spec's own rules", problems)
+
+# --- 8. §2.2's illustrative app-side blocks stay app-side --------------------
+problems = []
+illustrative = re.search(
+    r"\*\*Illustrative only\*\*.*?(?=\n## )", SPEC, re.S
+)
+if illustrative:
+    for line, body in toml_blocks(illustrative.group(0)):
+        is_app = "pyproject.toml" in body
+        tables = re.findall(r"^\[+([a-z][^\]]*)\]+", body, re.M)
+        for table in tables:
+            root = table.split(".")[0]
+            if is_app and root != "tool":
+                problems.append(f"§2.2 app-side example declares [{table}], which is not [tool.*]")
+            if not is_app and root == "tool":
+                problems.append(f"§2.2 sidecar example declares [{table}], which belongs to the application")
+check("§2.2 keeps sidecar and application examples distinct", problems)
+
+print()
+if failures:
+    print(f"{len(failures)} problem(s) found.")
+    sys.exit(1)
+print("All checks passed.")

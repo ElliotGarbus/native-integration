@@ -1,0 +1,20 @@
+name: Consistency checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  check:
+    name: SPEC, README and examples
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          # tomllib is stdlib from 3.11
+          python-version: "3.12"
+      - name: Check consistency
+        run: python3 tools/check_spec.py
