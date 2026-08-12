@@ -242,11 +242,6 @@ A producer **MUST** declare exactly one entry point in the group
 native = "mypkg._native"
 ```
 
-- The group name uses an underscore because the
-  [entry-points specification](https://packaging.python.org/en/latest/specifications/entry-points/)
-  requires group names to match `^\w+(\.\w+)*$`, which permits no hyphen. It
-  stands for the PyPI project `native-integration`, following that
-  specification's recommendation that a new group begin with a project name.
 - The entry-point name **SHOULD** be `native`. It carries no meaning and
   consumers ignore it (§3.3).
 - The value **MUST** be an importable module reference — a dotted path of valid
@@ -259,9 +254,13 @@ metadata stays truthful to the entry-points specification, which defines a value
 as pointing to an importable object; this convention reads the named directory's
 *files* instead.
 
-> The quotes are required TOML syntax. In an unquoted header a dot nests, so
-> `[project.entry-points.native_integration.v1]` declares a group
-> `native_integration` containing a table `v1` — which no consumer will find.
+> **Two ways to misspell the group, both silent.** The underscore is required —
+> [entry-point group names](https://packaging.python.org/en/latest/specifications/entry-points/)
+> cannot contain hyphens, so `native-integration.v1` is not this group despite
+> matching the project name. And the quotes are required TOML syntax: in an
+> unquoted header a dot nests, so `[project.entry-points.native_integration.v1]`
+> declares a group `native_integration` containing a table `v1`. Either mistake
+> yields a wheel that installs cleanly and a build that never finds the sidecar.
 
 ### 3.2 Resolution
 
