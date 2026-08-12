@@ -33,9 +33,9 @@ That inversion **is** the problem.
 ## The shape of the fix
 
 A package ships a small TOML file declaring its native requirements — Maven
-coordinates, permissions, manifest components, SwiftPM packages, `Info.plist` keys,
-any glue source it must contribute, and the prerequisites only the app can
-satisfy. A build tool discovers it through an entry point, reads it **without
+coordinates, permissions, manifest components, SwiftPM packages, `Info.plist`
+keys, any glue source it must contribute, a Swift package that *is* its Python
+extension module, and the prerequisites only the app can satisfy. A build tool discovers it through an entry point, reads it **without
 importing the package**, validates its prerequisites, and stages its
 contributions into the generated Gradle or Xcode project.
 
@@ -131,7 +131,10 @@ version, SDK-licence acceptance and an AndroidX flag; this convention models
 neither those nor anything else that belongs to the build tool rather than to a
 package.
 
-Read the full [specification](SPEC.md).
+Read the full [specification](SPEC.md). Every key a sidecar may contain is
+listed with a one-line description in
+[Appendix D](SPEC.md#appendix-d-declaration-reference), which is the faster way
+in if you are writing one or reviewing one.
 
 ## What makes this different from "put the Java in a wheel"
 
@@ -185,17 +188,28 @@ Three properties follow from that, and they are the reason for the design:
 | Prebuilt iOS binaries **carried by the wheel** | Forces a platform tag onto an otherwise pure-Python wheel, and is opaque to this convention's source-and-provenance checks |
 | Extension modules and frameworks **shipped as binaries in wheels** | Already solved by platform-tagged wheels — [PEP 738](https://peps.python.org/pep-0738/) on Android, [PEP 730](https://peps.python.org/pep-0730/) on iOS |
 | Android resources (`res/`) | Resource names are one flat namespace per type, so no ownership rule can be built for them — a package shipping `values/strings.xml` with `app_name` would rename your app. They arrive through an `.aar` instead |
+| Build plugins, run-script phases, hooks | Excluded **on principle**: a sidecar is data, and nothing in it is executed. This is permanent, and it puts one whole category of SDK out of reach — see below |
+| Startup and lifecycle participation | A package cannot run code at launch or join an app-delegate callback. **Deferred, not refused**: real SDKs want it, and the shape it should take is not settled |
 
 Everything the Python packaging ecosystem already handles stays there. This
 convention covers only what wheels have no story for: the Gradle/JVM and
 Xcode/SwiftPM side.
 
-One qualifier on that third row, because it is the difference between "excluded"
-and "the main iOS use case": what is out of scope is a **binary in a wheel**. A
-Swift package that *implements* a Python extension module in source — compiled
-into the app target against the app's own interpreter, no binary anywhere in the
-wheel — is in scope, and the spec registers it with the interpreter so `import`
-finds it. That shape turns out to be how most Python-Swift packages are built.
+One qualifier on the binaries rows, because it is the difference between
+"excluded" and "the main iOS use case": what is out of scope is a **binary in a
+wheel**. A Swift package that *implements* a Python extension module in source —
+compiled into the app target against the app's own interpreter, no binary
+anywhere in the wheel — is in scope, and the spec registers it with the
+interpreter so `import` finds it. That shape turns out to be how most
+Python-Swift packages are built.
+
+**The excluded category worth knowing about before you start** is any SDK whose
+value depends on uploading build artifacts — symbol files, mapping files, source
+maps. Those need build-time execution by construction, so this convention will
+never carry them. Whether that matters depends on the SDK: Sentry's upload
+plugin is optional and the rest of it is declarations, so a wrapper is worth
+shipping with a known deficiency; Firebase Crashlytics without its plugin
+reports unsymbolicated crashes, which is the part nobody wants.
 
 ## Why a convention rather than a PEP
 
@@ -278,12 +292,15 @@ agreement.
 ## Checks
 
 `python3 tools/check_spec.py` validates the specification against itself and
-against the ten worked examples: every `§` reference resolves, the consumer
-requirements are sequentially numbered and fully indexed, every TOML block
-parses, every documented sidecar obeys the rules the specification states, and
-no RFC 2119 keyword is left unmarked. It runs in CI.
+against the ten worked examples: that every `§` reference and link resolves, the
+consumer requirements are sequentially numbered and fully indexed, every TOML
+block parses, every documented sidecar obeys the rules the specification states,
+every key appears in the reference table, and no RFC 2119 keyword is left
+unmarked. It runs in CI on every push and pull request.
 
-Each check exists because the corresponding mistake shipped at least once.
+Each check exists because the corresponding mistake shipped at least once. They
+cover mechanical drift only — a section that contradicts itself still needs a
+reader, which is how two of the defects above were found.
 
 ## Planned
 
