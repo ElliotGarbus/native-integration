@@ -262,11 +262,14 @@ six could not, and two results are worth pulling out:
   build-script SDKs were one uniform category, and that application values had
   no live use. Both were corrected by a vendor, not by argument.
 
-The design history is in [PROPOSALS.md](PROPOSALS.md), including what was cut
-back, deferred, or withdrawn. Complete sidecars and per-case findings are in
-[examples/](examples/), where [pystripe](examples/pystripe/) carries both halves
-— the package's declaration and the application's reply — if you would rather
-see the authority split end to end than described.
+[**examples/**](examples/) carries one integration in full — the package's
+declaration and the application's reply side by side — if you would rather see
+the authority split than read about it.
+
+The other nine, and the design history behind every decision including what was
+cut back, deferred or withdrawn, are under
+[**development/**](development/): [the sidecars](development/examples/) with
+their findings, and [PROPOSALS.md](development/PROPOSALS.md).
 
 ## Getting involved
 

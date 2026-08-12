@@ -45,9 +45,10 @@ feature — a convention only one tool reads isn't worth defining.
 
 Ten integration cases have been written as sidecars: four existing packages from
 PyPlatformPackages, plus clean-sheet ones for Firebase, Sentry, Stripe and
-Mapbox. They're all in
-[`examples/`](https://github.com/ElliotGarbus/native-integration/tree/main/examples)
-with the findings beside them.
+Mapbox. [`examples/`](https://github.com/ElliotGarbus/native-integration/tree/main/examples)
+carries one of them in full — the package's declaration *and* the application's
+reply. The other nine, with the findings beside each, are under
+[`development/`](https://github.com/ElliotGarbus/native-integration/tree/main/development).
 
 **Every one was written by the same hand.** A sidecar written by someone who
 didn't write the spec is worth more than another written by someone who did, and
@@ -88,10 +89,10 @@ spec:
 Don't start with the spec — it's ~17k words.
 **[README](https://github.com/ElliotGarbus/native-integration)** first, then
 **one** example:
-[Firebase](https://github.com/ElliotGarbus/native-integration/tree/main/examples/firebase)
-to watch it hit real boundaries, or
-[PyGMA](https://github.com/ElliotGarbus/native-integration/tree/main/examples/pygma)
-to see it work end to end.
+[pystripe](https://github.com/ElliotGarbus/native-integration/tree/main/examples/pystripe)
+to see both halves of one integration, or
+[Firebase](https://github.com/ElliotGarbus/native-integration/tree/main/development/examples/firebase)
+to watch the spec hit real boundaries.
 [Appendix D](https://github.com/ElliotGarbus/native-integration/blob/main/SPEC.md#appendix-d-declaration-reference)
 is a one-line description of every key if you'd rather scan the surface.
 

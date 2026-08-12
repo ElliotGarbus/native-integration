@@ -24,7 +24,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 SPEC = (ROOT / "SPEC.md").read_text(encoding="utf-8")
 README = (ROOT / "README.md").read_text(encoding="utf-8")
-EXAMPLES = sorted(ROOT.glob("examples/**/native.toml"))
+EXAMPLES = sorted(
+    [*ROOT.glob("examples/**/native.toml"), *ROOT.glob("development/examples/**/native.toml")]
+)
 
 RFC2119 = r"MUST NOT|MUST|SHOULD NOT|SHOULD|MAY"
 failures: list[str] = []
@@ -144,6 +146,7 @@ for label, text, base in (
     ("README.md", README, ROOT),
     ("SPEC.md", SPEC, ROOT),
     ("examples/README.md", (ROOT / "examples/README.md").read_text(encoding="utf-8"), ROOT / "examples"),
+    ("development/README.md", (ROOT / "development/README.md").read_text(encoding="utf-8"), ROOT / "development"),
 ):
     for target in sorted(set(re.findall(r"\]\((?!https?:)([^)#]+)\)", text))):
         if not (base / target).exists():

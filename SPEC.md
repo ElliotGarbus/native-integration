@@ -15,9 +15,10 @@ tool discovers, validates, and stages that material.
 > against the text as ten **integration cases** — four existing Python packages,
 > and six clean-sheet sidecars
 > for Firebase, Sentry, Stripe and Mapbox, whose vendors have never heard of this
-> convention. See [`examples/`](examples/) for the worked cases and
-> [`PROPOSALS.md`](PROPOSALS.md) for the proposals those cases produced,
-> including the ones deliberately not adopted.
+> convention. See [`examples/`](examples/) for a worked integration with both
+> halves, [`development/examples/`](development/examples/) for the nine that
+> shaped the text, and [`development/PROPOSALS.md`](development/PROPOSALS.md)
+> for the decisions they produced, including the ones deliberately not adopted.
 
 ---
 
