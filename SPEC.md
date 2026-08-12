@@ -11,9 +11,12 @@ tool discovers, validates, and stages that material.
 > line is removed, and this revision makes some — the draft is amended in place
 > rather than by contract minor.
 >
-> This revision incorporates the corrections found by expressing four real
-> packages against the previous text; see [`examples/`](examples/) for the
-> worked cases and [`PROPOSALS.md`](PROPOSALS.md) for the changes not yet made.
+> This revision incorporates the corrections found by expressing **ten packages**
+> against the text — four existing Python packages, and six clean-sheet sidecars
+> for Firebase, Sentry, Stripe and Mapbox, whose vendors have never heard of this
+> convention. See [`examples/`](examples/) for the worked cases and
+> [`PROPOSALS.md`](PROPOSALS.md) for the proposals those cases produced,
+> including the ones deliberately not adopted.
 
 ---
 

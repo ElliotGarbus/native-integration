@@ -7,8 +7,9 @@
 > from maintainers of other toolchains is the point — see
 > [Getting involved](#getting-involved).
 >
-> The spec has been stress-tested by expressing four real packages against it,
-> which changed it substantially — see
+> The spec has been stress-tested by expressing ten packages against it — four
+> existing ones, plus clean-sheet sidecars for Firebase, Sentry, Stripe and
+> Mapbox — which changed it substantially. See
 > [Tested against real packages](#tested-against-real-packages).
 
 ## The problem
@@ -187,12 +188,15 @@ afterward, never a PEP.
 
 ## Tested against real packages
 
-Before asking anyone to implement a consumer, four packages from
-[PyPlatformPackages](https://github.com/PyPlatformPackages) were expressed
-against this spec, chosen to pull in different directions: **PyOneSignal**
-(push, capabilities, components), **PyCoreLocation** (native Swift, permissions,
-privacy), **PyWebViews** (substantial package-owned Swift), and **PyGMA**
-(cross-platform third-party SDK).
+Before asking anyone to implement a consumer, ten packages were expressed
+against this spec as `native.toml` sidecars.
+
+**Round one — four existing packages** from
+[PyPlatformPackages](https://github.com/PyPlatformPackages), chosen to pull in
+different directions: **PyOneSignal** (push, capabilities, components),
+**PyCoreLocation** (native Swift, permissions, privacy), **PyWebViews**
+(substantial package-owned Swift), and **PyGMA** (cross-platform third-party
+SDK).
 
 **One of the four fit without a workaround.** The other three each needed either
 a change to the package or a capability that did not exist, and the spec changed
@@ -213,10 +217,29 @@ as a result:
   locking rule; three namespace-containment rules that never said whether they
   compared strings or dotted segments.
 
-Each package's `native.toml` and the findings behind it are in
-[examples/](examples/). [PROPOSALS.md](PROPOSALS.md) records what was adopted,
-what was cut back, and what was deferred — with the reasoning, including the
-places the evidence turned out weaker than first claimed.
+**Round two — six clean-sheet sidecars**, written against the documentation of
+vendors who have never heard of this convention, because all four packages above
+share one toolchain lineage:
+
+- **Firebase** (Core/Analytics, Crashlytics, FCM) — one of four halves came out
+  clean. Its Gradle plugin and Crashlytics' dSYM upload are permanently out of
+  scope, which is the spec **correctly refusing** rather than failing; FCM's
+  service intent filter was a real gap and is now `intent_filters`.
+- **Sentry** — chosen to test a claim rather than hunt gaps, and it corrected
+  one: build-script SDKs are not one category, since Sentry's plugin is optional
+  where Crashlytics' is load-bearing. It also produced the **first live use** of
+  application values, validating a table two earlier decisions had nearly
+  removed.
+- **Stripe** — validated `view_links` on its first real use, and showed iOS had
+  no browser-return counterpart.
+- **Mapbox** — chosen from a coverage audit: custom Maven repositories were the
+  only declarable table nothing had exercised. It works, and then hits a
+  credential requirement the section could not express at all.
+
+Each sidecar and the findings behind it are in [examples/](examples/).
+[PROPOSALS.md](PROPOSALS.md) records what was adopted, what was cut back, and
+what was deferred — with the reasoning, including the places the evidence turned
+out weaker than first claimed.
 
 ## Getting involved
 
@@ -230,9 +253,11 @@ tool reads is not worth defining.
 
 Particularly wanted:
 
-1. Is the declaration set right — what is missing, what is unnecessary? The
-   four packages above are all from one toolchain lineage, so a package built
-   against a *different* toolchain is worth more than a fifth from the same one.
+1. Is the declaration set right — what is missing, what is unnecessary? Ten
+   sidecars have been written, but every one by the same hand. **A sidecar
+   written by someone who did not write the spec** is worth more than another
+   written by someone who did — that is the reading the examples cannot give
+   themselves.
 2. Does the app-keeps-authority split land in the right place?
 3. If you maintain a build tool: is this something you would plausibly read?
 

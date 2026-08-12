@@ -1,9 +1,13 @@
 # Worked examples
 
-Four real packages from [PyPlatformPackages](https://github.com/PyPlatformPackages),
-each expressed as a `native.toml` under contract 1, with the gaps recorded
-beside it. The purpose is to find out whether version 1 has the right
+Ten packages expressed as `native.toml` sidecars under contract 1, with the gaps
+recorded beside each. The purpose is to find out whether version 1 has the right
 primitives **before** a consumer implements it.
+
+Four are existing packages from
+[PyPlatformPackages](https://github.com/PyPlatformPackages). The other six are
+clean-sheet, written against the documentation of vendors who have never heard
+of this convention.
 
 | Example | Chosen to stress | Outcome |
 | --- | --- | --- |
@@ -75,8 +79,8 @@ evidence:
 The iOS half is where version 1 runs out, and the failures are structural rather
 than incidental.
 
-**Three of the four packages could not be expressed without changing the
-package.** PyOneSignal must delete its `Application` subclass and initialize
+**Three of the four round-one packages could not be expressed without changing
+the package.** PyOneSignal must delete its `Application` subclass and initialize
 late from Python — a silent runtime behaviour change, not an omitted
 convenience. PyCoreLocation and PyWebViews cannot register the Swift-implemented
 Python module that *is* their implementation, so the build succeeds and `import`
@@ -128,8 +132,25 @@ because the diagnostic is not the consumer's to write.
 > If the current spec expresses all four naturally, that's strong evidence that
 > v1 has the right primitives.
 
-It expresses one of four naturally. The other three each required either a
-change to the package or a capability that does not exist.
+It expressed one of four naturally. The other three each required either a
+change to the package or a capability that did not exist.
+
+**Round two answers a stronger version of the same question**, because those
+four packages shared one toolchain lineage and could plausibly have been fitting
+a spec written with them in view. Six clean-sheet sidecars for Firebase, Sentry,
+Stripe and Mapbox — vendors with no knowledge of this convention — came out at
+roughly the same rate, from an entirely independent direction.
+
+More useful than the rate: **the hardest failures turned out to be correct
+refusals.** Firebase's Gradle plugin and Crashlytics' dSYM upload are
+unreachable because §2.1 declines build-time execution, not because anything is
+missing. That is a different and much better position than "we have not got to
+it yet", and it is only visible once you try.
+
+Round two also caught two claims this document had made too strongly — that
+build-script SDKs were one uniform category, and that application values had no
+live use — which is the argument for running examples rather than reasoning
+about them.
 
 The encouraging reading is that the **shape** held: nothing found here suggests
 `owns` / `requires` / `contributes` is the wrong decomposition, no finding
