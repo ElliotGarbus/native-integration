@@ -286,8 +286,15 @@ Particularly wanted:
 2. Does the app-keeps-authority split land in the right place?
 3. If you maintain a build tool: is this something you would plausibly read?
 
-Open an issue. Disagreement about the design is more useful right now than
-agreement.
+**[Start a discussion](https://github.com/ElliotGarbus/native-integration/discussions)**
+for anything about the design — including "I am not sure this is right" with no
+proposal attached, which is the most useful thing you can bring right now.
+Issues are for concrete defects: a rule that contradicts another, an example
+that no longer matches the specification, a requirement you could not implement.
+
+Disagreement is more useful than agreement. The specification has been through
+two rounds of external review, and both changed it substantially; the places it
+is wrong now are the places nobody has looked yet.
 
 ## Checks
 
