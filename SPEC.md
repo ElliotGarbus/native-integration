@@ -650,21 +650,30 @@ contribution references the `id`. Until then the consumer emits **nothing** on
 the producer's behalf and fails, naming the distribution and the `reason` (a
 *requires* is checked, never auto-satisfied — §2.1).
 
-> **Why this table is Android-only.** Splitting `id` from
-> `manifest_meta_data` removes the *structural* obstacle to a platform-neutral
-> form: a top-level table keyed by `id`, with one delivery field per platform,
-> would work. An earlier revision argued that it could not, on the grounds that
-> the identifier had to carry the vendor's platform-specific key — that
-> objection is dissolved by the split, and the honest reason is now simply
-> evidence.
->
-> No iOS case has needed a build-embedded value. The iOS SDKs examined either
-> take their configuration through a runtime call or read a whole file (§7.3's
-> `application_files`); Sentry needs its DSN on both platforms but reaches it on
+> **Why this table is Android-only, and why it stays that way.** No iOS case has
+> needed a build-embedded value: the iOS SDKs examined either take their
+> configuration through a runtime call or read a whole file (§7.3's
+> `application_files`). Sentry needs its DSN on both platforms but reaches it on
 > iOS through `SentrySDK.start`, which is a runtime call and not this table's
-> business. When one appears, the shape is an `info_plist_key` delivery field
-> beside `manifest_meta_data` and this table moving up a level — not a second
-> table.
+> business.
+>
+> When one does appear, the shape is a **parallel `[[ios.requires.application_values]]`
+> table** with its own delivery field — not this table promoted to the top level
+> with one delivery field per platform. That promotion looks tidier and cannot
+> work, because **the value itself is frequently per-platform**. An AdMob
+> application ID differs between Android and iOS, since the console registers a
+> separate app for each. Firebase encodes the platform *inside* the identifier —
+> `1:1234:android:…` against `1:1234:ios:…` — which is why `google-services.json`
+> and `GoogleService-Info.plist` carry different values rather than one value in
+> two formats.
+>
+> A single entry answered once cannot express that. Producers would be forced to
+> invent `admob_app_id_android` and `admob_app_id_ios`, pushing the platform into
+> the `id` — precisely what an identifier separated from its delivery key exists
+> to avoid. With parallel tables, a value that genuinely is the same on both
+> platforms is declared twice under one `id` and answered once per platform,
+> which is mild duplication in the easy case and the only correct shape in the
+> hard one.
 
 A contribution **MAY** reference an application value **inline** —
 `{ application_value = "<id>" }`, as in §6.8's `view_links` — and the consumer
