@@ -510,6 +510,9 @@ A sidecar declaring no platform table is valid and contributes nothing — which
 is a statement about contributions, not about where the distribution works
 (§4.5). Within a platform table, each category is optional.
 
+Every key above is listed with a one-line description in
+[Appendix D](#appendix-d-declaration-reference).
+
 ## 6. Android
 
 ### 6.1 Ownership: `[android.owns]`
@@ -2020,6 +2023,74 @@ applications that do.
 Producers **SHOULD NOT** reach for that mechanism to avoid stating an
 unconditional requirement. A requirement wrongly marked conditional converts a
 build failure that names the problem into a line in a report.
+
+## Appendix D: declaration reference
+
+Every key a sidecar may contain, with the section that defines it. Descriptions
+are summaries; where this table and the body differ, the body governs.
+
+| Entry | Description |
+| --- | --- |
+| **Top level** | |
+| `contract` | **Required.** Major of this specification, optionally with a minor — `"1"` or `"1.1"`. §4.3 |
+| `platforms` | Optional. Where the distribution *functions*, not merely where it contributes; a build for an omitted platform fails. §4.5 |
+| **`[android.owns]`** §6.1 | |
+| `java_namespaces` | Exclusive, collision-checked claim. Required when contributing Java/Kotlin, producer-sourced components, or keep patterns under its own namespace |
+| **`[android.requires]`** §6.2 | |
+| `compile_sdk`, `min_sdk` | Floors. The build fails when the application is lower; the consumer never raises the application to match |
+| **`[[android.requires.application_values]]`** §6.3 | |
+| `id` | Logical identifier the application answers under, and what a contribution references inline |
+| `reason` | **Required.** What the value is and where to obtain it |
+| `manifest_meta_data` | Optional. The `<meta-data>` key the SDK reads; the consumer writes the supplied value there |
+| **`[android.contributes.src]`** §6.4 | |
+| `java`, `kotlin` | Directories whose `.java` / `.kt` files the application's own toolchain compiles |
+| **`[[android.contributes.gradle_dependencies]]`** §6.5 | |
+| `coordinate` | `group:artifact:version`, exactly versioned. **Recommended** — legible without consulting the record |
+| `module` + `version` | `group:artifact` with a bounded `{ at_least, below }` range. Open-ended and changing versions are invalid |
+| `configuration` | Optional; `implementation` is the only value defined in version 1 |
+| **`[[android.contributes.gradle_repositories]]`** §6.6 | |
+| `url` | A repository added to the application's resolution — the highest-authority contribution here |
+| `reason` | **Required.** Why the artifacts are not on Maven Central |
+| `groups`, `modules` | **At least one required.** Bounds what the repository may serve |
+| `credentials_required` | Optional. Declares the repository authenticated. A sidecar **MUST NOT** contain the credential itself |
+| **`[[android.contributes.permissions]]`** §6.7 | |
+| `name` | The canonical manifest string — `android.permission.INTERNET`, never a shorthand |
+| `reason` | Recommended; carried into the report of §9 |
+| **`[[android.contributes.features]]`** §6.7 | |
+| `name` | Always registered `required="false"`; only the application may promote a feature |
+| **`[[android.contributes.components]]`** §6.8 | |
+| `kind` | `service`, `activity`, `receiver` or `provider` |
+| `name` | The class. Under an owned namespace unless `from_dependency` says otherwise |
+| `from_dependency` | `group:artifact` of a declared dependency that owns the class |
+| `exported_required` + `reason` | Requests export. The build fails without explicit application approval — it never falls back to unexported |
+| `[[…view_links]]` — `scheme`, `host`, `path_prefix` | Generates the browser-return filter. Valid only on an exported activity; `scheme` is required |
+| `[[…intent_filters]]` — `action` | One vendor-defined action, on a component that is neither exported nor carrying `view_links` |
+| **`[android.contributes.r8]`** §6.9 | |
+| `keep_classes` | Patterns within an owned namespace |
+| `[[…r8.keep]]` — `pattern`, `from_dependency` | A declared dependency's classes, verified against its resolved archive rather than its Maven group |
+| **`[ios]`** §7.1 | |
+| `swift_symbol_prefixes` | Naming guidance, not an ownership claim; it does not reach file-scope declarations |
+| **`[ios.requires]`** §7.2 | |
+| `deployment_target` | A floor, with §6.2's semantics |
+| **`[ios.requires.*]` — prerequisites** §7.3 | Every entry takes `reason` (**required**) and `conditional` (optional). Unconditional and unsatisfied fails the build; conditional and unsatisfied is recorded |
+| `[[…entitlements]]` — `key` | Satisfied by the key's presence; v1 does not model its value |
+| `[[…usage_descriptions]]` — `key` | The application writes the sentence; §7.6 rejects one offered as a contribution |
+| `[[…app_extensions]]` — `kind` | `notification_service` or `location_push`. The application builds the target |
+| `[[…application_files]]` — `name` | A file the SDK reads from the bundle. Declare only when no programmatic path exists |
+| `[[…url_schemes]]` | Carries no identifier — joined by distribution, so **at most one per sidecar** |
+| **`[[ios.contributes.swift_packages]]`** §7.4 | |
+| `name` | Local handle, unique within the sidecar; §7.7 and §7.3 refer to packages by it |
+| `url`, `products` | The repository, and which of its products to link |
+| `requirement` | Exactly one of `{ exact }`, `{ from }`, `{ revision }`. `branch` is invalid |
+| **`[ios.contributes.src]`** §7.5 | |
+| `swift` | Directories of `.swift` staged into the application target. For small shims only |
+| **`[ios.contributes.info_plist]`** §7.6 | |
+| `values` | Scalar keys set verbatim. Collisions fail; `*UsageDescription` keys are rejected |
+| `append` | Array keys merged with the application's and other producers', de-duplicated |
+| **`[[ios.contributes.python_modules]]`** §7.7 | |
+| `name` | The name Python imports. A single ASCII identifier, no dots |
+| `swift_package` | A package the same sidecar declares, which implements the module |
+| `init` | Optional initialization symbol; defaults to `PyInit_<name>` |
 
 ## Appendix A: why contributions stay per-distribution
 

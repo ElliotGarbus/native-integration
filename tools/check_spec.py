@@ -306,6 +306,39 @@ if illustrative:
                 problems.append(f"§2.2 sidecar example declares [{table}], which belongs to the application")
 check("§2.2 keeps sidecar and application examples distinct", problems)
 
+# --- 9. the declaration reference covers every documented key ----------------
+# A reference table that silently omits a new key is worse than none, so it is
+# checked against the keys the specification's own examples use.
+#
+# One-directional, deliberately: this catches a key added without a reference
+# entry, not an entry left behind after a key is removed. The reverse needs
+# context a whole-document scan does not have — when `application_values` moved
+# from `name` to `id`, `name` was still legitimately in four other tables.
+problems = []
+try:
+    appendix = SPEC.split("## Appendix D: declaration reference")[1].split("\n## ")[0]
+    documented: set[str] = set()
+    for _, body in toml_blocks(SPEC):
+        table = None
+        for raw_line in body.splitlines():
+            line = raw_line.strip()
+            if line.startswith("["):
+                table = line.strip("[]").split("]")[0]
+            elif "=" in line and not line.startswith("#") and table is not None:
+                root = table.split(".")[0]
+                # info_plist children are the application's plist keys, not schema
+                if root in ("android", "ios") and not table.startswith(
+                    ("ios.contributes.info_plist.values", "ios.contributes.info_plist.append")
+                ):
+                    documented.add(line.split("=")[0].strip())
+    for key in sorted(documented):
+        if f"`{key}`" not in appendix:
+            problems.append(f"Appendix D does not list `{key}`")
+except IndexError:
+    problems.append("Appendix D is missing")
+check("declaration reference covers every documented key", problems)
+
+
 print()
 if failures:
     print(f"{len(failures)} problem(s) found.")
