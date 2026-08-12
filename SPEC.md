@@ -104,6 +104,78 @@ all, and a diagnostic that omits it sends the reader to the wrong repository.
 producer contributes must resolve identically from the same integration record;
 see §6.5 and §7.4.
 
+### 2.2 How the application answers
+
+Every `requires` in this specification is answered by the **application**,
+through the **consumer's own configuration**. This specification defines the
+capability a consumer must provide and never the spelling: two conforming
+consumers will ask for the same value in different words, and that is expected.
+
+A consumer **MUST** provide a means for the application to:
+
+| Answer | For |
+| --- | --- |
+| supply a declared application value, keyed by its `id` | §6.3 |
+| satisfy each prerequisite kind | §7.3 |
+| approve an exported component | §6.8 |
+| suppress a contributed permission | §6.7 |
+| supply credentials for an authenticated repository | §6.6 |
+
+**Credentials MUST be supplyable by indirection.** For a build-time credential
+(§6.6), a consumer **MUST** support supplying it as a *reference* — an
+environment variable, an external secret store, a file outside the project — and
+**MUST NOT** require the value to be written into a file the consumer directs the
+application to commit.
+
+> Rationale. §9 already forbids a consumer from writing a credential into the
+> integration record, which protects the machine-written path. This protects the
+> human-written one, and that is the likelier leak: directing an application
+> author to paste a token into `pyproject.toml` and then carefully keeping it out
+> of the lock beside it would be theatre. Vendors already assume indirection —
+> Mapbox's own instructions put its download token in `~/.gradle/gradle.properties`,
+> outside the project, for exactly this reason.
+>
+> Note the asymmetry with ordinary application values, which is deliberate: a
+> value like an analytics DSN or an ad-network application ID is **embedded in
+> the shipped application** and readable by anyone who unzips it. Committing
+> those is not a leak, and treating them as secrets buys nothing. A build-time
+> credential never reaches the device, and is the only thing here that must not
+> come to rest in the repository.
+
+**Illustrative only** — no consumer is required to use these spellings, and a
+sidecar never contains any of it:
+
+```toml
+# The application's own pyproject.toml, under some build tool's namespace.
+
+# Values the producer declared with `id` (§6.3). These ship inside the
+# application, so a committed file is the right home for them.
+[tool.examplebuild.android.application_values]
+sentry_dsn = "https://examplePublicKey@o0.ingest.sentry.io/0"
+admob_app_id = "ca-app-pub-3940256099942544~3347511713"
+
+# A build-time credential (§6.6). The *reference* is committed; the value is not.
+[tool.examplebuild.android.repository_credentials."api.mapbox.com"]
+username = "mapbox"
+password = { env = "MAPBOX_DOWNLOADS_TOKEN" }
+
+# Prerequisites the application answers (§7.3). `url_schemes` is satisfied by
+# acknowledgement, because forwarding cannot be verified.
+[tool.examplebuild.ios]
+usage_descriptions = { NSLocationWhenInUseUsageDescription = "Shows trails near you." }
+acknowledged_url_schemes = ["pystripe"]
+```
+
+with the secret itself supplied from the environment, never the file:
+
+```bash
+export MAPBOX_DOWNLOADS_TOKEN=sk.ey...        # developer shell, CI secret store
+```
+
+A consumer **MAY** accept a literal in place of a reference — a developer
+experimenting should not be blocked — but **MUST NOT** make the literal the only
+option.
+
 ## 3. Discovery
 
 ### 3.1 The entry point
@@ -734,8 +806,9 @@ credentials_required = true
 > remainder is the producer's discipline, and review's.
 - `credentials_required = true` declares only that the repository is
   authenticated. The application supplies the credentials through the
-  consumer's own configuration, whose form is the consumer's concern; `reason`
-  **MUST** say what credential is needed and where to obtain it.
+  consumer's own configuration (§2.2), which **MUST** accept them by
+  indirection so the value need never be committed; `reason` **MUST** say what
+  credential is needed and where to obtain it.
 - A consumer **MUST** report an authenticated repository as a prerequisite and
   **MUST** fail when no credentials are configured for it, naming the
   distribution — rather than attempting resolution and surfacing a bare `401`.
@@ -1482,6 +1555,7 @@ gives the thematic reading:
 | Generated manifest and project material | 11, 13, 20, 24 |
 | Recording, disclosure, attribution | 9, 15, 19, 25 |
 | Platform applicability | 18 |
+| The application's side of the contract | 7, 26 |
 
 A conforming consumer **MUST**:
 
@@ -1554,6 +1628,9 @@ A conforming consumer **MUST**:
 25. Fail when a repository declaring `credentials_required` has no credentials
     configured, and never write a supplied credential into the generated
     project, the record, or a diagnostic (§6.6, §9).
+26. Provide a means for the application to answer every `requires`, and accept a
+    build-time credential **by indirection** rather than only as a literal in a
+    committed file (§2.2).
 
 > Rationale for 16. Every other rule here assumes native resolution *succeeds*.
 > It need not: two distributions in one closure can declare native dependencies
