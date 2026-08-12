@@ -762,18 +762,13 @@ record a checksum per resolved artifact.
 > and it is cheap, because the consumer has already downloaded every artifact it
 > is hashing.
 
-> Why a bounded range is permitted at all: the lock is what delivers
-> reproducibility, and it delivers it identically for both forms. §7.4 has
-> always permitted `{ from = "1.2.0" }` — an up-to-next-major range — on the
-> same reasoning, so forbidding the construct here was the specification
-> disagreeing with itself. The cost of the ban was real: several SDK vendors
-> document a range as the supported coordinate, and a producer forced to pin
-> must cut a release for every upstream patch.
->
-> The exact form remains RECOMMENDED for a reason the lock does not cover: it
-> tells a reviewer what the build will use from the sidecar alone, without
-> consulting the record. A range trades that legibility for maintenance, and the
-> producer should make that trade knowingly.
+> Both forms are equally reproducible, because the lock is what delivers that
+> and it applies to both — §7.4 permits an up-to-next-major range on the same
+> reasoning. The exact form is RECOMMENDED for something the lock does not
+> cover: it tells a reviewer what the build will use from the sidecar alone,
+> without consulting the record. A range trades that legibility for not having
+> to cut a release on every upstream patch, which several SDK vendors' documented
+> coordinates make a real cost. The producer should make that trade knowingly.
 
 **Cross-artifact alignment is not expressible**, and producers of SDK families
 should know it. Every rule here governs **one dependency at a time**. A vendor
@@ -1785,24 +1780,18 @@ Consumer ProGuard rules embedded in a resolved `.aar` **SHOULD** likewise be
 reported: they are appended to the application's shrinker configuration without
 passing through §6.9's scoping.
 
-> Why the Android half is a MUST. This is the case §9 says matters most — a
-> permission arriving through a transitive Python dependency the application
-> author has never heard of, and one that can carry obligations beyond the
-> build: `com.google.android.gms.permission.AD_ID` comes from an ads AAR and
-> pulls the application into a Play Console data-safety declaration.
+> Why the Android half is a MUST. It is the case this section says matters
+> most — a permission arriving through a transitive Python dependency the
+> author has never heard of, carrying obligations beyond the build:
+> `com.google.android.gms.permission.AD_ID` comes from an ads AAR and pulls the
+> application into a Play Console data-safety declaration.
 >
-> §11 also depends on it. A prebuilt `.aar` **embedded in a wheel** is excluded
-> there precisely because its manifest merges "with no attribution," while an
-> `.aar` reached through a **declared coordinate** is permitted on the grounds
-> that it is "locked by §6.5/§7.4 and surfaced by §9's effective-delta
-> reporting." That justification cannot rest on an optional feature: if the
-> surfacing is a SHOULD, the two cases differ only by whether anyone bothered.
->
-> The cost objection was overstated. Reading `AndroidManifest.xml` out of each
-> resolved `.aar` is unzip-and-parse over a graph the consumer already records
-> — it requires no manifest merger, and a consumer that drives Gradle can
-> alternatively read AGP's own merged manifest and blame report, which supply
-> the attribution directly.
+> §11 also rests on it. An `.aar` embedded in a wheel is excluded there because
+> its manifest merges with no attribution, while one reached through a declared
+> coordinate is permitted because §9 surfaces it — a justification that cannot
+> stand on an optional feature. The cost is small: reading `AndroidManifest.xml`
+> out of each resolved `.aar` is unzip-and-parse over a graph the consumer
+> already records, needing no manifest merger.
 
 **Secrets are never recorded.** A consumer **MUST NOT** write an
 application-supplied credential — or any value the application supplies as a
@@ -1887,28 +1876,21 @@ is the narrower scope stated there rather than new machinery (§7.1).
 | Xcode build settings, compiler/linker flags | Arbitrary build mutation; revisit only with a concrete, bounded need |
 | Application configuration — *writing* it | The application's own build settings are the consumer's concern. **Declaring a requirement on it is in scope** and is most of §7.3; see below |
 
-**The lifecycle row is a deferral, not a principle**, and is the most
-consequential thing version 1 cannot express. Real SDKs want it: Firebase calls
-`FirebaseApp.configure()` from `application(_:didFinishLaunchingWithOptions:)`,
-OneSignal's Android integration is an `Application` subclass, and Stripe needs a
-URL callback forwarded from the app delegate. Each is currently the
-**application's** work to wire up, and a producer can only say it is needed.
+**What "in the wheel" excludes — and what it does not.** The qualifier on the
+first four rows is deliberate. A **declared Maven coordinate** may resolve to an
+`.aar`, a **declared Swift package** may vend binary targets, and a Swift package
+may implement a Python extension module from source, compiled into the
+application target against the application's own interpreter (§7.7). All three
+are in scope: they arrive through the platform's own dependency channel, locked
+by §6.5/§7.4 and surfaced by §9. What is excluded is native material smuggled
+inside the Python artifact, where no resolver, lock, or manifest tooling ever
+sees it.
 
-Two things argue for waiting rather than for closing the gap. Some vendors reach
-the same result declaratively — Sentry initializes before any application code
-through a `ContentProvider` in its own library plus manifest meta-data (§6.3),
-with no producer code at launch — so a hook is not the only shape the problem
-takes. And a startup hook is the largest runtime capability this specification
-could grant: unlike a `service` or `receiver`, which run when the platform
-routes an event to them, it would run unconditionally and first, in every
-application that acquires the package transitively.
-
-If it is added, the shape should be a **closed vocabulary of events plus a
-producer-owned typed handler**, with the consumer generating a static
-dispatcher — never a source snippet to splice in, which would breach §2.1. The
-singleton slots such a design depends on (`<application android:name>`, the
-generated entry point) are the consumer's, and a producer **MUST NOT** be able
-to claim one meanwhile.
+That distinction is only as good as the surfacing, which is why §9 makes the
+Android half of that reporting a **MUST**. An embedded `.aar` and a
+coordinate-resolved `.aar` merge identical manifests into the application; what
+separates them is that one is locked, attributable, and reported. Were the
+reporting optional, the two would differ only by whether the consumer bothered.
 
 **The application-configuration row is a boundary, not a silence.** A producer
 cannot write the application's entitlements, `Info.plist`, bundle contents,
@@ -1916,54 +1898,47 @@ build targets or URL registrations — but it can and should *declare that it
 needs them*, and a consumer must report those requirements and fail when they
 are unmet. That is what §7.3 is, and it has grown to five kinds of prerequisite
 plus §6.6's repository credentials. The excluded thing is the producer reaching
-into the application's own configuration, not the producer having a say in it.
+into the application's configuration, not the producer having a say in it.
 
-The wheel-embedded qualifier is deliberate: a **declared Maven coordinate** may
-resolve to an `.aar`, and a **declared Swift package** may vend binary targets —
-those arrive through the platform's own dependency channel, locked by §6.5/§7.4
-and surfaced by §9's effective-delta reporting, rather than hidden inside a
-Python artifact. What this specification excludes is native binaries smuggled in
-the wheel itself, where no resolver, lock, or manifest tooling ever sees them.
-
-**One category of SDK is excluded by that principle in its entirety, and is
-worth naming.** Any SDK whose value depends on **uploading build artifacts** —
-symbol files, mapping files, source maps — requires build-time execution by
-construction. Firebase Crashlytics is the canonical case: on Android its Gradle
-plugin uploads the R8 mapping file, and on Apple platforms a run-script build
-phase uploads dSYMs. Sentry, Bugsnag, Instabug and Datadog share the shape.
-
-Such an SDK can be *linked* through §6.5 or §7.4, and the result will build.
-**This is a permanent exclusion, not a deferral**, and a producer in that
-category should learn it here rather than from a sidecar that succeeds and
-under-delivers. Applications needing the build-time step must configure it in
-their own build, outside this convention.
+**Build-time uploads are an excluded category, not one product.** Any SDK whose
+value depends on uploading build artifacts — symbol files, mapping files, source
+maps — requires build-time execution by construction. Firebase Crashlytics is
+the canonical case: its Gradle plugin uploads the R8 mapping file, and a
+run-script phase uploads dSYMs. Sentry, Bugsnag, Instabug and Datadog share the
+shape. Such an SDK can be *linked* through §6.5 or §7.4 and the result will
+build; the build-time step must be configured in the application's own build,
+outside this convention. **This is permanent, not a deferral.**
 
 The consequence is not uniform, and a producer should work out which case it is
-in before concluding anything:
+in:
 
-- **The SDK degrades.** The build-time step adds symbolication to something
-  that already captures and delivers events. Sentry is the example: its Gradle
-  plugin is optional, and the SDK is configured by manifest declarations this
-  specification can express. A wrapper is worth shipping, with a known
-  deficiency.
+- **The SDK degrades.** The build-time step adds symbolication to something that
+  already captures and delivers events. Sentry is the example — its Gradle plugin
+  is optional and its configuration is declarations this specification can
+  express. A wrapper is worth shipping, with a known deficiency.
 - **The SDK fails.** The build-time step is load-bearing for the SDK's core
-  value. Firebase Crashlytics is the example: without its plugin and run-script
-  phase, every report is unsymbolicated, which is the part nobody wants. A
-  wrapper is not worth shipping.
+  value. Crashlytics is the example: without it every report is unsymbolicated,
+  which is the part nobody wants. A wrapper is not worth shipping.
 
-The extension-module rows are qualified the same way: they exclude extension
-modules **carried as binaries in a wheel**, which the platform-tagged wheel PEPs
-solve and the ordinary import machinery loads. An extension module implemented
-by a **declared Swift package** — arriving as source, compiled into the
-application target against the application's own interpreter, with no binary in
-the wheel — is in scope, and §7.7 registers it.
+**Lifecycle composition is a deferral, not a principle**, and is the most
+consequential thing version 1 cannot express. Firebase calls
+`FirebaseApp.configure()` from `application(_:didFinishLaunchingWithOptions:)`,
+OneSignal's Android integration is an `Application` subclass, and Stripe needs a
+URL callback forwarded from the app delegate. Each is currently the
+application's work to wire up, and a producer can only say it is needed.
 
-The distinction is only as good as the surfacing, which is why §9 makes the
-Android half of that reporting a **MUST**. An embedded `.aar` and a
-coordinate-resolved `.aar` merge identical manifests into the application; what
-separates them is that one is locked, attributable, and reported, and the other
-is not. Were the reporting optional, the two would differ only by whether the
-consumer bothered.
+Two things argue for waiting. Some vendors reach the same result declaratively —
+Sentry initializes before any application code through a `ContentProvider` in its
+own library plus manifest meta-data (§6.3) — so a hook is not the only shape the
+problem takes. And it would be the largest runtime capability here: unlike a
+`service` or `receiver`, which run when the platform routes an event to them, a
+startup hook runs unconditionally and first, in every application that acquires
+the package transitively. If it is added, the shape is a closed vocabulary of
+events plus a producer-owned typed handler, with the consumer generating a
+static dispatcher — never a source snippet, which would breach §2.1. The
+singleton slots such a design needs (`<application android:name>`, the generated
+entry point) are the consumer's, and a producer **MUST NOT** be able to claim one
+meanwhile.
 
 ## 12. Producer guidance
 
