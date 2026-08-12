@@ -242,33 +242,26 @@ A producer **MUST** declare exactly one entry point in the group
 native = "mypkg._native"
 ```
 
-- The group name uses an **underscore**: the
+- The group name uses an underscore because the
   [entry-points specification](https://packaging.python.org/en/latest/specifications/entry-points/)
-  requires group names to match `^\w+(\.\w+)*$` — letters, numbers, and
-  underscores separated by dots; a hyphen is not permitted. The spelling also
-  follows the specification's recommendation that a new group begin with a PyPI
-  project name. `native_integration` is equivalent to the project name
-  `native-integration` under PyPA name normalization, and is spelled with an
-  underscore because entry-point group names cannot contain hyphens. (The
-  *normalized* form is `native-integration`: normalization folds runs of `.`,
-  `_` and `-` to a hyphen, so the underscore spelling is an equivalent name, not
-  the normal form.)
-- The entry-point name **SHOULD** be `native`. The name has no semantic meaning
-  and consumers ignore it (§3.3).
-- The entry-point value **MUST** be an importable module reference — a dotted
-  path whose parts are valid Python identifiers, with no `:attr` suffix — naming
-  the package directory that contains the sidecar (§4.1).
+  requires group names to match `^\w+(\.\w+)*$`, which permits no hyphen. It
+  stands for the PyPI project `native-integration`, following that
+  specification's recommendation that a new group begin with a project name.
+- The entry-point name **SHOULD** be `native`. It carries no meaning and
+  consumers ignore it (§3.3).
+- The value **MUST** be an importable module reference — a dotted path of valid
+  Python identifiers, no `:attr` suffix — naming the directory that contains the
+  sidecar (§4.1).
 
-**The entry point is used solely as distribution metadata identifying the
-location of a resource.** A consumer **MUST NOT** load the entry point or import
-the module it names; the reference exists so the metadata stays truthful to the
-entry-points specification, which defines a value as pointing to an importable
-object, while this convention reads the named directory's *files* instead.
+**Nothing is ever imported.** A consumer **MUST NOT** load the entry point or
+import the module it names. The value is spelled as a module reference so the
+metadata stays truthful to the entry-points specification, which defines a value
+as pointing to an importable object; this convention reads the named directory's
+*files* instead.
 
-> The quotes around the group name are required TOML syntax: a dot in an unquoted
-> table header is a nesting separator, so `[project.entry-points.native_integration.v1]`
-> declares a group named `native_integration` containing a table `v1`, which no
-> consumer will find.
+> The quotes are required TOML syntax. In an unquoted header a dot nests, so
+> `[project.entry-points.native_integration.v1]` declares a group
+> `native_integration` containing a table `v1` — which no consumer will find.
 
 ### 3.2 Resolution
 
