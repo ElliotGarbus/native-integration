@@ -1560,7 +1560,11 @@ the same reasoning as requirement 8.14.
 > The table is iOS-only because that is where the shape occurs. On Android the
 > §11 answer holds.
 
-## 8. Consumer requirements
+## 8. Consuming tool requirements
+
+Everything a **consumer** (§1) must do — the build tool that reads sidecars and
+generates the native project, as distinct from the application it builds or the
+distributions it reads.
 
 The list below is numbered in the order the requirements were added, and stable
 numbering matters more than tidy grouping once implementations exist. This index
