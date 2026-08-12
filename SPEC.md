@@ -248,11 +248,10 @@ native = "mypkg._native"
   Python identifiers, no `:attr` suffix — naming the directory that contains the
   sidecar (§4.1).
 
-**Nothing is ever imported.** A consumer **MUST NOT** load the entry point or
-import the module it names. The value is spelled as a module reference so the
-metadata stays truthful to the entry-points specification, which defines a value
-as pointing to an importable object; this convention reads the named directory's
-*files* instead.
+**Nothing is ever imported** (§3.2). The value is spelled as a module reference
+so the metadata stays truthful to the entry-points specification, which defines a
+value as pointing to an importable object; this convention reads the named
+directory's *files* instead.
 
 > **Two ways to misspell the group, both silent.** The underscore is required —
 > [entry-point group names](https://packaging.python.org/en/latest/specifications/entry-points/)
@@ -269,14 +268,15 @@ A consumer **MUST** resolve declarations as follows:
 1. Determine the candidate set: the **resolved dependency closure of the
    application** for the target platform. A consumer operating in an isolated
    environment containing exactly that closure **MAY** treat all installed
-   distributions as candidates. A consumer **MUST NOT** accept contributions
-   from distributions outside the closure — a debugging tool that happens to be
-   installed beside the application, and happens to ship a sidecar, must not
-   configure the application.
+   distributions as candidates.
 2. For each candidate, read entry points in the group `native_integration.v1`
    via `importlib.metadata`.
 3. Interpret the value's dotted path as a directory within the distribution —
    e.g. `mypkg._native` → `mypkg/_native/` — and read `native.toml` inside it.
+
+A consumer **MUST NOT** accept contributions from distributions outside the
+closure: a debugging tool that happens to be installed beside the application,
+and happens to ship a sidecar, must not configure it.
 
 A consumer **MUST** access the sidecar and every resource it references through
 the distribution's metadata/file-resource interface
@@ -286,8 +286,9 @@ conventional `site-packages` directory. When a distribution's resources cannot
 be materialized or read, the consumer **MUST** fail, naming the distribution —
 not silently skip it.
 
-A consumer **MUST NOT** import the producing package, or any module of it, at
-any point. Metadata reads and file reads only.
+**Nothing is imported, ever.** A consumer **MUST NOT** import the producing
+package or any module of it, at any point — including the module the entry point
+names. Metadata reads and file reads only.
 
 > Rationale: a consumer runs on a desktop build host. A distribution targeting
 > Android or iOS may raise on import there, or may not be importable at all.
@@ -359,13 +360,10 @@ mypkg/
     swift/…              ← optional, per §7.5
 ```
 
-The sidecar directory **MUST** contain an `__init__.py` (typically empty). It
-exists solely to make the entry-point value a truthful importable module
-reference — a subdirectory of a regular package is not importable without one —
-and **nothing ever imports it** (§3.1, §3.2). The requirement serves the
-packaging metadata, not this convention's own mechanics.
-
-Nothing is placed at the `site-packages` root.
+The sidecar directory **MUST** contain an `__init__.py` (typically empty), so
+that the entry-point value names a real importable module — a subdirectory of a
+regular package is not importable without one. It serves the packaging metadata,
+not this convention, which never imports it (§3.2).
 
 **Referenced resources.** Every path a sidecar declares is interpreted relative
 to `native.toml` and **MUST NOT** escape its directory, checked **after** path
