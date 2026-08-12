@@ -27,7 +27,9 @@ to be interpreted as described in [RFC 2119](https://www.rfc-editor.org/rfc/rfc2
 
 - **Distribution** — an installed Python distribution, as seen by
   `importlib.metadata`.
-- **Producer** — a distribution that declares a native integration.
+- **Producer** — a distribution that declares a native integration. Where
+  something is addressed to the person who writes and publishes one, this
+  specification says **package author**.
 - **Consumer** — a tool that reads declarations and generates a native app
   project. Consumers are build tools, not installers.
 - **Application** — the app being built. Its own configuration is outside this
@@ -1131,12 +1133,12 @@ swift_symbol_prefixes = ["MyPkg"]
 contributed type names, and in particular `@objc` runtime names, with a declared
 prefix.
 
-This is **producer guidance, not an ownership claim**, and it deliberately does
-not live in an `owns` table: Swift source compiled into the application target
-shares one module, and `@objc` runtime names are global across modules, so a
-consumer cannot enforce exclusivity the way §6.1 does for Java. A consumer
-**SHOULD** use declared prefixes to attribute a redeclaration or duplicate-name
-error to the contributing distribution.
+This is **guidance to package authors, not an ownership claim**, and it
+deliberately does not live in an `owns` table: Swift source compiled into the
+application target shares one module, and `@objc` runtime names are global
+across modules, so a consumer cannot enforce exclusivity the way §6.1 does for
+Java. A consumer **SHOULD** use declared prefixes to attribute a redeclaration
+or duplicate-name error to the contributing distribution.
 
 **What this guidance does not reach.** Prefixing covers type names and `@objc`
 runtime names. It does nothing for file-scope functions, global constants, or
@@ -1943,7 +1945,7 @@ singleton slots such a design needs (`<application android:name>`, the generated
 entry point) are the consumer's, and a producer **MUST NOT** be able to claim one
 meanwhile.
 
-## 12. Producer guidance
+## 12. Guidance for package authors
 
 A producer **SHOULD** declare only what it **unconditionally** requires. A
 declaration is unconditional when every application that imports the package
