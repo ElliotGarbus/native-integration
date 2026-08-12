@@ -264,7 +264,9 @@ six could not, and two results are worth pulling out:
 
 The design history is in [PROPOSALS.md](PROPOSALS.md), including what was cut
 back, deferred, or withdrawn. Complete sidecars and per-case findings are in
-[examples/](examples/).
+[examples/](examples/), where [pystripe](examples/pystripe/) carries both halves
+— the package's declaration and the application's reply — if you would rather
+see the authority split end to end than described.
 
 ## Getting involved
 

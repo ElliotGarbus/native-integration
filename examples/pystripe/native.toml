@@ -1,5 +1,10 @@
 # pystripe — HYPOTHETICAL, clean-sheet. Stripe payments.
 #
+# Read this beside app-pyproject.toml in the same directory: this file is what
+# the *package* declares, that one is what the *application* writes in reply.
+# It is the only worked pair in the example set, and the only place §2.2's
+# answer surface is shown end to end.
+#
 # Chosen to test §6.8's `view_links` — the redirect-scheme machinery the spec
 # built for OAuth callbacks and no example had yet exercised — and to see what
 # a financial SDK asks of an application.
@@ -88,7 +93,7 @@ products = ["StripePaymentSheet"]
 #     the specification addresses. Firebase sidesteps the equivalent by
 #     swizzling; Stripe requires the explicit forward. The prerequisite above
 #     reports it; nothing generates it, because naming a producer symbol to
-#     receive the URL is the startup-hook shape §10 deliberately excludes.
+#     receive the URL is the startup-hook shape §11 deliberately excludes.
 #
 # T4  Google Pay. <meta-data android:name="com.google.android.gms.wallet.api.enabled"
 #     android:value="true"/> is a *fixed* entry, identical for every
@@ -98,4 +103,6 @@ products = ["StripePaymentSheet"]
 # T5  Apple Pay. com.apple.developer.in-app-payments carries the merchant
 #     identifiers the application registered with Apple. §7.3 entitlements are
 #     key + reason, with no way to say the entitlement takes values or which
-#     ones — the third example to hit that limit.
+#     ones. Recorded as P26 and decided against: the count was miscounted as
+#     three, and §7.3 now says the omission is deliberate — `reason` carries
+#     what a type tag could not.

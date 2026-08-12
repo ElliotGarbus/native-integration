@@ -1,0 +1,75 @@
+# The APPLICATION's pyproject.toml — the other half of native.toml beside it.
+#
+# Every other example in this directory is a sidecar: what a *package* declares.
+# This is what the *application* writes in reply, so the two halves of §2.2 can
+# be read together. It is the only file here that is not a sidecar.
+#
+# ILLUSTRATIVE SPELLING. §2.2 defines the capability a consuming tool must
+# provide and deliberately not the syntax, so every tool asks for these in its
+# own words; `examplebuild` is a placeholder, not a real tool's schema.
+#
+# WHAT IS NOT ILLUSTRATIVE is the join: each answer is filed under the
+# **declaring distribution** plus the key the declaration named. A tool may
+# spell that however it likes and cannot drop either half — an answer that said
+# only `stripe_return_scheme` would not say whose requirement it met.
+
+[project]
+name = "trailmap"
+dependencies = ["pystripe"]
+
+# --- floors (§6.2) ----------------------------------------------------------
+# Not answers, but checks: pystripe requires min_sdk 21 and compile_sdk 34, and
+# the build fails if these are lower. The consumer never raises them for you.
+
+[tool.examplebuild.android]
+min_sdk = 24
+compile_sdk = 35
+
+# --- an application value (§6.3) --------------------------------------------
+# pystripe declares `id = "stripe_return_scheme"` and cannot know the value: the
+# scheme is registered per application in the Stripe dashboard. Keyed by
+# (distribution, id), because another package could declare the same id.
+#
+# Nothing else in the sidecar names this scheme. It reaches the manifest by
+# substitution into the generated intent filter, wherever `view_links` referenced
+# it as `{ application_value = "stripe_return_scheme" }`.
+
+[tool.examplebuild.native.pystripe.android.application_values]
+stripe_return_scheme = "trailmap-pay"
+
+# --- approving an exported component (§6.8) ---------------------------------
+# `exported_required = true` is a *request*. Without this line the build fails
+# naming pystripe — it does not quietly register the activity unexported, which
+# would produce an app that builds and then cannot complete a 3DS payment.
+#
+# An exported activity is reachable by any other app on the device. That is the
+# point here, and it is the application's decision to make.
+
+[tool.examplebuild.native.pystripe.android]
+allow_exported = ["org.pystripe.PaymentReturnActivity"]
+
+# --- acknowledging a conditional prerequisite (§7.3) ------------------------
+# `url_schemes` has no key the platform supplies — the application picks the
+# scheme — so it is answered by acknowledging `(pystripe, stripe_3ds_callback)`.
+#
+# It is `conditional = true`, so leaving this out does *not* fail the build; the
+# unresolved prerequisite is recorded in the integration record instead. Saying
+# it here asserts that the scheme is registered in CFBundleURLTypes and that
+# application(_:open:options:) forwards to StripeAPI.handleURLCallback(with:) —
+# which no consumer can verify, and which is why satisfaction is an
+# acknowledgement rather than a check.
+
+[tool.examplebuild.native.pystripe.ios]
+acknowledged = ["stripe_3ds_callback"]
+
+# --- what does NOT belong here ----------------------------------------------
+#
+# The Stripe publishable key. It is per-application and secret-adjacent, so the
+# instinct is to put it beside the scheme above — but the SDK takes it at
+# runtime through StripeAPI.defaultPublishableKey, and §6.3 is only for values
+# the *build* must embed. It goes in the application's Python:
+#
+#     stripe.set_publishable_key("pk_live_…")
+#
+# The scheme above is different in kind: it is baked into a manifest intent
+# filter at build time, and no runtime call can supply it after the fact.

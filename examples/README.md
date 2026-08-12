@@ -17,7 +17,7 @@ of this convention.
 | [PyGMA](pygma/) | cross-platform third-party SDK | **clean** on Android; iOS unimplemented upstream |
 | [Firebase](firebase/) | a vendor outside this ecosystem | **blocked** — build plugins, build scripts, service intent filters |
 | [Sentry](pysentry/) | a check on §11's build-script exclusion | **mostly clean** — and the first live use of §6.3 |
-| [Stripe](pystripe/) | `view_links`, and a financial SDK's demands | **clean on Android**; iOS has no browser-return form |
+| [Stripe](pystripe/) | `view_links`, and a financial SDK's demands | **clean on Android**; iOS has no browser-return form. **The only worked pair** — see `app-pyproject.toml` beside the sidecar |
 | [Mapbox](pymapbox/) | §6.6, the only table with no coverage | **§6.6 holds** — but cannot express the repository's credential |
 
 The first four are existing packages from one toolchain lineage. Firebase,
@@ -40,6 +40,14 @@ claims**:
 - **Mapbox** — chosen from a **coverage audit** rather than a hunch. After nine
   sidecars, §6.6 was the only declarable table nothing had used, and it carries
   the strongest safety language in the specification.
+
+**Start with [pystripe](pystripe/) if you want to see both halves.** Every other
+example is a sidecar — what a package declares. That one also carries
+`app-pyproject.toml`, what the application writes in reply: the value it
+supplies, the exported component it approves, the conditional prerequisite it
+acknowledges, and one thing that deliberately does *not* go there. It is the
+only place §2.2's answer surface is shown end to end, and a check keeps the two
+halves in step.
 
 Running `python3 tools/check_spec.py` from the repository root validates every
 sidecar here against the specification — and the specification against itself.

@@ -374,6 +374,51 @@ except IndexError:
 check("declaration reference covers every documented key", problems)
 
 
+# --- 10. the paired application example answers its sidecar -----------------
+# examples/pystripe/ carries both halves of §2.2. If the sidecar grows a
+# requirement, the application half must answer it or the pair stops teaching
+# the thing it exists to teach.
+problems = []
+pair_dir = ROOT / "examples" / "pystripe"
+app_path = pair_dir / "app-pyproject.toml"
+if app_path.exists():
+    app = tomllib.loads(app_path.read_text(encoding="utf-8"))
+    side = tomllib.loads((pair_dir / "native.toml").read_text(encoding="utf-8"))
+    tool = app.get("tool", {}).get("examplebuild", {})
+    per_pkg = tool.get("native", {}).get("pystripe", {})
+
+    for stray in set(app) - {"project", "tool"}:
+        problems.append(f"app-pyproject.toml declares [{stray}] — it is not a sidecar")
+
+    declared = {v.get("id") for v in entries(side.get("android", {}), "requires", "application_values")}
+    answered = set(per_pkg.get("android", {}).get("application_values", {}))
+    for miss in sorted(declared - answered):
+        problems.append(f"app-pyproject.toml does not supply application value `{miss}`")
+
+    exported = {
+        c.get("name")
+        for c in entries(side.get("android", {}), "contributes", "components")
+        if c.get("exported_required")
+    }
+    approved = set(per_pkg.get("android", {}).get("allow_exported", []))
+    for miss in sorted(exported - approved):
+        problems.append(f"app-pyproject.toml does not approve exported component `{miss}`")
+
+    schemes = {u.get("id") for u in entries(side.get("ios", {}), "requires", "url_schemes")}
+    acked = set(per_pkg.get("ios", {}).get("acknowledged", []))
+    for miss in sorted(schemes - acked):
+        problems.append(f"app-pyproject.toml does not acknowledge url_scheme `{miss}`")
+
+    floors = side.get("android", {}).get("requires", {})
+    app_android = tool.get("android", {})
+    for key in ("min_sdk", "compile_sdk", "target_sdk"):
+        if key in floors and app_android.get(key, 0) < floors[key]:
+            problems.append(f"app-pyproject.toml {key}={app_android.get(key)} is below pystripe's floor {floors[key]}")
+else:
+    problems.append("examples/pystripe/app-pyproject.toml is missing")
+check("the paired application example answers its sidecar", problems)
+
+
 print()
 if failures:
     print(f"{len(failures)} problem(s) found.")
