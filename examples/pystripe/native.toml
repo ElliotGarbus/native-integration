@@ -58,6 +58,7 @@ keep_classes = ["org.pystripe.**", "com.stripe.**"]
 deployment_target = "15.0"
 
 [[ios.requires.url_schemes]]
+id = "stripe_3ds_callback"
 # Finding T2. The counterpart of the Android view_links above — but a
 # prerequisite rather than a contribution, because iOS binds URL registration to
 # the bundle rather than to a component, and the application must forward the

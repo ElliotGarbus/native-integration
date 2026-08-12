@@ -241,6 +241,8 @@ for rel, raw, doc in sidecar_sources():
     for value in entries(android, "requires", "application_values"):
         if not {"id", "reason"} <= set(value):
             problems.append(f"{rel} application value needs `id` and `reason`: {value}")
+        if value.get("id") in ids:
+            problems.append(f"{rel} declares application value id `{value.get('id')}` more than once")
         ids.add(value.get("id"))
     for ref in set(re.findall(r'application_value\s*=\s*"([^"]+)"', raw)):
         if ref not in ids:
@@ -259,11 +261,18 @@ for rel, raw, doc in sidecar_sources():
                     problems.append(f"{rel} intent filter takes only `action`: {flt}")
 
     # §7.3 — reason on every prerequisite; conditional ones state the condition;
-    #        at most one url_schemes entry, since it carries no identifier
+    #        producer-local ids present and unique, since identity is
+    #        (distribution, id) and an application answers on both
     for table in ("entitlements", "usage_descriptions", "app_extensions", "application_files", "url_schemes"):
         rows = entries(ios, "requires", table)
-        if table == "url_schemes" and len(rows) > 1:
-            problems.append(f"{rel} declares {len(rows)} url_schemes entries; at most one is allowed")
+        if table in ("app_extensions", "url_schemes"):
+            ids = [e.get("id") for e in rows]
+            for entry in rows:
+                if not entry.get("id"):
+                    problems.append(f"{rel} {table} entry needs an `id`: {entry}")
+            dupes = {i for i in ids if i and ids.count(i) > 1}
+            for dupe in sorted(dupes):
+                problems.append(f"{rel} declares {table} id `{dupe}` more than once")
         for entry in rows:
             if "reason" not in entry:
                 problems.append(f"{rel} {table} entry needs a `reason`: {entry}")

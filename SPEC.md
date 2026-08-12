@@ -12,7 +12,8 @@ tool discovers, validates, and stages that material.
 > rather than by contract minor.
 >
 > This revision incorporates the corrections found by expressing **ten packages**
-> against the text — four existing Python packages, and six clean-sheet sidecars
+> against the text as ten **integration cases** — four existing Python packages,
+> and six clean-sheet sidecars
 > for Firebase, Sentry, Stripe and Mapbox, whose vendors have never heard of this
 > convention. See [`examples/`](examples/) for the worked cases and
 > [`PROPOSALS.md`](PROPOSALS.md) for the proposals those cases produced,
@@ -65,7 +66,8 @@ trusting producer code, and it is deliberate that this specification resembles
 `pkg-config` — *describe what consuming me requires* — rather than a build
 script.
 
-**Everything a producer declares falls into one of three categories:**
+**All native integration material a producer declares falls into one of three
+categories:**
 
 | Category | Meaning | Examples |
 | --- | --- | --- |
@@ -148,23 +150,29 @@ application to commit.
 an application answers under is not: it comes from the declaration, so that an
 answer can be matched to the requirement that asked for it.
 
+**A producer-local identifier is scoped by its distribution.** Where the join key
+is an `id` the producer invents rather than a name the platform defines, the
+identity is the pair **(declaring distribution, `id`)**, and a consumer **MUST**
+key the answer on both. Two distributions may each declare `id = "client_id"`
+without collision, and an application answering only `client_id` would not say
+which it meant.
+
 | The producer declares | Joined by | The application answers with |
 | --- | --- | --- |
-| `[[android.requires.application_values]]` | `id` | the value |
+| `[[android.requires.application_values]]` | distribution + `id` | the value |
 | a contributed permission (§6.7) | permission `name` | a suppression |
 | a component with `exported_required` (§6.8) | component `name` | approval |
 | a repository with `credentials_required` (§6.6) | repository `url` | credentials, by indirection |
 | `[[ios.requires.entitlements]]` | `key` | the entitlement, configured |
 | `[[ios.requires.usage_descriptions]]` | `key` | a non-empty string |
 | `[[ios.requires.application_files]]` | `name` | the file, in the bundle |
-| `[[ios.requires.app_extensions]]` | `kind` | an extension target |
-| `[[ios.requires.url_schemes]]` | **the declaring distribution** | acknowledgement |
+| `[[ios.requires.app_extensions]]` | distribution + `id` | acknowledgement, plus an extension target of that `kind` |
+| `[[ios.requires.url_schemes]]` | distribution + `id` | acknowledgement |
 
-`url_schemes` is the one entry with no identifier of its own — it names no key,
-because the application chooses the scheme. It is therefore joined by
-distribution, and a sidecar **MUST NOT** declare more than one: two would be
-indistinguishable to the application answering them, and the answer is a single
-acknowledgement either way.
+The platform supplies a natural key for some of these — an entitlement key, a
+plist key, a file name — and for the rest the producer supplies an `id`. Both
+are joined under the declaring distribution; only the source of the local part
+differs.
 
 **Illustrative only** — no consumer is required to use these spellings. Each
 pair shows the sidecar the producer ships, then the application's own
@@ -363,9 +371,10 @@ mypkg/
 ```
 
 The sidecar directory **MUST** contain an `__init__.py` (typically empty), so
-that the entry-point value names a real importable module — a subdirectory of a
-regular package is not importable without one. It serves the packaging metadata,
-not this convention, which never imports it (§3.2).
+that the sidecar directory is a **regular** package rather than relying on
+implicit namespace-package behaviour, giving the entry-point reference one
+portable and unambiguous form. It serves the packaging metadata, not this
+convention, which never imports it (§3.2).
 
 **Referenced resources.** Every path a sidecar declares is interpreted relative
 to `native.toml` and **MUST NOT** escape its directory, checked **after** path
@@ -553,8 +562,7 @@ resolve any conflict by file or copy order:
 
 **Containment is computed on dot-separated segments, never on raw strings.** A
 namespace *A* contains a namespace *B* when *B* equals *A*, or when *B* begins
-with *A* followed by a `.`. The same rule governs rule 4's reserved prefixes and
-§6.9's group check. So `org.kivy.android` contains `org.kivy.android.helpers`
+with *A* followed by a `.`. The same rule governs rule 4's reserved prefixes. So `org.kivy.android` contains `org.kivy.android.helpers`
 and does **not** contain `org.kivy.androidx`; `PyGMA` does not contain
 `PyGMAKit`.
 
@@ -587,13 +595,30 @@ These are **floors**, not settings. A consumer **MUST** fail, naming the
 distribution, when the application's configured value is lower. A consumer
 **MUST NOT** raise the application's configuration to satisfy them.
 
-`compile_sdk` and `min_sdk` are the only floors defined. **`target_sdk` is
-deliberately absent**: it selects the platform behaviours the application opts
-into — runtime permission prompts, background execution limits, storage
-semantics — across the whole application, not merely the producer's surface. A
-producer that could raise it would change how unrelated code behaves. A producer
-whose material depends on a `targetSdk` behaviour states that in the `reason` of
-whatever it does declare, and leaves the setting to the application.
+`target_sdk` is a floor on the same terms:
+
+```toml
+[android.requires]
+target_sdk = 33
+```
+
+> An earlier revision excluded it, on the grounds that `targetSdk` selects
+> platform behaviours across the whole application rather than the producer's
+> surface, so a producer able to raise it would change how unrelated code
+> behaves. That argues against *raising* — which no floor does, per the
+> paragraph above. Excluding a machine-checkable requirement and telling
+> producers to mention it in prose was the inconsistency, not the risk.
+>
+> The case is real: `POST_NOTIFICATIONS` is only requested at runtime when the
+> application targets 33 or higher. Below that the permission is granted at
+> install time and a push package's permission request silently does nothing —
+> exactly the failure this specification exists to surface.
+
+`target_sdk` is nonetheless the most invasive of the three, because raising it
+changes behaviour in code that has nothing to do with the producer. §12's
+guidance — declare only what you **unconditionally** require — applies here with
+more force than anywhere else, and a producer **SHOULD** state in `reason` which
+behaviour it depends on rather than naming a version alone.
 
 ### 6.3 Application-supplied values: `[[android.requires.application_values]]`
 
@@ -608,10 +633,20 @@ Values a producer needs but cannot supply.
 
 - **`id`** is a **logical identifier**, unique within the sidecar. It is how
   contributions refer to the value (below) and how the consumer's own
-  configuration asks the application for it. It is not a platform key.
+  configuration asks the application for it. It is not a platform key, and its
+  identity is scoped by the declaring distribution (§2.2) — two distributions
+  may each declare `client_id` without collision.
 - **`reason`** is **REQUIRED**.
+- The supplied value is a **non-empty string**. Version 1 defines no other type:
+  a manifest attribute and an intent-filter field are both text, and admitting
+  TOML integers or booleans would leave each consumer to invent its own
+  serialisation.
 - **`manifest_meta_data`** is **OPTIONAL** and names the `<meta-data>` key the
-  SDK itself reads. When present, the consumer emits
+  SDK itself reads. Two distributions may deliver to the same key: when the
+  supplied values are equal the consumer coalesces them, preserving both
+  provenance records; when they differ it **MUST** fail, naming both. A key the
+  **application** also sets is the application's — the consumer keeps its value
+  and reports the override. When present, the consumer emits
   `<meta-data android:name="<that key>" android:value="<the supplied value>"/>`
   into the generated manifest. When absent, the value has no manifest
   destination and exists only to be referenced by a contribution.
@@ -756,7 +791,13 @@ paragraph above — so can direct ones. A consumer **MUST** record the fully
 resolved dependency graph — every artifact and version, including transitives —
 in the integration record (§9), and **MUST** resolve from that record on
 subsequent builds until a new resolution is accepted. A consumer **MUST**
-record a checksum per resolved artifact.
+record a checksum per resolved artifact, and on subsequent builds **MUST**
+verify each resolved artifact against the recorded checksum and fail on a
+mismatch, naming the artifact and the distribution that declared it.
+
+Recording without verifying would leave the guarantee descriptive: a repository
+can serve different bytes under one coordinate, which is the case the checksum
+exists to catch.
 
 > **"Reproducible" here means artifact identity, not graph identity.** §2.1 says
 > every contributed dependency must resolve identically from the same record. A
@@ -807,6 +848,24 @@ groups = ["org.example"]
 repository **MUST NOT** participate in resolution for anything outside the
 declared groups/modules. A consumer implements that with its build system's
 native mechanism — Gradle's repository content filtering expresses exactly this.
+
+**Overlapping scopes are rejected.** Two contributed repositories whose
+`groups`/`modules` intersect **MUST** fail, naming both distributions and the
+contested coordinates — unless they declare the same `url`, which is not a
+conflict. Gradle searches repositories in declaration order and takes a module's
+artifacts from the first repository that has its metadata, so an overlap makes
+the source of an artifact depend on declaration order rather than on anything
+either sidecar said.
+
+```
+native integration conflict: com.example may resolve from two repositories
+  package-a  →  https://repo-a.example/maven
+  package-b  →  https://repo-b.example/maven
+```
+
+The rule is deliberately blunt for version 1. It is simple to implement, the
+diagnostic writes itself, and it can be relaxed if a real package demonstrates a
+need that ordering rules would serve better.
 
 `exclusiveContent` is a **different and stronger** policy: it additionally makes
 the declared modules resolvable *only* from that repository, which can change
@@ -1085,10 +1144,11 @@ forms, distinguished by **whose classes are being kept**:
   segments per §6.1.
 - **`[[…r8.keep]]`** — a pattern belonging to a **declared dependency**.
   `from_dependency` **MUST** match the group and artifact of a dependency the
-  same sidecar declares (§6.5). A consumer **MUST** verify that every class the
-  pattern matches is contained in that dependency's **resolved artifacts** — a
-  listing of the `.jar`/`.aar` contents, not a parser — and reject the entry
-  otherwise, naming the distribution and the pattern.
+  same sidecar declares (§6.5). A consumer **MUST** evaluate the pattern against
+  the **effective compilation classpath** and reject the entry when any class it
+  matches originates outside that dependency's **resolved artifacts** — a
+  listing of archive contents, not a parser — naming the distribution, the
+  pattern, and the artifact the stray class came from.
 
 > **Why dependency keeps are checked against the archive rather than the Maven
 > group.** An earlier revision gated them on the pattern falling under the
@@ -1104,6 +1164,15 @@ forms, distinguished by **whose classes are being kept**:
 > Naming the dependency explicitly is what makes the check cheap and the intent
 > reviewable — the alternative, inferring which declared dependency a bare
 > pattern was aiming at, is guesswork the record should not have to record.
+>
+> **Why the check is against the classpath, not only the named artifact.** The
+> generated rule is `-keep class <pattern> { *; }`, and R8 applies it to every
+> matching class in the program. Confirming that the named dependency *contains*
+> classes matching `okhttp3.**` would not establish that the rule reaches
+> nothing else — another artifact shipping `okhttp3.extra.Bar` would be kept
+> too, silently, on a declaration naming a different dependency. Checking what
+> the pattern actually matches is what makes `from_dependency` mean what its
+> name claims: bounded authority, not merely provenance.
 
 This scope permits *keeping*, not contributing, and is not exclusive.
 
@@ -1178,6 +1247,7 @@ key = "NSLocationWhenInUseUsageDescription"
 reason = "requestWhenInUseAuthorization() traps if this key is absent"
 
 [[ios.requires.app_extensions]]
+id = "onesignal_nse"
 kind = "notification_service"
 reason = """\
 Without it, confirmed delivery, badge counts and image attachments are \
@@ -1224,14 +1294,21 @@ would otherwise diverge:
 | `entitlements` | …configures the entitlement **key**. v1 verifies key presence, not the semantic correctness of any value it carries |
 | `usage_descriptions` | …supplies a **non-empty** value for the key |
 | `application_files` | …configures the named file for inclusion in the application bundle |
-| `app_extensions` | …declares an extension target of the requested `kind` |
-| `url_schemes` | …**explicitly acknowledges** the requirement in its own configuration |
+| `app_extensions` | …declares an extension target of the requested `kind` **and** acknowledges this entry by `(distribution, id)` |
+| `url_schemes` | …**explicitly acknowledges** this entry by `(distribution, id)` |
 
-`url_schemes` is an acknowledgement rather than a check for a reason worth
-stating: the requirement has two halves, and a consumer can observe the
-registration but cannot prove the application forwards the callback. Making
-satisfaction an explicit acknowledgement is honest about that, where inspecting
-`CFBundleURLTypes` and declaring victory would not be.
+Both take an **`id`**, because neither has a key the platform supplies. Both are
+acknowledgements rather than checks, for reasons worth stating.
+
+For `url_schemes` the requirement has two halves, and a consumer can observe the
+registration but cannot prove the application forwards the callback; inspecting
+`CFBundleURLTypes` and declaring victory would not be honest.
+
+For `app_extensions` the `kind` is not sufficient on its own. Two packages may
+each need a `notification_service` extension while needing *different code
+inside it*, and a single existing target would otherwise appear to satisfy both.
+The extension's existence is checked; that it serves this producer is
+acknowledged.
 
 **Conditional prerequisites.** Per common rule 2, any entry in this section
 **MAY** declare `conditional = true`, meaning *the producer cannot determine
@@ -1312,9 +1389,10 @@ leaves no choice. Firebase is the motivating example — most of its services
 accept `FirebaseOptions` programmatically, and Analytics on Apple platforms does
 not.
 
-**`app_extensions`** — `kind` is a closed vocabulary: `notification_service` and
-`location_push` in this revision. The application creates the target, writes its
-source, and configures its bundle identifier, entitlements and `Info.plist`.
+**`app_extensions`** — `id` names the requirement, and `kind` is a closed
+vocabulary: `notification_service` and `location_push` in this revision. The
+application creates the target, writes its source, and configures its bundle
+identifier, entitlements and `Info.plist`.
 
 > Rationale for the `requires` form. An app extension is a separate signed
 > executable with its own bundle identifier and entitlements, launched by the
@@ -1330,6 +1408,7 @@ a browser needs a custom URL scheme:
 
 ```toml
 [[ios.requires.url_schemes]]
+id = "stripe_3ds_callback"
 conditional = true
 reason = """\
 Required only if the 3D Secure webview fallback is reached. Register a custom \
@@ -1339,10 +1418,9 @@ StripeAPI.handleURLCallback(with:)."""
 
 The application chooses the scheme, registers it in its own `CFBundleURLTypes`,
 and forwards the callback; a consumer **MUST NOT** register one on the
-producer's behalf. This table carries no identifier — the producer names nothing
-— so it is joined to the acknowledgement by the **declaring distribution**
-(§2.2), and a sidecar **MUST NOT** declare more than one entry: two would be
-indistinguishable to whoever answers them.
+producer's behalf. `id` names the requirement rather than the scheme, so a
+package needing several — an OAuth callback and a payment return, say — declares
+one entry each and the application answers them separately.
 
 > Rationale, and why this is not the iOS half of §6.8's `view_links`. On Android
 > an intent filter is attached to the producer's own component, which is what
@@ -1610,19 +1688,22 @@ A conforming consumer **MUST**:
 9. Record each distribution's resolved contribution durably and in reviewable
    form, per the lifecycle of §9, and fail the build when the effective set
    drifts from the last accepted record.
-10. Restrict contributed repositories to their declared groups/modules, report
-    them with distinct prominence, and reject a credential in a syntactically
-    identifiable location such as URL user-info (§6.6).
-11. Validate `keep_classes` against owned namespaces, and every
-    `from_dependency` keep against the contents of that dependency's resolved
-    artifacts (§6.9).
+10. Restrict contributed repositories to their declared groups/modules, reject
+    two whose scopes overlap at different URLs, report them with distinct
+    prominence, and reject a credential in a syntactically identifiable location
+    such as URL user-info (§6.6).
+11. Validate `keep_classes` against owned namespaces, and reject a
+    `from_dependency` keep whose pattern matches any class on the effective
+    classpath originating outside that dependency's resolved artifacts (§6.9).
 12. Enforce reproducible native dependency resolution: reject unbounded and
     changing versions, and lock the **fully resolved graph, transitives
     included** — Gradle and SwiftPM alike, recording the resolved *revision* for
     Swift packages — in the record, resolving from it thereafter (§6.5, §7.4).
     Never convert a declared Gradle version into a `strictly` constraint, and
-    show requested-versus-resolved where they differ (§6.5). Reject a resolved
-    Swift graph containing a branch or path dependency (§7.4).
+    show requested-versus-resolved where they differ. **Verify each resolved
+    artifact against its recorded checksum on every subsequent build, failing on
+    a mismatch** (§6.5). Reject a resolved Swift graph containing a branch or
+    path dependency (§7.4).
 13. Validate `view_links` (activity-only, export-gated) and generate their
     filters (§6.8).
 14. Exclude sidecar directories from any Python payload it assembles.
@@ -1630,7 +1711,7 @@ A conforming consumer **MUST**:
 16. When native dependency resolution **fails**, report every declared
     coordinate, module, and Swift package **with the distribution that declared
     it** (§6.5, §7.4).
-17. Compute every namespace, prefix, and group containment test on
+17. Compute every namespace and reserved-prefix containment test on
     dot-separated segments (§6.1).
 18. Fail when building for a platform a sidecar's `platforms` key omits, naming
     the distribution (§4.5).
@@ -1679,7 +1760,11 @@ A conforming consumer **SHOULD**:
 
 ## 9. Recording and review
 
-Requirement 8.9 is about **disclosure**, not integrity.
+The integration record serves two purposes: **review** of the native surface an
+application is acquiring, and **integrity** of the inputs and resolved artifacts
+that produced it. An earlier revision of this section claimed the first and
+disclaimed the second; per-file hashes, per-artifact checksums and failing on
+drift are integrity, and the record does both.
 
 The lifecycle is:
 
@@ -1777,10 +1862,14 @@ security-sensitive — and because the consumer is already reading these manifes
 to satisfy the paragraph above:
 
 - A resolved artifact declaring `<uses-feature required="true">` **MUST NOT** be
-  allowed to silently make hardware mandatory. The consumer **MUST** report it
-  and **MUST** obtain application approval or override it to `required="false"`,
-  mirroring §6.7's rule for producers. Silently shrinking an application's
-  device reach is the same harm whoever authors it.
+  allowed to silently make hardware mandatory. The consumer **MUST** report it,
+  and **MUST** override it to `required="false"` unless the **application itself**
+  independently declares that feature required. Silently shrinking an
+  application's device reach is the same harm whoever authors it.
+
+  This deliberately adds no approval channel to §2.2: required hardware is
+  already the application's to declare, so its own configuration is the source
+  of truth and a resolved artifact cannot enlarge it.
 - A resolved artifact declaring an **exported component** **MUST** be reported
   with the same prominence as a contributed one (§6.8), so the application sees
   every externally reachable surface it is acquiring, whatever declared it.
@@ -1876,10 +1965,10 @@ is the narrower scope stated there rather than new machinery (§7.1).
 | Not covered | Reason |
 | --- | --- |
 | Prebuilt `.aar` **embedded in the wheel** | Carries an `AndroidManifest.xml` that merges into the application's, defeating §6.7 and §6.8 with no attribution |
-| Prebuilt iOS binaries **carried by the wheel** | Forces a platform tag onto an otherwise pure-Python wheel; unauditable |
+| Prebuilt iOS binaries **carried by the wheel** | Forces a platform tag onto an otherwise pure-Python wheel, and is opaque to this convention's source-level inspection model |
 | Native `.so`, extension modules | Solved by `android_<api>_<abi>`-tagged wheels ([PEP 738](https://peps.python.org/pep-0738/)) |
 | iOS frameworks in wheels | Solved by `ios_*`-tagged wheels ([PEP 730](https://peps.python.org/pep-0730/)) |
-| Android resources (`res/`) | Resource names are a flat global namespace per type, so no ownership rule can be built for them (§6.1 needs dots to compute containment). A producer shipping `values/strings.xml` with `app_name` renames the application. Resources reach an application through an `.aar` from a declared coordinate, where AGP merges them and §9 reports them |
+| Android resources (`res/`) | Resource names are a flat global namespace per type, so no ownership rule can be built for them (§6.1 needs dots to compute containment). A producer shipping `values/strings.xml` with `app_name` renames the application. Resources reach an application through an `.aar` from a declared coordinate, where AGP merges them |
 | Scripts, hooks, build plugins | Excluded on principle (§2.1), not as a deferral |
 | **Native runtime lifecycle composition** | No way for a producer to run code at application start, or to participate in an app-delegate callback. Deliberate in version 1, and not on principle — see below |
 | Xcode build settings, compiler/linker flags | Arbitrary build mutation; revisit only with a concrete, bounded need |
@@ -2099,9 +2188,9 @@ are summaries; where this table and the body differ, the body governs.
 | **`[android.owns]`** §6.1 | |
 | `java_namespaces` | Java package namespaces this distribution claims exclusively; two distributions claiming overlapping ones fail the build. Required when contributing Java/Kotlin, producer-sourced components, or keep patterns |
 | **`[android.requires]`** §6.2 | |
-| `compile_sdk`, `min_sdk` | Floors. The build fails when the application is lower; the consumer never raises the application to match |
+| `compile_sdk`, `min_sdk`, `target_sdk` | Floors. The build fails when the application is lower; the consumer never raises the application to match. `target_sdk` is the most invasive — it changes behaviour app-wide — so declare it only when a behaviour depends on it |
 | **`[[android.requires.application_values]]`** §6.3 | |
-| `id` | A logical name for the value. The application supplies it under this name, and contributions reference it as `{ application_value = "…" }` |
+| `id` | A logical name for the value, unique within the sidecar; full identity is (distribution, `id`). The application supplies the value under it, and contributions reference it as `{ application_value = "…" }`. Values are non-empty strings |
 | `reason` | **Required.** What the value is and where to obtain it |
 | `manifest_meta_data` | Optional. The `<meta-data>` key the SDK reads; the consumer writes the supplied value there |
 | **`[android.contributes.src]`** §6.4 | |
@@ -2137,9 +2226,9 @@ are summaries; where this table and the body differ, the body governs.
 | **`[ios.requires.*]` — prerequisites** §7.3 | Every entry takes `reason` (**required**) and `conditional` (optional). Unconditional and unsatisfied fails the build; conditional and unsatisfied is recorded |
 | `[[…entitlements]]` — `key` | Satisfied by the key's presence; v1 does not model its value |
 | `[[…usage_descriptions]]` — `key` | The application writes the sentence; §7.6 rejects one offered as a contribution |
-| `[[…app_extensions]]` — `kind` | `notification_service` or `location_push`. The application builds the target |
+| `[[…app_extensions]]` — `id`, `kind` | `notification_service` or `location_push`. The application builds the target and acknowledges this `id`, since one target cannot be assumed to serve two producers |
 | `[[…application_files]]` — `name` | A file the SDK reads from the bundle. Declare only when no programmatic path exists |
-| `[[…url_schemes]]` | Says the application must register a URL scheme and forward the callback. Names no key — the application chooses the scheme — so its answer is matched by distribution, and **at most one per sidecar** is allowed |
+| `[[…url_schemes]]` — `id` | Says the application must register a URL scheme and forward the callback. `id` names the requirement, not the scheme — the application chooses that — so a package may declare several |
 | **`[[ios.contributes.swift_packages]]`** §7.4 | |
 | `name` | Local handle, unique within the sidecar; §7.7 and §7.3 refer to packages by it |
 | `url`, `products` | The repository, and which of its products to link |

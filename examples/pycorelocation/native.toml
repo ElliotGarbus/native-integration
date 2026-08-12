@@ -79,6 +79,7 @@ requestTemporaryFullAccuracyAuthorization(purposeKey:); its keys are the \
 purpose keys your application passes."""
 
 [[ios.requires.app_extensions]]
+id = "corelocation_push_ext"
 kind = "location_push"
 conditional = true
 reason = """\

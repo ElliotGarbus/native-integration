@@ -63,6 +63,7 @@ must be set on both targets."""
 # application's tree. §7.3 does not let the producer contribute it; it lets the
 # producer say it is needed, so the loss is reported rather than discovered
 # when notifications arrive without images.
+id = "onesignal_nse"
 kind = "notification_service"
 reason = """\
 Confirmed delivery, badge counts and image attachments are unavailable \

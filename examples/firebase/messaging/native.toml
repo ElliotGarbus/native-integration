@@ -53,6 +53,7 @@ key = "aps-environment"
 reason = "APNs delivery; FCM sends through APNs on Apple platforms"
 
 [[ios.requires.app_extensions]]
+id = "fcm_image_nse"
 kind = "notification_service"
 conditional = true
 reason = """\
