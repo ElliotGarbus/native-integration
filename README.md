@@ -301,6 +301,40 @@ Disagreement is more useful than agreement. The specification has been through
 three rounds of external review, and each changed it substantially; the places
 it is wrong now are the places nobody has looked yet.
 
+## The reference reader
+
+[**`src/native_integration/`**](src/README.md) is a reader for this
+specification — discovery, parsing, validation, and rule enforcement — so that
+the consumer obligations of [§8](SPEC.md#8-consuming-tool-requirements) are code
+paths a build tool gets by *using* it, rather than prose it has to remember to
+implement. It is not a build tool: it never writes a Gradle or Xcode project,
+never resolves a Maven coordinate, and never runs anything.
+
+```python
+integration = read(platform=Platform.ANDROID, closure=..., application=..., record_path=...)
+print(integration.report())
+integration.raise_for_errors()
+```
+
+[`docs/REQUIREMENTS.md`](docs/REQUIREMENTS.md) maps every §8 requirement to the
+code path that discharges it, generated from the rule registry and from SPEC.md
+so it cannot drift.
+
+Two things it does deliberately, because they are the obligations most easily
+lost:
+
+- **A diagnostic cannot be constructed without naming a distribution.** That is
+  requirement 8.15, enforced by a constructor rather than by discipline.
+- **A missing port raises rather than passing.** Four obligations need something
+  only a build tool has — a locked dependency graph with per-artifact checksums,
+  an archive listing, the manifest inside a resolved `.aar`. Those are protocols
+  a consumer implements, and a sidecar that needs one when none was supplied
+  stops the read. A tool must not be able to pass validation by leaving a check
+  unimplemented.
+
+Writing a sidecar? `check_sidecar()` validates one on its own, before you
+publish it.
+
 ## Checks
 
 `python3 tools/check_spec.py` validates the specification against itself and
@@ -314,12 +348,17 @@ Each check exists because the corresponding mistake shipped at least once. They
 cover mechanical drift only — a section that contradicts itself still needs a
 reader, which is how two of the defects above were found.
 
+`python3 -m pytest` runs the reference reader's own suite, which asks a
+different question of the same files: not whether the documents agree with each
+other, but whether all ten sidecars survive an implementation of the rules the
+specification states. Both run in CI on every push and pull request.
+
 ## Planned
 
-- A reference reader library — discovery, parsing, validation, and rule
-  enforcement — so the consumer obligations are code paths a tool gets by *using*
-  it, rather than prose it has to remember to implement.
-- A conformance test suite any consumer can run against itself.
+- A conformance test suite any consumer can run against itself. The reference
+  reader is the start of one — its rule registry is the list of behaviours a
+  suite would have to check — but a suite has to be runnable against a *tool*
+  rather than against this library.
 
 ## License
 

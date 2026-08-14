@@ -18,3 +18,22 @@ jobs:
           python-version: "3.12"
       - name: Check consistency
         run: python3 tools/check_spec.py
+      - name: Check the requirement map is current
+        run: python3 tools/requirements_table.py --check
+
+  reader:
+    name: Reference reader
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # 3.11 is the floor: tomllib.
+        python-version: ["3.11", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install
+        run: python3 -m pip install -e ".[test,closure]"
+      - name: Test
+        run: python3 -m pytest -q

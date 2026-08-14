@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "native-integration"
+version = "0.1.0.dev0"
+description = "Reference reader for the native-integration specification"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { file = "LICENSE" }
+authors = [{ name = "Elliot Garbus" }]
+keywords = ["android", "ios", "packaging", "native", "build"]
+classifiers = [
+  "Development Status :: 2 - Pre-Alpha",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3 :: Only",
+  "Topic :: Software Development :: Build Tools",
+]
+dependencies = []
+
+[project.optional-dependencies]
+# Only for Closure.from_installed(), which parses Requires-Dist and evaluates
+# environment markers. A consumer that resolves its own closure — which every
+# real one does, because the closure is resolved for the *target* platform —
+# needs none of this.
+closure = ["packaging>=23"]
+test = ["pytest>=7"]
+
+[project.urls]
+Specification = "https://github.com/ElliotGarbus/native-integration/blob/main/SPEC.md"
+Source = "https://github.com/ElliotGarbus/native-integration"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+native_integration = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

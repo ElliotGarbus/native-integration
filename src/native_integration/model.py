@@ -1,0 +1,426 @@
+"""Typed declarations: what a sidecar says, after it has been found valid.
+
+Nothing here validates. These are built only from a document that already
+passed :mod:`native_integration.schema`, which is why the field types can be
+trusted — §4.3's "never by parsing it partially" applies to the model too.
+"""
+
+from __future__ import annotations
+
+import enum
+from dataclasses import dataclass, field
+from typing import Any, Mapping, Sequence
+
+from .contract import ContractVersion
+from .naming import Module, split_coordinate
+from .resources import SidecarSource
+
+
+class Platform(str, enum.Enum):
+    ANDROID = "android"
+    IOS = "ios"
+
+    def __str__(self) -> str:  # pragma: no cover - trivial
+        return self.value
+
+
+# --- shared -----------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class Ref:
+    """A literal, or §6.3's inline reference to an application value."""
+
+    literal: str | None = None
+    application_value: str | None = None
+
+    @classmethod
+    def of(cls, raw: Any) -> "Ref":
+        if isinstance(raw, dict):
+            return cls(application_value=raw["application_value"])
+        return cls(literal=raw)
+
+    @property
+    def is_reference(self) -> bool:
+        return self.application_value is not None
+
+    def render(self) -> str:
+        return self.literal if self.literal is not None else "${%s}" % self.application_value
+
+
+# --- Android ----------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class ApplicationValue:
+    id: str
+    reason: str
+    manifest_meta_data: str | None = None
+
+
+@dataclass(frozen=True)
+class GradleDependency:
+    """§6.5's two forms, kept distinguishable after parsing."""
+
+    module: Module
+    exact_version: str | None = None
+    at_least: str | None = None
+    below: str | None = None
+    configuration: str = "implementation"
+
+    @property
+    def is_range(self) -> bool:
+        return self.exact_version is None
+
+    @property
+    def requested(self) -> str:
+        if self.exact_version is not None:
+            return self.exact_version
+        return f"[{self.at_least}, {self.below})"
+
+    def render(self) -> str:
+        return f"{self.module}:{self.requested}"
+
+
+@dataclass(frozen=True)
+class GradleRepository:
+    url: str
+    reason: str
+    groups: tuple[str, ...] = ()
+    modules: tuple[str, ...] = ()
+    credentials_required: bool = False
+
+    @property
+    def scope(self) -> tuple[str, ...]:
+        return (*self.groups, *self.modules)
+
+    def serves(self, module: Module) -> bool:
+        return str(module) in self.modules or module.group in self.groups
+
+
+@dataclass(frozen=True)
+class Permission:
+    name: str
+    reason: str | None = None
+
+
+@dataclass(frozen=True)
+class Feature:
+    name: str
+    #: §6.7 — every producer-declared feature is `required = false`, always.
+    required: bool = False
+
+
+@dataclass(frozen=True)
+class ViewLink:
+    scheme: Ref
+    host: Ref | None = None
+    path_prefix: Ref | None = None
+
+    def refs(self) -> tuple[Ref, ...]:
+        return tuple(r for r in (self.scheme, self.host, self.path_prefix) if r is not None)
+
+
+@dataclass(frozen=True)
+class IntentFilter:
+    action: str
+
+
+@dataclass(frozen=True)
+class Component:
+    kind: str
+    name: str
+    from_dependency: str | None = None
+    exported_required: bool = False
+    reason: str | None = None
+    view_links: tuple[ViewLink, ...] = ()
+    intent_filters: tuple[IntentFilter, ...] = ()
+
+    @property
+    def producer_sourced(self) -> bool:
+        return self.from_dependency is None
+
+
+@dataclass(frozen=True)
+class DependencyKeep:
+    pattern: str
+    from_dependency: str
+
+
+@dataclass(frozen=True)
+class AndroidSection:
+    java_namespaces: tuple[str, ...] = ()
+    compile_sdk: int | None = None
+    min_sdk: int | None = None
+    target_sdk: int | None = None
+    application_values: tuple[ApplicationValue, ...] = ()
+    src_java: tuple[str, ...] = ()
+    src_kotlin: tuple[str, ...] = ()
+    gradle_dependencies: tuple[GradleDependency, ...] = ()
+    gradle_repositories: tuple[GradleRepository, ...] = ()
+    permissions: tuple[Permission, ...] = ()
+    features: tuple[Feature, ...] = ()
+    components: tuple[Component, ...] = ()
+    keep_classes: tuple[str, ...] = ()
+    dependency_keeps: tuple[DependencyKeep, ...] = ()
+
+    @property
+    def floors(self) -> dict[str, int]:
+        return {
+            name: value
+            for name, value in (
+                ("compile_sdk", self.compile_sdk),
+                ("min_sdk", self.min_sdk),
+                ("target_sdk", self.target_sdk),
+            )
+            if value is not None
+        }
+
+    @property
+    def declared_modules(self) -> tuple[str, ...]:
+        return tuple(str(d.module) for d in self.gradle_dependencies)
+
+
+# --- iOS --------------------------------------------------------------------
+
+
+class PrerequisiteKind(str, enum.Enum):
+    ENTITLEMENT = "entitlements"
+    USAGE_DESCRIPTION = "usage_descriptions"
+    APP_EXTENSION = "app_extensions"
+    APPLICATION_FILE = "application_files"
+    URL_SCHEME = "url_schemes"
+
+    def __str__(self) -> str:  # pragma: no cover - trivial
+        return self.value
+
+
+#: Which tables are joined on a key the platform supplies, and which on an `id`
+#: the producer invents. §2.2: both are scoped by the declaring distribution;
+#: only the source of the local part differs.
+PRODUCER_LOCAL_IDS = (PrerequisiteKind.APP_EXTENSION, PrerequisiteKind.URL_SCHEME)
+
+
+@dataclass(frozen=True)
+class Prerequisite:
+    """One §7.3 entry. ``key`` is the join key, whatever the table calls it."""
+
+    kind: PrerequisiteKind
+    key: str
+    reason: str
+    conditional: bool = False
+    extension_kind: str | None = None
+
+    @property
+    def producer_local(self) -> bool:
+        return self.kind in PRODUCER_LOCAL_IDS
+
+    @property
+    def field_name(self) -> str:
+        if self.producer_local:
+            return "id"
+        return "name" if self.kind is PrerequisiteKind.APPLICATION_FILE else "key"
+
+
+@dataclass(frozen=True)
+class SwiftPackage:
+    name: str
+    url: str
+    requirement_kind: str  # exact | from | revision | branch
+    requirement_value: str
+    products: tuple[str, ...] = ()
+
+    def render(self) -> str:
+        return f"{self.name} ({self.url}, {self.requirement_kind} {self.requirement_value})"
+
+
+@dataclass(frozen=True)
+class PythonModule:
+    name: str
+    swift_package: str
+    init: str | None = None
+
+    @property
+    def init_symbol(self) -> str:
+        return self.init or f"PyInit_{self.name}"
+
+
+@dataclass(frozen=True)
+class IosSection:
+    swift_symbol_prefixes: tuple[str, ...] = ()
+    deployment_target: str | None = None
+    prerequisites: tuple[Prerequisite, ...] = ()
+    swift_packages: tuple[SwiftPackage, ...] = ()
+    src_swift: tuple[str, ...] = ()
+    info_plist_values: Mapping[str, Any] = field(default_factory=dict)
+    info_plist_append: Mapping[str, Sequence[Any]] = field(default_factory=dict)
+    python_modules: tuple[PythonModule, ...] = ()
+
+    def of_kind(self, kind: PrerequisiteKind) -> tuple[Prerequisite, ...]:
+        return tuple(p for p in self.prerequisites if p.kind is kind)
+
+
+# --- the sidecar ------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class Sidecar:
+    distribution: str
+    version: str
+    contract: ContractVersion
+    platforms: tuple[str, ...] | None
+    android: AndroidSection | None = None
+    ios: IosSection | None = None
+    source: SidecarSource | None = None
+
+    @property
+    def name(self) -> str:
+        return self.distribution
+
+    def section(self, platform: Platform) -> AndroidSection | IosSection | None:
+        return self.android if platform is Platform.ANDROID else self.ios
+
+
+# --- construction from a validated document ---------------------------------
+
+
+def _refs(entry: Mapping[str, Any], key: str) -> Ref | None:
+    return Ref.of(entry[key]) if key in entry else None
+
+
+def build_android(table: Mapping[str, Any]) -> AndroidSection:
+    owns = table.get("owns", {})
+    requires = table.get("requires", {})
+    contributes = table.get("contributes", {})
+    src = contributes.get("src", {})
+    r8 = contributes.get("r8", {})
+
+    dependencies: list[GradleDependency] = []
+    for entry in contributes.get("gradle_dependencies", []):
+        configuration = entry.get("configuration", "implementation")
+        if "coordinate" in entry:
+            module, version = split_coordinate(entry["coordinate"])
+            dependencies.append(
+                GradleDependency(module=module, exact_version=version, configuration=configuration)
+            )
+        else:
+            bounds = entry.get("version", {})
+            dependencies.append(
+                GradleDependency(
+                    module=Module.parse(entry["module"]),
+                    at_least=bounds.get("at_least"),
+                    below=bounds.get("below"),
+                    configuration=configuration,
+                )
+            )
+
+    components: list[Component] = []
+    for entry in contributes.get("components", []):
+        components.append(
+            Component(
+                kind=entry["kind"],
+                name=entry["name"],
+                from_dependency=entry.get("from_dependency"),
+                exported_required=bool(entry.get("exported_required", False)),
+                reason=entry.get("reason"),
+                view_links=tuple(
+                    ViewLink(
+                        scheme=Ref.of(link["scheme"]),
+                        host=_refs(link, "host"),
+                        path_prefix=_refs(link, "path_prefix"),
+                    )
+                    for link in entry.get("view_links", [])
+                ),
+                intent_filters=tuple(
+                    IntentFilter(action=flt["action"]) for flt in entry.get("intent_filters", [])
+                ),
+            )
+        )
+
+    return AndroidSection(
+        java_namespaces=tuple(owns.get("java_namespaces", [])),
+        compile_sdk=requires.get("compile_sdk"),
+        min_sdk=requires.get("min_sdk"),
+        target_sdk=requires.get("target_sdk"),
+        application_values=tuple(
+            ApplicationValue(
+                id=v["id"], reason=v["reason"], manifest_meta_data=v.get("manifest_meta_data")
+            )
+            for v in requires.get("application_values", [])
+        ),
+        src_java=tuple(src.get("java", [])),
+        src_kotlin=tuple(src.get("kotlin", [])),
+        gradle_dependencies=tuple(dependencies),
+        gradle_repositories=tuple(
+            GradleRepository(
+                url=r["url"],
+                reason=r["reason"],
+                groups=tuple(r.get("groups", [])),
+                modules=tuple(r.get("modules", [])),
+                credentials_required=bool(r.get("credentials_required", False)),
+            )
+            for r in contributes.get("gradle_repositories", [])
+        ),
+        permissions=tuple(
+            Permission(name=p["name"], reason=p.get("reason"))
+            for p in contributes.get("permissions", [])
+        ),
+        features=tuple(Feature(name=f["name"]) for f in contributes.get("features", [])),
+        components=tuple(components),
+        keep_classes=tuple(r8.get("keep_classes", [])),
+        dependency_keeps=tuple(
+            DependencyKeep(pattern=k["pattern"], from_dependency=k["from_dependency"])
+            for k in r8.get("keep", [])
+        ),
+    )
+
+
+_PREREQUISITE_KEY = {
+    PrerequisiteKind.ENTITLEMENT: "key",
+    PrerequisiteKind.USAGE_DESCRIPTION: "key",
+    PrerequisiteKind.APP_EXTENSION: "id",
+    PrerequisiteKind.APPLICATION_FILE: "name",
+    PrerequisiteKind.URL_SCHEME: "id",
+}
+
+
+def build_ios(table: Mapping[str, Any]) -> IosSection:
+    requires = table.get("requires", {})
+    contributes = table.get("contributes", {})
+    plist = contributes.get("info_plist", {})
+
+    prerequisites: list[Prerequisite] = []
+    for kind, key_field in _PREREQUISITE_KEY.items():
+        for entry in requires.get(kind.value, []):
+            prerequisites.append(
+                Prerequisite(
+                    kind=kind,
+                    key=entry[key_field],
+                    reason=entry["reason"],
+                    conditional=bool(entry.get("conditional", False)),
+                    extension_kind=entry.get("kind"),
+                )
+            )
+
+    return IosSection(
+        swift_symbol_prefixes=tuple(table.get("swift_symbol_prefixes", [])),
+        deployment_target=requires.get("deployment_target"),
+        prerequisites=tuple(prerequisites),
+        swift_packages=tuple(
+            SwiftPackage(
+                name=p["name"],
+                url=p["url"],
+                requirement_kind=next(iter(p["requirement"])),
+                requirement_value=next(iter(p["requirement"].values())),
+                products=tuple(p.get("products", [])),
+            )
+            for p in contributes.get("swift_packages", [])
+        ),
+        src_swift=tuple(contributes.get("src", {}).get("swift", [])),
+        info_plist_values=dict(plist.get("values", {})),
+        info_plist_append={k: tuple(v) for k, v in plist.get("append", {}).items()},
+        python_modules=tuple(
+            PythonModule(name=m["name"], swift_package=m["swift_package"], init=m.get("init"))
+            for m in contributes.get("python_modules", [])
+        ),
+    )
