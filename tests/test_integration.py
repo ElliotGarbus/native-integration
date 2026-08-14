@@ -981,6 +981,97 @@ swift_package = "PyWebViews"
     assert "pywebviews/_native/" in exclusions
 
 
+# --- regressions ------------------------------------------------------------
+
+
+def test_one_sidecar_may_not_register_a_module_name_twice(tmp_path):
+    """The same ambiguity as the cross-distribution case, by a shorter path."""
+    body = """
+contract = "1"
+[[ios.contributes.swift_packages]]
+name = "A"
+url = "https://example.com/a"
+requirement = { exact = "1.0.0" }
+products = ["A"]
+[[ios.contributes.swift_packages]]
+name = "B"
+url = "https://example.com/b"
+requirement = { exact = "1.0.0" }
+products = ["B"]
+[[ios.contributes.python_modules]]
+name = "web_views"
+swift_package = "A"
+[[ios.contributes.python_modules]]
+name = "web_views"
+swift_package = "B"
+"""
+    integration = read(
+        platform=Platform.IOS,
+        closure=Closure.direct("pkg-two"),
+        application=Application(),
+        profile=PROFILE,
+        resolvers=Resolvers(swift=FakeSwift(SwiftGraph())),
+        sources=[build(tmp_path, body, name="pkg-two", module="pkg_two._native")],
+    )
+    duplicates = [d for d in integration.diagnostics if d.rule.code == "python-module-duplicate"]
+    assert len(duplicates) == 1 and duplicates[0].blocking
+
+
+def test_an_unsupplied_value_is_absent_rather_than_a_placeholder(tmp_path):
+    """A caller that stages before checking must not get `${id}` in a manifest."""
+    integration = read(
+        platform=Platform.ANDROID,
+        closure=Closure.direct("pystripe"),
+        application=Application(android_sdk={"min_sdk": 24, "compile_sdk": 35}),
+        profile=PROFILE,
+        sources=[build(tmp_path)],
+    )
+    link = integration.effective.contributions[0].components[0].view_links[0]
+    assert link.scheme is None
+    assert link.unresolved == ("stripe_return_scheme",)
+    assert not link.complete
+    assert "unsupplied" in link.render()
+
+
+def test_a_malformed_record_names_the_file_rather_than_raising_a_traceback(tmp_path):
+    from native_integration import MalformedRecord
+
+    truncated = tmp_path / "truncated.json"
+    truncated.write_text('{"distributions": [{"name":', encoding="utf-8")
+    with pytest.raises(MalformedRecord, match="is not valid JSON"):
+        IntegrationRecord.read(truncated)
+
+    wrong_shape = tmp_path / "wrong.json"
+    wrong_shape.write_text('{"distributions": "not-a-list"}', encoding="utf-8")
+    with pytest.raises(MalformedRecord, match="not a list of objects"):
+        IntegrationRecord.read(wrong_shape)
+
+    # An absent record is still None: "no record yet" is a different situation
+    # from "a record I could not read", and only the first bootstraps.
+    assert IntegrationRecord.read(tmp_path / "absent.json") is None
+
+
+def test_an_unreadable_record_does_not_silently_re_bootstrap(tmp_path):
+    from native_integration import MalformedRecord
+
+    record_path = tmp_path / "record.json"
+    record_path.write_text("}{ not json", encoding="utf-8")
+    with pytest.raises(MalformedRecord):
+        read(
+            platform=Platform.ANDROID,
+            closure=Closure.direct("pystripe"),
+            application=answered(),
+            profile=PROFILE,
+            sources=[build(tmp_path)],
+            record_path=record_path,
+        )
+
+
+def test_closure_from_installed_reports_what_it_could_not_find():
+    closure = Closure.from_installed(["definitely-not-installed-xyz"])
+    assert closure.missing == ("definitely-not-installed-xyz",)
+
+
 # --- requirement coverage ---------------------------------------------------
 
 

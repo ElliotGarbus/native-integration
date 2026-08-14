@@ -31,6 +31,7 @@ from .model import (
     Ref,
     Sidecar,
     SwiftPackage,
+    ViewLink,
 )
 from .resources import SidecarSource
 
@@ -61,23 +62,40 @@ class MetaDataEntry:
 
 @dataclass(frozen=True)
 class GeneratedViewLink:
-    """A resolved ``view_links`` entry: the consumer generates the filter itself."""
+    """A resolved ``view_links`` entry: the consumer generates the filter itself.
 
-    scheme: str
+    A field is ``None`` when it referenced an application value the application
+    has not supplied. That is deliberately not a placeholder string: the build
+    is already blocked by ``application-value-unsupplied``, and a consumer that
+    stages before checking should hit a missing value rather than write
+    ``${some_id}`` into a manifest, where it would look like a filter that
+    merely never matches.
+    """
+
+    scheme: str | None = None
     host: str | None = None
     path_prefix: str | None = None
+    #: The application-value ids this filter referenced and did not get.
+    unresolved: tuple[str, ...] = ()
     #: ``android.intent.action.VIEW`` plus DEFAULT and BROWSABLE are implied by
     #: the type and are not spellable, which is what removes the classic
     #: missing-DEFAULT silent failure.
     action: str = "android.intent.action.VIEW"
     categories: tuple[str, ...] = ("android.intent.category.DEFAULT", "android.intent.category.BROWSABLE")
 
+    @property
+    def complete(self) -> bool:
+        """True when every referenced value was supplied and this can be staged."""
+        return self.scheme is not None and not self.unresolved
+
     def render(self) -> str:
-        parts = [f"scheme {self.scheme}"]
+        parts = [f"scheme {self.scheme}" if self.scheme is not None else "scheme <unsupplied>"]
         if self.host:
             parts.append(f"host {self.host}")
         if self.path_prefix:
             parts.append(f"pathPrefix {self.path_prefix}")
+        if self.unresolved:
+            parts.append("unsupplied: " + ", ".join(self.unresolved))
         return ", ".join(parts)
 
 
@@ -358,14 +376,7 @@ def _one(
                         "integration cannot proceed — it is not registered unexported",
                         name,
                     )
-            links = tuple(
-                GeneratedViewLink(
-                    scheme=_resolve(link.scheme, supplied),
-                    host=_resolve(link.host, supplied),
-                    path_prefix=_resolve(link.path_prefix, supplied),
-                )
-                for link in component.view_links
-            )
+            links = tuple(_generate_link(link, supplied) for link in component.view_links)
             components.append(
                 ComponentEntry(
                     distribution=name,
@@ -481,12 +492,30 @@ def _one(
     )
 
 
-def _resolve(ref: Ref | None, supplied: Mapping[str, str]) -> str | None:
-    if ref is None:
-        return None
-    if ref.is_reference:
-        return supplied.get(ref.application_value or "", ref.render())
-    return ref.literal
+def _generate_link(link: ViewLink, supplied: Mapping[str, str]) -> GeneratedViewLink:
+    """Substitute the application's answers into one ``view_links`` entry (§6.3)."""
+    unresolved: list[str] = []
+
+    def value(ref: Ref | None) -> str | None:
+        if ref is None:
+            return None
+        if not ref.is_reference:
+            return ref.literal
+        supplied_value = supplied.get(ref.application_value or "")
+        if supplied_value is None:
+            unresolved.append(ref.application_value or "")
+            return None
+        return supplied_value
+
+    scheme = value(link.scheme)
+    host = value(link.host)
+    path_prefix = value(link.path_prefix)
+    return GeneratedViewLink(
+        scheme=scheme,
+        host=host,
+        path_prefix=path_prefix,
+        unresolved=tuple(dict.fromkeys(unresolved)),
+    )
 
 
 def _version_tuple(text: str) -> tuple[int, ...]:

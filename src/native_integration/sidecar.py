@@ -564,7 +564,19 @@ def _check_ios(
                 name,
             )
 
+    registered: set[str] = set()
     for module in ios.python_modules:
+        if module.name in registered:
+            # §7.7 states the cross-distribution case, but one sidecar
+            # registering a name twice is the same ambiguity with a shorter
+            # path to it: the second registration has no defined meaning.
+            bag.add(
+                rules.PYTHON_MODULE_DUPLICATE,
+                f"registers the Python module `{module.name}` more than once; a module "
+                "name is registered against exactly one implementation",
+                name,
+            )
+        registered.add(module.name)
         if not _PYTHON_IDENTIFIER.match(module.name):
             bag.add(
                 rules.PYTHON_MODULE_NAME_INVALID,

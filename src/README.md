@@ -40,10 +40,18 @@ for permission in integration.effective.permissions():
     ...                                          # stage it; the library computed it
 ```
 
-`integration.effective` is the description a consumer stages from — permissions
-after suppression, components with their export decisions, generated intent
-filters with application values already substituted, the merged `Info.plist`,
-and the paths that must never reach the device.
+`integration.effective` is what the **sidecars** contribute, after the
+application's answers — permissions after suppression, components with their
+export decisions, generated intent filters with application values already
+substituted, the merged `Info.plist`, and the paths that must never reach the
+device.
+
+It is not the whole native surface. What a *resolved artifact* brings in on its
+own — an `.aar`'s permissions, its exported components, a `required="true"`
+feature this library overrides — lives in `integration.resolution.artifact_findings`
+and in the record, because §9 attributes those to the artifact rather than to
+the distribution that named the coordinate. A consumer staging a manifest needs
+both.
 
 ## Where the obligations live
 

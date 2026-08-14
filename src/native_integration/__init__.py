@@ -77,7 +77,7 @@ from .ports import (
     SwiftPackageRequest,
     SwiftResolver,
 )
-from .record import Delta, DistributionRecord, IntegrationRecord
+from .record import Delta, DistributionRecord, IntegrationRecord, MalformedRecord
 from .resolution import Integration, check_sidecar, read
 from .resources import SidecarSource
 
@@ -112,6 +112,7 @@ __all__ = [
     "Integration",
     "IntegrationError",
     "IntegrationRecord",
+    "MalformedRecord",
     "IosSection",
     "ManifestComponent",
     "ManifestFeature",

@@ -62,6 +62,10 @@ class Closure:
     #: containing exactly the closure may treat all installed distributions as
     #: candidates.
     isolated: bool = False
+    #: Names :meth:`from_installed` walked to and could not find. A closure with
+    #: anything here is incomplete, and a distribution that would have declared a
+    #: sidecar may be missing from it — so it is reported rather than swallowed.
+    missing: tuple[str, ...] = ()
 
     @classmethod
     def direct(cls, *names: str) -> "Closure":
@@ -102,11 +106,17 @@ class Closure:
 
         frontier = list(origins)
         dependents: dict[str, set[str]] = {}
+        missing: list[str] = []
         while frontier:
             current = frontier.pop(0)
             try:
                 dist = metadata.distribution(current)
             except metadata.PackageNotFoundError:
+                # Not installed here, so its own requirements cannot be walked
+                # and any sidecar it ships is invisible. Recorded rather than
+                # swallowed: the caller is entitled to know the closure is
+                # partial before it decides what may configure the build.
+                missing.append(current)
                 continue
             wanted = set(extras.get(current, ()))
             for raw in dist.metadata.get_all("Requires-Dist") or []:
@@ -130,7 +140,8 @@ class Closure:
                 if origin.direct
                 else Origin(via=tuple(sorted(dependents.get(name, ()))))
                 for name, origin in origins.items()
-            }
+            },
+            missing=tuple(sorted(missing)),
         )
 
     def contains(self, name: str) -> bool:

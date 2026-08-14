@@ -18,6 +18,7 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Iterable, Mapping
 
+from .diagnostics import SpecViolation
 from .discovery import normalize_name
 from .effective import Contribution, EffectiveSet
 from .native import NativeResolution
@@ -25,6 +26,21 @@ from .naming import Module
 from .ports import GradleGraph, ResolvedArtifact, ResolvedSwiftPackage, SwiftGraph
 
 RECORD_FORMAT = 1
+
+
+class MalformedRecord(SpecViolation):
+    """An integration record exists but cannot be read.
+
+    An exception rather than a diagnostic, because a diagnostic must name the
+    distribution it concerns and a broken lock file concerns none of them — it
+    is a fault in the application's own repository. The message names the path
+    and the reason, which is what the person editing it needs.
+    """
+
+    def __init__(self, source: str, reason: str) -> None:
+        self.source = source
+        self.reason = reason
+        super().__init__(f"integration record {source} {reason}")
 
 
 @dataclass(frozen=True)
@@ -90,22 +106,39 @@ class IntegrationRecord:
         return json.dumps(self.to_dict(), indent=2, sort_keys=True, ensure_ascii=False) + "\n"
 
     @classmethod
-    def loads(cls, text: str) -> "IntegrationRecord":
-        data = json.loads(text)
+    def loads(cls, text: str, *, source: str = "<string>") -> "IntegrationRecord":
+        try:
+            data = json.loads(text)
+        except json.JSONDecodeError as exc:
+            raise MalformedRecord(source, f"is not valid JSON ({exc})") from exc
+        if not isinstance(data, dict):
+            raise MalformedRecord(source, "is not a JSON object")
+        entries = data.get("distributions", [])
+        if not isinstance(entries, list) or not all(isinstance(e, dict) for e in entries):
+            raise MalformedRecord(source, "`distributions` is not a list of objects")
         return cls(
             platform=str(data.get("platform", "")),
             contract=str(data.get("contract", "")),
-            distributions=tuple(
-                DistributionRecord.from_dict(d) for d in data.get("distributions", [])
-            ),
+            distributions=tuple(DistributionRecord.from_dict(d) for d in entries),
         )
 
     @classmethod
     def read(cls, path: Path | str) -> "IntegrationRecord | None":
+        """The last accepted record, or None when there is none.
+
+        A record that exists but cannot be read raises rather than returning
+        None: "no record" and "a record I could not parse" lead to opposite
+        actions, and treating the second as the first would silently re-bootstrap
+        a lock the application had already accepted.
+        """
         file = Path(path)
         if not file.exists():
             return None
-        return cls.loads(file.read_text(encoding="utf-8"))
+        try:
+            text = file.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError) as exc:
+            raise MalformedRecord(str(file), f"could not be read ({exc})") from exc
+        return cls.loads(text, source=str(file))
 
     def write(self, path: Path | str) -> Path:
         file = Path(path)
