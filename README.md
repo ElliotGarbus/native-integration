@@ -2,10 +2,12 @@
 
 **A convention for Python packages to declare what they need from a native mobile app build.**
 
-> **Status: draft, seeking review.** Nothing is implemented yet. This repository
-> exists so the design can be argued over before anyone writes code. Feedback
-> from maintainers of other toolchains is the point — see
-> [Getting involved](#getting-involved).
+> **Status: draft, seeking review.** No build tool implements this yet. A
+> [reference reader](#the-reference-reader) in this repository does, and is a
+> draft alongside the text — it exists so the consumer obligations are tested
+> against real sidecars rather than only asserted. This repository exists so the
+> design can be argued over; feedback from maintainers of other toolchains is
+> the point — see [Getting involved](#getting-involved).
 >
 > The spec has been stress-tested against **ten integration cases** — four
 > existing Python packages, and six clean-sheet sidecars covering Firebase,

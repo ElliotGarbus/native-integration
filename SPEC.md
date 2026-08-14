@@ -7,9 +7,10 @@ A convention by which a Python distribution declares the native material an
 Android or iOS application build must provide on its behalf, and by which a build
 tool discovers, validates, and stages that material.
 
-> **Status: draft.** Not implemented. Breaking changes are expected until this
-> line is removed, and this revision makes some — the draft is amended in place
-> rather than by contract minor.
+> **Status: draft.** No build tool implements this yet; a reference reader in
+> this repository does, and tracks the text. Breaking changes are expected until
+> this line is removed, and this revision makes some — the draft is amended in
+> place rather than by contract minor.
 >
 > This revision incorporates the corrections found by expressing **ten packages**
 > against the text as ten **integration cases** — four existing Python packages,
@@ -190,8 +191,8 @@ manifest_meta_data = "io.sentry.dsn"
 ```
 
 ```toml
-# the application's pyproject.toml — answered under the producer's `id`
-[tool.examplebuild.android.application_values]
+# the application's pyproject.toml — answered under (distribution, `id`)
+[tool.examplebuild.native.pysentry.android.application_values]
 sentry_dsn = "https://examplePublicKey@o0.ingest.sentry.io/0"
 ```
 
