@@ -1738,7 +1738,8 @@ A conforming consumer **MUST**:
 26. Provide a means for the application to answer every `requires`, joined to
     the declaration by the key §2.2 names, and accept a build-time credential
     **by indirection** rather than only as a literal in a committed file (§2.2).
-    Reject a sidecar declaring more than one `url_schemes` entry (§7.3).
+    Reject a sidecar declaring two `app_extensions` or `url_schemes` entries
+    under one `id`, which the application could not answer separately (§7.3).
 
 > Rationale for 16. Every other rule here assumes native resolution *succeeds*.
 > It need not: two distributions in one closure can declare native dependencies
