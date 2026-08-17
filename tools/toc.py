@@ -10,6 +10,10 @@ them, so the two cannot disagree: lowercase, drop anything outside
 `[a-z0-9 -]`, then spaces to hyphens. That is GitHub's own scheme for the
 heading shapes this document uses.
 
+Depth stops at level 4. Only §7.3 and §9 go that deep, because only they are
+long enough to need it; §7.3's six tables sit a level below that and are listed
+by name in its satisfaction table anyway.
+
     python3 tools/toc.py          # rewrite the block in place
     python3 tools/toc.py --check  # fail if it is out of date
 """
@@ -45,12 +49,22 @@ def label(heading: str) -> str:
 
 
 def build(text: str) -> str:
+    """Indent by depth in the hierarchy, not by raw heading level.
+
+    §9 is a level-2 heading whose parts are level 4, because level 3 is taken by
+    the ``N.M`` sub-sections everywhere else. Indenting on the level itself
+    would show those parts as grandchildren of a section that has no children.
+    """
     out: list[str] = []
-    for level, heading in re.findall(r"^(#{2,3}) (.+)$", text, re.M):
+    ancestors: list[int] = []
+    for hashes, heading in re.findall(r"^(#{2,4}) (.+)$", text, re.M):
         if heading in SKIP:
             continue
-        indent = "  " * (len(level) - 2)
-        out.append(f"{indent}- [{label(heading)}](#{anchor(heading)})")
+        level = len(hashes)
+        while ancestors and ancestors[-1] >= level:
+            ancestors.pop()
+        out.append(f"{'  ' * len(ancestors)}- [{label(heading)}](#{anchor(heading)})")
+        ancestors.append(level)
     return "\n".join(out)
 
 

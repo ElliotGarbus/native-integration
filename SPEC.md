@@ -65,12 +65,22 @@ checklist, and §§3–7 are what it refers to.
   - [7.1 Symbol prefixes](#71-symbol-prefixes-ios)
   - [7.2 Build requirements](#72-build-requirements-iosrequires)
   - [7.3 Application prerequisites](#73-application-prerequisites-iosrequires)
+    - [Common rules](#common-rules)
+    - [What counts as satisfied](#what-counts-as-satisfied)
+    - [Conditional prerequisites](#conditional-prerequisites)
+    - [The six tables](#the-six-tables)
   - [7.4 Swift packages](#74-swift-packages-ioscontributesswiftpackages)
   - [7.5 Source](#75-source-ioscontributessrc)
   - [7.6 Info.plist](#76-infoplist-ioscontributesinfoplist)
   - [7.7 Python modules](#77-python-modules-ioscontributespythonmodules)
 - [8. Consuming tool requirements](#8-consuming-tool-requirements)
 - [9. Recording and review](#9-recording-and-review)
+  - [The lifecycle](#the-lifecycle)
+  - [The report](#the-report)
+  - [Hashing the integration inputs](#hashing-the-integration-inputs)
+  - [What resolved artifacts bring with them](#what-resolved-artifacts-bring-with-them)
+  - [Secrets are never recorded](#secrets-are-never-recorded)
+  - [What a record is, and what it must contain](#what-a-record-is-and-what-it-must-contain)
 - [10. Versioning](#10-versioning)
 - [11. Out of scope](#11-out-of-scope)
 - [12. Guidance for package authors](#12-guidance-for-package-authors)
@@ -1461,9 +1471,11 @@ Without it, confirmed delivery, badge counts and image attachments are \
 unavailable. The extension must share an app group with the application."""
 ```
 
-**Common rules, binding on every table in this section** — `entitlements`,
-`usage_descriptions`, `app_extensions`, `application_files`, `url_schemes` and
-`plist_capabilities` alike:
+#### Common rules
+
+Binding on every table in this section — `entitlements`, `usage_descriptions`,
+`app_extensions`, `application_files`, `url_schemes` and `plist_capabilities`
+alike:
 
 1. `reason` is **REQUIRED**.
 2. An entry **MAY** declare `conditional = true` (default `false`), whose
@@ -1493,8 +1505,9 @@ consumer writes it into `Info.plist` as a matter of course. What it must never
 do is originate that text, or enable a capability, because a *producer* asked
 for it.
 
-**What counts as satisfied**, per table — stated because two conforming readers
-would otherwise diverge:
+#### What counts as satisfied
+
+Per table, stated because two conforming readers would otherwise diverge:
 
 | Table | Satisfied when the application… |
 | --- | --- |
@@ -1519,7 +1532,9 @@ inside it*, and a single existing target would otherwise appear to satisfy both.
 The extension's existence is checked; that it serves this producer is
 acknowledged.
 
-**Conditional prerequisites.** Per common rule 2, any entry in this section
+#### Conditional prerequisites
+
+Per common rule 2, any entry in this section
 **MAY** declare `conditional = true`, meaning *the producer cannot determine
 whether this applies; the application can*:
 
@@ -1549,10 +1564,14 @@ that it survives to be read later.
 > legitimate mode. It is also the one mechanism here a producer can misuse to
 > downgrade a real requirement into prose; §12.1 says so plainly.
 
-**The six tables.** Each is a prerequisite under the common rules above; what
-follows is only what is specific to it.
+#### The six tables
 
-**`entitlements`** — an entitlement is bound to the App ID and provisioning
+Each is a prerequisite under the common rules above; what follows is only what is
+specific to it.
+
+##### `entitlements`
+
+An entitlement is bound to the App ID and provisioning
 profile, and `codesign` requires the application's entitlements to be a subset
 of the profile's. Writing one the developer has not enabled produces a signing
 failure with no trace back to the distribution that caused it, and some cannot
@@ -1567,7 +1586,9 @@ would describe something the consumer can neither write nor check, and "must be
 `group.<your-bundle-id>.onesignal`, the same on both targets" tells a reader
 more than a type tag.
 
-**`usage_descriptions`** — a purpose string is **user-facing, localized, and
+##### `usage_descriptions`
+
+A purpose string is **user-facing, localized, and
 read by App Store review**, and it is a claim about what *the application* does
 with the data. A library cannot know it, and a binding that wrote one would give
 every application the same unhelpful sentence: useless to users, and a rejection
@@ -1578,8 +1599,9 @@ one as an `info_plist` value (§7.6).
 despite being dictionary-valued: as a prerequisite it is never spelled by the
 producer, so §7.6's exclusion of dictionaries does not bite.
 
-**`application_files`** — some SDKs read a configuration file from the built
-bundle:
+##### `application_files`
+
+Some SDKs read a configuration file from the built bundle:
 
 ```toml
 [[ios.requires.application_files]]
@@ -1598,7 +1620,9 @@ leaves no choice. Firebase is the motivating example — most of its services
 accept `FirebaseOptions` programmatically, and Analytics on Apple platforms does
 not.
 
-**`app_extensions`** — `id` names the requirement, and `kind` is a closed
+##### `app_extensions`
+
+`id` names the requirement, and `kind` is a closed
 vocabulary: `notification_service` and `location_push` in version 1. The
 application creates the target, writes its source, and configures its bundle
 identifier, entitlements and `Info.plist`.
@@ -1612,8 +1636,10 @@ identifier, entitlements and `Info.plist`.
 > should own; it needs a producer that wants to own it. Meanwhile this converts
 > a silent capability loss into a reported prerequisite.
 
-**`url_schemes`** — an SDK whose flow leaves the application and returns through
-a browser needs a custom URL scheme:
+##### `url_schemes`
+
+An SDK whose flow leaves the application and returns through a browser needs a
+custom URL scheme:
 
 ```toml
 [[ios.requires.url_schemes]]
@@ -1641,8 +1667,10 @@ one entry each and the application answers them separately.
 > one is the startup-hook shape, deliberately absent (§11). Registering half a
 > requirement is worse than reporting both, because it looks done.
 
-**`plist_capabilities`** — a few `Info.plist` keys do not describe the
-application, they **grant it a capability or restrict who may install it**:
+##### `plist_capabilities`
+
+A few `Info.plist` keys do not describe the application, they **grant it a
+capability or restrict who may install it**:
 
 ```toml
 [[ios.requires.plist_capabilities]]
@@ -2092,7 +2120,7 @@ application is acquiring, and **integrity** of the inputs and resolved artifacts
 that produced it. Per-file hashes, per-artifact checksums and failing on drift
 are what make the second more than a claim.
 
-The lifecycle is:
+#### The lifecycle
 
 1. **Compute** the integration resolution — the effective set from the
    application's dependency closure, including locked native dependency graphs
@@ -2112,7 +2140,9 @@ covering the initial set satisfies this; treating "no record yet" as implicit
 approval does not, because the first build is the one where an application
 acquires *all* of its inherited native surface at once.
 
-A report **MUST** carry three things — the distribution, **how it entered the
+#### The report
+
+It **MUST** carry three things — the distribution, **how it entered the
 dependency closure**, and the delta:
 
 ```
@@ -2142,8 +2172,10 @@ distinguished from an unresolved **conditional** one (§7.3), because the first
 blocks the build and the second is guidance. No format is mandated — only that a
 report which collapses these distinctions has not reported them.
 
-**Integration inputs are hashed for every producer** — not only path and
-editable installs. The record **MUST** include a SHA-256 per file, keyed by
+#### Hashing the integration inputs
+
+Inputs are hashed for **every** producer, not only path and editable
+installs. The record **MUST** include a SHA-256 per file, keyed by
 normalized relative path (forward slashes, relative to the sidecar directory),
 covering `native.toml` and every resource it references. The wheel's own hash
 pins the distribution, but the useful identity for *this* protocol is precisely
@@ -2151,9 +2183,11 @@ the material the integration was computed from: per-file hashes let a
 diagnostic say `java/Bridge.java changed`, not merely "the producer's hash
 changed."
 
-**Resolved dependencies can carry native effects of their own.** A Maven
-coordinate can resolve to an `.aar` whose manifest AGP merges into the
-application's; a Swift package can vend binary targets.
+#### What resolved artifacts bring with them
+
+A resolved dependency carries native effects of its own. A Maven coordinate can
+resolve to an `.aar` whose manifest AGP merges into the application's; a Swift
+package can vend binary targets.
 
 For Android, a consumer **MUST** include in the record and report every
 `<uses-permission>`, `<uses-feature>`, and manifest component declared by the
@@ -2217,7 +2251,9 @@ passing through §6.9's scoping.
 > out of each resolved `.aar` is unzip-and-parse over a graph the consumer
 > already records, needing no manifest merger.
 
-**Secrets are never recorded.** A consumer **MUST NOT** write an
+#### Secrets are never recorded
+
+A consumer **MUST NOT** write an
 application-supplied credential — or any value the application supplies as a
 secret — into the integration record, into a report, or into a diagnostic. Where
 a record must refer to one, it refers to the *requirement* (that a repository is
@@ -2229,6 +2265,8 @@ authenticated, §6.6) and never to the value.
 > auditable is exactly the machinery that would publish a credential to version
 > control. The rule is stated here rather than left to implementers' judgement
 > because nothing else in this specification would prompt the thought.
+
+#### What a record is, and what it must contain
 
 Two concepts are worth distinguishing by name, though this specification
 mandates neither a file nor a format:

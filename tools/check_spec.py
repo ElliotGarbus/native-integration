@@ -166,7 +166,7 @@ for label, text, base in (
             problems.append(f"{label} links to {target}, which does not exist")
     headings = {
         re.sub(r"[^a-z0-9 -]", "", h.lower()).replace(" ", "-")
-        for h in re.findall(r"^#{1,4} (.+)$", text, re.M)
+        for h in re.findall(r"^#{1,6} (.+)$", text, re.M)
     }
     for anchor in sorted(set(re.findall(r"\]\(#([a-z0-9-]+)\)", text))):
         if anchor not in headings:
