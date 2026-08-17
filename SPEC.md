@@ -545,6 +545,9 @@ Every key above is listed with a one-line description in
 
 ### 6.1 Ownership: `[android.owns]`
 
+*So that two distributions cannot claim the same Java package, and none can
+replace a toolchain's entry point through a transitive dependency.*
+
 ```toml
 [android.owns]
 java_namespaces = ["org.example.mypkg"]
@@ -602,6 +605,9 @@ accidental overlap with a sibling project markedly more likely.
 
 ### 6.2 Build requirements: `[android.requires]`
 
+*The SDK levels a producer needs, checked as floors — so an application never
+discovers one by hitting a platform behaviour that silently did nothing.*
+
 ```toml
 [android.requires]
 compile_sdk = 34
@@ -633,6 +639,10 @@ more force than anywhere else, and a producer **SHOULD** state in `reason` which
 behaviour it depends on rather than naming a version alone.
 
 ### 6.3 Application-supplied values: `[[android.requires.application_values]]`
+
+*For a value only the application has — an account identifier, a redirect
+scheme — that the **build** must embed because no runtime call can reach it.
+Sentry's DSN is read before any Python runs.*
 
 ```toml
 [[android.requires.application_values]]
@@ -736,6 +746,9 @@ consumer **MUST NOT** invent a value.
 
 ### 6.4 Source: `[android.contributes.src]`
 
+*For the glue classes a binding needs on the device, compiled by the
+application's own toolchain rather than shipped as a binary.*
+
 ```toml
 [android.contributes.src]
 java = ["java"]
@@ -750,6 +763,10 @@ a consumer **MUST** compile them with the application's own toolchain, and
 rule 1.
 
 ### 6.5 Gradle dependencies: `[[android.contributes.gradle_dependencies]]`
+
+*For the vendor artifacts an integration actually needs: Maven coordinates,
+resolved by Gradle, locked and attributed by §9 rather than transcribed into
+the application's build file by hand.*
 
 ```toml
 [[android.contributes.gradle_dependencies]]
@@ -846,6 +863,11 @@ whose own manifest AGP merges into the application's; see §9 and §11.
 
 ### 6.6 Maven repositories: `[[android.contributes.gradle_repositories]]`
 
+*For an SDK its vendor does not publish to Maven Central. The most powerful
+thing a sidecar can contribute — an unconstrained repository reaching an
+application through a transitive dependency is a dependency-confusion vector —
+so the rules here are the strictest in this specification.*
+
 ```toml
 [[android.contributes.gradle_repositories]]
 url = "https://maven.pkg.github.com/example/repo"
@@ -887,11 +909,8 @@ differently depending on which mechanism the consumer picked. Should a vendor
 genuinely require exclusivity, that is a future explicit field, not a consumer's
 choice to make.
 
-A repository contribution changes where artifacts in the application's build can
-resolve from, which makes it a supply-chain concern of a different order than
-any other contribution — an unconstrained repository added by a transitive
-dependency is a dependency-confusion vector. The content constraint reduces
-that surface from "may shadow anything" to "may serve exactly what it named."
+The content constraint is what reduces that surface from "may shadow anything"
+to "may serve exactly what it named."
 
 A consumer **MUST** additionally report repository contributions with distinct
 prominence in the record and report of §9 — never folded into a generic list —
@@ -954,6 +973,10 @@ credentials_required = true
 > than a field would.
 
 ### 6.7 Permissions and features: `[[android.contributes.permissions]]`, `[[android.contributes.features]]`
+
+*The manifest permissions a producer's code needs at runtime — disclosed and
+attributed rather than silently merged, and refusable, because the application
+is the party that answers for them.*
 
 ```toml
 [[android.contributes.permissions]]
@@ -1023,6 +1046,10 @@ than being reported against the producer.
 > remedy short of forking the producer.
 
 ### 6.8 Manifest components: `[[android.contributes.components]]`
+
+*For the services, receivers and activities an SDK dispatches to — a push
+service, an OAuth redirect target — registered in the generated manifest, and
+unexported unless the application says otherwise.*
 
 ```toml
 [[android.contributes.components]]
@@ -1137,6 +1164,9 @@ name = "org.example.mypkg.MessagingService"
 
 ### 6.9 Shrinker keep patterns: `[android.contributes.r8]`
 
+*So a producer's reflectively-reached classes survive R8, without letting any
+dependency disable shrinking for the whole application.*
+
 ```toml
 [android.contributes.r8]
 keep_classes = ["org.example.mypkg.**"]
@@ -1205,6 +1235,10 @@ shrinking.
 
 ### 7.1 Symbol prefixes: `[ios]`
 
+*Contributed Swift compiles into the application's own target, so two producers
+can collide on one type name. This is the guidance that reduces that — and,
+unlike §6.1, cannot enforce it.*
+
 ```toml
 [ios]
 swift_symbol_prefixes = ["MyPkg"]
@@ -1248,6 +1282,11 @@ deployment_target = "15.0"
 A floor, with the same semantics as §6.2.
 
 ### 7.3 Application prerequisites: `[ios.requires]`
+
+*For everything on iOS a producer needs and must not write: entitlements,
+purpose strings, bundle files, extension targets, URL registrations, capability
+keys. The producer states the need and the application answers, because each of
+these fails far from its cause — a codesign error, a trap on first API call.*
 
 ```toml
 [[ios.requires.entitlements]]
@@ -1488,6 +1527,9 @@ as contributions. Version 1 names two:
 
 ### 7.4 Swift packages: `[[ios.contributes.swift_packages]]`
 
+*For a vendor's Swift package, or a producer's own: resolved by SwiftPM, locked
+by §9, and compiled as its own module rather than into the application's.*
+
 ```toml
 [[ios.contributes.swift_packages]]
 name = "Shim"
@@ -1585,6 +1627,10 @@ few glue files. Note that a Swift package may vend prebuilt binary targets; see
 
 ### 7.5 Source: `[ios.contributes.src]`
 
+*Contributed Swift lands in the application's own compilation scope under
+exactly the names it was written with — which is why this is for shims, and
+§7.4 is for everything else.*
+
 ```toml
 [ios.contributes.src]
 swift = ["swift"]
@@ -1609,6 +1655,10 @@ confined to its own module. In practice this is nearly every producer with more
 than a shim, which is what the SHOULD NOT above intends.
 
 ### 7.6 Info.plist: `[ios.contributes.info_plist]`
+
+*For the `Info.plist` keys an SDK genuinely needs set — and deliberately not
+the ones that grant the application a capability or restrict who may install
+it, which are §7.3's.*
 
 ```toml
 [ios.contributes.info_plist.values]
@@ -1684,6 +1734,10 @@ general form would hand producers the ability to write arbitrary structured
 application configuration for cases that keep turning out to be something else.
 
 ### 7.7 Python modules: `[[ios.contributes.python_modules]]`
+
+*When a Swift package **is** the Python extension module, compiled into the
+application target. Without this registration the build succeeds and the
+`import` fails.*
 
 ```toml
 [[ios.contributes.python_modules]]
