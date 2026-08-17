@@ -30,12 +30,19 @@ Writing a sidecar? [§5.1](#51-a-complete-sidecar) shows one whole, and
 Building a tool that reads them? [§8](#8-consuming-tool-requirements) is the
 checklist, and §§3–7 are what it refers to.
 
+> Indented blocks like this one are **rationale**: why a rule is the way it is,
+> and what went wrong in the cases that produced it. They state no requirement,
+> and a reader who skips every one of them has missed nothing binding.
+
 <!-- toc -->
 
 - [1. Terminology](#1-terminology)
 - [2. Overview](#2-overview)
   - [2.1 Design principles](#21-design-principles)
   - [2.2 How the application answers](#22-how-the-application-answers)
+    - [What a consumer must be able to ask](#what-a-consumer-must-be-able-to-ask)
+    - [The join key is not the consumer's to choose](#the-join-key-is-not-the-consumers-to-choose)
+    - [Three answers, end to end](#three-answers-end-to-end)
 - [3. Discovery](#3-discovery)
   - [3.1 The entry point](#31-the-entry-point)
   - [3.2 Resolution](#32-resolution)
@@ -189,6 +196,8 @@ through the **consumer's own configuration**. This specification defines the
 capability a consumer must provide and never the spelling: two conforming
 consumers will ask for the same value in different words, and that is expected.
 
+#### What a consumer must be able to ask
+
 A consumer **MUST** provide a means for the application to:
 
 | Answer | For |
@@ -220,7 +229,9 @@ application to commit.
 > credential never reaches the device, and is the only thing here that must not
 > come to rest in the repository.
 
-**What joins the two halves.** A consumer's spelling is its own, but the *key*
+#### The join key is not the consumer's to choose
+
+A consumer's spelling is its own, but the *key*
 an application answers under is not: it comes from the declaration, so that an
 answer can be matched to the requirement that asked for it.
 
@@ -248,6 +259,8 @@ The platform supplies a natural key for some of these — an entitlement key, a
 plist key, a file name — and for the rest the producer supplies an `id`. Both
 are joined under the declaring distribution; only the source of the local part
 differs.
+
+#### Three answers, end to end
 
 **Illustrative only** — no consumer is required to use these spellings. Each
 pair shows the sidecar the producer ships, then the application's own
@@ -338,13 +351,14 @@ so the metadata stays truthful to the entry-points specification, which defines 
 value as pointing to an importable object; this convention reads the named
 directory's *files* instead.
 
-> **Two ways to misspell the group, both silent.** The underscore is required —
-> [entry-point group names](https://packaging.python.org/en/latest/specifications/entry-points/)
-> cannot contain hyphens, so `native-integration.v1` is not this group despite
-> matching the project name. And the quotes are required TOML syntax: in an
-> unquoted header a dot nests, so `[project.entry-points.native_integration.v1]`
-> declares a group `native_integration` containing a table `v1`. Either mistake
-> yields a wheel that installs cleanly and a build that never finds the sidecar.
+**There are two ways to misspell the group, and both are silent.** The
+underscore is required —
+[entry-point group names](https://packaging.python.org/en/latest/specifications/entry-points/)
+cannot contain hyphens, so `native-integration.v1` is not this group despite
+matching the project name. And the quotes are required TOML syntax: in an
+unquoted header a dot nests, so `[project.entry-points.native_integration.v1]`
+declares a group `native_integration` containing a table `v1`. Either mistake
+yields a wheel that installs cleanly and a build that never finds the sidecar.
 
 ### 3.2 Resolution
 
@@ -551,6 +565,10 @@ distribution and how it entered the dependency closure (§9).
   consumer **MUST** reject it, naming the distribution.
 - **Omitting the key makes no claim**, and is the default.
 
+Should a future packaging standard express platform support enforceably for
+pure-Python distributions, this key becomes a restatement of it and **SHOULD**
+be deprecated in favour of it.
+
 **This is not the same as declaring no platform table.** Absence of an `[ios]`
 table means *"I contribute no native material on iOS"* — which is true of a
 package that works fine there and simply needs nothing. `platforms` means *"I do
@@ -568,9 +586,7 @@ indistinguishable, and the second is the one that breaks applications.
 > This is deliberately a claim about the **distribution**, not about its native
 > material, which makes it the one key here that reaches beyond this
 > specification's usual scope. It earns that on the reasoning in §3.5: the
-> mechanism that ought to carry it does not exist. Should a future packaging
-> standard express platform support enforceably for pure-Python distributions,
-> this key becomes a restatement and **SHOULD** be deprecated in favour of it.
+> mechanism that ought to carry it does not exist.
 
 ## 5. Structure
 
@@ -995,13 +1011,14 @@ exists to catch.
 > and it is cheap, because the consumer has already downloaded every artifact it
 > is hashing.
 
-> Both forms are equally reproducible, because the lock is what delivers that
-> and it applies to both — §7.4 permits an up-to-next-major range on the same
-> reasoning. The exact form is RECOMMENDED for something the lock does not
-> cover: it tells a reviewer what the build will use from the sidecar alone,
-> without consulting the record. A range trades that legibility for not having
-> to cut a release on every upstream patch, which several SDK vendors' documented
-> coordinates make a real cost. The producer should make that trade knowingly.
+**Choosing between the two forms.** Both are equally reproducible, because the
+lock is what delivers that and it applies to both — §7.4 permits an
+up-to-next-major range on the same reasoning. The exact form is **RECOMMENDED**
+for something the lock does not cover: it tells a reviewer what the build will
+use from the sidecar alone, without consulting the record. A range trades that
+legibility for not having to cut a release on every upstream patch, which
+several SDK vendors' documented coordinates make a real cost. Make that trade
+knowingly.
 
 **Cross-artifact alignment is not expressible**, and producers of SDK families
 should know it. Every rule here governs **one dependency at a time**. A vendor
@@ -1742,12 +1759,12 @@ preserve both for every package in the graph — for `exact` and `revision`
 requirements as much as for `from`, since a locked graph that only remembers
 version strings does not pin what a later build will fetch.
 
-> Neither requirement form is inherently safer. `exact` looks stricter and is
-> the right choice when a vendor's components must move together, but it also
-> makes two packages that pin different versions of one dependency
-> unresolvable. `from` composes better and is pinned just as firmly once the
-> resolution is recorded. Choose on whether the dependency's versions are
-> independent, not on which spelling sounds stricter.
+**Choosing between the requirement forms.** Neither is inherently safer.
+`exact` looks stricter and is the right choice when a vendor's components must
+move together, but it also makes two packages that pin different versions of one
+dependency unresolvable. `from` composes better and is pinned just as firmly
+once the resolution is recorded. Choose on whether the dependency's versions are
+independent, not on which spelling sounds stricter.
 
 **Why this section needs no per-package checksum, and §6.5 does.** A recorded
 revision *is* content identity: a commit names the tree it contains, so
@@ -1965,6 +1982,10 @@ the same reasoning as requirement 8.14.
 Everything a **consumer** (§1) must do — the build tool that reads sidecars and
 generates the native project, as distinct from the application it builds or the
 distributions it reads.
+
+This section restates §§3–7 as a checklist; it introduces no obligation those
+sections do not already carry. Where the two differ, **the body governs** and
+the discrepancy is a defect worth reporting.
 
 The list below is numbered in the order the requirements were added, and stable
 numbering matters more than tidy grouping once implementations exist. This index

@@ -148,6 +148,25 @@ for m in re.finditer(rf"(?<!\*\*)\b({RFC2119})\b(?!\*\*)", prose):
     problems.append(f"SPEC.md:{line} unmarked `{m.group(1)}`: …{context}…")
 check("RFC 2119 keywords are emphasised", problems)
 
+# --- 5b. rationale states no requirement ------------------------------------
+# The contents block tells a reader that indented blocks are rationale and that
+# skipping them loses nothing binding. That is only safe if it is true: a
+# normative keyword inside one is a requirement a reader was invited to skip.
+problems = []
+quotes, cur, start = [], [], 0
+for i, line in enumerate(SPEC.splitlines(), 1):
+    if line.startswith(">"):
+        if not cur:
+            start = i
+        cur.append(line[1:])
+    elif cur:
+        quotes.append((start, " ".join(cur)))
+        cur = []
+for line, body in quotes:
+    for kw in re.findall(rf"\*\*({RFC2119})\*\*", re.sub(r"`[^`]*`", " ", body)):
+        problems.append(f"SPEC.md:{line} rationale block states a normative `{kw}`")
+check("rationale blocks state no requirement", problems)
+
 # --- 6. relative links resolve ----------------------------------------------
 problems = []
 for label, text, base in (
