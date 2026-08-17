@@ -1406,12 +1406,11 @@ swift_symbol_prefixes = ["MyPkg"]
 contributed type names, and in particular `@objc` runtime names, with a declared
 prefix.
 
-This is **guidance to package authors, not an ownership claim**, and it
-deliberately does not live in an `owns` table: Swift source compiled into the
-application target shares one module, and `@objc` runtime names are global
-across modules, so a consumer cannot enforce exclusivity the way §6.1 does for
-Java. A consumer **SHOULD** use declared prefixes to attribute a redeclaration
-or duplicate-name error to the contributing distribution.
+This guidance deliberately does not live in an `owns` table: one shared module
+and globally-scoped `@objc` names leave a consumer nothing to enforce, where
+§6.1 has a namespace it can hold exclusively. A consumer **SHOULD** use declared
+prefixes to attribute a redeclaration or duplicate-name error to the
+contributing distribution.
 
 **What this guidance does not reach.** Prefixing covers type names and `@objc`
 runtime names. It does nothing for file-scope functions, global constants, or
@@ -1816,13 +1815,12 @@ Path rules per §4.1; the consumer stages `.swift` files recursively and ignores
 other files. Intended for small `@objc` shims whose value is versioning
 atomically with the Python half; it **SHOULD NOT** be used for a library.
 
-**The scope restriction is narrow and load-bearing.** Contributed files are
-compiled into the application target, so every declaration they make at file
-scope — free functions, global constants, protocols, and extension members on
-types the producer does not own — lands in the application's own compilation
-scope under the name it was written with. §7.1's prefix guidance does not reach
-any of them. A file declaring `let ui_scale` and `func invertedHeight(_:)` is a
-collision waiting for a second producer or for the application itself, and
+**The scope restriction is narrow and load-bearing.** Every declaration a
+contributed file makes at file scope is exposed to the application's own code —
+free functions, global constants, protocols, and extension members on types the
+producer does not own — and §7.1's prefix guidance reaches none of them. A file
+declaring `let ui_scale` and `func invertedHeight(_:)` is a collision waiting
+for a second producer or for the application itself, and
 `extension Double { … }` is visible to everything the target compiles.
 
 A producer whose Swift declares anything at file scope beyond prefixed types
@@ -1922,11 +1920,10 @@ swift_package = "PyWebViews"
 init = "PyInit_WebViews"      # optional; defaults to PyInit_<name>
 ```
 
-A declared Swift package (§7.4) may **implement a Python extension module
-directly**, compiled into the application target rather than loaded from a
-shared object. Such a module is invisible to the import system until it is
-registered with the interpreter, and this table is that registration — a name
-and a symbol, nothing executed at build time.
+The package (§7.4) is compiled into the application target rather than loaded
+from a shared object, so the ordinary import machinery never sees it. This table
+registers it with the interpreter — a name and a symbol, nothing executed at
+build time.
 
 - `swift_package` **MUST** name a package the same sidecar declares (§7.4). A
   module cannot be registered without the code that implements it.
@@ -2134,7 +2131,7 @@ acquires *all* of its inherited native surface at once.
 
 #### The report
 
-It **MUST** carry three things — the distribution, **how it entered the
+A report **MUST** carry three things — the distribution, **how it entered the
 dependency closure**, and the delta:
 
 ```
