@@ -812,8 +812,6 @@ reason = "Your Sentry project DSN, from Settings → Projects → Client Keys"
 manifest_meta_data = "io.sentry.dsn"
 ```
 
-Values a producer needs but cannot supply.
-
 - **`id`** is a **logical identifier**, unique within the sidecar. It is how
   contributions refer to the value (below) and how the consumer's own
   configuration asks the application for it. It is not a platform key, and its
@@ -901,9 +899,8 @@ implicit declaration would have no `reason`, which is the one field a
 prerequisite report cannot do without — leaving the application told that
 something is missing and not what it is or where to get it.
 
-In both forms a consumer **MUST** report unsatisfied values as prerequisites and
-**MUST** fail when one is absent, naming the distribution and the `reason`. A
-consumer **MUST NOT** invent a value.
+Satisfaction above governs both forms: an inline reference is a prerequisite on
+exactly the same terms as a declared value.
 
 ### 6.4 Source: `[android.contributes.src]`
 
@@ -1043,6 +1040,8 @@ groups = ["org.example"]
 repository **MUST NOT** participate in resolution for anything outside the
 declared groups/modules. A consumer implements that with its build system's
 native mechanism — Gradle's repository content filtering expresses exactly this.
+That constraint is what reduces a contributed repository from "may shadow
+anything" to "may serve exactly what it named."
 
 **Overlapping scopes are rejected.** Two contributed repositories whose
 `groups`/`modules` intersect **MUST** fail, naming both distributions and the
@@ -1069,9 +1068,6 @@ substitute it for content filtering, because the same sidecar would then resolve
 differently depending on which mechanism the consumer picked. Should a vendor
 genuinely require exclusivity, that is a future explicit field, not a consumer's
 choice to make.
-
-The content constraint is what reduces that surface from "may shadow anything"
-to "may serve exactly what it named."
 
 A consumer **MUST** additionally report repository contributions with distinct
 prominence in the record and report of §9 — never folded into a generic list —
@@ -1101,13 +1097,6 @@ credentials_required = true
   (`https://user:pass@host/…`) in `url` — and **SHOULD** warn on obvious
   embedded-secret forms elsewhere.
 
-> The producer prohibition is absolute; the consumer obligation deliberately is
-> not. Given `reason = "use the value abc123"` there is no general algorithm
-> that decides whether `abc123` is a secret, so requiring a consumer to reject
-> credentials "under any spelling" would be a conformance clause no
-> implementation could satisfy — and an unsatisfiable MUST teaches implementers
-> to skim the rest. What a consumer can do deterministically it must; the
-> remainder is the producer's discipline, and review's.
 - `credentials_required = true` declares only that the repository is
   authenticated. The application supplies the credentials through the
   consumer's own configuration (§2.2), which **MUST** accept them by
@@ -1120,6 +1109,14 @@ credentials_required = true
   project in any persisted form, into the integration record (§9), or into any
   diagnostic.
 
+> The producer prohibition is absolute; the consumer obligation deliberately is
+> not. Given `reason = "use the value abc123"` there is no general algorithm
+> that decides whether `abc123` is a secret, so requiring a consumer to reject
+> credentials "under any spelling" would be a conformance clause no
+> implementation could satisfy — and an unsatisfiable MUST teaches implementers
+> to skim the rest. What a consumer can do deterministically it must; the
+> remainder is the producer's discipline, and review's.
+>
 > Rationale for the shape. This is `exported_required`'s pattern (§6.8): a
 > requires-flavoured flag on a contribution, where the producer states a need
 > and the application decides. The credential itself is never named because
