@@ -170,6 +170,7 @@ which it meant.
 | `[[ios.requires.application_files]]` | `name` | the file, in the bundle |
 | `[[ios.requires.app_extensions]]` | distribution + `id` | acknowledgement, plus an extension target of that `kind` |
 | `[[ios.requires.url_schemes]]` | distribution + `id` | acknowledgement |
+| `[[ios.requires.plist_capabilities]]` | `key` + `value` | the capability, in its own `Info.plist` |
 
 The platform supplies a natural key for some of these — an entitlement key, a
 plist key, a file name — and for the rest the producer supplies an `id`. Both
@@ -430,6 +431,19 @@ consumer's age rather than the producer's declaration.
 > 1.1"), instead of the consumer ignoring the feature and building a silently
 > broken application.
 
+**[Appendix D](#appendix-d-declaration-reference) is the registry that makes the
+under-declaration rule checkable.** Every key it lists is contract 1.0 unless it
+carries a *Since* note, and a minor revision that adds a key **MUST** record the
+minor there. Without a single normative source for "which revision introduced
+this key", two conforming consumers would reach different verdicts on the same
+sidecar — the rule above would be stated and unimplementable.
+
+**A consumer MUST be able to state the contract it implements**, and **SHOULD**
+report it where a person can see it — a version string, a doctor check. The
+rejection messages above already name the contract a sidecar needs; this is the
+other half, and it is what lets a package author decide whether adopting a minor
+strands their users.
+
 ### 4.4 Unknown keys fail closed
 
 Within a platform table the consumer is **building for**, an unrecognized key
@@ -511,7 +525,8 @@ platforms = ["android", "ios"]   # §4.5 — optional; where the distribution wo
   [[ios.requires.usage_descriptions]]       # §7.3  │ prerequisites the
   [[ios.requires.app_extensions]]           # §7.3  │ application supplies;
   [[ios.requires.application_files]]        # §7.3  │ never satisfied by
-  [[ios.requires.url_schemes]]              # §7.3 ─┘ the consumer
+  [[ios.requires.url_schemes]]              # §7.3  │ the consumer
+  [[ios.requires.plist_capabilities]]       # §7.3 ─┘
 [ios.contributes]
   [[ios.contributes.swift_packages]]        # §7.4
   [ios.contributes.src]                     # §7.5  swift
@@ -1257,8 +1272,8 @@ unavailable. The extension must share an app group with the application."""
 ```
 
 **Common rules, binding on every table in this section** — `entitlements`,
-`usage_descriptions`, `app_extensions`, `application_files` and `url_schemes`
-alike:
+`usage_descriptions`, `app_extensions`, `application_files`, `url_schemes` and
+`plist_capabilities` alike:
 
 1. `reason` is **REQUIRED**.
 2. An entry **MAY** declare `conditional = true` (default `false`), whose
@@ -1298,9 +1313,11 @@ would otherwise diverge:
 | `application_files` | …configures the named file for inclusion in the application bundle |
 | `app_extensions` | …declares an extension target of the requested `kind` **and** acknowledges this entry by `(distribution, id)` |
 | `url_schemes` | …**explicitly acknowledges** this entry by `(distribution, id)` |
+| `plist_capabilities` | …configures the declared `value` under the declared `key` in its own `Info.plist` |
 
-Both take an **`id`**, because neither has a key the platform supplies. Both are
-acknowledgements rather than checks, for reasons worth stating.
+**`app_extensions` and `url_schemes`** take an `id`, because neither has a key
+the platform supplies, and both are acknowledgements rather than checks — for
+reasons worth stating.
 
 For `url_schemes` the requirement has two halves, and a consumer can observe the
 registration but cannot prove the application forwards the callback; inspecting
@@ -1342,7 +1359,7 @@ that it survives to be read later.
 > legitimate mode. It is also the one mechanism here a producer can misuse to
 > downgrade a real requirement into prose; §12.1 says so plainly.
 
-**The five tables.** Each is a prerequisite under the common rules above; what
+**The six tables.** Each is a prerequisite under the common rules above; what
 follows is only what is specific to it.
 
 **`entitlements`** — an entitlement is bound to the App ID and provisioning
@@ -1434,6 +1451,46 @@ one entry each and the application answers them separately.
 > one is the startup-hook shape, deliberately absent (§11). Registering half a
 > requirement is worse than reporting both, because it looks done.
 
+**`plist_capabilities`** — a few `Info.plist` keys do not describe the
+application, they **grant it a capability or restrict who may install it**:
+
+```toml
+[[ios.requires.plist_capabilities]]
+key = "UIBackgroundModes"
+value = "remote-notification"
+reason = """\
+Delivery of silent pushes while the application is backgrounded. You must also \
+implement the background handler; App Store review asks what the application \
+does with it."""
+```
+
+`key` and `value` are the plist key and the single array entry the producer
+needs, and the pair is the join key — a natural platform key, so an application
+that already declares `remote-notification` for its own reasons satisfies every
+producer that asked for it.
+
+The keys this applies to are a **closed list**, given in §7.6, which rejects them
+as contributions. Version 1 names two:
+
+| Key | Why it is not contributable |
+| --- | --- |
+| `UIBackgroundModes` | Grants background execution. It is a claim about what the application does when the user is not looking, it costs battery, and App Store review scrutinizes it |
+| `UIRequiredDeviceCapabilities` | **Restricts installation.** A producer adding an entry silently removes the application from devices lacking that hardware — precisely the harm §6.7 forbids by refusing to let a producer promote a feature to `required` |
+
+> Rationale. This is §2.1's rule applied to a case §7.6 originally missed:
+> *when the application owns the artifact, state the need rather than
+> contributing.* A background mode written by a producer is half a requirement —
+> the handler, the battery cost and the review answer all remain the
+> application's — and §2.1 says plainly that half a requirement is worse than a
+> prerequisite naming both, because it looks finished.
+>
+> The list is closed and short on purpose. Most array-valued plist keys are
+> ordinary contributions and stay that way: `LSApplicationQueriesSchemes` lets an
+> SDK ask whether a wallet application is installed, which grants the application
+> nothing and is exactly what §7.6's `append` is for. What earns a key a place
+> here is that a producer's entry changes what the application may do, or who may
+> install it.
+
 ### 7.4 Swift packages: `[[ios.contributes.swift_packages]]`
 
 ```toml
@@ -1479,6 +1536,25 @@ version strings does not pin what a later build will fetch.
 > unresolvable. `from` composes better and is pinned just as firmly once the
 > resolution is recorded. Choose on whether the dependency's versions are
 > independent, not on which spelling sounds stricter.
+
+**Why this section needs no per-package checksum, and §6.5 does.** A recorded
+revision *is* content identity: a commit names the tree it contains, so
+re-resolving one either yields the same source or fails to produce it at all. A
+Maven version names no content — a repository may serve different bytes under
+one coordinate indefinitely — which is why §6.5 must add a hash to get the same
+guarantee. The asymmetry is in the ecosystems, not in what this specification
+asks of them.
+
+**Binary targets are where that reasoning stops.** A Swift package may vend a
+prebuilt binary target (§11), whose bytes are fetched from a URL the package
+names and which the package's own revision does not cover. SwiftPM models this
+already: a remote `binaryTarget` carries a `checksum`. A consumer **MUST**
+record that checksum for every binary target in the resolved graph, and on
+subsequent builds **MUST** verify it and fail on a mismatch, naming the package
+and the declaring distribution — the obligation §6.5 places on a resolved Maven
+artifact, for the reason that applies identically here. A consumer **SHOULD**
+warn when a remote binary target carries no checksum, since the record then pins
+nothing.
 
 **The declaration rules above bind the sidecar; the resolved graph is where they
 are enforced.** A declared package's own `Package.swift` may name anything — a
@@ -1581,6 +1657,28 @@ purpose string, naming the distribution and directing the producer to §7.3.
 These are application-authored text, and a `values` entry is the one place a
 producer could write it by accident.
 
+**Capability keys are not contributable either.** A consumer **MUST** reject
+these keys in `values` and in `append` alike, naming the distribution and
+directing the producer to §7.3's `plist_capabilities`:
+
+| Key | What a producer's entry would do |
+| --- | --- |
+| `UIBackgroundModes` | grant the application background execution |
+| `UIRequiredDeviceCapabilities` | remove the application from devices lacking the hardware |
+
+The list is closed, and a minor revision may extend it. What puts a key on it is
+that a producer's entry **changes what the application may do, or who may install
+it** — not that the key is array-valued. `LSApplicationQueriesSchemes`, the
+example above, grants nothing and stays an ordinary contribution.
+
+> Rationale. Without this, §7.6 quietly undoes §7.3. Every other capability an
+> iOS application acquires — an entitlement, an app extension, a URL
+> registration — is a prerequisite the application answers, and a background mode
+> arriving through `append` from a transitive dependency would be the one that
+> did not. The evidence that the boundary was missing is in this repository: two
+> worked examples contribute `UIBackgroundModes` and a third refuses to, writing
+> down why. Both readings were conforming, which is the defect.
+
 **Dictionary-valued keys are excluded by design, not deferred.** Every
 structured case encountered so far is better served by a narrower primitive than
 by general dictionary support: `NSExtension` is generated from a declared
@@ -1662,6 +1760,22 @@ gives the thematic reading:
 | Platform applicability | 18 |
 | The application's side of the contract | 7, 26 |
 
+**Three outcomes, and no others.** What a consumer finds falls into exactly
+three kinds, named here so that two implementations classify the same condition
+the same way:
+
+| Outcome | Meaning | Produced by |
+| --- | --- | --- |
+| **blocking** | the build **MUST NOT** proceed | every numbered requirement below that says *fail* |
+| **advisory** | reported; the build proceeds | the **SHOULD** list below |
+| **recorded** | written to the integration record (§9), and not reported as a problem at all | an unsatisfied *conditional* prerequisite (§7.3 rule 5), and the disclosure §9 requires |
+
+The third is the one an implementation is likely to lack. §7.3 rule 5 and §9
+both require material that neither stops the build nor warns about anything, and
+a consumer with only two levels files it under one of them and is wrong either
+way: as a warning it becomes noise to be silenced, and as nothing it stops being
+the durable disclosure that was the point.
+
 A conforming consumer **MUST**:
 
 1. Enforce the contract version gate, including the minor (§4.3), and fail
@@ -1705,7 +1819,8 @@ A conforming consumer **MUST**:
     show requested-versus-resolved where they differ. **Verify each resolved
     artifact against its recorded checksum on every subsequent build, failing on
     a mismatch** (§6.5). Reject a resolved Swift graph containing a branch or
-    path dependency (§7.4).
+    path dependency, and record and verify the checksum of every **binary
+    target** in it, which the package's revision does not pin (§7.4).
 13. Validate `view_links` (activity-only, export-gated) and generate their
     filters (§6.8).
 14. Exclude sidecar directories from any Python payload it assembles.
@@ -1752,12 +1867,16 @@ A conforming consumer **MUST**:
 > thing the consumer knows and the underlying resolver does not, which is what
 > makes requirement 8.15 meetable in the case that needs it most.
 
+The advisory obligations carry stable identifiers of their own — referenced as
+requirement 8.S1 and so on — so that a conformance claim can name the ones it
+meets rather than gesturing at the list.
+
 A conforming consumer **SHOULD**:
 
-- Warn on unrecognized top-level tables (§4.4).
-- Verify `from_dependency` component classes against the resolved artifact
-  (§6.8).
-- Report the delta of the **fully merged** Android manifest, beyond the
+- **S1.** Warn on unrecognized top-level tables (§4.4).
+- **S2.** Verify `from_dependency` component classes against the resolved
+  artifact (§6.8).
+- **S3.** Report the delta of the **fully merged** Android manifest, beyond the
   per-artifact declarations required by requirement 8.19, and the native effects of Swift
   packages' binary targets (§9, §11).
 
@@ -1918,6 +2037,26 @@ A lockfile entry, a checksum file beside the generated project, or any other
 durable artifact satisfies the record. The normative property is that a change
 in what distributions contribute **MUST NOT** pass silently.
 
+**What a record must make recoverable.** No format is mandated, and that is
+deliberate — a consumer's records belong beside its own lock files, and Gradle,
+SwiftPM and Python packaging each spell that differently. What is not optional is
+the content. For every distribution in the effective set, a record **MUST** make
+these recoverable:
+
+| | |
+| --- | --- |
+| the distribution | its name and version, and the contract it declared |
+| its provenance | how it entered the dependency closure (§3.2) |
+| its inputs | a SHA-256 per file, keyed by normalized relative path (above) |
+| its contributions | each one, in a form two records can be compared by |
+| its unmet asks | every unsatisfied **conditional** prerequisite (§7.3 rule 5) |
+| the native graph | every resolved artifact with its checksum (§6.5), and every resolved package with its version **and** revision, plus a checksum per binary target (§7.4) |
+
+A record that cannot answer one of those rows has not recorded the integration,
+whatever else it contains. [Appendix E](#appendix-e-a-record-that-satisfies-9)
+shows one shape that does; it is illustrative and not required, and exists so
+that a second implementer is not obliged to rediscover the same decisions.
+
 > **What this does and does not guarantee.** The build *does* stop: an
 > unaccepted change fails, and that is requirement 8.9. What acceptance cannot
 > guarantee is that anyone read what they accepted — a reviewer can approve a
@@ -1997,7 +2136,7 @@ reporting optional, the two would differ only by whether the consumer bothered.
 cannot write the application's entitlements, `Info.plist`, bundle contents,
 build targets or URL registrations — but it can and should *declare that it
 needs them*, and a consumer must report those requirements and fail when they
-are unmet. That is what §7.3 is, and it has grown to five kinds of prerequisite
+are unmet. That is what §7.3 is, and it has grown to six kinds of prerequisite
 plus §6.6's repository credentials. The excluded thing is the producer reaching
 into the application's configuration, not the producer having a say in it.
 
@@ -2183,6 +2322,11 @@ the latter.
 Every key a sidecar may contain, with the section that defines it. Descriptions
 are summaries; where this table and the body differ, the body governs.
 
+**This table is also the contract-minor registry** (§4.3). Every entry below is
+contract **1.0**; a key added by a later minor **MUST** be marked *Since 1.n*
+here, and a consumer checks under-declaration against these marks. An unmarked
+key is 1.0, which is why nothing below carries a mark yet.
+
 | Entry | Description |
 | --- | --- |
 | **Top level** | |
@@ -2232,6 +2376,7 @@ are summaries; where this table and the body differ, the body governs.
 | `[[…app_extensions]]` — `id`, `kind` | `notification_service` or `location_push`. The application builds the target and acknowledges this `id`, since one target cannot be assumed to serve two producers |
 | `[[…application_files]]` — `name` | A file the SDK reads from the bundle. Declare only when no programmatic path exists |
 | `[[…url_schemes]]` — `id` | Says the application must register a URL scheme and forward the callback. `id` names the requirement, not the scheme — the application chooses that — so a package may declare several |
+| `[[…plist_capabilities]]` — `key`, `value` | An `Info.plist` key that grants a capability or restricts installation. A closed list, given in §7.6, which rejects the same keys as contributions |
 | **`[[ios.contributes.swift_packages]]`** §7.4 | |
 | `name` | Local handle, unique within the sidecar; §7.7 and §7.3 refer to packages by it |
 | `url`, `products` | The repository, and which of its products to link |
@@ -2245,3 +2390,54 @@ are summaries; where this table and the body differ, the body governs.
 | `name` | The name Python imports. A single ASCII identifier, no dots |
 | `swift_package` | A package the same sidecar declares, which implements the module |
 | `init` | Optional initialization symbol; defaults to `PyInit_<name>` |
+
+## Appendix E: a record that satisfies §9
+
+**Non-normative.** §9 mandates the content of an integration record and
+deliberately not its format. This is the shape the reference reader writes,
+included so that a second implementation has a worked example to disagree with
+rather than a blank page. Nothing here is required, and a consumer whose records
+live inside its own lock file is conforming without resembling this at all.
+
+```json
+{
+  "record": 1,
+  "platform": "android",
+  "contract": "1",
+  "distributions": [
+    {
+      "name": "pystripe",
+      "version": "2.1.0",
+      "origin": "via some-ui-lib",
+      "contract": "1",
+      "inputs": {
+        "java/org/pystripe/PaymentReturnActivity.java": "sha256:9f2c…",
+        "native.toml": "sha256:cde8…"
+      },
+      "entries": [
+        "permission android.permission.INTERNET  (\"Stripe API calls\")",
+        "component activity org.pystripe.PaymentReturnActivity (exported)",
+        "  view_link org.pystripe.PaymentReturnActivity: scheme trailmap-pay, host stripe-redirect",
+        "dependency com.stripe:stripe-android  requested [21.0.0, 22.0.0) → resolved 21.6.0",
+        "requires url_schemes stripe_3ds_callback (conditional, unresolved)"
+      ],
+      "artifacts": { "com.stripe:stripe-android:21.6.0": "sha256:4b1a…" },
+      "swift": {},
+      "swift_binaries": {}
+    }
+  ]
+}
+```
+
+Three properties are worth naming, because they are what make the file useful
+rather than merely present:
+
+- **One line per contributed thing.** A set difference over `entries` *is* the
+  delta a reviewer reads, so the report of §9 needs no separate computation and
+  a `git diff` is already legible.
+- **Sorted keys, UTF-8, one contribution per line.** The record is normally
+  committed; anything that reorders between runs turns review into noise.
+- **No credential, ever.** An authenticated repository appears as
+  `REPOSITORY … authenticated — credentials configured`. That the repository
+  needs a credential is a fact about the integration; the credential is not
+  (§6.6, and the secrets rule above).

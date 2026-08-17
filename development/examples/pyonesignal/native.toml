@@ -72,11 +72,21 @@ Confirmed delivery, badge counts and image attachments are unavailable \
 without it. Link OneSignalExtension into the extension target, and give it \
 the same app group as the application."""
 
+# Was `[ios.contributes.info_plist.append] UIBackgroundModes = [...]` until §7.6
+# closed the capability boundary. A background mode grants the application
+# execution while the user is not looking, costs battery, and is answered for at
+# App Store review — so the producer states the need and the application grants
+# it, like every other iOS capability in §7.3.
+[[ios.requires.plist_capabilities]]
+key = "UIBackgroundModes"
+value = "remote-notification"
+reason = """\
+Silent pushes wake the application to fetch notification content. Without it \
+OneSignal cannot deliver background data messages, and confirmed-delivery \
+receipts stop working."""
+
 [[ios.contributes.swift_packages]]
 name = "OneSignal"
 url = "https://github.com/OneSignal/OneSignal-XCFramework"
 requirement = { from = "5.4.1" }
 products = ["OneSignalFramework"]
-
-[ios.contributes.info_plist.append]
-UIBackgroundModes = ["remote-notification"]

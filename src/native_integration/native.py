@@ -32,6 +32,7 @@ from .ports import (
     DependencyRequest,
     GradleGraph,
     ResolutionFailure,
+    ResolvedSwiftPackage,
     Resolvers,
     SwiftGraph,
     SwiftPackageRequest,
@@ -77,7 +78,13 @@ def resolve(
             locked=locked_gradle,
             bag=bag,
         )
-    return _ios(sidecars, resolvers=resolvers, locked=locked_swift, bag=bag)
+    return _ios(
+        sidecars,
+        resolvers=resolvers,
+        locked=locked_swift,
+        previous_checksums=previous_checksums or {},
+        bag=bag,
+    )
 
 
 # --- Android ----------------------------------------------------------------
@@ -344,6 +351,7 @@ def _ios(
     *,
     resolvers: Resolvers,
     locked: SwiftGraph | None,
+    previous_checksums: Mapping[str, str],
     bag: DiagnosticBag,
 ) -> NativeResolution:
     requests: list[SwiftPackageRequest] = []
@@ -385,4 +393,35 @@ def _ios(
                 "does not resolve on another machine",
                 *blame,
             )
+        _binary_targets(package, declarers, previous_checksums, bag)
     return NativeResolution(swift=graph)
+
+
+def _binary_targets(
+    package: ResolvedSwiftPackage,
+    declarers: Sequence[str],
+    previous: Mapping[str, str],
+    bag: DiagnosticBag,
+) -> None:
+    """§7.4 — a package's revision pins its source, not the bytes it fetches."""
+    blame = package.declared_by or tuple(declarers)
+    for target in package.binary_targets:
+        key = f"{package.name}/{target.name}"
+        if target.checksum is None:
+            if target.remote:
+                bag.add(
+                    rules.SWIFT_BINARY_UNCHECKSUMMED,
+                    f"binary target {key} is fetched from {target.url} and declares no "
+                    "checksum; the record pins nothing for it",
+                    *blame,
+                )
+            continue
+        recorded = previous.get(key)
+        if recorded is not None and recorded != target.checksum:
+            bag.add(
+                rules.SWIFT_BINARY_CHECKSUM_MISMATCH,
+                f"binary target {key} does not match the recorded checksum "
+                f"({recorded} → {target.checksum}); the package's revision does not pin "
+                "bytes fetched from a URL",
+                *blame,
+            )

@@ -84,6 +84,14 @@ try:
         problems.append(f"requirement {missing} is in no index theme")
     for phantom in sorted(listed - set(nums)):
         problems.append(f"index names requirement {phantom}, which does not exist")
+    # The SHOULD list carries its own identifiers, referenced as 8.S1 and so on.
+    advisory = SPEC.split("A conforming consumer **SHOULD**:")[1].split("\n## ")[0]
+    letters = [int(n) for n in re.findall(r"^- \*\*S(\d+)\.\*\*", advisory, re.M)]
+    if letters != list(range(1, len(letters) + 1)):
+        problems.append(f"advisory numbering is not S1..SN: {letters}")
+    for referenced in sorted(set(re.findall(r"requirement 8\.S(\d+)", SPEC))):
+        if int(referenced) not in letters:
+            problems.append(f"text references requirement 8.S{referenced}, which does not exist")
 except IndexError:
     problems.append("could not locate the §8 requirement list or its index table")
 check("§8 requirements sequential and fully indexed", problems)
@@ -297,7 +305,14 @@ for rel, raw, doc in sidecar_sources():
     # §7.3 — reason on every prerequisite; conditional ones state the condition;
     #        producer-local ids present and unique, since identity is
     #        (distribution, id) and an application answers on both
-    for table in ("entitlements", "usage_descriptions", "app_extensions", "application_files", "url_schemes"):
+    for table in (
+        "entitlements",
+        "usage_descriptions",
+        "app_extensions",
+        "application_files",
+        "url_schemes",
+        "plist_capabilities",
+    ):
         rows = entries(ios, "requires", table)
         if table in ("app_extensions", "url_schemes"):
             ids = [e.get("id") for e in rows]

@@ -65,14 +65,22 @@ Required only if you send notifications with image attachments. Link \
 FirebaseMessaging into the extension and call \
 Messaging.serviceExtension().populateNotificationContent()."""
 
+# Was an info_plist.append contribution until §7.6 closed the capability
+# boundary; see the OneSignal sidecar, which made the same move for the same
+# key. FCM and OneSignal both needing `remote-notification` is the case the
+# (key, value) join handles: one application answer satisfies both.
+[[ios.requires.plist_capabilities]]
+key = "UIBackgroundModes"
+value = "remote-notification"
+reason = """\
+Background delivery of data messages and image attachments. Without it FCM \
+can only deliver notifications the user taps."""
+
 [[ios.contributes.swift_packages]]
 name = "Firebase"
 url = "https://github.com/firebase/firebase-ios-sdk"
 requirement = { from = "11.0.0" }
 products = ["FirebaseMessaging"]
-
-[ios.contributes.info_plist.append]
-UIBackgroundModes = ["remote-notification"]
 
 # ------------------------------------------------------------ NOT EXPRESSIBLE
 #

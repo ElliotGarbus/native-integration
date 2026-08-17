@@ -124,6 +124,13 @@ def value_or_reference(value: Any) -> str | None:
     return "must be a string or { application_value = \"<id>\" }"
 
 
+#: §7.6 — plist keys that grant a capability or restrict installation, which a
+#: producer declares as a §7.3 prerequisite and never contributes. Closed, and
+#: extensible by a minor revision. What puts a key here is not that it is
+#: array-valued but that a producer's entry changes what the application may do,
+#: or who may install it.
+CAPABILITY_KEYS: tuple[str, ...] = ("UIBackgroundModes", "UIRequiredDeviceCapabilities")
+
 _PLIST_SCALARS = (str, int, float, bool)
 
 
@@ -290,6 +297,10 @@ IOS = Table(
                 ),
                 "application_files": _prerequisite(name=Field(nonempty_string, required=True)),
                 "url_schemes": _prerequisite(id=Field(nonempty_string, required=True)),
+                "plist_capabilities": _prerequisite(
+                    key=Field(one_of(*CAPABILITY_KEYS), required=True),
+                    value=Field(nonempty_string, required=True),
+                ),
             },
         ),
         "contributes": Table(

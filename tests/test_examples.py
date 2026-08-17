@@ -86,7 +86,7 @@ def test_the_pystripe_pair_reads_end_to_end():
         profile=REVIEW,
         resolvers=stub_resolvers(),
         sources=[source],
-        accepted=True,
+        accept_current_surface=True,
     )
     assert android.ok, android.diagnostics.render()
     link = android.effective.exported_components()[0].view_links[0]
@@ -99,7 +99,7 @@ def test_the_pystripe_pair_reads_end_to_end():
         profile=REVIEW,
         resolvers=stub_resolvers(),
         sources=[source],
-        accepted=True,
+        accept_current_surface=True,
     )
     assert ios.ok, ios.diagnostics.render()
     assert not ios.effective.unresolved_conditionals()

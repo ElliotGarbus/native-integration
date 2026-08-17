@@ -18,6 +18,7 @@ from typing import Mapping, Sequence
 
 from .ports import (
     ArtifactManifest,
+    BinaryTarget,
     DependencyRequest,
     GradleGraph,
     ResolvedArtifact,
@@ -70,6 +71,9 @@ class EchoGradleResolver:
 class EchoSwiftResolver:
     """Returns one resolved package per declared package, with a stub revision."""
 
+    #: Binary targets to attach, keyed by package name (§7.4).
+    binary_targets: Mapping[str, Sequence[BinaryTarget]] = field(default_factory=dict)
+
     def resolve(
         self, requests: Sequence[SwiftPackageRequest], locked: SwiftGraph | None = None
     ) -> SwiftGraph:
@@ -84,6 +88,7 @@ class EchoSwiftResolver:
                 version=package.requirement_value if kind == "version" else None,
                 revision=_fake_checksum(package.url + package.requirement_value)[7:15],
                 declared_by=(request.distribution,),
+                binary_targets=tuple(self.binary_targets.get(package.name, ())),
             )
         return SwiftGraph(tuple(packages.values()))
 
@@ -109,7 +114,7 @@ def stub_resolvers(**kwargs: object) -> Resolvers:
     """Every port, stubbed. Tests only."""
     return Resolvers(
         gradle=EchoGradleResolver(kwargs.get("versions", {})),  # type: ignore[arg-type]
-        swift=EchoSwiftResolver(),
+        swift=EchoSwiftResolver(kwargs.get("binary_targets", {})),  # type: ignore[arg-type]
         artifacts=EmptyArtifactInspector(
             kwargs.get("manifests", {}),  # type: ignore[arg-type]
             kwargs.get("classes", {}),  # type: ignore[arg-type]

@@ -60,8 +60,31 @@ class Integration:
             body += "\n\n" + "\n".join(notes)
         return body
 
+    @property
+    def gate_only(self) -> tuple[Diagnostic, ...]:
+        """Blocking diagnostics other than the record gate itself.
+
+        The record gate is the one blocking diagnostic acceptance is *supposed*
+        to answer. Anything else means the surface being accepted is not one
+        this application can build.
+        """
+        return tuple(
+            d for d in self.errors if d.rule not in (rules.RECORD_ABSENT, rules.RECORD_DRIFT)
+        )
+
     def accept(self, path: Path | str | None = None) -> Path:
-        """Step 5 — update the record, only on acceptance."""
+        """Step 5 — update the record, only on acceptance.
+
+        Refuses when the integration has blocking diagnostics beyond the record
+        gate. A record is the statement *this is the native surface the
+        application accepted and could build*; writing one for a surface with an
+        unsupplied application value or an unapproved export would certify
+        something untrue, and would leave the next build comparing against a
+        baseline that was never valid.
+        """
+        blocking = self.gate_only
+        if blocking:
+            raise IntegrationError(blocking)
         target = Path(path) if path is not None else self.record_path
         if target is None:
             raise ValueError("no record path: pass one to accept() or to read()")
@@ -82,14 +105,21 @@ def read(
     distributions: Iterable[object] | None = None,
     record_path: Path | str | None = None,
     previous: IntegrationRecord | None = None,
-    accepted: bool = False,
+    accept_current_surface: bool = False,
 ) -> Integration:
     """Discover, validate and stage-plan the application's native integration.
 
-    ``accepted=True`` is the caller saying the application has explicitly
-    approved the current effective set — a re-lock, a flag, a committed record,
-    whichever the consumer's workflow uses. Without it, a first build or a
-    changed one produces a blocking diagnostic rather than a silent write.
+    ``accept_current_surface=True`` says the application has explicitly approved
+    whatever this read computes — a re-lock, a flag, a committed record,
+    whichever the consumer's workflow uses (§9 leaves the form to the consumer).
+    Without it, a first build or a changed one produces a blocking diagnostic
+    rather than a silent write.
+
+    It is spelled as an instruction rather than as ``accepted=True`` because
+    that is what it is: not "this was accepted at some point" but "accept what
+    you are about to compute". A consumer wiring it to a global flag is turning
+    the review gate of §9 off, and the name should make that visible at the call
+    site.
     """
     platform = Platform(platform) if isinstance(platform, str) else platform
     profile = profile or ConsumerProfile()
@@ -131,7 +161,7 @@ def read(
     current = record_module.build(effective, resolution, contract=profile.contract.canonical)
     delta = record_module.compare(previous, current)
 
-    if current.distributions and not accepted:
+    if current.distributions and not accept_current_surface:
         _gate_record(previous, delta, current, bag)
 
     return Integration(

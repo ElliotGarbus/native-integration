@@ -59,6 +59,9 @@ class DistributionRecord:
     #: Swift packages as ``name → "version @ revision"``. A version is a tag and
     #: a tag can be moved, so both are preserved.
     swift: Mapping[str, str] = field(default_factory=dict)
+    #: ``package/target`` → checksum, for every binary target in the resolved
+    #: Swift graph. The package's revision pins its source and not these (§7.4).
+    swift_binaries: Mapping[str, str] = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         return {
@@ -70,6 +73,7 @@ class DistributionRecord:
             "entries": list(self.entries),
             "artifacts": dict(sorted(self.artifacts.items())),
             "swift": dict(sorted(self.swift.items())),
+            "swift_binaries": dict(sorted(self.swift_binaries.items())),
         }
 
     @classmethod
@@ -83,6 +87,7 @@ class DistributionRecord:
             entries=tuple(data.get("entries", []) or ()),  # type: ignore[arg-type]
             artifacts=dict(data.get("artifacts", {}) or {}),  # type: ignore[arg-type]
             swift=dict(data.get("swift", {}) or {}),  # type: ignore[arg-type]
+            swift_binaries=dict(data.get("swift_binaries", {}) or {}),  # type: ignore[arg-type]
         )
 
 
@@ -153,7 +158,21 @@ class IntegrationRecord:
         return None
 
     def checksums(self) -> dict[str, str]:
-        """Every recorded artifact checksum, for §6.5's verification next build."""
+        """Every recorded content hash, for verification on the next build.
+
+        Maven artifacts (§6.5) and Swift binary targets (§7.4) share one map:
+        their keys cannot collide — a coordinate is ``group:artifact:version``
+        and a binary target is ``package/target`` — and both answer the same
+        question, which is whether the bytes changed under a fixed name.
+        """
+        out: dict[str, str] = {}
+        for distribution in self.distributions:
+            out.update(distribution.artifacts)
+            out.update(distribution.swift_binaries)
+        return out
+
+    def artifact_checksums(self) -> dict[str, str]:
+        """Maven artifact checksums only, without the Swift binary targets."""
         out: dict[str, str] = {}
         for distribution in self.distributions:
             out.update(distribution.artifacts)
@@ -162,7 +181,7 @@ class IntegrationRecord:
     def locked_gradle(self) -> GradleGraph:
         """The recorded Gradle graph, to resolve from on a subsequent build (§6.5)."""
         artifacts = []
-        for coordinate, checksum in sorted(self.checksums().items()):
+        for coordinate, checksum in sorted(self.artifact_checksums().items()):
             try:
                 module, version = coordinate.rsplit(":", 1)
                 group, artifact = module.split(":")
@@ -305,6 +324,7 @@ def build(
         artifacts = _artifacts_for(contribution, resolution.gradle)
         claimed.update(artifacts)
         swift = _swift_for(contribution, resolution.swift)
+        swift_binaries = _swift_binaries_for(contribution, resolution.swift)
         distributions.append(
             DistributionRecord(
                 name=contribution.distribution,
@@ -315,6 +335,7 @@ def build(
                 entries=_entries(contribution, resolution),
                 artifacts=artifacts,
                 swift=swift,
+                swift_binaries=swift_binaries,
             )
         )
 
@@ -381,6 +402,24 @@ def _swift_for(contribution: Contribution, graph: SwiftGraph) -> dict[str, str]:
             normalize_name(d) for d in package.declared_by
         }:
             out[package.name] = f"{package.version or package.kind} @ {package.revision or 'unrecorded'}"
+    return out
+
+
+def _swift_binaries_for(contribution: Contribution, graph: SwiftGraph) -> dict[str, str]:
+    """§7.4 — record what a package's revision does not pin."""
+    if not contribution.swift_packages:
+        return {}
+    names = {p.name for p in contribution.swift_packages}
+    out: dict[str, str] = {}
+    for package in graph.packages:
+        owned = package.name in names or normalize_name(contribution.distribution) in {
+            normalize_name(d) for d in package.declared_by
+        }
+        if not owned:
+            continue
+        for target in package.binary_targets:
+            if target.checksum is not None:
+                out[f"{package.name}/{target.name}"] = target.checksum
     return out
 
 
@@ -451,8 +490,10 @@ def compare(previous: IntegrationRecord | None, current: IntegrationRecord) -> D
             if path in old_inputs and old_inputs[path] != digest:
                 changed_inputs.append((distribution.name, path))
 
-        old_artifacts = dict(before.artifacts) if before else {}
-        for coordinate, checksum in sorted(distribution.artifacts.items()):
+        old_artifacts = {**(dict(before.artifacts) if before else {}),
+                         **(dict(before.swift_binaries) if before else {})}
+        current_hashes = {**distribution.artifacts, **distribution.swift_binaries}
+        for coordinate, checksum in sorted(current_hashes.items()):
             if coordinate in old_artifacts and old_artifacts[coordinate] != checksum:
                 changed_artifacts.append((distribution.name, coordinate))
 

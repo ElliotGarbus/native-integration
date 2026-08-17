@@ -115,6 +115,11 @@ class AnswerSource(Protocol):
     # §7.3 — acknowledgement, joined by (distribution, id)
     def acknowledged(self, distribution: str, entry_id: str) -> bool: ...
 
+    # §7.3 — a capability key, joined by (key, value). Not distribution-scoped:
+    # one application declaring `remote-notification` satisfies every producer
+    # that needed it.
+    def plist_capability_configured(self, key: str, value: str) -> bool: ...
+
 
 def _norm(name: str) -> str:
     return name.lower().replace("_", "-")
@@ -138,6 +143,9 @@ class MappingAnswers:
     application_files: Sequence[str] = ()
     extension_targets: Sequence[str] = ()
     acknowledged_ids: Mapping[str, Sequence[str]] = field(default_factory=dict)
+    #: The application's own capability keys, e.g.
+    #: ``{"UIBackgroundModes": ["remote-notification"]}``.
+    plist_capabilities: Mapping[str, Sequence[str]] = field(default_factory=dict)
 
     def _per_distribution(self, table: Mapping[str, object], distribution: str):
         for key, value in table.items():
@@ -179,6 +187,9 @@ class MappingAnswers:
     def acknowledged(self, distribution: str, entry_id: str) -> bool:
         acked = self._per_distribution(self.acknowledged_ids, distribution) or ()
         return entry_id in acked  # type: ignore[operator]
+
+    def plist_capability_configured(self, key: str, value: str) -> bool:
+        return value in self.plist_capabilities.get(key, ())
 
 
 class NoAnswers(MappingAnswers):

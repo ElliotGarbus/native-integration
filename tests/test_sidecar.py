@@ -550,6 +550,39 @@ NSCameraUsageDescription = "We need your camera"
     assert "[[ios.requires.usage_descriptions]]" in bag.items[0].message
 
 
+@pytest.mark.parametrize("mode", ["values", "append"])
+@pytest.mark.parametrize("key", ["UIBackgroundModes", "UIRequiredDeviceCapabilities"])
+def test_a_capability_key_may_not_be_contributed(parse, mode, key):
+    """§7.6 — a producer's entry would grant a capability or restrict installation."""
+    entry = '["remote-notification"]' if mode == "append" else '"x"'
+    text = f'contract = "1"\n[ios.contributes.info_plist.{mode}]\n{key} = {entry}\n'
+    _, codes, bag = parse(text, platform=Platform.IOS)
+    assert "plist-capability-key" in codes
+    assert "[[ios.requires.plist_capabilities]]" in bag.items[0].message
+
+
+def test_an_ordinary_array_key_is_still_contributable(parse):
+    """The line is capability, not array-valued: LSApplicationQueriesSchemes stays."""
+    text = (
+        'contract = "1"\n[ios.contributes.info_plist.append]\n'
+        'LSApplicationQueriesSchemes = ["examplescheme"]\n'
+    )
+    _, codes, _ = parse(text, platform=Platform.IOS)
+    assert codes == []
+
+
+def test_a_capability_prerequisite_takes_a_key_from_the_closed_list(parse):
+    text = """
+contract = "1"
+[[ios.requires.plist_capabilities]]
+key = "UIFileSharingEnabled"
+value = "true"
+reason = "not on the closed list"
+"""
+    sidecar, codes, _ = parse(text, platform=Platform.IOS)
+    assert sidecar is None and codes == ["type-invalid"]
+
+
 @pytest.mark.parametrize(
     "value", ["1979-05-27T07:32:00Z", "{ nested = 1 }", '["a", 1]']
 )

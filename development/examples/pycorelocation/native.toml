@@ -86,8 +86,18 @@ reason = """\
 Required only if your application calls startMonitoringLocationPushes(). \
 Also needs com.apple.developer.location.push, which Apple must approve."""
 
-# Still absent, and correctly so: UIBackgroundModes = ["location"] is a
-# contribution, not a prerequisite, and §7.6 has no conditional form. A
-# producer cannot know whether an application wants background location, and
-# declaring it would hand the capability to every application. It stays the
-# application's to add.
+# This example's earlier note said UIBackgroundModes = ["location"] had to stay
+# absent: as an info_plist contribution it would hand background location to
+# every application that installed this package, and §7.6 had no conditional
+# form. The reasoning was right and the conclusion is now unnecessary — §7.6
+# rejects the key as a contribution, and §7.3 takes it as a prerequisite, which
+# has carried `conditional` all along. Declared below, imposed on nobody.
+
+[[ios.requires.plist_capabilities]]
+key = "UIBackgroundModes"
+value = "location"
+conditional = true
+reason = """\
+Required only if your application sets allowsBackgroundLocationUpdates. \
+Without it the location manager stops delivering updates the moment the \
+application is backgrounded, silently."""

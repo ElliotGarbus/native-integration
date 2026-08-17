@@ -8,11 +8,14 @@ discharges it.
 `native_integration.rules`; CI fails if it drifts. A requirement that appears in
 neither column fails `tests/test_integration.py::test_every_requirement_is_discharged_somewhere`.
 
+Severity is not the reader's invention: §8 names three outcomes — **blocking**,
+**advisory**, **recorded** — and each rule below is registered at one of them,
+in one place, so "MUST fail" cannot decay into a warning through an edit at a
+call site.
+
 Two kinds of entry:
 
-- a **rule code** is a check that produces a diagnostic. Every rule names its
-  section and severity once, in `rules.py`, so "MUST fail" cannot decay into a
-  warning through an edit at a call site.
+- a **rule code** is a check that produces a diagnostic.
 - a **structural** entry is an obligation discharged by the shape of the API
   rather than by a check — you cannot construct a `Diagnostic` without naming a
   distribution, so requirement 8.15 has no rule and cannot be forgotten either.
@@ -30,13 +33,13 @@ returning a clean result.
 | 8.3 | Discover by iterating the group, ignoring the entry-point name (§3.3), and never import the producing package or execute declared content (§2.1, §3.2). | `entry-point-value-invalid`<br>*structural* — discovery reads entry points and files only — the module is never imported |
 | 8.4 | Fail when a distribution declares multiple entries (§3.4), when a declared resource cannot be read (§3.2), or when a resource violates the containment and symlink rules (§4.1). | `entry-point-value-invalid`, `multiple-entry-points`, `resource-escapes`, `resource-not-utf8`, `resource-symlink`, `resource-unreadable`, `sidecar-missing`, `source-root-missing` |
 | 8.5 | Enforce ownership and fail on collision, never resolving by order (§6.1). | `component-outside-namespace`, `namespace-overlap`, `namespace-required`, `namespace-reserved`, `namespace-single-label`, `source-outside-namespace` |
-| 8.6 | Never promote a feature to `required` (§6.7), never register a component as exported without explicit application approval (§6.8), and never write a required entitlement or usage description (§7.3) — including rejecting a usage description offered as an `info_plist` value (§7.6). | `component-export-forbidden-key`, `feature-required-forbidden`, `plist-usage-description` |
+| 8.6 | Never promote a feature to `required` (§6.7), never register a component as exported without explicit application approval (§6.8), and never write a required entitlement or usage description (§7.3) — including rejecting a usage description offered as an `info_plist` value (§7.6). | `component-export-forbidden-key`, `feature-required-forbidden`, `plist-capability-key`, `plist-usage-description` |
 | 8.7 | Provide application-side permission suppression, ensure a suppressed permission is absent from the effective merged manifest — emitting a merger removal rule when a resolved dependency contributes it — and report it (§6.7). | `permission-suppressed`<br>*structural* — answers.AnswerSource.permission_suppressed() + EffectiveSet.manifest_removals() |
 | 8.8 | Fail when a producer's `requires` exceeds the application's configuration (§6.2, §7.2), when a declared application value is unsupplied or an inline reference names no declared `id` (§6.3), when an unconditional §7.3 prerequisite is unsatisfied — judged by that section's satisfaction table — or when a component declaring `exported_required` has no application approval (§6.8). | `application-value-unresolved-ref`, `application-value-unsupplied`, `component-duplicate`, `component-export-unapproved`, `floor-unmet`, `meta-data-application-override`, `meta-data-conflict`, `prerequisite-unsatisfied` |
 | 8.9 | Record each distribution's resolved contribution durably and in reviewable form, per the lifecycle of §9, and fail the build when the effective set drifts from the last accepted record. | `record-absent`, `record-drift`<br>*structural* — record.IntegrationRecord / Delta / Integration.accept() |
 | 8.10 | Restrict contributed repositories to their declared groups/modules, reject two whose scopes overlap at different URLs, report them with distinct prominence, and reject a credential in a syntactically identifiable location such as URL user-info (§6.6). | `repository-contributed`, `repository-credential-in-url`, `repository-credential-shaped`, `repository-scope-missing`, `repository-scope-overlap` |
 | 8.11 | Validate `keep_classes` against owned namespaces, and reject a `from_dependency` keep whose pattern matches any class on the effective classpath originating outside that dependency's resolved artifacts (§6.9). | `keep-dependency-undeclared`, `keep-matches-foreign-class`, `keep-outside-namespace` |
-| 8.12 | Enforce reproducible native dependency resolution: reject unbounded and changing versions, and lock the fully resolved graph, transitives included — Gradle and SwiftPM alike, recording the resolved *revision* for Swift packages — in the record, resolving from it thereafter (§6.5, §7.4). Never convert a declared Gradle version into a `strictly` constraint, and show requested-versus-resolved where they differ. Verify each resolved artifact against its recorded checksum on every subsequent build, failing on a mismatch (§6.5). Reject a resolved Swift graph containing a branch or path dependency (§7.4). | `dependency-checksum-mismatch`, `dependency-configuration`, `dependency-form`, `dependency-version-changing`, `dependency-version-substituted`, `dependency-version-unbounded`, `swift-branch-requirement`, `swift-graph-unpinnable`<br>*structural* — ports.GradleResolver + ports.SwiftResolver, with recorded checksums |
+| 8.12 | Enforce reproducible native dependency resolution: reject unbounded and changing versions, and lock the fully resolved graph, transitives included — Gradle and SwiftPM alike, recording the resolved *revision* for Swift packages — in the record, resolving from it thereafter (§6.5, §7.4). Never convert a declared Gradle version into a `strictly` constraint, and show requested-versus-resolved where they differ. Verify each resolved artifact against its recorded checksum on every subsequent build, failing on a mismatch (§6.5). Reject a resolved Swift graph containing a branch or path dependency, and record and verify the checksum of every binary target in it, which the package's revision does not pin (§7.4). | `dependency-checksum-mismatch`, `dependency-configuration`, `dependency-form`, `dependency-version-changing`, `dependency-version-substituted`, `dependency-version-unbounded`, `swift-binary-checksum-mismatch`, `swift-binary-unchecksummed`, `swift-branch-requirement`, `swift-graph-unpinnable`<br>*structural* — ports.GradleResolver + ports.SwiftResolver, with recorded checksums |
 | 8.13 | Validate `view_links` (activity-only, export-gated) and generate their filters (§6.8). | `view-links-invalid` |
 | 8.14 | Exclude sidecar directories from any Python payload it assembles. | *structural* — resources.SidecarSource.payload_exclusions() |
 | 8.15 | Name the contributing distribution in every diagnostic. | *structural* — diagnostics.Diagnostic requires a non-empty distribution tuple |
@@ -51,6 +54,16 @@ returning a clean result.
 | 8.24 | Generate `intent_filters` only on components that are neither exported nor declaring `view_links`, and show each action in the record (§6.8). | `intent-filter-invalid` |
 | 8.25 | Fail when a repository declaring `credentials_required` has no credentials configured, and never write a supplied credential into the generated project, the record, or a diagnostic (§6.6, §9). | `repository-credentials-missing`, `secret-withheld` |
 | 8.26 | Provide a means for the application to answer every `requires`, joined to the declaration by the key §2.2 names, and accept a build-time credential by indirection rather than only as a literal in a committed file (§2.2). Reject a sidecar declaring two `app_extensions` or `url_schemes` entries under one `id`, which the application could not answer separately (§7.3). | `application-value-unsupplied`, `prerequisite-id-duplicate`, `repository-credentials-missing`<br>*structural* — answers.AnswerSource — every requires is answered under (distribution, key) |
+
+## Advisory obligations (§8's SHOULD list)
+
+Reported, never blocking. One is deliberately not implemented, and says so — an advisory obligation quietly skipped is how a conformance claim overstates itself.
+
+| §8 | The obligation | Discharged by |
+| --- | --- | --- |
+| 8.S1 | Warn on unrecognized top-level tables (§4.4). | `unknown-top-level` |
+| 8.S2 | Verify `from_dependency` component classes against the resolved artifact (§6.8). | `component-class-absent` |
+| 8.S3 | Report the delta of the fully merged Android manifest, beyond the per-artifact declarations required by requirement 8.19, and the native effects of Swift packages' binary targets (§9, §11). | *not implemented — the fully merged manifest delta needs a manifest merger, which belongs to the consumer's build system; this library reports the per-artifact declarations of requirement 8.19 instead, and a consumer stopping there must say so in its own documentation (§9)* |
 
 ## Rules with no requirement number
 

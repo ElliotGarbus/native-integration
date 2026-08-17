@@ -190,6 +190,7 @@ class PrerequisiteKind(str, enum.Enum):
     APP_EXTENSION = "app_extensions"
     APPLICATION_FILE = "application_files"
     URL_SCHEME = "url_schemes"
+    PLIST_CAPABILITY = "plist_capabilities"
 
     def __str__(self) -> str:  # pragma: no cover - trivial
         return self.value
@@ -210,6 +211,8 @@ class Prerequisite:
     reason: str
     conditional: bool = False
     extension_kind: str | None = None
+    #: The single plist array entry a `plist_capabilities` prerequisite needs.
+    value: str | None = None
 
     @property
     def producer_local(self) -> bool:
@@ -220,6 +223,13 @@ class Prerequisite:
         if self.producer_local:
             return "id"
         return "name" if self.kind is PrerequisiteKind.APPLICATION_FILE else "key"
+
+    @property
+    def join_key(self) -> str:
+        """How the application's answer is looked up (§2.2)."""
+        if self.kind is PrerequisiteKind.PLIST_CAPABILITY:
+            return f"{self.key}={self.value}"
+        return self.key
 
 
 @dataclass(frozen=True)
@@ -381,6 +391,7 @@ _PREREQUISITE_KEY = {
     PrerequisiteKind.APP_EXTENSION: "id",
     PrerequisiteKind.APPLICATION_FILE: "name",
     PrerequisiteKind.URL_SCHEME: "id",
+    PrerequisiteKind.PLIST_CAPABILITY: "key",
 }
 
 
@@ -399,6 +410,7 @@ def build_ios(table: Mapping[str, Any]) -> IosSection:
                     reason=entry["reason"],
                     conditional=bool(entry.get("conditional", False)),
                     extension_kind=entry.get("kind"),
+                    value=entry.get("value"),
                 )
             )
 

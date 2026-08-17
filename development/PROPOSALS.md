@@ -28,8 +28,17 @@ example set stops changing it.
 > **P21** (narrowed), **P22**, **P23**, and P24's documentation half.
 > **Deferred:** P24's BOM form. P1's deferral was sharpened, not reversed.
 >
-> Nothing landed adds a capability a producer must adopt, with two exceptions
-> worth noting: §6.5's bounded range form and §7.3's `usage_descriptions` are
+> **A fourth round, from an implementation rather than an example.** Writing the
+> reference reader, and reviewing it, produced **P28–P33** — all landed. They
+> are a different kind of finding: no new example was run, and each came from
+> either a rule that could not be implemented as written or an authority
+> boundary two conforming readings had already split on. An example shows what a
+> producer needs; an implementation shows what a consumer cannot do. **P28 is
+> the one that changes a producer's obligations**, and this repository was its
+> own evidence — three of its sidecars disagreed.
+>
+> Nothing landed in rounds one to three adds a capability a producer must adopt,
+> with two exceptions worth noting: §6.5's bounded range form and §7.3's `usage_descriptions` are
 > both new spellings. Because the specification is still a draft amended in
 > place, no contract minor was allocated for them, and the restriction that
 > §7.6 now rejects usage-description keys would otherwise have required a new
@@ -1565,3 +1574,106 @@ in this file.
 It also confirmed the value of the standard applied throughout: of the four new
 proposals, only P23 is recommended without qualification, and it adds no
 capability at all.
+
+
+---
+
+# Round four: proposals from the reference reader
+
+These came from implementing the specification rather than from expressing a
+package against it, and from an external review of the result. All six landed.
+
+The distinction worth keeping: an example finds a capability a producer needs; an
+implementation finds a rule that cannot be implemented as written, and a review
+finds a boundary two conforming readers already split on. P31 is the second kind
+and P28 is the third — this repository was itself the evidence.
+
+## P28 — Capability keys are not contributable *(DECIDED: adopted, §7.6/§7.3)*
+
+**Motivating evidence: three sidecars in this repository, disagreeing.**
+`pyonesignal` and `firebase/messaging` contributed
+`UIBackgroundModes = ["remote-notification"]` through §7.6's `append`.
+`pycorelocation` refused to, and wrote down why: *"a producer cannot know whether
+an application wants background location, and declaring it would hand the
+capability to every application."*
+
+Both readings conformed, which is the defect. §7.6 constrained `append` by TOML
+*type* and never by what a key does, so the one iOS capability that could arrive
+without the application granting it was the one nobody had noticed.
+
+Landed as a closed denylist in §7.6 — `UIBackgroundModes`,
+`UIRequiredDeviceCapabilities` — plus a sixth §7.3 table,
+`plist_capabilities`, joined by `(key, value)` rather than by distribution,
+because a plist key is application-wide and one answer satisfies every producer
+that asked.
+
+`UIRequiredDeviceCapabilities` is on the list without a motivating example, which
+this file normally treats as insufficient. It is here on the §6.7 parallel: a
+producer's entry silently removes the application from devices lacking the
+hardware, which is exactly the harm §6.7 prevents by refusing to let a producer
+promote a feature to `required`. The same harm through a different door is not a
+new hypothesis.
+
+**Cost, stated plainly:** every application using a push wrapper now writes one
+line it did not write before. That cost *is* the argument — `pycorelocation`
+declined to impose it and was right to.
+
+## P29 — The record gate is not a boolean *(DECIDED: adopted, reader only)*
+
+The reader let `accept()` write an integration record for a surface with unmet
+SDK floors, an unsupplied application value and an unapproved export. §9's record
+is the statement *this is what the application accepted and could build*; a
+record certifying a surface that never built is worse than none, because the next
+build compares against a baseline that was never valid.
+
+No specification change: §9 already leaves the acceptance workflow to the
+consumer, and this is a defect in one consumer. Recorded here because the shape
+of the mistake is available to every implementation.
+
+## P30 — Binary targets need a checksum *(DECIDED: adopted, §7.4)*
+
+§6.5 required a checksum per resolved Maven artifact and §7.4 required only a
+recorded revision, and requirement 8.12 claimed comparable reproducibility for
+both. Most of that asymmetry is principled and was never written down: a git
+revision *is* content identity, and a Maven version names no content at all.
+
+The genuine hole is binary targets, which §11 already acknowledges a Swift
+package may vend. Their bytes come from a URL the package's revision does not
+cover, and SwiftPM models this itself with `binaryTarget(checksum:)`. §7.4 now
+requires recording and verifying it, and states why the rest of the asymmetry
+stands.
+
+## P31 — Appendix D is the contract-minor registry *(DECIDED: adopted, §4.3)*
+
+§4.3 requires a consumer to reject a sidecar that **under-declares** — one using
+a key introduced later than the contract it names. Nothing said which revision
+introduced which key, so the rule was unimplementable the moment a 1.1 existed:
+two consumers would reach different verdicts on the same sidecar.
+
+Vacuous today, because every v1 key is 1.0. That is exactly why it was worth
+fixing now — the cost is one paragraph, and the alternative is discovering it
+while cutting the first minor.
+
+## P32 — Name the three outcomes *(DECIDED: adopted, §8)*
+
+§7.3 rule 5 and §9 both require material that is **recorded and not reported as a
+problem**, which is neither a failure nor a warning. The specification required
+that mode without naming it, so an implementation with two severity levels files
+it under one of them and is wrong either way: as a warning it becomes noise to be
+silenced, as nothing it stops being the durable disclosure that was the point.
+
+§8 now names blocking / advisory / recorded, and the SHOULD list carries stable
+identifiers (8.S1–8.S3) so a conformance claim can say which advisory
+obligations it meets. Both are prerequisites for the conformance suite in the
+README's Planned section.
+
+## P33 — Say what a record must contain *(DECIDED: adopted, §9 + Appendix E)*
+
+§9 mandates neither a file nor a format, deliberately and correctly — a
+consumer's records belong beside its own lock files. But it never said what a
+record must *contain*, leaving the substance as unspecified as the spelling, so
+two consumers could both conform and neither could read the other's output.
+
+§9 now lists the facts a record must make recoverable, and Appendix E shows one
+satisfying shape as explicitly non-normative. The format stays free; the content
+does not.

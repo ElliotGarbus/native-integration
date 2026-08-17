@@ -17,6 +17,7 @@ from native_integration import (
     Diagnostic,
     DiagnosticBag,
     GradleGraph,
+    IntegrationError,
     IntegrationRecord,
     ManifestComponent,
     ManifestFeature,
@@ -199,7 +200,7 @@ def test_a_real_installed_distribution_is_read_without_importing_it(tmp_path):
         closure=Closure.direct("demo-native-pkg"),
         application=Application(),
         sources=found,
-        accepted=True,
+        accept_current_surface=True,
     )
     assert integration.ok, integration.diagnostics.render()
     assert integration.effective.permissions()[0].name == "android.permission.INTERNET"
@@ -293,7 +294,7 @@ def test_an_answered_integration_substitutes_and_exports(tmp_path):
         application=answered(),
         profile=PROFILE,
         sources=[build(tmp_path)],
-        accepted=True,
+        accept_current_surface=True,
     )
     assert integration.ok, integration.diagnostics.render()
     component = integration.effective.exported_components()[0]
@@ -328,7 +329,7 @@ def test_a_suppressed_permission_leaves_the_effective_manifest(tmp_path):
         application=application,
         profile=PROFILE,
         sources=[build(tmp_path)],
-        accepted=True,
+        accept_current_surface=True,
     )
     assert integration.effective.permissions() == ()
     # Omitting it from the generated manifest is not sufficient: an .aar can
@@ -380,7 +381,7 @@ credentials_required = true
         application=application,
         profile=PROFILE,
         sources=[build(tmp_path, body, name="pymapbox", module="pymapbox._native")],
-        accepted=True,
+        accept_current_surface=True,
     )
     assert integration.ok
     dumped = integration.record.dumps()
@@ -463,8 +464,77 @@ def test_an_extension_needs_both_a_target_and_an_acknowledgement(tmp_path):
             acknowledged_ids={"pyios": ["onesignal_nse"]},
         ),
     )
-    integration = ios_read(tmp_path, both, accepted=True)
+    integration = ios_read(tmp_path, both, accept_current_surface=True)
     assert not any(d.rule.code == "prerequisite-unsatisfied" for d in integration.diagnostics)
+
+
+CAPABILITY_SIDE = """
+contract = "1"
+[[ios.requires.plist_capabilities]]
+key = "UIBackgroundModes"
+value = "remote-notification"
+reason = "Silent pushes wake the application to fetch content"
+"""
+
+
+def test_a_capability_is_a_prerequisite_the_application_grants(tmp_path):
+    """§7.3 — the producer states the need; the application's own plist grants it."""
+    unanswered = read(
+        platform=Platform.IOS,
+        closure=Closure.direct("pypush"),
+        application=Application(),
+        profile=PROFILE,
+        sources=[build(tmp_path, CAPABILITY_SIDE, name="pypush", module="pypush._native")],
+    )
+    blocked = [d for d in unanswered.diagnostics if d.rule.code == "prerequisite-unsatisfied"]
+    assert len(blocked) == 1 and "UIBackgroundModes" in blocked[0].message
+
+    granted = read(
+        platform=Platform.IOS,
+        closure=Closure.direct("pypush"),
+        application=Application(
+            answers=MappingAnswers(
+                plist_capabilities={"UIBackgroundModes": ["remote-notification"]}
+            )
+        ),
+        profile=PROFILE,
+        sources=[build(tmp_path, CAPABILITY_SIDE, name="pypush", module="pypush._native")],
+        accept_current_surface=True,
+    )
+    assert granted.ok, granted.diagnostics.render()
+
+
+def test_one_application_answer_satisfies_every_producer_that_asked(tmp_path):
+    """Joined by (key, value), not by distribution: the plist key is app-wide."""
+    a = build(tmp_path, CAPABILITY_SIDE, name="pypush-a", module="pypush_a._native")
+    b = build(tmp_path, CAPABILITY_SIDE, name="pypush-b", module="pypush_b._native")
+    integration = read(
+        platform=Platform.IOS,
+        closure=Closure.direct("pypush-a", "pypush-b"),
+        application=Application(
+            answers=MappingAnswers(
+                plist_capabilities={"UIBackgroundModes": ["remote-notification"]}
+            )
+        ),
+        profile=PROFILE,
+        sources=[a, b],
+        accept_current_surface=True,
+    )
+    assert integration.ok, integration.diagnostics.render()
+    assert len(integration.effective.prerequisites()) == 2
+
+
+def test_a_capability_a_different_value_does_not_satisfy(tmp_path):
+    integration = read(
+        platform=Platform.IOS,
+        closure=Closure.direct("pypush"),
+        application=Application(
+            answers=MappingAnswers(plist_capabilities={"UIBackgroundModes": ["location"]})
+        ),
+        profile=PROFILE,
+        sources=[build(tmp_path, CAPABILITY_SIDE, name="pypush", module="pypush._native")],
+    )
+    assert any(d.rule.code == "prerequisite-unsatisfied" for d in integration.diagnostics)
 
 
 def test_an_ios_floor_is_compared_numerically(tmp_path):
@@ -539,7 +609,7 @@ groups = ["com.example"]
         application=Application(),
         profile=PROFILE,
         sources=[a, b],
-        accepted=True,
+        accept_current_surface=True,
     )
     assert integration.ok
 
@@ -591,7 +661,7 @@ manifest_meta_data = "com.vendor.APPLICATION_ID"
         application=application,
         profile=PROFILE,
         sources=[a, b],
-        accepted=True,
+        accept_current_surface=True,
     )
     assert integration.ok
     # Both provenance records survive: one entry per distribution.
@@ -667,7 +737,7 @@ def test_a_higher_resolved_version_is_shown_alongside_the_request(tmp_path):
         gradle=FakeGradle(widget_graph(version="1.4.0")),
         artifacts=FakeArtifacts({"com.example:widget:1.4.0": None}, {}, []),
     )
-    integration = dep_read(tmp_path, resolvers, accepted=True)
+    integration = dep_read(tmp_path, resolvers, accept_current_surface=True)
     substituted = [
         d for d in integration.diagnostics if d.rule.code == "dependency-version-substituted"
     ]
@@ -699,7 +769,7 @@ def test_a_keep_pattern_within_the_named_artifact_passes(tmp_path):
             classpath=["okhttp3.OkHttpClient", "okhttp3.extra.Bar", "org.other.Thing"],
         ),
     )
-    integration = dep_read(tmp_path, resolvers, accepted=True)
+    integration = dep_read(tmp_path, resolvers, accept_current_surface=True)
     assert integration.ok, integration.diagnostics.render()
 
 
@@ -708,7 +778,7 @@ def test_a_checksum_mismatch_fails_the_next_build(tmp_path):
         gradle=FakeGradle(widget_graph()),
         artifacts=FakeArtifacts({"com.example:widget:1.2.3": None}, {}, []),
     )
-    first = dep_read(tmp_path, resolvers, accepted=True)
+    first = dep_read(tmp_path, resolvers, accept_current_surface=True)
     record_path = tmp_path / "record.json"
     first.accept(record_path)
 
@@ -730,7 +800,7 @@ def test_the_recorded_graph_is_handed_back_to_the_resolver(tmp_path):
             gradle=FakeGradle(widget_graph()),
             artifacts=FakeArtifacts({"com.example:widget:1.2.3": None}, {}, []),
         ),
-        accepted=True,
+        accept_current_surface=True,
     ).accept(record_path)
 
     second = FakeGradle(widget_graph())
@@ -756,7 +826,7 @@ def test_an_artifacts_own_manifest_is_reported_and_a_required_feature_overridden
         gradle=FakeGradle(widget_graph()),
         artifacts=FakeArtifacts({"com.example:widget:1.2.3": manifest}, {}, []),
     )
-    integration = dep_read(tmp_path, resolvers, accepted=True)
+    integration = dep_read(tmp_path, resolvers, accept_current_surface=True)
     codes = [d.rule.code for d in integration.diagnostics]
     assert "artifact-permission" in codes
     assert "artifact-feature-overridden" in codes
@@ -813,7 +883,7 @@ products = ["Shim"]
         profile=PROFILE,
         resolvers=Resolvers(swift=FakeSwift(graph)),
         sources=[build(tmp_path, body, name="pkg-swift", module="pkg_swift._native")],
-        accepted=True,
+        accept_current_surface=True,
     )
     assert integration.record.distributions[0].swift == {"Shim": "1.2.3 @ abc123"}
 
@@ -844,7 +914,7 @@ def test_an_accepted_record_makes_the_next_identical_build_quiet(tmp_path):
         profile=PROFILE,
         sources=[build(tmp_path)],
         record_path=record_path,
-        accepted=True,
+        accept_current_surface=True,
     )
     first.accept()
     second = read(
@@ -867,7 +937,7 @@ def test_a_new_permission_fails_the_build_attributed_to_its_distribution(tmp_pat
         profile=PROFILE,
         sources=[build(tmp_path)],
         record_path=record_path,
-        accepted=True,
+        accept_current_surface=True,
     ).accept()
 
     grown = SIDE + """
@@ -909,7 +979,7 @@ def test_a_changed_input_file_is_named_by_path(tmp_path):
         application=Application(),
         sources=[source],
         record_path=record_path,
-        accepted=True,
+        accept_current_surface=True,
     )
     assert "java/org/example/Bridge.java" in first.record.distributions[0].inputs
     first.accept()
@@ -934,7 +1004,7 @@ def test_the_report_says_how_a_distribution_entered_the_closure(tmp_path):
         application=answered(),
         profile=PROFILE,
         sources=[build(tmp_path)],
-        accepted=True,
+        accept_current_surface=True,
     )
     assert "pystripe 1.0.0  (via some-ui-lib)" in integration.report()
 
@@ -946,7 +1016,7 @@ def test_a_record_round_trips(tmp_path):
         application=answered(),
         profile=PROFILE,
         sources=[build(tmp_path)],
-        accepted=True,
+        accept_current_surface=True,
     )
     path = integration.accept(tmp_path / "record.json")
     assert IntegrationRecord.read(path) == integration.record
@@ -974,7 +1044,7 @@ swift_package = "PyWebViews"
         profile=PROFILE,
         resolvers=Resolvers(swift=FakeSwift(graph)),
         sources=[build(tmp_path, body, name="pywebviews", module="pywebviews._native")],
-        accepted=True,
+        accept_current_surface=True,
     )
     exclusions = integration.payload_exclusions()
     assert "web_views.py" in exclusions and "web_views.pyi" in exclusions
@@ -1067,6 +1137,110 @@ def test_an_unreadable_record_does_not_silently_re_bootstrap(tmp_path):
         )
 
 
+SWIFT_SIDE = """
+contract = "1"
+[[ios.contributes.swift_packages]]
+name = "Shim"
+url = "https://example.com/shim"
+requirement = { exact = "1.2.3" }
+products = ["Shim"]
+"""
+
+
+def swift_read(tmp_path, targets, *, record_path=None, **kwargs):
+    from native_integration.testing import stub_resolvers
+
+    return read(
+        platform=Platform.IOS,
+        closure=Closure.direct("pkg-bin"),
+        application=Application(),
+        profile=PROFILE,
+        resolvers=stub_resolvers(binary_targets={"Shim": targets}),
+        sources=[build(tmp_path, SWIFT_SIDE, name="pkg-bin", module="pkg_bin._native")],
+        record_path=record_path,
+        **kwargs,
+    )
+
+
+def test_a_binary_targets_checksum_is_recorded_and_verified(tmp_path):
+    """§7.4 — a package's revision pins its source, not bytes fetched from a URL."""
+    from native_integration import BinaryTarget
+
+    record_path = tmp_path / "record.json"
+    first = swift_read(
+        tmp_path,
+        [BinaryTarget("ShimBinary", checksum="sha256:aaa", url="https://example.com/x.zip")],
+        record_path=record_path,
+        accept_current_surface=True,
+    )
+    assert first.record.distributions[0].swift_binaries == {"Shim/ShimBinary": "sha256:aaa"}
+    first.accept()
+
+    moved = swift_read(
+        tmp_path,
+        [BinaryTarget("ShimBinary", checksum="sha256:bbb", url="https://example.com/x.zip")],
+        record_path=record_path,
+    )
+    mismatch = [
+        d for d in moved.diagnostics if d.rule.code == "swift-binary-checksum-mismatch"
+    ]
+    assert len(mismatch) == 1 and mismatch[0].distributions == ("pkg-bin",)
+
+
+def test_a_remote_binary_target_without_a_checksum_warns(tmp_path):
+    from native_integration import BinaryTarget
+
+    integration = swift_read(
+        tmp_path,
+        [BinaryTarget("ShimBinary", url="https://example.com/x.zip")],
+        accept_current_surface=True,
+    )
+    warned = [d for d in integration.diagnostics if d.rule.code == "swift-binary-unchecksummed"]
+    assert len(warned) == 1 and not warned[0].blocking
+
+
+def test_a_local_binary_target_is_pinned_by_the_packages_revision(tmp_path):
+    """No url means the bytes came with the checkout the revision already pins."""
+    from native_integration import BinaryTarget
+
+    integration = swift_read(
+        tmp_path, [BinaryTarget("Vendored")], accept_current_surface=True
+    )
+    assert integration.ok, integration.diagnostics.render()
+
+
+def test_accept_refuses_to_record_a_surface_that_cannot_be_built(tmp_path):
+    """A record says the application accepted a surface *and could build it*."""
+    integration = read(
+        platform=Platform.ANDROID,
+        closure=Closure.direct("pystripe"),
+        application=Application(android_sdk={"min_sdk": 1, "compile_sdk": 1}),
+        profile=PROFILE,
+        sources=[build(tmp_path)],
+        accept_current_surface=True,
+    )
+    codes = {d.rule.code for d in integration.gate_only}
+    assert {"floor-unmet", "application-value-unsupplied", "component-export-unapproved"} <= codes
+
+    with pytest.raises(IntegrationError):
+        integration.accept(tmp_path / "record.json")
+    assert not (tmp_path / "record.json").exists()
+
+
+def test_accept_proceeds_when_only_the_record_gate_is_blocking(tmp_path):
+    integration = read(
+        platform=Platform.ANDROID,
+        closure=Closure.direct("pystripe"),
+        application=answered(),
+        profile=PROFILE,
+        sources=[build(tmp_path)],
+        record_path=tmp_path / "record.json",
+    )
+    assert [d.rule.code for d in integration.errors] == ["record-absent"]
+    assert integration.gate_only == ()
+    assert integration.accept().exists()
+
+
 def test_closure_from_installed_reports_what_it_could_not_find():
     closure = Closure.from_installed(["definitely-not-installed-xyz"])
     assert closure.missing == ("definitely-not-installed-xyz",)
@@ -1081,6 +1255,27 @@ def test_every_requirement_is_discharged_somewhere():
         n for n in range(1, 27) if not rules_for_requirement(n) and n not in STRUCTURAL
     ]
     assert missing == []
+
+
+def test_every_advisory_obligation_is_accounted_for():
+    """§8's SHOULD list, by identifier. 'Not implemented' is a value, not a gap."""
+    import re
+    from pathlib import Path as _Path
+
+    from native_integration.rules import ADVISORY
+
+    spec = (_Path(__file__).resolve().parent.parent / "SPEC.md").read_text(encoding="utf-8")
+    block = spec.split("A conforming consumer **SHOULD**")[1].split("\n## ")[0]
+    declared = set(re.findall(r"^- \*\*(S\d+)\.\*\*", block, re.M))
+    assert declared, "no identified SHOULD items found in §8"
+    assert declared == set(ADVISORY)
+
+
+def test_the_severity_model_is_the_specifications_not_the_readers():
+    """§8 names three outcomes; Severity has exactly three members."""
+    from native_integration import Severity
+
+    assert {s.name for s in Severity} == {"ERROR", "WARNING", "NOTE"}
 
 
 def test_no_rule_is_declared_and_never_emitted():
@@ -1136,7 +1331,7 @@ from_dependency = "com.example:widget"
         profile=PROFILE,
         resolvers=resolvers,
         sources=[build(tmp_path, body, name="pkg-dep", module="pkg_dep._native")],
-        accepted=True,
+        accept_current_surface=True,
     )
     warned = [d for d in integration.diagnostics if d.rule.code == "component-class-absent"]
     assert len(warned) == 1 and not warned[0].blocking

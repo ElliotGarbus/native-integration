@@ -20,7 +20,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
-from native_integration.rules import RULES, STRUCTURAL  # noqa: E402
+from native_integration.rules import ADVISORY, RULES, STRUCTURAL  # noqa: E402
 
 OUTPUT = ROOT / "docs" / "REQUIREMENTS.md"
 
@@ -34,11 +34,14 @@ discharges it.
 `native_integration.rules`; CI fails if it drifts. A requirement that appears in
 neither column fails `tests/test_integration.py::test_every_requirement_is_discharged_somewhere`.
 
+Severity is not the reader's invention: §8 names three outcomes — **blocking**,
+**advisory**, **recorded** — and each rule below is registered at one of them,
+in one place, so "MUST fail" cannot decay into a warning through an edit at a
+call site.
+
 Two kinds of entry:
 
-- a **rule code** is a check that produces a diagnostic. Every rule names its
-  section and severity once, in `rules.py`, so "MUST fail" cannot decay into a
-  warning through an edit at a call site.
+- a **rule code** is a check that produces a diagnostic.
 - a **structural** entry is an obligation discharged by the shape of the API
   rather than by a check — you cannot construct a `Diagnostic` without naming a
   distribution, so requirement 8.15 has no rule and cannot be forgotten either.
@@ -69,6 +72,17 @@ def requirement_text() -> dict[int, str]:
     return found
 
 
+def advisory_text() -> dict[str, str]:
+    """§8's SHOULD items, by the identifier the specification gives them."""
+    spec = (ROOT / "SPEC.md").read_text(encoding="utf-8")
+    block = spec.split("A conforming consumer **SHOULD**")[1].split("\n## ")[0]
+    found: dict[str, str] = {}
+    for match in re.finditer(r"^- \*\*(S\d+)\.\*\*\s(.*?)(?=^- \*\*S|\Z)", block, re.M | re.S):
+        text = " ".join(match.group(2).split()).replace("**", "").replace("|", "\\|")
+        found[match.group(1)] = text
+    return found
+
+
 def build() -> str:
     requirements = requirement_text()
     lines = [HEADER]
@@ -79,6 +93,23 @@ def build() -> str:
             structural = f"*structural* — {STRUCTURAL[number]}"
             where = f"{where}<br>{structural}" if where else structural
         lines.append(f"| 8.{number} | {requirements[number]} | {where or '—'} |")
+    advisory = advisory_text()
+    lines.append("")
+    lines.append("## Advisory obligations (§8's SHOULD list)")
+    lines.append("")
+    lines.append(
+        "Reported, never blocking. One is deliberately not implemented, and says so — "
+        "an advisory obligation quietly skipped is how a conformance claim overstates "
+        "itself."
+    )
+    lines.append("")
+    lines.append("| §8 | The obligation | Discharged by |")
+    lines.append("| --- | --- | --- |")
+    for identifier in sorted(advisory):
+        target = ADVISORY.get(identifier, "—")
+        where = f"`{target}`" if target in RULES else f"*{target}*"
+        lines.append(f"| 8.{identifier} | {advisory[identifier]} | {where} |")
+
     lines.append("")
     lines.append("## Rules with no requirement number")
     lines.append("")

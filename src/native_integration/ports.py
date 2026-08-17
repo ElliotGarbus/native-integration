@@ -91,6 +91,24 @@ class GradleGraph:
 
 
 @dataclass(frozen=True)
+class BinaryTarget:
+    """A prebuilt artifact a Swift package vends (§7.4, §11).
+
+    The package's revision pins its *source*; it does not pin bytes fetched
+    from ``url``. SwiftPM already requires a ``checksum`` for a remote binary
+    target, and that is what the record keeps.
+    """
+
+    name: str
+    checksum: str | None = None
+    url: str | None = None
+
+    @property
+    def remote(self) -> bool:
+        return self.url is not None
+
+
+@dataclass(frozen=True)
 class ResolvedSwiftPackage:
     """One package in the resolved Swift graph, transitives included."""
 
@@ -106,6 +124,9 @@ class ResolvedSwiftPackage:
     #: record must preserve both.
     revision: str | None = None
     declared_by: tuple[str, ...] = ()
+    #: Prebuilt targets this package vends. Empty for a source-only package,
+    #: which is the common case.
+    binary_targets: tuple[BinaryTarget, ...] = ()
 
 
 @dataclass(frozen=True)

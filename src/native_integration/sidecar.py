@@ -599,7 +599,19 @@ def _check_ios(
                 name,
             )
 
+    for key in (*ios.info_plist_values, *ios.info_plist_append):
+        if key in schema.CAPABILITY_KEYS:
+            bag.add(
+                rules.PLIST_CAPABILITY_KEY,
+                f"contributes `{key}`, which grants the application a capability or "
+                "restricts who may install it; that is the application's to declare — "
+                "use [[ios.requires.plist_capabilities]] instead",
+                name,
+            )
+
     for key, value in ios.info_plist_values.items():
+        if key in schema.CAPABILITY_KEYS:
+            continue  # already reported, with the rule that says why
         if key.endswith("UsageDescription"):
             bag.add(
                 rules.PLIST_USAGE_DESCRIPTION,

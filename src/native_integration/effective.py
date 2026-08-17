@@ -545,6 +545,10 @@ def _satisfied(prerequisite: Prerequisite, *, distribution: str, application: Ap
         ) and answers.acknowledged(distribution, prerequisite.key)
     if kind is PrerequisiteKind.URL_SCHEME:
         return answers.acknowledged(distribution, prerequisite.key)
+    if kind is PrerequisiteKind.PLIST_CAPABILITY:
+        return bool(prerequisite.value) and answers.plist_capability_configured(
+            prerequisite.key, prerequisite.value
+        )
     return False  # pragma: no cover - the enum is closed
 
 

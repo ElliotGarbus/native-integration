@@ -85,6 +85,8 @@ RESOLUTION_FAILED = _rule("resolution-failed", "§6.5", ERROR, 16)
 SWIFT_PACKAGE_DUPLICATE_NAME = _rule("swift-package-duplicate-name", "§7.4", ERROR, 1)
 SWIFT_BRANCH_REQUIREMENT = _rule("swift-branch-requirement", "§7.4", ERROR, 12)
 SWIFT_GRAPH_UNPINNABLE = _rule("swift-graph-unpinnable", "§7.4", ERROR, 12)
+SWIFT_BINARY_CHECKSUM_MISMATCH = _rule("swift-binary-checksum-mismatch", "§7.4", ERROR, 12)
+SWIFT_BINARY_UNCHECKSUMMED = _rule("swift-binary-unchecksummed", "§7.4", WARN, 12)
 
 # --- repositories (§6.6) ----------------------------------------------------
 REPOSITORY_SCOPE_MISSING = _rule("repository-scope-missing", "§6.6", ERROR, 10)
@@ -120,6 +122,7 @@ PREREQUISITE_ID_DUPLICATE = _rule("prerequisite-id-duplicate", "§7.3", ERROR, 2
 
 # --- Info.plist (§7.6) ------------------------------------------------------
 PLIST_USAGE_DESCRIPTION = _rule("plist-usage-description", "§7.6", ERROR, 6)
+PLIST_CAPABILITY_KEY = _rule("plist-capability-key", "§7.6", ERROR, 6)
 PLIST_VALUE_CONFLICT = _rule("plist-value-conflict", "§7.6", ERROR, 1)
 PLIST_CONSUMER_MANAGED = _rule("plist-consumer-managed", "§7.6", ERROR, 1)
 
@@ -155,6 +158,23 @@ STRUCTURAL: dict[int, str] = {
     19: "ports.ArtifactInspector.manifest_of() drives the §9 artifact rules",
     20: "EffectiveSet.python_payload_exclusions() drops <name>.py and <name>.pyi",
     26: "answers.AnswerSource — every requires is answered under (distribution, key)",
+}
+
+
+#: §8's **SHOULD** obligations, by the stable identifier the specification gives
+#: them, against the rule that discharges each — or a plain statement that this
+#: library does not. An advisory obligation quietly unimplemented is how a
+#: conformance claim overstates itself, so "not implemented" is a value here
+#: rather than an absence.
+ADVISORY: dict[str, str] = {
+    "S1": "unknown-top-level",
+    "S2": "component-class-absent",
+    "S3": (
+        "not implemented — the fully merged manifest delta needs a manifest merger, "
+        "which belongs to the consumer's build system; this library reports the "
+        "per-artifact declarations of requirement 8.19 instead, and a consumer "
+        "stopping there must say so in its own documentation (§9)"
+    ),
 }
 
 

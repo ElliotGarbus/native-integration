@@ -63,6 +63,7 @@ from .model import (
 from .ports import (
     ArtifactInspector,
     ArtifactManifest,
+    BinaryTarget,
     DependencyRequest,
     GradleGraph,
     GradleResolver,
@@ -90,6 +91,7 @@ __all__ = [
     "ApplicationValue",
     "ArtifactInspector",
     "ArtifactManifest",
+    "BinaryTarget",
     "Closure",
     "Component",
     "ConsumerProfile",
