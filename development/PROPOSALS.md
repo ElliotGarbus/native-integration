@@ -1607,16 +1607,62 @@ Landed as a closed denylist in §7.6 — `UIBackgroundModes`,
 because a plist key is application-wide and one answer satisfies every producer
 that asked.
 
-`UIRequiredDeviceCapabilities` is on the list without a motivating example, which
-this file normally treats as insufficient. It is here on the §6.7 parallel: a
-producer's entry silently removes the application from devices lacking the
-hardware, which is exactly the harm §6.7 prevents by refusing to let a producer
-promote a feature to `required`. The same harm through a different door is not a
-new hypothesis.
-
 **Cost, stated plainly:** every application using a push wrapper now writes one
 line it did not write before. That cost *is* the argument — `pycorelocation`
 declined to impose it and was right to.
+
+### The second key, which has no motivating example
+
+`UIRequiredDeviceCapabilities` is on the denylist with **no producer-side
+artifact behind it**, which is the standard at the top of this file being set
+aside rather than met. The gap is real: no iOS SDK examined documents an
+instruction to set this key. Three things carry it anyway, and the first two are
+stronger than the §6.7 parallel this entry originally led with.
+
+**The §6.7 remedy does not transfer, so the choice is binary.** §6.7 does not
+forbid a producer from declaring a feature; it lets the producer declare and
+forces `required = false`. That works because Android has a meaningful
+non-restrictive form — `required="false"` means *I use this if present*, and Play
+does not filter on it. `UIRequiredDeviceCapabilities` has no such form. Listing a
+capability **is** the restriction, and the dictionary spelling's `false` is a
+*different* restriction (the device must not have it), not a relaxation. There is
+nothing to neuter, so the options are to ban the key or to accept the whole
+harm. The parallel that motivated the entry turns out to argue for a stricter
+remedy than §6.7's, not the same one.
+
+**The failure mode is the worst in this specification.** A misused
+`UIBackgroundModes` gives an application more power than it needs: bad, and
+visible — the application runs, and a reviewer can see the key. A misused
+`UIRequiredDeviceCapabilities` makes the application **uninstallable** for a
+slice of users. The build succeeds. Runtime is fine on the developer's device,
+which by definition has the capability. It surfaces as users who never arrive.
+Nothing in the toolchain will ever name it. "Broken far from the cause" is the
+failure this convention exists to prevent, and this is its limit case.
+
+**§10 makes waiting the expensive option.** Relaxing this ban later makes a
+previously *invalid* sidecar valid — a minor revision. Adding it later makes a
+previously *valid* sidecar invalid, which §10 says requires **a new major and a
+new entry-point group name**. Holding out for evidence is therefore not a neutral
+hold; it selects the irreversible direction. (The draft marker suspends both
+today. The decision is made as though it will bind, because it will.)
+
+**The evidence standard is being applied to the wrong motion.** The rule at the
+top of this file — one example is a hypothesis, several are a finding — was built
+to gate *adding* primitives a producer must adopt, where thin evidence means
+shipping a capability that proves wrong and cannot be withdrawn. A denylist entry
+is the opposite motion with the opposite risk profile, and nothing is lost by it:
+a producer that genuinely needs the restriction declares it under
+`plist_capabilities` and the application grants it. Authority moves; capability
+does not.
+
+**Reopening trigger.** A vendor's documented iOS setup that asks an application
+to add `UIRequiredDeviceCapabilities`, or a producer that finds the prerequisite
+form insufficient. Either reopens it, and the fix is a minor revision.
+
+**One narrowing worth recording.** The denylist closes a single door. The
+dictionary spelling was already unreachable through §7.6's exclusion of
+dictionary values, which predates this proposal, so what P28 adds for this key is
+the rejection of the array form alone.
 
 ## P29 — The record gate is not a boolean *(DECIDED: adopted, reader only)*
 
