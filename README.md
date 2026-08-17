@@ -350,6 +350,11 @@ Each check exists because the corresponding mistake shipped at least once. They
 cover mechanical drift only — a section that contradicts itself still needs a
 reader, which is how two of the defects above were found.
 
+`python3 tools/toc.py` and `python3 tools/requirements_table.py` regenerate the
+specification's table of contents and the requirement map; both have a
+`--check` mode that CI runs, because a contents list that silently omits a
+section is worse than none.
+
 `python3 -m pytest` runs the reference reader's own suite, which asks a
 different question of the same files: not whether the documents agree with each
 other, but whether all ten sidecars survive an implementation of the rules the

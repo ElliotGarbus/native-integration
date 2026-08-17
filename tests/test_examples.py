@@ -120,6 +120,30 @@ def test_the_pystripe_pair_blocks_when_the_application_answers_nothing():
     assert {"application-value-unsupplied", "component-export-unapproved"} <= codes
 
 
+def test_the_specs_own_complete_example_is_valid(tmp_path):
+    """§5.1 shows a whole sidecar. The reader is what proves it is a real one."""
+    spec = (ROOT / "SPEC.md").read_text(encoding="utf-8")
+    block = next(
+        b for b in spec.split("```toml")[1:] if "examplytics" in b
+    ).split("```")[0]
+    root = tmp_path / "examplytics" / "_native"
+    root.mkdir(parents=True)
+    (root / "native.toml").write_text(block, encoding="utf-8")
+    source = source_from_path(root, distribution="examplytics", version="1.0.0")
+
+    for platform in Platform:
+        sidecar, bag = check_sidecar(source, platform=platform, profile=REVIEW)
+        assert sidecar is not None and bag.ok, f"[{platform}]\n{bag.render()}"
+
+    android, _ = check_sidecar(source, platform=Platform.ANDROID, profile=REVIEW)
+    ios, _ = check_sidecar(source, platform=Platform.IOS, profile=REVIEW)
+    # It is meant to show all three categories of §2.1 at once.
+    assert android.android.java_namespaces          # owns
+    assert android.android.application_values       # requires
+    assert android.android.permissions              # contributes
+    assert ios.ios.prerequisites and ios.ios.swift_packages
+
+
 def test_the_readme_kivmob_sidecar_is_valid(tmp_path):
     """The README's headline example, read as a sidecar rather than as prose."""
     readme = (ROOT / "README.md").read_text(encoding="utf-8")

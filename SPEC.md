@@ -23,6 +23,68 @@ tool discovers, validates, and stages that material.
 
 ---
 
+## Contents
+
+Writing a sidecar? [§5.1](#51-a-complete-sidecar) shows one whole, and
+[Appendix D](#appendix-d-declaration-reference) lists every key it may contain.
+Building a tool that reads them? [§8](#8-consuming-tool-requirements) is the
+checklist, and §§3–7 are what it refers to.
+
+<!-- toc -->
+
+- [1. Terminology](#1-terminology)
+- [2. Overview](#2-overview)
+  - [2.1 Design principles](#21-design-principles)
+  - [2.2 How the application answers](#22-how-the-application-answers)
+- [3. Discovery](#3-discovery)
+  - [3.1 The entry point](#31-the-entry-point)
+  - [3.2 Resolution](#32-resolution)
+  - [3.3 Iteration, not lookup](#33-iteration-not-lookup)
+  - [3.4 Multiple entries](#34-multiple-entries)
+  - [3.5 The distribution is the carrier](#35-the-distribution-is-the-carrier)
+- [4. The sidecar file](#4-the-sidecar-file)
+  - [4.1 Location and name](#41-location-and-name)
+  - [4.2 One file, all platforms](#42-one-file-all-platforms)
+  - [4.3 Contract version](#43-contract-version)
+  - [4.4 Unknown keys fail closed](#44-unknown-keys-fail-closed)
+  - [4.5 Platform support](#45-platform-support-platforms)
+- [5. Structure](#5-structure)
+  - [5.1 A complete sidecar](#51-a-complete-sidecar)
+  - [5.2 Every table at a glance](#52-every-table-at-a-glance)
+- [6. Android](#6-android)
+  - [6.1 Ownership](#61-ownership-androidowns)
+  - [6.2 Build requirements](#62-build-requirements-androidrequires)
+  - [6.3 Application-supplied values](#63-application-supplied-values-androidrequiresapplicationvalues)
+  - [6.4 Source](#64-source-androidcontributessrc)
+  - [6.5 Gradle dependencies](#65-gradle-dependencies-androidcontributesgradledependencies)
+  - [6.6 Maven repositories](#66-maven-repositories-androidcontributesgradlerepositories)
+  - [6.7 Permissions and features](#67-permissions-and-features-androidcontributespermissions-androidcontributesfeatures)
+  - [6.8 Manifest components](#68-manifest-components-androidcontributescomponents)
+  - [6.9 Shrinker keep patterns](#69-shrinker-keep-patterns-androidcontributesr8)
+- [7. iOS](#7-ios)
+  - [7.1 Symbol prefixes](#71-symbol-prefixes-ios)
+  - [7.2 Build requirements](#72-build-requirements-iosrequires)
+  - [7.3 Application prerequisites](#73-application-prerequisites-iosrequires)
+  - [7.4 Swift packages](#74-swift-packages-ioscontributesswiftpackages)
+  - [7.5 Source](#75-source-ioscontributessrc)
+  - [7.6 Info.plist](#76-infoplist-ioscontributesinfoplist)
+  - [7.7 Python modules](#77-python-modules-ioscontributespythonmodules)
+- [8. Consuming tool requirements](#8-consuming-tool-requirements)
+- [9. Recording and review](#9-recording-and-review)
+- [10. Versioning](#10-versioning)
+- [11. Out of scope](#11-out-of-scope)
+- [12. Guidance for package authors](#12-guidance-for-package-authors)
+  - [12.1 Framework bindings, where the guidance does not apply](#121-framework-bindings-where-the-guidance-does-not-apply)
+- [Appendix A: why contributions stay per-distribution](#appendix-a-why-contributions-stay-per-distribution)
+- [Appendix B: why not a build backend](#appendix-b-why-not-a-build-backend)
+- [Appendix C: prior art](#appendix-c-prior-art)
+- [Appendix D: declaration reference](#appendix-d-declaration-reference)
+- [Appendix E: a record that satisfies §9](#appendix-e-a-record-that-satisfies-9)
+
+<!-- /toc -->
+
+---
+
 ## 1. Terminology
 
 The key words **MUST**, **MUST NOT**, **SHOULD**, **SHOULD NOT**, and **MAY** are
@@ -501,6 +563,100 @@ indistinguishable, and the second is the one that breaks applications.
 > this key becomes a restatement and **SHOULD** be deprecated in favour of it.
 
 ## 5. Structure
+
+A sidecar whole, and then every table it may contain. §§6–7 take the same
+material apart key by key.
+
+### 5.1 A complete sidecar
+
+Nothing here is special. This is an ordinary `native.toml` for a wrapper around
+a hypothetical cross-platform analytics SDK — the shape the problem statement
+opens with, where an application author would otherwise transcribe a screenful
+of build configuration out of a README.
+
+```toml
+# examplytics/_native/native.toml
+contract = "1"
+platforms = ["android", "ios"]
+
+# ---------------------------------------------------------------- Android ---
+
+[android.owns]
+java_namespaces = ["org.example.analytics"]
+
+[android.requires]
+min_sdk = 24
+compile_sdk = 35
+
+# The one thing the package cannot know.
+[[android.requires.application_values]]
+id = "analytics_key"
+reason = "Your project key, from the vendor console under Settings → Client Keys"
+manifest_meta_data = "com.example.analytics.API_KEY"
+
+[android.contributes.src]
+java = ["java"]
+
+[[android.contributes.gradle_dependencies]]
+coordinate = "com.example.analytics:android-sdk:4.2.0"
+
+[[android.contributes.permissions]]
+name = "android.permission.INTERNET"
+reason = "Event delivery"
+
+[[android.contributes.components]]
+kind = "service"
+name = "org.example.analytics.DeliveryService"
+
+  [[android.contributes.components.intent_filters]]
+  action = "com.example.analytics.DELIVER"
+
+[android.contributes.r8]
+keep_classes = ["org.example.analytics.**"]
+
+# -------------------------------------------------------------------- iOS ---
+
+[ios]
+swift_symbol_prefixes = ["ExampleAnalytics"]
+
+[ios.requires]
+deployment_target = "15.0"
+
+[[ios.requires.usage_descriptions]]
+key = "NSUserTrackingUsageDescription"
+conditional = true
+reason = """\
+Required only if you enable attribution. The sentence is yours to write: it is \
+shown to the user and read by App Store review."""
+
+[[ios.contributes.swift_packages]]
+name = "ExampleAnalytics"
+url = "https://github.com/example/analytics-swift"
+requirement = { from = "4.2.0" }
+products = ["ExampleAnalytics"]
+
+[ios.contributes.info_plist.append]
+LSApplicationQueriesSchemes = ["exampleanalytics"]
+```
+
+Read it as the three categories of §2.1. It **owns** a Java namespace, so no
+other distribution may write into it. It **requires** two SDK floors, a value
+only the application has, and — on iOS, and only if a feature is used — a
+purpose string the producer must not write. Everything else it **contributes**:
+source, a Maven coordinate, a permission, a service the SDK dispatches to, a
+shrinker rule, a Swift package, one `Info.plist` array entry.
+
+What it does **not** contain is as instructive. No entitlement, no background
+mode, no URL registration, no `Info.plist` key that grants a capability: those
+are the application's, and §7.3 is where a producer asks for them. No commands,
+no scripts, no build plugin (§2.1). No credential, in any field (§6.6). The
+application's reply — the analytics key, and any acknowledgement — lives in the
+consumer's own configuration and never in this file (§2.2).
+
+[`examples/pystripe/`](examples/pystripe/) carries both halves of one
+integration, sidecar and application reply side by side.
+
+### 5.2 Every table at a glance
 
 ```toml
 contract = "1"                   # §4.3 — required
