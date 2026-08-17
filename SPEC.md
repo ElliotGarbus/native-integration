@@ -729,45 +729,40 @@ resolve any conflict by file or copy order:
 1. Every contributed source file's path **and** its declared `package` **MUST**
    fall under an owned namespace.
 2. Every producer-sourced manifest component name (§6.8) **MUST** fall under an
-   owned namespace. (A component attributed to a declared dependency via
-   `from_dependency` is exempt — its class is the dependency's, not the
-   producer's.)
-3. Every `keep_classes` pattern (§6.9) **MUST** fall within an owned
-   namespace. Dependency keeps are checked against the resolved artifact
-   instead.
-4. An owned namespace under a reserved prefix **MUST** be rejected. Reserved
-   prefixes are the bootstrap/runtime namespaces of the known Python-mobile
-   toolchains — `org.kivy.android`, `org.libsdl.app`, `org.jnius`,
-   `org.renpy.android` (Kivy / python-for-android), `com.chaquo.python`
-   (Chaquopy), `org.beeware.android` (Briefcase) — plus any namespace the
-   consumer's own generated bootstrap occupies. The shared portion of the list
-   is deliberately consumer-independent: a distribution must not be able to
-   clobber one toolchain's runtime just because a different toolchain built the
-   application.
+   owned namespace. A component attributed to a declared dependency is exempt;
+   the class is not the producer's.
+3. Every `keep_classes` pattern **MUST** fall within an owned namespace.
+   Dependency keeps are checked differently (§6.9).
+4. An owned namespace under a reserved prefix **MUST** be rejected: the
+   bootstrap namespaces of the known Python-mobile toolchains —
+   `org.kivy.android`, `org.libsdl.app`, `org.jnius`, `org.renpy.android`
+   (Kivy / python-for-android), `com.chaquo.python` (Chaquopy),
+   `org.beeware.android` (Briefcase) — plus any namespace the consumer's own
+   generated bootstrap occupies.
 5. Two distributions claiming overlapping namespaces **MUST** fail, naming both.
 
-**Containment is computed on dot-separated segments, never on raw strings.** A
-namespace *A* contains a namespace *B* when *B* equals *A*, or when *B* begins
-with *A* followed by a `.`. The same rule governs rule 4's reserved prefixes. So `org.kivy.android` contains `org.kivy.android.helpers`
-and does **not** contain `org.kivy.androidx`; `PyGMA` does not contain
-`PyGMAKit`.
-
-> Rationale: a raw string-prefix test produces false collisions that block
-> legitimate distributions, and — in §6.9, where the test widens a keep scope
-> rather than narrowing a claim — false *acceptances*. It is the most likely
-> point of divergence between two conforming implementations, so it is stated
-> once and referenced.
+**Containment is computed on dot-separated segments, never on raw strings**, in
+rule 4 as in rule 5. A namespace *A* contains a namespace *B* when *B* equals
+*A*, or when *B* begins with *A* followed by a `.`: `org.kivy.android` contains
+`org.kivy.android.helpers` and does **not** contain `org.kivy.androidx`;
+`PyGMA` does not contain `PyGMAKit`.
 
 An owned namespace **SHOULD** be reverse-DNS. A consumer **SHOULD** warn on a
-single-label namespace (`PyGMA`): it is ownable and collision-checked like any
-other, but it claims a top-level name on behalf of one distribution and makes
-accidental overlap with a sibling project markedly more likely.
+single-label one (`PyGMA`): ownable and collision-checked like any other, but it
+claims a top-level name for a single distribution, which makes accidental
+overlap with a sibling project far likelier.
 
-> Rationale: without rule 4, a distribution shipping
-> `org/kivy/android/PythonActivity.java` replaces the application's own entry
-> point — unauthenticated, reachable through any transitive dependency. The
-> exclusivity model parallels Cargo's `links` key, which permits only one crate
-> to claim a native library.
+> Rationale. Rule 4 is what stops a distribution shipping
+> `org/kivy/android/PythonActivity.java` from silently replacing the
+> application's entry point, and its shared list is consumer-independent so that
+> one toolchain's runtime cannot be clobbered because a different toolchain
+> built the application. Rule 5's exclusivity parallels Cargo's `links` key,
+> which permits only one crate to claim a native library.
+>
+> Segment containment earns its own paragraph because a raw string-prefix test
+> produces false collisions that block legitimate distributions and — in §6.9,
+> where the test widens a keep scope rather than narrowing a claim — false
+> *acceptances*.
 
 ### 6.2 Build requirements: `[android.requires]`
 
