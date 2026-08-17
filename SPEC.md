@@ -619,17 +619,12 @@ distribution, when the application's configured value is lower. A consumer
 target_sdk = 33
 ```
 
-> An earlier revision excluded it, on the grounds that `targetSdk` selects
-> platform behaviours across the whole application rather than the producer's
-> surface, so a producer able to raise it would change how unrelated code
-> behaves. That argues against *raising* — which no floor does, per the
-> paragraph above. Excluding a machine-checkable requirement and telling
-> producers to mention it in prose was the inconsistency, not the risk.
->
-> The case is real: `POST_NOTIFICATIONS` is only requested at runtime when the
-> application targets 33 or higher. Below that the permission is granted at
-> install time and a push package's permission request silently does nothing —
-> exactly the failure this specification exists to surface.
+> Why a floor and not an exclusion. `POST_NOTIFICATIONS` is only requested at
+> runtime when the application targets 33 or higher. Below that the permission is
+> granted at install time and a push package's permission request silently does
+> nothing — exactly the failure this specification exists to surface. A
+> machine-checkable requirement left to producers to mention in prose is not a
+> smaller risk, only a quieter one.
 
 `target_sdk` is nonetheless the most invasive of the three, because raising it
 changes behaviour in code that has nothing to do with the producer. §12's
@@ -1168,10 +1163,10 @@ forms, distinguished by **whose classes are being kept**:
   pattern, and the artifact the stray class came from.
 
 > **Why dependency keeps are checked against the archive rather than the Maven
-> group.** An earlier revision gated them on the pattern falling under the
-> dependency's group ID, which is wrong often enough to matter: Maven
-> coordinates and Java packages are different namespace systems that only
-> conventionally coincide. `com.squareup.okhttp3:okhttp` ships `okhttp3.*`, and
+> group.** Gating them on the pattern falling under the dependency's group ID
+> looks equivalent and is wrong often enough to matter: Maven coordinates and
+> Java packages are different namespace systems that only conventionally
+> coincide. `com.squareup.okhttp3:okhttp` ships `okhttp3.*`, and
 > `com.squareup.retrofit2:retrofit` ships `retrofit2.*` — both perfectly
 > legitimate, both rejected by a group check before anything could look at the
 > artifact that would have proved them right.
@@ -1409,7 +1404,7 @@ accept `FirebaseOptions` programmatically, and Analytics on Apple platforms does
 not.
 
 **`app_extensions`** — `id` names the requirement, and `kind` is a closed
-vocabulary: `notification_service` and `location_push` in this revision. The
+vocabulary: `notification_service` and `location_push` in version 1. The
 application creates the target, writes its source, and configures its bundle
 identifier, entitlements and `Info.plist`.
 
@@ -1477,8 +1472,8 @@ as contributions. Version 1 names two:
 | `UIBackgroundModes` | Grants background execution. It is a claim about what the application does when the user is not looking, it costs battery, and App Store review scrutinizes it |
 | `UIRequiredDeviceCapabilities` | **Restricts installation.** A producer adding an entry silently removes the application from devices lacking that hardware — precisely the harm §6.7 forbids by refusing to let a producer promote a feature to `required` |
 
-> Rationale. This is §2.1's rule applied to a case §7.6 originally missed:
-> *when the application owns the artifact, state the need rather than
+> Rationale. This is §2.1's rule applied to a boundary a type constraint cannot
+> draw: *when the application owns the artifact, state the need rather than
 > contributing.* A background mode written by a producer is half a requirement —
 > the handler, the battery cost and the review answer all remain the
 > application's — and §2.1 says plainly that half a requirement is worse than a
@@ -1884,9 +1879,8 @@ A conforming consumer **SHOULD**:
 
 The integration record serves two purposes: **review** of the native surface an
 application is acquiring, and **integrity** of the inputs and resolved artifacts
-that produced it. An earlier revision of this section claimed the first and
-disclaimed the second; per-file hashes, per-artifact checksums and failing on
-drift are integrity, and the record does both.
+that produced it. Per-file hashes, per-artifact checksums and failing on drift
+are what make the second more than a claim.
 
 The lifecycle is:
 
@@ -2084,23 +2078,18 @@ valid sidecar invalid, requires a new major version and a new group name.
 
 **That rule binds from the moment the draft marker at the top of this document is
 removed, and not before.** While the specification is a draft it is amended in
-place, and this revision has twice done what the paragraph above forbids —
-§7.6 now rejects usage-description keys it once accepted, and §6.5's dependency
-forms changed shape. Both were corrections found by expressing real packages
-against the text. No contract minor was allocated for the capabilities added
-alongside them, because there is no released version to negotiate against yet.
+place, and this one has done what the paragraph above forbids more than once:
+§7.6 now rejects usage-description keys and capability keys it once accepted,
+and §6.5's dependency forms changed shape. Each was a correction found by
+expressing real packages against the text, or by implementing it. No contract
+minor was allocated for the capabilities added alongside them, because there is
+no released version to negotiate against yet.
 
 Anticipated minor-revision work, deliberately excluded from version 1: verified
 App Links (`autoVerify`) and further filter forms beyond `view_links`;
 conditional contributions (a `when` key with a **closed vocabulary** of
 conditions such as ABI or simulator/device — not an expression language);
 further Gradle configurations; and further namespace-scoped shrinker rule forms.
-
-Two items previously listed here have been **removed rather than deferred**.
-Typed Info.plist dictionary structures are now excluded by design (§7.6).
-Per-producer Swift modules are unnecessary for their motivating case: a producer
-that follows §7.4 already compiles into its own module, and the remedy for §7.5
-is the narrower scope stated there rather than new machinery (§7.1).
 
 ## 11. Out of scope
 
@@ -2136,9 +2125,9 @@ reporting optional, the two would differ only by whether the consumer bothered.
 cannot write the application's entitlements, `Info.plist`, bundle contents,
 build targets or URL registrations — but it can and should *declare that it
 needs them*, and a consumer must report those requirements and fail when they
-are unmet. That is what §7.3 is, and it has grown to six kinds of prerequisite
-plus §6.6's repository credentials. The excluded thing is the producer reaching
-into the application's configuration, not the producer having a say in it.
+are unmet. That is what §7.3 is: six kinds of prerequisite, plus §6.6's
+repository credentials. The excluded thing is the producer reaching into the
+application's configuration, not the producer having a say in it.
 
 **Build-time uploads are an excluded category, not one product.** Any SDK whose
 value depends on uploading build artifacts — symbol files, mapping files, source
