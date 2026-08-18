@@ -361,8 +361,8 @@ yields a wheel that installs cleanly and a build that never finds the sidecar.
 
 A consumer **MUST** resolve declarations as follows:
 
-1. Determine the candidate set: the **resolved dependency closure of the
-   application** for the target platform. A consumer operating in an isolated
+1. Determine the candidate set: the **resolved dependency closure** (§1) **of
+   the application** for the target platform. A consumer operating in an isolated
    environment containing exactly that closure **MAY** treat all installed
    distributions as candidates.
 2. For each candidate, read entry points in the group `native_integration.v1`
@@ -371,8 +371,16 @@ A consumer **MUST** resolve declarations as follows:
    e.g. `mypkg._native` → `mypkg/_native/` — and read `native.toml` inside it.
 
 A consumer **MUST NOT** accept contributions from distributions outside the
-closure: a debugging tool that happens to be installed beside the application,
-and happens to ship a sidecar, must not configure it.
+closure, regardless of what else is installed alongside it.
+
+> Rationale: `importlib.metadata` has no concept of "the application's
+> dependencies" — it enumerates entry points across whatever is installed.
+> Resolving the closure into a clean environment that contains nothing else is
+> what makes step 1's shortcut sound: only there does "installed" coincide with
+> "in the closure," so the consumer can skip writing its own filter. Outside
+> such an environment the two sets diverge, and the consumer must compute the
+> closure itself and filter against it rather than trust what it finds
+> installed.
 
 A consumer **MUST** access the sidecar and every resource it references through
 the distribution's metadata/file-resource interface
