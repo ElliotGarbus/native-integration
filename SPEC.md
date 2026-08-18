@@ -39,7 +39,7 @@ checklist, and §§3–7 are what it refers to.
 - [1. Terminology](#1-terminology)
 - [2. Overview](#2-overview)
   - [2.1 Design principles](#21-design-principles)
-  - [2.2 How the application answers](#22-how-the-application-answers)
+  - [2.2 How the application answers, at build time](#22-how-the-application-answers-at-build-time)
     - [What a consumer must be able to ask](#what-a-consumer-must-be-able-to-ask)
     - [The join key is not the consumer's to choose](#the-join-key-is-not-the-consumers-to-choose)
     - [Three answers, end to end](#three-answers-end-to-end)
@@ -130,11 +130,6 @@ the declared material into the native project it generates.
 Nothing in this specification requires a change to any packaging standard, a
 custom build backend, or a new artifact type.
 
-```
-producer's pyproject.toml          →  wheel  →  site-packages  →  consumer
-  [project.entry-points.…]            .dist-info/entry_points.txt
-  package data                        pkg/_native/native.toml
-```
 
 ### 2.1 Design principles
 
@@ -160,41 +155,37 @@ The categories carry the security model: ownership claims are exclusive and
 collision-checked; requirements are reported and verified, never auto-satisfied;
 contributions are staged, attributed, and disclosed per §9.
 
-A consumer may still *place* a value it was given — writing an
-application-supplied value into the manifest (§6.3), or a credential into
-repository configuration (§6.6). What it must never do is originate one. The
-distinction is between carrying the application's answer and inventing it.
+**Never originate what belongs to the application.** Where the application owns
+the artifact — an entitlement, its `Info.plist`, its bundle, an extra build
+target, a URL registration — a producer **MUST** declare a requirement and stop,
+not attempt a contribution (§7.3). The same rule binds the consumer at build
+time: it may *place* a value it was given — an application-supplied value into
+the manifest (§6.3), a credential into repository configuration (§6.6) — but it
+must never invent one. A producer that needs a Mapbox download token (§6.6), for
+instance, declares the requirement and stops; the token comes from the
+application, and the consumer's only job is to write that supplied value into
+the generated repository configuration, never to source or default it.
 
-**When the application owns the artifact, state the need rather than
-contributing.** An application's entitlements, its `Info.plist`, its bundle, its
-extra build targets and its URL registrations belong to the application, and a
-producer's job for those is to declare what it requires and stop (§7.3). This is
-not a stylistic preference: a contribution that writes half of a two-part
-requirement is worse than a prerequisite reporting both, because it looks
-finished. Several capabilities that were first drafted as contributions belong
-here for exactly that reason.
+**Unrecognized declarations fail closed.** A consumer **MUST NOT** silently
+skip a contribution it does not understand (§4.4) — doing so ships an
+application that is broken at runtime, far from the cause.
 
-**Unrecognized declarations fail closed.** A consumer never silently ignores a
-contribution it does not understand (§4.4) — a build that omits declared native
-material produces a broken application that fails far from the cause.
-
-**Contributions stay per-distribution.** Provenance survives from declaration to
-diagnostic; see Appendix A. Concretely, a consumer **MUST** name the
+**Contributions stay per-distribution.** A consumer **MUST** name the
 contributing distribution in **every** diagnostic it emits about declared
-material — not only the ones this specification spells out individually.
-Attribution is the property that makes a transitive contribution reviewable at
-all, and a diagnostic that omits it sends the reader to the wrong repository.
+material — not only the ones this specification spells out individually
+(Appendix A explains why). Skip that, and a transitive contribution stops being
+reviewable: the diagnostic points the reader at the wrong repository.
 
-**Native dependency resolution MUST be reproducible.** Every dependency a
-producer contributes must resolve identically from the same integration record;
-see §6.5 and §7.4.
+**Native dependency resolution MUST resolve identically from the same
+integration record**, every time, for every dependency a producer contributes
+(§6.5, §7.4).
 
-### 2.2 How the application answers
+### 2.2 How the application answers, at build time
 
-Every `requires` in this specification is answered by the **application**,
-through the **consumer's own configuration**. This specification defines the
-capability a consumer must provide and never the spelling: two conforming
-consumers will ask for the same value in different words, and that is expected.
+The **application** answers every `requires` in this specification, through
+the **consumer's own configuration**. This specification mandates the
+capability a consumer must offer, never its spelling: two conforming
+consumers can ask for the same value in different words, and that is expected.
 
 #### What a consumer must be able to ask
 
@@ -233,7 +224,13 @@ application to commit.
 
 A consumer's spelling is its own, but the *key*
 an application answers under is not: it comes from the declaration, so that an
-answer can be matched to the requirement that asked for it.
+answer can be matched to the requirement that asked for it. For example, a
+producer that declares `id = "sentry_dsn"` (§6.3) fixes that string as the join
+key. A consumer can nest the answer under any config path it likes — say,
+`[tool.examplebuild.native.pysentry.android.application_values]` — but to
+satisfy the requirement the application must answer with that same key inside
+it: `sentry_dsn = "https://…"`. The path around it is the consumer's spelling;
+`sentry_dsn` is the producer's, and the application supplies it verbatim.
 
 **A producer-local identifier is scoped by its distribution.** Where the join key
 is an `id` the producer invents rather than a name the platform defines, the
