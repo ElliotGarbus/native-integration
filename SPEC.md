@@ -444,7 +444,7 @@ Platform support is **not** symmetric with this, which is why §4.5 exists. No
 enforceable standard metadata carries "this distribution does not function on
 Android" for a distribution whose own content is pure Python: wheel platform
 tags require platform-specific content, and `Classifier: Operating System ::
-Android` is informational and enforced by nothing.
+Android` is only informational.
 
 ## 4. The sidecar file
 
@@ -464,11 +464,13 @@ mypkg/
     swift/…              ← optional, per §7.5
 ```
 
-The sidecar directory **MUST** contain an `__init__.py` (typically empty), so
-that the sidecar directory is a **regular** package rather than relying on
-implicit namespace-package behaviour, giving the entry-point reference one
-portable and unambiguous form. It serves the packaging metadata, not this
-convention, which never imports it (§3.2).
+The sidecar directory **MUST** contain an `__init__.py` (typically empty).
+
+> Rationale: without it, the directory is only a namespace package (PEP 420),
+> and implicit namespace-package resolution is not guaranteed to behave
+> identically across import systems — so the entry point's dotted-path
+> reference would not be reliably portable. A regular package makes it one
+> unambiguous thing.
 
 **Referenced resources.** Every path a sidecar declares is interpreted relative
 to `native.toml` and **MUST NOT** escape its directory, checked **after** path
@@ -478,10 +480,15 @@ source files **MUST** be UTF-8 encoded.
 
 **The sidecar directory is build input, not application payload.** A consumer
 **MUST** exclude it — `native.toml` and every resource under it — from any
-Python payload it assembles for the device. Its contents have already been
-consumed at build time: contributed source is compiled by the application's own
-toolchain (§6.4, §7.5), and shipping a second copy inside the application would
-be dead weight at best and a stale duplicate at worst.
+Python payload it assembles for the device.
+
+> Rationale: its contents have already been consumed at build time —
+> contributed source is compiled by the application's own toolchain (§6.4,
+> §7.5) — so a second copy inside the application is at best dead weight. At
+> worst it is a regression: source that compilation had already turned into
+> something less directly readable now ships a second time as plain,
+> human-readable text, undoing whatever protection the build step gave a
+> producer's proprietary glue code.
 
 ### 4.2 One file, all platforms
 
@@ -570,28 +577,22 @@ distribution and how it entered the dependency closure (§9).
   consumer **MUST** reject it, naming the distribution.
 - **Omitting the key makes no claim**, and is the default.
 
-Should a future packaging standard express platform support enforceably for
-pure-Python distributions, this key becomes a restatement of it and **SHOULD**
-be deprecated in favour of it.
+**A missing platform table and a missing platform name are different claims.**
+No `[ios]` table means *"I contribute no native material on iOS."* The package
+may still work there; it just needs nothing. Omitting `android` from
+`platforms = ["ios"]` means something stronger: *"I do not function on Android
+at all."*
 
-**This is not the same as declaring no platform table.** Absence of an `[ios]`
-table means *"I contribute no native material on iOS"* — which is true of a
-package that works fine there and simply needs nothing. `platforms` means *"I do
-not work there."* Version 1 could express only the first, so the two facts were
-indistinguishable, and the second is the one that breaks applications.
-
-> Rationale: a distribution binding a platform-specific framework installs
-> perfectly well on the wrong platform — its own content is pure Python, so
-> nothing in the wheel objects. The application builds, and the failure arrives
-> at `import`, or worse does not arrive at all: a facade whose unimplemented
-> branch is a bare `pass` produces an application that runs and silently does
-> nothing. That is the failure mode §4.4 exists to prevent, reaching the
-> application through a door §4.4 does not watch.
+> Rationale: a platform-specific framework's Python wrapper installs fine on
+> the wrong platform — its own content is pure Python, so nothing in the wheel
+> objects. The build succeeds. The failure shows up later, at `import`, or not
+> at all: a facade with an unimplemented branch that is just `pass` runs and
+> does nothing, silently. §4.4 cannot catch this — there is no key to reject,
+> only a distribution that does not work here.
 >
-> This is deliberately a claim about the **distribution**, not about its native
-> material, which makes it the one key here that reaches beyond this
-> specification's usual scope. It earns that on the reasoning in §3.5: the
-> mechanism that ought to carry it does not exist.
+> This key makes a claim about the **distribution**, not about native
+> material. That reaches beyond this specification's usual scope, but no other
+> mechanism carries the claim today (§3.5).
 
 ## 5. Structure
 
@@ -938,8 +939,17 @@ Path rules per §4.1. From each listed directory the consumer stages, recursivel
 exactly the files with the matching extension — `.java` for `java` roots, `.kt`
 for `kotlin` roots — and ignores other files. Contents **MUST** be source text;
 a consumer **MUST** compile them with the application's own toolchain, and
-**MUST** exclude them from any Python payload it assembles. Subject to §6.1
-rule 1.
+**MUST** exclude them from any Python payload it assembles. A consumer **MUST**
+compile `.java` sources with UTF-8 forced, never the platform default. Subject
+to §6.1 rule 1.
+
+> Rationale: `kotlinc` and the Swift compiler (§7.5) always read source as
+> UTF-8; `javac` does not — it falls back to the platform default charset
+> unless told otherwise. Without forcing it here, §4.1's UTF-8 requirement on
+> the producer's side guarantees nothing: a validly UTF-8-encoded `.java` file
+> can still be misread on a consumer whose environment defaults elsewhere,
+> corrupting non-ASCII content or failing to compile, through no fault of the
+> producer's.
 
 ### 6.5 Gradle dependencies: `[[android.contributes.gradle_dependencies]]`
 
@@ -2003,7 +2013,7 @@ gives the thematic reading:
 | **Never satisfy a prerequisite** | 6, 8, 21, 22, 23, 25 |
 | The application's authority | 7 |
 | Native dependency resolution | 10, 12, 16 |
-| Generated manifest and project material | 11, 13, 20, 24 |
+| Generated manifest and project material | 11, 13, 20, 24, 27 |
 | Recording, disclosure, attribution | 9, 15, 19, 25 |
 | Platform applicability | 18 |
 | The application's side of the contract | 7, 26 |
@@ -2104,6 +2114,8 @@ A conforming consumer **MUST**:
     **by indirection** rather than only as a literal in a committed file (§2.2).
     Reject a sidecar declaring two `app_extensions` or `url_schemes` entries
     under one `id`, which the application could not answer separately (§7.3).
+27. Compile contributed `.java` sources with UTF-8 forced, never the platform
+    default (§6.4).
 
 > Rationale for 16. Every other rule here assumes native resolution *succeeds*.
 > It need not: two distributions in one closure can declare native dependencies
