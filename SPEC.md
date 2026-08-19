@@ -613,29 +613,36 @@ platforms = ["android", "ios"]
 
 # ---------------------------------------------------------------- Android ---
 
+# Reserves this Java namespace; no other distribution may write into it.
 [android.owns]
 java_namespaces = ["org.example.analytics"]
 
+# SDK floors the application must build against.
 [android.requires]
 min_sdk = 24
 compile_sdk = 35
 
-# The one thing the package cannot know.
+# The application supplies this value at build time, keyed by this
+# distribution's id.
 [[android.requires.application_values]]
 id = "analytics_key"
 reason = "Your project key, from the vendor console under Settings → Client Keys"
 manifest_meta_data = "com.example.analytics.API_KEY"
 
+# Java sources the consumer compiles into the application.
 [android.contributes.src]
 java = ["java"]
 
+# The SDK itself, pulled in via Gradle.
 [[android.contributes.gradle_dependencies]]
 coordinate = "com.example.analytics:android-sdk:4.2.0"
 
+# Needed to deliver events over the network.
 [[android.contributes.permissions]]
 name = "android.permission.INTERNET"
 reason = "Event delivery"
 
+# A service the SDK dispatches delivery events to.
 [[android.contributes.components]]
 kind = "service"
 name = "org.example.analytics.DeliveryService"
@@ -643,17 +650,22 @@ name = "org.example.analytics.DeliveryService"
   [[android.contributes.components.intent_filters]]
   action = "com.example.analytics.DELIVER"
 
+# Keeps the SDK's classes through shrinking/obfuscation.
 [android.contributes.r8]
 keep_classes = ["org.example.analytics.**"]
 
 # -------------------------------------------------------------------- iOS ---
 
+# Namespaces the Swift symbols this sidecar generates (§7.5).
 [ios]
 swift_symbol_prefixes = ["ExampleAnalytics"]
 
+# SDK floor the application must build against.
 [ios.requires]
 deployment_target = "15.0"
 
+# A purpose string only the application can write, and only if attribution
+# is enabled (§7.6).
 [[ios.requires.usage_descriptions]]
 key = "NSUserTrackingUsageDescription"
 conditional = true
@@ -661,12 +673,14 @@ reason = """\
 Required only if you enable attribution. The sentence is yours to write: it is \
 shown to the user and read by App Store review."""
 
+# The SDK itself, pulled in via Swift Package Manager.
 [[ios.contributes.swift_packages]]
 name = "ExampleAnalytics"
 url = "https://github.com/example/analytics-swift"
 requirement = { from = "4.2.0" }
 products = ["ExampleAnalytics"]
 
+# Registers the URL scheme the SDK needs to detect other apps.
 [ios.contributes.info_plist.append]
 LSApplicationQueriesSchemes = ["exampleanalytics"]
 ```
