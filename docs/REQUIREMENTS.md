@@ -54,6 +54,7 @@ returning a clean result.
 | 8.24 | Generate `intent_filters` only on components that are neither exported nor declaring `view_links`, and show each action in the record (§6.8). | `intent-filter-invalid` |
 | 8.25 | Fail when a repository declaring `credentials_required` has no credentials configured, and never write a supplied credential into the generated project, the record, or a diagnostic (§6.6, §9). | `repository-credentials-missing`, `secret-withheld` |
 | 8.26 | Provide a means for the application to answer every `requires`, joined to the declaration by the key §2.2 names, and accept a build-time credential by indirection rather than only as a literal in a committed file (§2.2). Reject a sidecar declaring two `app_extensions` or `url_schemes` entries under one `id`, which the application could not answer separately (§7.3). | `application-value-unsupplied`, `prerequisite-id-duplicate`, `repository-credentials-missing`<br>*structural* — answers.AnswerSource — every requires is answered under (distribution, key) |
+| 8.27 | Compile contributed `.java` sources with UTF-8 forced, never the platform default (§6.4). | — |
 
 ## Advisory obligations (§8's SHOULD list)
 
