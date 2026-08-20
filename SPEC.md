@@ -325,6 +325,14 @@ A consumer **MAY** accept a literal in place of a reference — a developer
 experimenting should not be blocked — but **MUST NOT** make the literal the only
 option.
 
+**A note for tool authors.** `[tool.*]` is the namespace `pyproject.toml`
+reserves for exactly this — arbitrary, tool-specific configuration (PEP 518).
+Anchoring under your own `tool.<name>` prefix, as every example above does, is
+the natural choice; everything beneath it — nesting, naming, whether you key
+by distribution first or by `id` first — is yours to design. What is fixed is
+only the leaf: the literal join key from the declaration, scoped by the
+declaring distribution wherever the table above requires it.
+
 ## 3. Discovery
 
 ### 3.1 The entry point
@@ -606,6 +614,11 @@ a hypothetical cross-platform analytics SDK — the shape the problem statement
 opens with, where an application author would otherwise transcribe a screenful
 of build configuration out of a README.
 
+In the example below, two tables are worth reading closely. They require
+information only the application has: `[[android.requires.application_values]]`
+asks for the analytics key, and `[[ios.requires.usage_descriptions]]` asks for a
+sentence only the application can honestly write. 
+
 ```toml
 # examplytics/_native/native.toml
 contract = "1"
@@ -688,16 +701,9 @@ LSApplicationQueriesSchemes = ["exampleanalytics"]
 Read it as the three categories of §2.1. It **owns** a Java namespace, so no
 other distribution may write into it. It **requires** two SDK floors, a value
 only the application has, and — on iOS, and only if a feature is used — a
-purpose string the producer must not write. Everything else it **contributes**:
+purpose string the application must provide. Everything else it **contributes**:
 source, a Maven coordinate, a permission, a service the SDK dispatches to, a
 shrinker rule, a Swift package, one `Info.plist` array entry.
-
-What it does **not** contain is as instructive. No entitlement, no background
-mode, no URL registration, no `Info.plist` key that grants a capability: those
-are the application's, and §7.3 is where a producer asks for them. No commands,
-no scripts, no build plugin (§2.1). No credential, in any field (§6.6). The
-application's reply — the analytics key, and any acknowledgement — lives in the
-consumer's own configuration and never in this file (§2.2).
 
 [`examples/pystripe/`](examples/pystripe/) carries both halves of one
 integration, sidecar and application reply side by side.
@@ -747,8 +753,9 @@ Every key above is listed with a one-line description in
 
 ### 6.1 Ownership: `[android.owns]`
 
-*So that two distributions cannot claim the same Java package, and none can
-replace a toolchain's entry point through a transitive dependency.*
+*For claiming a Java namespace as a distribution's own, so no other
+distribution can collide with it or replace a toolchain's entry point through
+a transitive dependency.*
 
 ```toml
 [android.owns]
@@ -759,8 +766,8 @@ java_namespaces = ["org.example.mypkg"]
 Kotlin source (§6.4), producer-sourced manifest components (§6.8), or shrinker
 keep patterns under its own namespace (§6.9).
 
-A consumer **MUST** enforce all of the following, and **MUST** fail rather than
-resolve any conflict by file or copy order:
+A consumer **MUST** enforce every rule below, and **MUST** fail the build when
+any is violated, naming the distribution or distributions responsible:
 
 1. Every contributed source file's path **and** its declared `package` **MUST**
    fall under an owned namespace.
@@ -795,15 +802,14 @@ overlap with a sibling project far likelier.
 > built the application. Rule 5's exclusivity parallels Cargo's `links` key,
 > which permits only one crate to claim a native library.
 >
-> Segment containment earns its own paragraph because a raw string-prefix test
-> produces false collisions that block legitimate distributions and — in §6.9,
-> where the test widens a keep scope rather than narrowing a claim — false
-> *acceptances*.
+> A raw string-prefix test would wrongly count `PyGMAKit` as falling inside
+> `PyGMA` — a false collision here, a false accept in §6.9's `keep_classes`
+> check. Segmenting on `.` is what rules that out.
 
 ### 6.2 Build requirements: `[android.requires]`
 
-*The SDK levels a producer needs, checked as floors — so an application never
-discovers one by hitting a platform behaviour that silently did nothing.*
+*For specifying the minimum SDK levels a build must meet — `compile_sdk`,
+`min_sdk`, `target_sdk` — checked as floors.*
 
 ```toml
 [android.requires]
@@ -819,21 +825,20 @@ distribution, when the application's configured value is lower. A consumer
 
 ```toml
 [android.requires]
+# POST_NOTIFICATIONS is requested at runtime only when targetSdk >= 33.
 target_sdk = 33
 ```
 
-> Why a floor and not an exclusion. `POST_NOTIFICATIONS` is only requested at
-> runtime when the application targets 33 or higher. Below that the permission is
-> granted at install time and a push package's permission request silently does
-> nothing — exactly the failure this specification exists to surface. A
-> machine-checkable requirement left to producers to mention in prose is not a
-> smaller risk, only a quieter one.
+`target_sdk` is the most invasive of the three: raising it changes behaviour
+app-wide, in code that has nothing to do with the producer. Declare it only
+when a specific behaviour depends on it, and say which one in a comment — a
+bare version number tells the reader nothing (§12).
 
-`target_sdk` is nonetheless the most invasive of the three, because raising it
-changes behaviour in code that has nothing to do with the producer. §12's
-guidance — declare only what you **unconditionally** require — applies here with
-more force than anywhere else, and a producer **SHOULD** state in `reason` which
-behaviour it depends on rather than naming a version alone.
+> Why this needs to be a floor. Below SDK 33, `POST_NOTIFICATIONS` is granted
+> at install time instead of requested at runtime, so a push package's runtime
+> request for it silently does nothing. Declaring the floor forces
+> `target_sdk` to be at least 33, turning that mismatch into a build failure
+> instead of an application that ships with notifications silently broken.
 
 ### 6.3 Application-supplied values: `[[android.requires.application_values]]`
 
@@ -859,22 +864,23 @@ manifest_meta_data = "io.sentry.dsn"
   TOML integers or booleans would leave each consumer to invent its own
   serialisation.
 - **`manifest_meta_data`** is **OPTIONAL** and names the `<meta-data>` key the
-  SDK itself reads. Two distributions may deliver to the same key: when the
+  SDK itself reads. Unlike `id`, this key is **not** scoped by distribution —
+  it is a real, platform-global manifest key, so two distributions naming the
+  same one are necessarily talking about the same manifest entry. When the
   supplied values are equal the consumer coalesces them, preserving both
   provenance records; when they differ it **MUST** fail, naming both. A key the
   **application** also sets is the application's — the consumer keeps its value
   and reports the override. When present, the consumer emits
   `<meta-data android:name="<that key>" android:value="<the supplied value>"/>`
-  into the generated manifest. When absent, the value has no manifest
-  destination and exists only to be referenced by a contribution.
+  into the generated manifest, where "the supplied value" is what the
+  application gave for this `id` — never anything the producer or consumer
+  originates. When absent, the consumer emits no manifest entry for this
+  value.
 
-Separating the two matters because they are genuinely different things. In the
-example, Sentry's `SentryInitProvider` — a `ContentProvider` shipped in its own
-library and merged into the application — reads `io.sentry.dsn` during provider
-initialization, which happens before `Application.onCreate` and long before any
-Python runs, so nothing at runtime can supply a value the SDK has already
-consumed. That key is the vendor's. The `id` the application answers under is
-this specification's.
+The  manifest key, when there is one, is fixed by whatever vendor code reads it —
+it is not this specification's to name or scope. The `id` is this
+specification's own handle for the application's answer, and stays usable
+even for a value with no manifest key of its own, as above.
 
 **A value belongs here only when the *build* must embed it** — a manifest entry,
 intent-filter data, anything baked into generated XML that no runtime call can
@@ -887,15 +893,18 @@ SDK reads its application ID from a manifest `<meta-data>` entry and fails at
 startup without it, so the build must embed it. The Next-Gen SDK takes the same
 value programmatically, through `InitializationConfig.Builder(appId)` — a
 wrapper for that SDK declares nothing here and passes the ID from Python
-instead. Same value, same vendor; only one of the two is this table's business.
+instead. The application ID is identical either way; only the legacy SDK's
+build-time reading makes it this table's business — the Next-Gen SDK's
+wrapper declares nothing here.
 
-**Satisfaction.** An application value is satisfied when the application has
-supplied a non-empty value for its `id` through the consumer's own configuration
-— never by hand-editing a manifest. The consumer then delivers it: into
-`manifest_meta_data` if one is declared, and by substitution wherever a
-contribution references the `id`. Until then the consumer emits **nothing** on
-the producer's behalf and fails, naming the distribution and the `reason` (a
-*requires* is checked, never auto-satisfied — §2.1).
+**Satisfying an `application_values` entry.** It is satisfied when the
+application has supplied a non-empty value for its `id` through the consumer's
+own configuration — never by hand-editing a manifest. The consumer then
+delivers it: into `manifest_meta_data` if one is declared, and by substitution
+wherever a contribution references the `id`. If the application has not
+supplied a value, the consumer emits nothing and fails the build, naming the
+distribution and the `reason`. A *requires* is checked, never auto-satisfied
+(§2.1).
 
 > **Why this table is Android-only, and why it stays that way.** No iOS case has
 > needed a build-embedded value: the iOS SDKs examined either take their
@@ -922,11 +931,15 @@ the producer's behalf and fails, naming the distribution and the `reason` (a
 > which is mild duplication in the easy case and the only correct shape in the
 > hard one.
 
-A contribution **MAY** reference an application value **inline** —
-`{ application_value = "<id>" }`, as in §6.8's `view_links` — and the consumer
-substitutes the supplied value where referenced. (This mirrors AGP manifest
-placeholders, the mechanism established Android libraries such as AppAuth
-already use for application-specific values like a redirect scheme.)
+**Inline references.** Some contributed fields need an application value
+spliced directly into them — an OAuth redirect scheme inside an intent
+filter's `scheme` (§6.8's `view_links`), for instance — not merely written to
+a fixed manifest key. For that case, a contribution **MAY** reference an
+application value **inline** instead: `{ application_value = "<id>" }`. The
+consumer substitutes the supplied value wherever the reference appears. (This
+mirrors AGP manifest placeholders, the mechanism established Android
+libraries such as AppAuth already use for application-specific values like a
+redirect scheme.)
 
 **An inline reference MUST resolve to an `id` declared in this table.** A
 consumer **MUST** reject a reference that does not, naming the distribution and
@@ -953,9 +966,9 @@ Path rules per §4.1. From each listed directory the consumer stages, recursivel
 exactly the files with the matching extension — `.java` for `java` roots, `.kt`
 for `kotlin` roots — and ignores other files. Contents **MUST** be source text;
 a consumer **MUST** compile them with the application's own toolchain, and
-**MUST** exclude them from any Python payload it assembles. A consumer **MUST**
-compile `.java` sources with UTF-8 forced, never the platform default. Subject
-to §6.1 rule 1.
+**MUST** exclude the source files from any Python payload it assembles. A
+consumer **MUST** compile `.java` sources with UTF-8 forced, never the platform
+default. Subject to §6.1 rule 1.
 
 > Rationale: `kotlinc` and the Swift compiler (§7.5) always read source as
 > UTF-8; `javac` does not — it falls back to the platform default charset
@@ -967,9 +980,9 @@ to §6.1 rule 1.
 
 ### 6.5 Gradle dependencies: `[[android.contributes.gradle_dependencies]]`
 
-*For the vendor artifacts an integration actually needs: Maven coordinates,
-resolved by Gradle, locked and attributed by §9 rather than transcribed into
-the application's build file by hand.*
+*For a vendor SDK — declared as a Maven coordinate, resolved by
+Gradle, locked and attributed in the integration record described by §9,
+rather than transcribed into the application's build file by hand.*
 
 ```toml
 [[android.contributes.gradle_dependencies]]
@@ -1027,10 +1040,6 @@ record a checksum per resolved artifact, and on subsequent builds **MUST**
 verify each resolved artifact against the recorded checksum and fail on a
 mismatch, naming the artifact and the distribution that declared it.
 
-Recording without verifying would leave the guarantee descriptive: a repository
-can serve different bytes under one coordinate, which is the case the checksum
-exists to catch.
-
 > **"Reproducible" here means artifact identity, not graph identity.** §2.1 says
 > every contributed dependency must resolve identically from the same record. A
 > locked graph alone delivers only the weaker promise — the same modules at the
@@ -1043,11 +1052,12 @@ exists to catch.
 **Choosing between the two forms.** Both are equally reproducible, because the
 lock is what delivers that and it applies to both — §7.4 permits an
 up-to-next-major range on the same reasoning. The exact form is **RECOMMENDED**
-for something the lock does not cover: it tells a reviewer what the build will
-use from the sidecar alone, without consulting the record. A range trades that
-legibility for not having to cut a release on every upstream patch, which
-several SDK vendors' documented coordinates make a real cost. Make that trade
-knowingly.
+for something the lock does not cover: it tells a reviewer the floor this
+producer requires, straight from the sidecar, without consulting the record —
+even though, per the rule above, the resolved version may end up higher. A
+range trades that legibility for not having to cut a release on every upstream
+patch, which several SDK vendors' documented coordinates make a real cost.
+Make that trade knowingly.
 
 **Cross-artifact alignment is not expressible**, and producers of SDK families
 should know it. Every rule here governs **one dependency at a time**. A vendor
@@ -1067,10 +1077,10 @@ whose own manifest AGP merges into the application's; see §9 and §11.
 
 ### 6.6 Maven repositories: `[[android.contributes.gradle_repositories]]`
 
-*For an SDK its vendor does not publish to Maven Central. The most powerful
-thing a sidecar can contribute — an unconstrained repository reaching an
-application through a transitive dependency is a dependency-confusion vector —
-so the rules here are the strictest in this specification.*
+*For an SDK its vendor does not publish to Maven Central. This is the most
+powerful thing a sidecar can contribute — an unconstrained repository can
+reach the application through any transitive dependency, a dependency-confusion
+vector — so the rules here are the strictest in this specification.*
 
 ```toml
 [[android.contributes.gradle_repositories]]
@@ -1107,13 +1117,15 @@ The rule is deliberately blunt for version 1. It is simple to implement, the
 diagnostic writes itself, and it can be relaxed if a real package demonstrates a
 need that ordering rules would serve better.
 
-`exclusiveContent` is a **different and stronger** policy: it additionally makes
-the declared modules resolvable *only* from that repository, which can change
-first-time resolution results. It is not required, and a consumer **MUST NOT**
-substitute it for content filtering, because the same sidecar would then resolve
-differently depending on which mechanism the consumer picked. Should a vendor
-genuinely require exclusivity, that is a future explicit field, not a consumer's
-choice to make.
+**A note on implementation choice: do not reach for Gradle's `exclusiveContent`
+instead of content filtering.** It is a **different and stronger** policy —
+it additionally makes the declared modules resolvable *only* from that
+repository, which can change first-time resolution results. Nothing here
+requires it, and a consumer **MUST NOT** substitute it for content filtering,
+because the same sidecar would then resolve differently depending on which
+mechanism the consumer picked. Should a vendor genuinely require exclusivity,
+that is a future explicit field for the producer to declare, not an
+implementation detail for the consumer to decide on its own.
 
 A consumer **MUST** additionally report repository contributions with distinct
 prominence in the record and report of §9 — never folded into a generic list —
@@ -1154,27 +1166,6 @@ credentials_required = true
 - A consumer **MUST NOT** write supplied credentials into the generated
   project in any persisted form, into the integration record (§9), or into any
   diagnostic.
-
-> The producer prohibition is absolute; the consumer obligation deliberately is
-> not. Given `reason = "use the value abc123"` there is no general algorithm
-> that decides whether `abc123` is a secret, so requiring a consumer to reject
-> credentials "under any spelling" would be a conformance clause no
-> implementation could satisfy — and an unsatisfiable MUST teaches implementers
-> to skim the rest. What a consumer can do deterministically it must; the
-> remainder is the producer's discipline, and review's.
->
-> Rationale for the shape. This is `exported_required`'s pattern (§6.8): a
-> requires-flavoured flag on a contribution, where the producer states a need
-> and the application decides. The credential itself is never named because
-> there is nowhere safe to name it — and §9 makes that sharper than it first
-> appears, since the record must be durable and diffable, and is usually
-> committed. A credential reaching a sidecar would be laundered into the
-> application's version control **by a rule written to improve auditability**.
->
-> Only the flag is modelled, not the credential's shape or username, because
-> everything past "this repository is authenticated" is something the consumer
-> passes through rather than acts on, and `reason` carries it more precisely
-> than a field would.
 
 ### 6.7 Permissions and features: `[[android.contributes.permissions]]`, `[[android.contributes.features]]`
 
