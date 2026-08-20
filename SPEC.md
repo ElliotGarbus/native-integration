@@ -1169,9 +1169,10 @@ credentials_required = true
 
 ### 6.7 Permissions and features: `[[android.contributes.permissions]]`, `[[android.contributes.features]]`
 
-*The manifest permissions a producer's code needs at runtime — disclosed and
-attributed rather than silently merged, and refusable, because the application
-is the party that answers for them.*
+*For the permissions and hardware features a producer's code needs at
+runtime — visible to the application instead of arriving silently through a
+dependency's AAR, and refusable, because the application is the one
+accountable for what the installed app can do.*
 
 ```toml
 [[android.contributes.permissions]]
@@ -1187,11 +1188,12 @@ name = "android.hardware.bluetooth_le"
   vendor permissions with no additional rule.
 - `reason` on a permission is **RECOMMENDED**; consumers **SHOULD** carry it
   into the record and report of §9.
-- Declared permissions **are staged into the generated manifest.** The gate is
-  §9 — the contribution is recorded, attributed, and reported, not silently
-  merged and not withheld pending a prompt. This is deliberately the same
-  capability an Android AAR dependency has via manifest merging, with the
-  disclosure an AAR does not provide.
+- Declared permissions **are staged into the generated manifest**, not held
+  back for a standalone prompt. What actually gates them is §9's acceptance
+  step: a new or changed permission must appear in the report and be
+  explicitly accepted (i.e. running a re-lock) before the build proceeds.
+  This is deliberately the same capability an Android AAR dependency already
+  has via manifest merging, with the disclosure an AAR does not provide.
 - A producer **MUST NOT** set `required` on a feature. A consumer **MUST** treat
   every producer-declared feature as `required = false`, and **MUST NOT**
   promote one on a producer's declaration alone.
@@ -1211,8 +1213,9 @@ either carries the permission or it does not — and this specification does not
 define the application-side syntax, only the capability; the application's
 configuration format is the consumer's concern.
 
-**Omitting it from the generated manifest is not sufficient.** A resolved `.aar`
-carries its own `AndroidManifest.xml`, which AGP merges into the application's,
+**Omitting a suppressed permission from the generated manifest is not
+sufficient.** A resolved `.aar` carries its own `AndroidManifest.xml`, 
+which AGP merges into the application's,
 so a permission the consumer never wrote can still arrive from a dependency —
 and the permission a producer declares here is very often the same one its AAR
 declares. Where that happens the consumer **MUST** emit an explicit
@@ -1242,9 +1245,10 @@ than being reported against the producer.
 
 ### 6.8 Manifest components: `[[android.contributes.components]]`
 
-*For the services, receivers and activities an SDK dispatches to — a push
-service, an OAuth redirect target — registered in the generated manifest, and
-unexported unless the application says otherwise.*
+*For registering the manifest components a producer needs — services,
+receivers, activities, providers — whether the producer's own class or one
+from a declared dependency; unexported by default, and exported only when the
+application explicitly approves the producer's request to open it.*
 
 ```toml
 [[android.contributes.components]]
@@ -1271,7 +1275,8 @@ states which:
   (§6.1 rule 2).
 - **A declared dependency** (`from_dependency = "group:artifact"`): the value
   **MUST** match the group and artifact of a dependency the same sidecar
-  declares (§6.5), in either the `coordinate` or the `module` form. The owned-namespace rule does not apply — the class is the
+  declares (§6.5), in either the `coordinate` or the `module` form. 
+  The owned-namespace rule does not apply — the class is the
   dependency's. A consumer **SHOULD** verify the class exists in the resolved
   artifact. Two distributions registering the same component class **MUST**
   fail, naming both.
@@ -1294,6 +1299,31 @@ not that it proceeds broken.
 > application on the device. Some integrations legitimately need one — OAuth
 > callbacks, deep links — but opening it is the application's decision. The
 > producer states the need; the application grants it.
+
+**A minimal example.** Before approval, a report (§9) surfaces the pending
+prerequisite and the build fails rather than proceeding unexported:
+
+```
+oauth-sdk 2.0.0  (direct dependency)
+  ! export required   org.example.mypkg.RedirectActivity
+                       "Receives the OAuth redirect from the browser"   ✗ BLOCKING
+```
+
+The application answers by naming that exact component in its own
+configuration — the join key is the component `name` (§2.2):
+
+```toml
+[tool.examplebuild.android.exported_components]
+"org.example.mypkg.RedirectActivity" = true
+```
+
+The next build finds that answer, registers the component
+`android:exported="true"`, and reports the change instead of failing:
+
+```
+oauth-sdk 2.0.0  (direct dependency)
+  + activity   org.example.mypkg.RedirectActivity  (exported, approved)
+```
 
 **Link targets: `view_links`.** An activity that must be reachable from a
 browser or another app — an OAuth redirect receiver, a deep-link target — needs
@@ -1326,11 +1356,69 @@ the intent-filter grammar:
   (§10); per §4.3 a producer needing them declares the contract that provides
   them.
 
-**Vendor actions: `intent_filters`.** A component that an SDK dispatches to
-needs to be registered for a **vendor-defined action**. Firebase Cloud
-Messaging's `FirebaseMessagingService` on `com.google.firebase.MESSAGING_EVENT`
-is the archetype, and the pattern is how most Android push, work-scheduling and
-install-referrer SDKs bind to a host application:
+**Putting the pieces together.** The component, the `application_values`
+entry `scheme` refers to, and `view_links` itself are three declarations in
+one sidecar, satisfied by one application:
+
+```toml
+# the producer's sidecar
+[[android.contributes.components]]
+kind = "activity"
+name = "org.example.mypkg.RedirectActivity"
+exported_required = true
+reason = "Receives the OAuth redirect from the browser"
+
+  [[android.contributes.components.view_links]]
+  scheme = { application_value = "oauth_redirect_scheme" }
+  host = "oauth2redirect"
+  path_prefix = "/callback"
+
+[[android.requires.application_values]]
+id = "oauth_redirect_scheme"
+reason = "The redirect URI scheme registered with your OAuth provider"
+```
+
+```toml
+# the application's build configuration — two separate answers
+[tool.examplebuild.android.exported_components]
+"org.example.mypkg.RedirectActivity" = true
+
+[tool.examplebuild.native.some-oauth-sdk.android.application_values]
+oauth_redirect_scheme = "myapp-oauth"
+```
+
+The consumer combines both answers into the generated manifest — the export
+approval and the spliced-in scheme:
+
+```xml
+<activity android:name="org.example.mypkg.RedirectActivity" android:exported="true">
+  <intent-filter>
+    <action android:name="android.intent.action.VIEW" />
+    <category android:name="android.intent.category.DEFAULT" />
+    <category android:name="android.intent.category.BROWSABLE" />
+    <data android:scheme="myapp-oauth"
+          android:host="oauth2redirect"
+          android:pathPrefix="/callback" />
+  </intent-filter>
+</activity>
+```
+
+Neither a plain Gradle project nor a sidecar-based project requires anyone to
+hand-write this XML. Gradle solves it the same way: AppAuth-Android
+ships the intent filter pre-written, with a placeholder for the one value the
+application supplies via `manifestPlaceholders` in `build.gradle`.
+`view_links` reproduces that same split — the producer supplies the filter's
+shape, the application supplies one value, and the consumer does the
+substitution.
+
+**Vendor actions: `intent_filters`.** Some components need to receive a
+**vendor-defined event** — not a link a browser or another app opens, but an
+intent the SDK's own backend or the Android system delivers under an action
+string the vendor defines. Firebase Cloud Messaging is the archetype: its
+`FirebaseMessagingService` is invoked via the action
+`com.google.firebase.MESSAGING_EVENT`, and most Android push,
+work-scheduling, and install-referrer SDKs register a component the same
+way:
 
 ```toml
 [[android.contributes.components]]
@@ -1348,19 +1436,17 @@ name = "org.example.mypkg.MessagingService"
   declares `view_links`.
 - The record and report of §9 **MUST** show the action alongside the component.
 
-> Rationale: this is not the intent-filter grammar this section otherwise
-> declines to model. `view_links` is generated because a hand-written browser
-> filter missing `DEFAULT` is the classic silent failure. This is the opposite
-> shape — one vendor-defined action on a component no other application can
-> reach — so there is nothing subtle to get wrong and no externally reachable
-> surface opened. The exported case stays excluded: a filter on an exported
-> component is an IPC entry point, a different question with no motivating
-> example yet.
+> Rationale: there is nothing subtle to get wrong here. The action is fixed
+> by the vendor, the component stays unexported, and no other application can
+> reach it — so there is no externally reachable surface to open, and no
+> filter grammar worth modelling beyond the one field.
 
 ### 6.9 Shrinker keep patterns: `[android.contributes.r8]`
 
-*So a producer's reflectively-reached classes survive R8, without letting any
-dependency disable shrinking for the whole application.*
+*For keeping classes R8's shrinker would otherwise strip or rename — a
+producer's own reflectively-reached classes, or a declared dependency's —
+without letting any distribution disable shrinking for the application as a
+whole.*
 
 ```toml
 [android.contributes.r8]
@@ -1387,29 +1473,20 @@ forms, distinguished by **whose classes are being kept**:
   listing of archive contents, not a parser — naming the distribution, the
   pattern, and the artifact the stray class came from.
 
-> **Why dependency keeps are checked against the archive rather than the Maven
-> group.** Gating them on the pattern falling under the dependency's group ID
-> looks equivalent and is wrong often enough to matter: Maven coordinates and
-> Java packages are different namespace systems that only conventionally
-> coincide. `com.squareup.okhttp3:okhttp` ships `okhttp3.*`, and
-> `com.squareup.retrofit2:retrofit` ships `retrofit2.*` — both perfectly
-> legitimate, both rejected by a group check before anything could look at the
-> artifact that would have proved them right.
+> **Why dependency keeps are checked against the archive, not the Maven
+> group.** A pattern's namespace does not have to match its dependency's
+> Maven group: `com.squareup.okhttp3:okhttp` ships classes under `okhttp3.*`,
+> not `com.squareup.okhttp3.*`. Checking the group would reject that
+> legitimate pattern outright, so the consumer checks the resolved artifact
+> instead.
 >
-> The archive listing is the ground truth, and the marginal cost is small: a
-> consumer already opens every resolved `.aar` to satisfy requirement 8.19.
-> Naming the dependency explicitly is what makes the check cheap and the intent
-> reviewable — the alternative, inferring which declared dependency a bare
-> pattern was aiming at, is guesswork the record should not have to record.
->
-> **Why the check is against the classpath, not only the named artifact.** The
-> generated rule is `-keep class <pattern> { *; }`, and R8 applies it to every
-> matching class in the program. Confirming that the named dependency *contains*
-> classes matching `okhttp3.**` would not establish that the rule reaches
-> nothing else — another artifact shipping `okhttp3.extra.Bar` would be kept
-> too, silently, on a declaration naming a different dependency. Checking what
-> the pattern actually matches is what makes `from_dependency` mean what its
-> name claims: bounded authority, not merely provenance.
+> **Why the check covers the whole classpath, not just the named artifact.**
+> The generated rule (`-keep class <pattern> { *; }`) applies everywhere in
+> the program, not only inside the named dependency. If some other artifact
+> also ships a class matching the pattern — `okhttp3.extra.Bar`, say — that
+> class gets kept too, unrelated to the dependency declared. Checking the
+> whole classpath is what makes `from_dependency` bound what the rule
+> reaches, rather than just where it came from.
 
 This scope permits *keeping*, not contributing, and is not exclusive.
 
