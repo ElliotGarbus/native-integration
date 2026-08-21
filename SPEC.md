@@ -1507,41 +1507,48 @@ shrinking.
 
 ### 7.1 Symbol prefixes: `[ios]`
 
-*Contributed Swift compiles into the application's own target, so two producers
-can collide on one type name. This is the guidance that reduces that — and,
-unlike §6.1, cannot enforce it.*
+*For reducing collisions between two producers' Swift type names: contributed
+Swift compiles straight into the application's own single target, with no
+per-package namespace like Android's to keep them apart. Declaring a prefix
+is guidance toward avoiding that collision — not, unlike §6.1's ownership
+rule, something a consumer can enforce.*
 
 ```toml
 [ios]
 swift_symbol_prefixes = ["MyPkg"]
 ```
 
-**RECOMMENDED** when the distribution contributes Swift source (§7.5): prefix
-contributed type names, and in particular `@objc` runtime names, with a declared
-prefix.
+**A producer that contributes Swift source (§7.5) SHOULD** do two things:
+name its contributed types — and in particular its `@objc` runtime names —
+with a consistent prefix in the code it writes, and declare that same prefix
+in `swift_symbol_prefixes`.
 
-This guidance deliberately does not live in an `owns` table: one shared module
-and globally-scoped `@objc` names leave a consumer nothing to enforce, where
-§6.1 has a namespace it can hold exclusively. A consumer **SHOULD** use declared
-prefixes to attribute a redeclaration or duplicate-name error to the
-contributing distribution.
+> Rationale: this guidance deliberately does not live in an `owns` table. One
+> shared module and globally-scoped `@objc` names leave a consumer nothing to
+> enforce, where §6.1 has a namespace it can hold exclusively.
+
+A consumer **SHOULD** use declared prefixes to attribute a redeclaration or
+duplicate-name error to the contributing distribution.
 
 **What this guidance does not reach.** Prefixing covers type names and `@objc`
-runtime names. It does nothing for file-scope functions, global constants, or
-extension members — a contributed file declaring `let ui_scale`,
+runtime names only — not file-scope functions, global constants, or extension
+members. A contributed file declaring `let ui_scale`,
 `func invertedHeight(_:)`, or `extension Double { var retinaScaled }` puts all
-three into the application target's scope under exactly the names it wrote, and
-the extension member becomes visible to the application's own code. Producers
-**SHOULD** confine contributed Swift's declarations to prefixed types, and
-consumers cannot check this.
+three into the application target's scope under exactly the names it wrote,
+with the extension member visible to the application's own code, and a
+consumer has no way to check for it.
 
-That limit is the strongest argument for §7.5's scope restriction rather than
-for more guidance here. **A producer that follows §7.4 has none of this
-problem**: a Swift package is its own module, so its symbols are already
-separated. The per-producer module separation once anticipated as future work
-therefore already exists for anything large enough to want it, and the remedy
-for §7.5 is the narrower scope stated there. `@objc` runtime names remain global
-in either case, and remain unpoliced.
+That limit is the real argument for keeping raw contributed Swift source
+narrowly scoped (§7.5) rather than adding more prefix guidance here. **A
+producer that instead ships its Swift as its own Swift package (§7.4)
+avoids the problem entirely**: a package compiles as its own module, so its
+symbols are already isolated from the application's. The module separation
+once anticipated as future work therefore already exists today, for any
+producer willing to package that way. Packaging as a Swift package isolates
+ordinary Swift symbols, but not `@objc` names: those register in the
+Objective-C runtime's single, flat, global namespace regardless of which
+Swift module declared them, so they stay unpoliced whether the Swift is
+packaged (§7.4) or contributed as raw source (§7.5).
 
 ### 7.2 Build requirements: `[ios.requires]`
 
@@ -1596,19 +1603,19 @@ alike:
    writing an entitlement, an `Info.plist` key, a bundle file, a URL
    registration, or a build target on the producer's authority.
 
-Rule 4 exists because reporting alone is not enough: an entitlement the
-application has not enabled produces a `codesign` failure far from its cause,
-and a missing usage description terminates the application the first time the
-API is touched. The consumer fails early, where the diagnostic can still name
-the distribution that needed it.
+> Rationale for rule 4: reporting alone is not enough. An entitlement the
+> application has not enabled produces a `codesign` failure far from its
+> cause, and a missing usage description terminates the application the
+> first time the API is touched. The consumer fails early, where the
+> diagnostic can still name the distribution that needed it.
 
-Rule 6 is the §2.1 distinction, not a broader prohibition. A consumer that also
-generates the application's project — as most will — **MAY and should**
-materialize application-owned configuration the **application itself** supplied:
-if the application declares its own `NSLocationWhenInUseUsageDescription`, the
-consumer writes it into `Info.plist` as a matter of course. What it must never
-do is originate that text, or enable a capability, because a *producer* asked
-for it.
+**Rule 6 is the §2.1 distinction, not a broader prohibition.** A consumer that
+also generates the application's project — as most will — may still
+materialize application-owned configuration the **application itself**
+supplied: if the application declares its own
+`NSLocationWhenInUseUsageDescription`, the consumer writes it into
+`Info.plist` as a matter of course. What it must never do is originate that
+text, or enable a capability, because a *producer* asked for it.
 
 #### What counts as satisfied
 
@@ -1623,19 +1630,41 @@ Per table, stated because two conforming readers would otherwise diverge:
 | `url_schemes` | …**explicitly acknowledges** this entry by `(distribution, id)` |
 | `plist_capabilities` | …configures the declared `value` under the declared `key` in its own `Info.plist` |
 
-**`app_extensions` and `url_schemes`** take an `id`, because neither has a key
-the platform supplies, and both are acknowledgements rather than checks — for
-reasons worth stating.
+**Why `app_extensions` and `url_schemes` use an `id` instead of a platform
+key.** Neither has a single string iOS defines the way an entitlement or an
+`Info.plist` key does, so there is nothing else to join on. And unlike the
+other four tables, satisfying either one is an **acknowledgement**, not
+something the consumer can verify on its own — the next two paragraphs
+explain why, for each.
 
-For `url_schemes` the requirement has two halves, and a consumer can observe the
-registration but cannot prove the application forwards the callback; inspecting
-`CFBundleURLTypes` and declaring victory would not be honest.
+**Why `url_schemes` only asks for acknowledgement.** It asks the application
+for two separate things: **register** a custom URL scheme in its own
+`CFBundleURLTypes`, and **forward** the resulting callback, in code, to the
+SDK's handler (e.g. `StripeAPI.handleURLCallback(with:)`). Only the first is
+something a consumer can inspect — read `CFBundleURLTypes` and see whether a
+scheme exists; there is no way to inspect application code and confirm the
+second actually happens. A consumer **MUST NOT** treat that inspectable half
+as sufficient on its own, since it would only prove half of what was asked
+for; the table above requires the application's explicit acknowledgement
+that both were done instead. In practice that means offering the application
+a way to answer, keyed by `(distribution, id)` (§2.2); treating that answer,
+once given, as satisfaction with no further check; and recording it in the
+integration record (§9) — disclosure standing in for the verification the
+consumer cannot do, per §9's report already covering this mode.
 
-For `app_extensions` the `kind` is not sufficient on its own. Two packages may
-each need a `notification_service` extension while needing *different code
-inside it*, and a single existing target would otherwise appear to satisfy both.
-The extension's existence is checked; that it serves this producer is
-acknowledged.
+**Why `app_extensions` also asks for acknowledgement, not just a target.**
+`kind` only names a *category* of extension — `notification_service`, say —
+not whose code belongs inside it. Take the example above: OneSignal declares
+`id = "onesignal_nse"`, `kind = "notification_service"`. A second, unrelated
+push SDK could just as easily declare its own `notification_service`
+requirement. If the application has built exactly one `notification_service`
+target, a consumer can check that a target of that `kind` exists — but it
+cannot tell whether that single target's code was written for OneSignal, for
+the other SDK, for both, or for neither. Existence is checkable; whose
+producer it actually serves is not. So satisfying this table takes both
+halves: the application builds a real target of the requested `kind`, *and*
+separately acknowledges, by `(distribution, id)`, that this specific
+producer's extension is the one it built.
 
 #### Conditional prerequisites
 
