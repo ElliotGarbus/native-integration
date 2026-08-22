@@ -1246,13 +1246,13 @@ than being reported against the producer.
 ### 6.8 Manifest components: `[[android.contributes.components]]`
 
 *For registering the manifest components a producer needs — services,
-receivers, activities, providers — whether the producer's own class or one
-from a declared dependency; unexported by default, and exported only when the
-application explicitly approves the producer's request to open it.*
+receivers, activities — whether the producer's own class or one from a declared
+dependency; unexported by default, and exported only when the application
+explicitly approves the producer's request to open it.*
 
 ```toml
 [[android.contributes.components]]
-kind = "service"        # service | activity | receiver | provider
+kind = "service"        # service | activity | receiver
 name = "org.example.mypkg.PushService"
 
 [[android.contributes.components]]
@@ -1266,6 +1266,24 @@ name = "org.example.mypkg.RedirectActivity"
 exported_required = true
 reason = "Receives the OAuth redirect from the browser"
 ```
+
+**`provider` is deliberately absent from the vocabulary.** A `<provider>` is
+invalid without `android:authorities`, and a provider authority must be unique
+**across every application on the device** — two applications installed with the
+same authority conflict, so the value is conventionally derived from the
+application ID, which a producer does not know. A `kind` this specification
+could not register validly is worse than one it does not offer, because a
+consumer would have to invent the authority to make the manifest parse, and
+inventing is exactly what §2.1 forbids.
+
+The two provider shapes seen in practice do not need this table anyway: a
+provider belonging to a declared dependency is registered by that dependency's
+own merged manifest, and a **shared** provider such as AndroidX Startup's
+`InitializationProvider` is a contended singleton that must be merged rather
+than registered a second time. A future minor **MAY** introduce providers with
+a producer-declared authority *suffix* the consumer prefixes with the
+application ID — the form §4.3's rationale already imagines as a 1.1
+`content_providers` table — once a producer needs one.
 
 **Provenance.** A component's class comes from one of two places, and the entry
 states which:
@@ -2030,7 +2048,12 @@ Two contribution modes, by shape:
 
 - **`values`** — scalar keys, set verbatim. A consumer **MUST** fail on a key
   that collides with one it manages itself, and on two distributions setting the
-  same key to different values, naming the distributions.
+  same key to different values, naming the distributions. Two distributions
+  setting the same key to the **same** value coalesce, preserving both
+  provenance records. A key the **application** also sets is the
+  application's: the consumer **MUST** keep the application's value and report
+  the override — the rule §6.3 states for a manifest `<meta-data>` key, which
+  applies here for the same reason.
 - **`append`** — array-valued keys. Contributions from all distributions and the
   application are concatenated and de-duplicated in a deterministic order: the
   application's entries first, then each distribution's in normalized
@@ -2082,14 +2105,26 @@ example above, grants nothing and stays an ordinary contribution.
 > worked examples contribute `UIBackgroundModes` and a third refuses to, writing
 > down why. Both readings were conforming, which is the defect.
 
-**Dictionary-valued keys are excluded by design, not deferred.** Every
-structured case encountered so far is better served by a narrower primitive than
-by general dictionary support: `NSExtension` is generated from a declared
+**Dictionary-valued keys are excluded by design, not deferred.** The structured
+cases this specification has examined are better served by a narrower primitive
+than by general dictionary support: `NSExtension` is generated from a declared
 extension type, `NSLocationTemporaryUsageDescriptionDictionary` is a §7.3
 prerequisite the application supplies, and `NSAppTransportSecurity` depends on
 what the application loads and is not the producer's to declare at all. A
 general form would hand producers the ability to write arbitrary structured
 application configuration for cases that keep turning out to be something else.
+
+**One key is a genuine counter-case, and version 1 cannot express it.**
+`SKAdNetworkItems` is an array of single-entry dictionaries, one per ad network,
+which every advertising and mediation SDK requires and which runs to around a
+hundred entries for a mediated integration. It is producer-known, it grants the
+application nothing, and it merges by de-duplicating on the identifier — the
+shape `append` exists for, blocked by a restriction on types rather than by any
+argument about authority. The remedy is the narrower primitive named above and
+not general dictionary support: a list of identifier strings the consumer
+renders into the dictionary array. **Not expressible in v1**; anticipated as a
+minor revision (§10), and recorded here so the paragraph above is read as the
+rule it is rather than as a claim that no counter-case exists.
 
 ### 7.7 Python modules: `[[ios.contributes.python_modules]]`
 
@@ -2528,6 +2563,8 @@ further Gradle configurations; and further namespace-scoped shrinker rule forms.
 | iOS frameworks in wheels | Solved by `ios_*`-tagged wheels ([PEP 730](https://peps.python.org/pep-0730/)) |
 | Android resources (`res/`) | Resource names are a flat global namespace per type, so no ownership rule can be built for them (§6.1 needs dots to compute containment). A producer shipping `values/strings.xml` with `app_name` renames the application. Resources reach an application through an `.aar` from a declared coordinate, where AGP merges them |
 | Scripts, hooks, build plugins | Excluded on principle (§2.1), not as a deferral |
+| **Arbitrary manifest, `Info.plist` or build-file fragments** | The declarative form of the same capability, and excluded on the same principle. A fragment cannot be collision-checked, cannot be refused per-permission (§6.7), cannot be gated per-component (§6.8), and cannot be diffed in a record (§9) — a producer's material stops being reviewable the moment its meaning is a merge nobody computes. Permanent, not a deferral; see below |
+| **CocoaPods-only iOS SDKs** | §7.4 declares Swift packages, and this specification defines no CocoaPods channel. A vendor that publishes only a podspec is out of reach; see below |
 | **Native runtime lifecycle composition** | No way for a producer to run code at application start, or to participate in an app-delegate callback. Deliberate in version 1, and not on principle — see below |
 | Xcode build settings, compiler/linker flags | Arbitrary build mutation; revisit only with a concrete, bounded need |
 | Application configuration — *writing* it | The application's own build settings are the consumer's concern. **Declaring a requirement on it is in scope** and is most of §7.3; see below |
@@ -2565,8 +2602,13 @@ shape. Such an SDK can be *linked* through §6.5 or §7.4 and the result will
 build; the build-time step must be configured in the application's own build,
 outside this convention. **This is permanent, not a deferral.**
 
-The consequence is not uniform, and a producer should work out which case it is
-in:
+**Uploading is not the only shape.** A second class of plugin **transforms the
+code being built** — instrumenting bytecode, or running as a compiler plugin —
+and for those the sentence above is false: linking the SDK produces a build that
+succeeds and an SDK that does nothing, or code that does not compile at all.
+
+The consequence is not uniform, and a producer should work out which of three
+cases it is in:
 
 - **The SDK degrades.** The build-time step adds symbolication to something that
   already captures and delivers events. Sentry is the example — its Gradle plugin
@@ -2575,6 +2617,35 @@ in:
 - **The SDK fails.** The build-time step is load-bearing for the SDK's core
   value. Crashlytics is the example: without it every report is unsymbolicated,
   which is the part nobody wants. A wrapper is not worth shipping.
+- **The SDK cannot be integrated at all.** The build-time step *is* the
+  integration: Embrace's `embrace-swazzler` and New Relic's Gradle plugin
+  instrument bytecode to insert the hooks the SDK reads, and Realm's Kotlin
+  compiler plugin generates members its model classes are unusable without.
+  There is nothing here to ship, and a producer should say so rather than
+  publish a wrapper whose failure looks like a bug in this convention.
+
+**Why arbitrary fragments stay excluded, and what it costs.** The obvious answer
+to every gap in this section is to let a producer contribute a block of manifest
+XML, a subtree of `Info.plist`, or a snippet of build script. It would make
+almost everything expressible, and it would remove the reason to trust any of
+it: authority in this specification is carried by knowing, per key, whether a
+producer may set it freely, only with the application's approval, or not at all
+(§6.7, §6.8, §7.3, §7.6). A fragment answers that question nowhere. §6.9 already
+refuses raw shrinker directives for exactly this reason and takes structured
+class patterns instead — *"raw rules are also a capability"* — and this row is
+that argument generalized. The cost is real and is paid deliberately: a
+mechanism this specification has no vocabulary for is unreachable until a minor
+adds one, which is the trade §4.4's fail-closed rule already makes.
+
+**A CocoaPods-only vendor is out of reach, and a producer has two options.**
+§7.4 resolves Swift packages; nothing here resolves podspecs, and adding a
+second dependency channel is a larger commitment than any single vendor
+justifies. Where a vendor publishes only to CocoaPods — Google's ML Kit for
+Apple platforms is the standing example — a producer can wait for the vendor's
+own Swift package, or publish a package of its own that vends the vendor's
+binaries and declare that under §7.4, taking on the maintenance that implies.
+Neither is free, and pretending otherwise by leaving the case unmentioned served
+nobody.
 
 **Lifecycle composition is a deferral, not a principle**, and is the most
 consequential thing version 1 cannot express. Firebase calls
@@ -2732,6 +2803,16 @@ the latter.
 - **PEP 561** — the standardization shape: a marker shipped as package data, a
   consumer that is not an installer, and normative obligations on that consumer,
   written down after the practice existed.
+- **Expo config plugins** — the executable form of this problem: JavaScript
+  functions a package ships to mutate the generated native project. Widely used,
+  and precisely the capability §2.1 excludes.
+- **Cordova / Capacitor `plugin.xml`** — the *declarative* form, and the more
+  instructive comparison, because it concedes §2.1's principle and keeps the
+  capability anyway: `<config-file target="AndroidManifest.xml" parent="/manifest">`
+  admits arbitrary XML at a chosen location. Fifteen years of practice, with the
+  failure Appendix A predicts for merged material — plugin-contributed manifest
+  entries that no tool can attribute, refuse, or arbitrate between plugins. §11's
+  exclusion of arbitrary fragments is a decision against this, not an oversight.
 
 ## Appendix D: declaration reference
 
@@ -2773,7 +2854,7 @@ key is 1.0, which is why nothing below carries a mark yet.
 | **`[[android.contributes.features]]`** §6.7 | |
 | `name` | Always registered `required="false"`; only the application may promote a feature |
 | **`[[android.contributes.components]]`** §6.8 | |
-| `kind` | `service`, `activity`, `receiver` or `provider` |
+| `kind` | `service`, `activity` or `receiver`. `provider` is deliberately absent: an authority is mandatory and must be unique device-wide, so only the application ID can supply it |
 | `name` | The class. Under an owned namespace unless `from_dependency` says otherwise |
 | `from_dependency` | `group:artifact` of a declared dependency that owns the class |
 | `exported_required` + `reason` | Requests export. The build fails without explicit application approval — it never falls back to unexported |
