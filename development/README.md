@@ -54,6 +54,11 @@ Proposed remedies live in [PROPOSALS.md](PROPOSALS.md). Gap identifiers are
 per-example: `A*`/`B*`/`C*` (PyOneSignal), `L*` (PyCoreLocation), `W*`
 (PyWebViews), `G*` (PyGMA), `F*` (Firebase), `S*` (Sentry), `T*` (Stripe), `M*` (Mapbox).
 
+[SURVEY.md](SURVEY.md) is the other kind of evidence: no sidecars, forty
+further SDKs read for what they ask of a build, and `N*` identifiers for what
+this specification cannot say. Depth found the refusals above; breadth found
+the missing tables.
+
 > **Reading these after the fact.** Each `NOTES.md` describes SPEC.md **as it
 > stood when that example was run**. For the four PyPlatformPackages examples
 > that is the text before the corrections group landed, so several findings

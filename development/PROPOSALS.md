@@ -44,6 +44,13 @@ example set stops changing it.
 > §7.6 now rejects usage-description keys would otherwise have required a new
 > major under §10.
 
+> **A fifth round, from breadth rather than depth.** [SURVEY.md](SURVEY.md)
+> reads forty further SDKs for what they ask of a build without writing a single
+> sidecar, and produces twenty-one gaps. **P34–P36 are the only architectural
+> ones**; the rest are missing vocabulary that the existing shapes already
+> accommodate, which is itself the most useful thing the survey established.
+> None of the three is decided.
+
 Each proposal names the example that produced it. A proposal with exactly one
 motivating example is a hypothesis; a proposal with several is a finding.
 
@@ -76,6 +83,9 @@ motivating example is a hypothesis; a proposal with several is a finding.
 | P25 | iOS URL schemes — a `view_links` counterpart | T2, T3 | Stripe |
 | P26 | Entitlements that carry values | T5, B3 | Stripe, PyOneSignal, PyCoreLocation |
 | P27 | Repository credentials, and keeping them out of the record | M2 | Mapbox |
+| P34 | The factoring pass: modes, merge rules, authority classes | the growth law | [SURVEY.md](SURVEY.md), 15 findings |
+| P35 | The host contract — a requirement the **consumer** satisfies | N10, N20 | Stripe, WeChat, Health Connect |
+| P36 | Close the escape hatch, and say why | all of SURVEY.md | Cordova, Expo |
 
 Gap identifiers refer to the NOTES.md beside each example:
 [PyOneSignal](examples/pyonesignal/NOTES.md) (A*, B*, C*),
@@ -85,6 +95,10 @@ Gap identifiers refer to the NOTES.md beside each example:
 [Firebase](examples/firebase/NOTES.md) (F*),
 [Sentry](examples/pysentry/NOTES.md) (S*),
 [Stripe](examples/pystripe/NOTES.md) (T*).
+
+`N*` identifiers refer to [SURVEY.md](SURVEY.md), which is breadth rather than
+depth: forty further SDKs read for what they ask of a build, with no sidecars
+written.
 
 P6 and P11 each gained a second example from PyGMA (G2, G4).
 
@@ -1723,3 +1737,271 @@ two consumers could both conform and neither could read the other's output.
 §9 now lists the facts a record must make recoverable, and Appendix E shows one
 satisfying shape as explicitly non-normative. The format stays free; the content
 does not.
+
+---
+
+# Round five: the architectural proposals
+
+P28–P33 came from writing a consumer. P34–P36 come from
+[SURVEY.md](SURVEY.md) — forty SDKs read for what they ask of a build — and they
+are the only three of its twenty-one findings that are about the **model**
+rather than about missing vocabulary.
+
+## P34 — The factoring pass: satisfaction modes, merge rules, authority classes
+
+**The problem is the growth law, not the decomposition.** Sort SURVEY.md's
+twenty-one findings by what each costs the *model*:
+
+| Class | Count |
+| --- | --- |
+| New vocabulary inside a shape that already exists | 15 |
+| Needs a concept the model does not have | 4 |
+| Confirms an exclusion, changes nothing | 2 |
+
+Fifteen to four is the diagnostic. A wrong abstraction produces gaps that stay
+inexpressible **after** you add the table; only four of these are like that, and
+two of those are P35. N1 is the extreme case in the other direction: §6.3's
+rationale predicted the table field-for-field, and the survey found the five
+vendors that trigger it. That is a model behaving correctly.
+
+What the survey does indict is arithmetic. Version 1 spends one hand-written
+table, with its own satisfaction rules and its own prose, per platform
+mechanism — and the platforms have hundreds of mechanisms. One survey produced
+fifteen. The next one produces more.
+
+**The proposal is a factoring pass, not a redesign**: state the small number of
+mechanisms the fifteen tables are instances of, so that adding the sixteenth is
+a classified row rather than a section. What follows is that pass, run against
+every table in SPEC.md.
+
+### The pass, part one: how a prerequisite is satisfied
+
+§7.3 already has a "What counts as satisfied" table for its own six entries.
+Widened to every `requires` in the specification, and to §2.2's answer surface:
+
+| Mode | The application… | Existing instances |
+| --- | --- | --- |
+| **floor** | is configured at or above a value | `compile_sdk`, `min_sdk`, `target_sdk` (§6.2), `deployment_target` (§7.2) |
+| **supplied value** | provides a value the consumer then delivers | `application_values` (§6.3), `usage_descriptions` (§7.3), repository credentials (§6.6) |
+| **presence** | has configured an artifact the consumer can inspect | `entitlements`, `application_files`, `plist_capabilities` (§7.3) |
+| **acknowledgement** | states that it did something the consumer *cannot* inspect | `app_extensions`, `url_schemes` (§7.3) |
+| **approval** | grants something the consumer then emits differently | `exported_required` (§6.8) |
+
+**The pass corrects the count I proposed.** I expected four modes; there are
+five. **Approval** is not presence and not acknowledgement: an acknowledgement
+records work done elsewhere and leaves the consumer's output unchanged, while an
+approval *changes what the consumer writes*. Collapsing them would have made
+§6.8's "MUST fail rather than register unexported" unstateable.
+
+Suppression (§6.7) is deliberately **not** in the table. It is not satisfaction
+of a requirement at all — it is the application's veto over a *contribution*,
+and it belongs to the second half of the pass. §2.2's five-row answer table
+already separates them; it simply never said that is what it was doing.
+
+**The modes are predictive, which is the test.** Two rules fall out that
+SPEC.md currently states twice each, per table, as if they were local:
+
+- *When a consumer cannot inspect the whole of what was asked, the mode is
+  **acknowledgement**, never partial presence.* §7.3 argues this at length for
+  `url_schemes` (the plist half is inspectable, the forwarding half is not) and
+  again for `app_extensions` (the target is checkable, whose code is in it is
+  not). Applied to SURVEY.md's N19, it settles verified App Links without a new
+  argument: a consumer cannot fetch `assetlinks.json` at build time, so the
+  answer is acknowledgement.
+- *A supplied value's delivery target is a property of the mode, not of the
+  table.* This is the finding that matters most, because it makes N1 fall out
+  rather than be invented: **`usage_descriptions` is already
+  `[[ios.requires.application_values]]`** — the application supplies a string,
+  the consumer writes it verbatim to an `Info.plist` key. The only difference is
+  the extra rule that a producer may not offer a default, which is an authority
+  class (below), not a mode. N1's proposed table is the same mode with the
+  producer-default rule relaxed.
+
+### The pass, part two: how contributions merge
+
+| Rule | Behaviour on collision | Existing instances |
+| --- | --- | --- |
+| **exclusive claim** | a second claimant fails, naming both | `java_namespaces` (§6.1), repository scopes (§6.6, equal `url` exempted), component `name` (§6.8), `python_modules.name` (§7.7) |
+| **unique key with a value** | equal values coalesce, differing values fail; the application's own value wins and is reported | `manifest_meta_data` (§6.3), `info_plist.values` (§7.6) |
+| **union, non-exclusive** | no collision is possible; where order could vary it is fixed for determinism (§7.6 `append`) | permissions and features (§6.7), `info_plist.append` (§7.6), `r8` keeps (§6.9) |
+| **delegate to the resolver** | the platform's own conflict resolution decides; the consumer records both requested and resolved | `gradle_dependencies` (§6.5), `swift_packages` (§7.4) |
+
+Four, as expected — though the first two are easy to conflate and the pass
+separates them: what distinguishes an exclusive claim from a unique key is
+whether the declaration **carries a value**. Two distributions registering one
+component class fail outright, because there is nothing to compare; two setting
+one `Info.plist` key are asking the same thing when the values agree. Writing a
+component's rule as if it were a meta-data key would silently permit a duplicate
+registration.
+
+The pass also removes one of my candidates. **"Generate from a stereotype" is
+not a merge rule.** `view_links`, `intent_filters`, §6.9's
+`-keep` synthesis and §7.7's module registration are all *rendering*: what text
+the consumer emits from one declaration, decided before anything merges. Keeping
+the two apart matters, because it is rendering — not merging — that removes the
+footguns those tables exist for, and a registry that flattened them would take
+that away. §6.8's parenthesis is explicit about it: omitting `DEFAULT` by hand is
+"the classic silent-failure bug this removes."
+
+### The pass, part three: what a producer may say about a key
+
+Three sections argue this separately and never name it:
+
+| Class | Meaning | Where it is argued today |
+| --- | --- | --- |
+| **free** | contributable; grants the application nothing | `LSApplicationQueriesSchemes` (§7.6) |
+| **disclosed, vetoable** | contributable, but reported and refusable | permissions (§6.7 + §9) |
+| **approval-gated** | contributable only with an explicit application grant | exported components (§6.8) |
+| **application-only** | never contributable; a producer may only *require* it | usage descriptions, `UIBackgroundModes`, `UIRequiredDeviceCapabilities`, entitlements, bundle files, URL registrations, extension targets (§7.3, §7.6) |
+
+§7.6's closed capability list, §6.8's export gate and §6.7's suppression are
+three spellings of one axis. P28 landed the third instance of it and its
+rationale says as much — that without the rule "§7.6 quietly undoes §7.3" — which
+is a sentence about a *classification* being missing, not about a key being
+missing.
+
+### What the pass found in the existing text
+
+One real defect, which is the pass paying for itself:
+
+**§7.6 does not say what happens when the application sets a contributed key.**
+§6.3 does — "A key the application also sets is the application's; the consumer
+keeps its value and reports the override" — and §7.6's `values` carries the same
+merge rule with the application-wins half missing. Two conforming consumers can
+diverge on an `Info.plist` key the application set itself.
+
+### The proposal
+
+1. **Add Appendix F: the mechanism registry.** One row per declarable table, with
+   its mode (prerequisites) or merge rule and authority class (contributions).
+   Descriptive of v1 as it stands — it must not change a single existing
+   behaviour, and if it cannot be written without changing one, this proposal is
+   wrong and should be dropped.
+2. **Require a new minor to classify.** §4.3 already makes Appendix D the
+   contract-minor registry (P31); a new key names its mode or its merge rule and
+   authority class in Appendix F at the same time. That is what turns the
+   sixteenth mechanism into a row.
+3. **Fix §7.6's missing application-wins rule** as a straight correction.
+4. **Do not rewrite §6.x and §7.x as views over the registry.** The tables stay
+   as they are. The registry is the thing that makes the *next* fifteen cheap,
+   not a reorganisation of the fourteen that exist.
+
+**Cost.** One appendix and one corrected paragraph. **Risk**: a registry that
+drifts from the body is worse than none, which is why item 4 keeps the body
+normative and the registry derived, exactly as Appendix D is today.
+
+**How to falsify it.** If a mechanism from a future survey cannot be classified
+into a mode or into a merge rule plus an authority class, the framing is wrong
+and the tables are irreducibly bespoke. Forty-three SDKs produced none.
+
+## P35 — The host contract: a requirement the **consumer** satisfies
+
+*Motivated by N10 (Stripe, Stripe Identity), with N20 (WeChat, Health Connect)
+as its application-side cousin.*
+
+P34's pass exposes this one mechanically. Run every SURVEY.md prerequisite
+through the five modes and they all land — except N10, which lands nowhere, and
+for a reason that is not about the mode: **§2.2 has exactly one answerer.** Every
+`requires` in version 1 is answered by the *application*. Stripe's requirement
+that its host activity be a `ComponentActivity` is answered by the **consumer**,
+because the consumer is what generates the bootstrap.
+
+That is the hole. Not a missing table — a missing answerer.
+
+**Why it matters here more than anywhere else.** A Python-mobile toolchain owns
+exactly one activity, and whether that singleton extends `Activity` or
+`ComponentActivity` decides whether a whole tier of SDKs functions at all —
+anything built on `ActivityResultContracts`, on fragments, or on a Material
+theme. The failure today is a `ClassCastException` at first use, in generated
+code, attributable to nobody. §11 already knows the axis exists: the singleton
+slots "are the consumer's, and a producer **MUST NOT** be able to claim one
+meanwhile."
+
+**The proposed shape is a capability floor, not a class demand:**
+
+```toml
+[android.requires.host]
+capabilities = ["activity_result_api", "lifecycle_owner"]
+
+[ios.requires.host]
+capabilities = ["url_callback_forwarding"]
+```
+
+- A **closed vocabulary**, extended by minor, exactly as `app_extensions.kind`
+  is. Free-form base class names are the wrong form: they would let a producer
+  dictate a toolchain's architecture, and they cannot be satisfied by a
+  consumer whose bootstrap reaches the same capability another way.
+- Satisfied by the **consumer**, which knows what it generates, and reported
+  under §9 like any other prerequisite. A consumer that cannot offer a
+  capability fails the build naming the distribution — the honest outcome, and
+  one available before the application ships.
+- Nothing executes. This is a floor on the *shape* of a singleton the consumer
+  already owns, which is why it is separable from P1.
+
+**What this deliberately does not touch.** P1 (startup hooks) stays deferred and
+unaffected: no producer code runs, no ordering is expressed, no slot is claimed.
+The second half of the same axis — **contended singleton slots**, where the
+platform permits one and several producers want it (one notification-service
+extension per application, `<application android:name>`, one
+`InitializationProvider`, one app delegate) — is real, is visible in §7.3's
+`app_extensions` acknowledgement rule and in §11's prohibition, and should be
+proposed separately once P35 settles whether the consumer can be an answerer at
+all. That is the question this proposal actually puts.
+
+**N20 is not this.** "The application must own a class at
+`${applicationId}.wxapi.WXEntryActivity`" is answered by the *application*, is
+inspectable in the source set the consumer compiles, and is therefore an
+ordinary **presence** prerequisite under P34. The pass separates the two cases
+cleanly, which is some evidence that both readings are right.
+
+**The objection to answer first.** A capability floor lets a producer refuse to
+integrate with a conforming consumer. That is the intended behaviour — it is
+§6.2's bargain, applied to a different axis — but it puts real pressure on
+toolchains whose bootstrap cannot change, and the vocabulary must therefore be
+small, concrete, and argued one token at a time.
+
+## P36 — Close the escape hatch, and say why
+
+*Motivated by all of SURVEY.md: the question every reviewer asks after reading
+twenty-one gaps.*
+
+Twenty-one gaps invite one obvious answer — let a producer contribute arbitrary
+manifest XML, an arbitrary `Info.plist` tree, a Gradle snippet — which converts
+every finding to "expressible" and the specification to a transport format with
+no security model. Everything lost is load-bearing: §6.1's exclusivity, §6.7's
+suppression, §6.8's export gate, §7.6's capability refusals, and above all §9's
+reviewability, which needs a contribution to be **semantically diffable** rather
+than a blob whose merged effect nobody can compute.
+
+The specification has already run this experiment at small scale and decided.
+§6.9 refuses raw R8 directives in favour of structured keep patterns, in a
+rationale that generalises exactly: *"Raw rules are also a capability."* §7.6
+refuses dictionary values on the same grounds. What is missing is the general
+statement, in the one place a reader goes looking for boundaries.
+
+**Proposed, and documentation-only:**
+
+1. **An §11 row** — *Arbitrary manifest, plist or build-file fragments* — with
+   the reason stated as attribution rather than taste: a fragment cannot be
+   collision-checked, cannot be classified into P34's authority classes, cannot
+   be vetoed per-permission, and cannot be diffed in a record. **Permanent, not
+   deferred**, on the same terms as §11's build-time-execution row.
+2. **Two entries in Appendix C**, because both are prior art a reviewer will
+   raise and both are more useful as evidence than as omissions:
+   - **Expo config plugins** — JavaScript functions that mutate the generated
+     native project. The executable form, excluded by §2.1 on principle, and the
+     ecosystem most readers will be arriving from.
+   - **Cordova / Capacitor `plugin.xml`** — `<config-file target="AndroidManifest.xml"
+     parent="/manifest">` with arbitrary XML at a chosen XPath. This is the more
+     instructive one, because it is **declarative**: it concedes §2.1's
+     principle and keeps the capability. Fifteen years of use, and its
+     characteristic failure is precisely what Appendix A predicts for a merged
+     tree — plugin-contributed manifest material that no tool can attribute or
+     arbitrate.
+3. **State the price.** SURVEY.md's fifteen vocabulary gaps *are* the cost of the
+   boundary. The answer to them is P34's registry growth, and saying so in §11
+   is what stops the next reader proposing the hatch again.
+
+**How to falsify it.** A mechanism that is genuinely per-application-unique,
+that no closed vocabulary could describe, and that a real vendor requires. None
+of forty-three produced one.

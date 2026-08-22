@@ -1594,10 +1594,12 @@ alike:
    meaning and constraints are below.
 3. A consumer **MUST** report every entry as a prerequisite, naming the
    distribution.
-4. An **unconditional** prerequisite that is unsatisfied **MUST** fail the
-   build, naming the distribution and the `reason`.
-5. A **conditional** prerequisite that is unsatisfied **MUST** be recorded in
-   the integration record (§9) and **MUST NOT** fail the build.
+4. An **unconditional** prerequisite (`conditional = false`, the default)
+   that is unsatisfied **MUST** fail the build, naming the distribution and
+   the `reason`.
+5. A **conditional** prerequisite (`conditional = true`) that is unsatisfied
+   **MUST** be recorded in the integration record (§9) and **MUST NOT** fail
+   the build.
 6. **A producer declaration MUST NOT cause a consumer to originate or enable
    application-owned configuration.** No entry here is satisfied by the consumer
    writing an entitlement, an `Info.plist` key, a bundle file, a URL
@@ -1653,18 +1655,26 @@ integration record (§9) — disclosure standing in for the verification the
 consumer cannot do, per §9's report already covering this mode.
 
 **Why `app_extensions` also asks for acknowledgement, not just a target.**
-`kind` only names a *category* of extension — `notification_service`, say —
-not whose code belongs inside it. Take the example above: OneSignal declares
-`id = "onesignal_nse"`, `kind = "notification_service"`. A second, unrelated
-push SDK could just as easily declare its own `notification_service`
-requirement. If the application has built exactly one `notification_service`
-target, a consumer can check that a target of that `kind` exists — but it
-cannot tell whether that single target's code was written for OneSignal, for
-the other SDK, for both, or for neither. Existence is checkable; whose
-producer it actually serves is not. So satisfying this table takes both
-halves: the application builds a real target of the requested `kind`, *and*
-separately acknowledges, by `(distribution, id)`, that this specific
-producer's extension is the one it built.
+Start with the underlying constraint: iOS allows an application only **one**
+active extension target per `kind` — one `notification_service` extension,
+full stop, no matter how many producers ask for one. Take the example above:
+OneSignal declares `id = "onesignal_nse"`, `kind = "notification_service"`.
+If a second, unrelated push SDK also declared a `notification_service`
+requirement, the application cannot build a second target to satisfy it
+separately — there is nowhere else on the device for that code to go.
+Resolving that conflict is the application developer's job: merging both
+producers' extension logic into the single target iOS permits, by hand,
+since neither vendor's own instructions account for the other's code sharing
+it.
+
+That merge is exactly what a consumer cannot verify. It can check that a
+target of the declared `kind` exists at all, but it has no way to open that
+target and confirm whose code — OneSignal's, the other SDK's, both, or
+neither — actually made it in. So satisfying this table takes two separate
+actions: the application builds a real target of the requested `kind`
+(checkable), and separately, per producer, acknowledges by `(distribution,
+id)` that this specific producer's need is one the target actually meets
+(not checkable, so it must be stated).
 
 #### Conditional prerequisites
 
@@ -1685,40 +1695,51 @@ Recording it in the integration record rather than a build-log line is the point
 — a log line scrolls past, and the whole value of a conditional prerequisite is
 that it survives to be read later.
 
-> Rationale: a framework binding cannot be split along its API, so it cannot
-> follow §12's guidance to move feature-conditional surface into optional
-> distributions (§12.1). Without this it must choose between declaring the union
-> — forcing every application to write an "Always" location purpose string that
-> App Store review scrutinizes, whether or not it ever requests Always — and
-> declaring the minimum, which leaves the caller of anything else to discover
-> the requirement as a runtime trap. Neither is acceptable, and the second is
-> the silent failure this specification exists to prevent.
+> Rationale. Elsewhere, this specification's answer to feature-conditional
+> native surface is to split it into optional distributions the application
+> opts into (§12) — but that needs a seam to split along, and a **framework
+> binding** (one class wrapping one platform API, not a facade with
+> independent features behind a dispatcher) has none (§12.1). It cannot be
+> split. Without a `conditional` flag it would have to choose between
+> declaring the union — forcing every application to write an "Always"
+> location purpose string that App Store review scrutinizes, whether or not
+> it ever requests Always — and declaring the minimum, which leaves the
+> caller of anything else to discover the requirement as a runtime trap.
+> Neither is acceptable, and the second is the silent failure this
+> specification exists to prevent.
 >
 > This is disclosure rather than enforcement, which §9 already treats as a
-> legitimate mode. It is also the one mechanism here a producer can misuse to
-> downgrade a real requirement into prose; §12.1 says so plainly.
+> legitimate mode. It is also the one mechanism here a producer can misuse:
+> marking a genuinely unconditional requirement as conditional turns a build
+> failure that names the problem into a line in a report instead — exactly
+> the misuse §12.1 warns against.
 
 #### The six tables
 
-Each is a prerequisite under the common rules above; what follows is only what is
-specific to it.
+The common rules above govern every table below. What follows covers only
+what differs per table.
 
 ##### `entitlements`
 
-An entitlement is bound to the App ID and provisioning
-profile, and `codesign` requires the application's entitlements to be a subset
-of the profile's. Writing one the developer has not enabled produces a signing
+An entitlement is bound to the App ID and provisioning profile.
+`codesign` requires the application's entitlements to be a subset of the
+profile's. Writing one the app developer has not enabled produces a signing
 failure with no trace back to the distribution that caused it, and some cannot
 be granted locally at all: `com.apple.developer.location.push` requires approval
 from Apple, so the gap between "declared" and "grantable" can be weeks.
 
-An entitlement's **value** is deliberately not modelled. Several carry one —
-`com.apple.security.application-groups` takes a group identifier,
-`com.apple.developer.in-app-payments` takes merchant identifiers, and some must
-agree across targets — and all of it belongs in `reason`. A structured form
-would describe something the consumer can neither write nor check, and "must be
-`group.<your-bundle-id>.onesignal`, the same on both targets" tells a reader
-more than a type tag.
+**The application supplies the actual value an entitlement's `key` requires,
+through the consumer's own configuration; the consumer checks only that the
+key exists, never whether the value it carries is correct.**
+
+> Rationale for leaving the value unmodelled. Several entitlements carry
+> one — `com.apple.security.application-groups` takes a group identifier,
+> `com.apple.developer.in-app-payments` takes merchant identifiers, and some
+> must agree across targets — and a structured field would describe
+> something the consumer can neither write nor check on the producer's
+> behalf. All of that belongs in `reason` instead: "must be
+> `group.<your-bundle-id>.onesignal`, the same on both targets" tells a
+> reader more than a type tag ever could.
 
 ##### `usage_descriptions`
 
@@ -1726,12 +1747,25 @@ A purpose string is **user-facing, localized, and
 read by App Store review**, and it is a claim about what *the application* does
 with the data. A library cannot know it, and a binding that wrote one would give
 every application the same unhelpful sentence: useless to users, and a rejection
-risk the application answers for. A consumer **MUST** reject any attempt to set
-one as an `info_plist` value (§7.6).
+risk the application answers for. A producer cannot contribute one through
+`[ios.contributes.info_plist]` either — §7.6 rejects that outright, for the
+same reason.
 
-`NSLocationTemporaryUsageDescriptionDictionary` is declared here like any other
-despite being dictionary-valued: as a prerequisite it is never spelled by the
-producer, so §7.6's exclusion of dictionaries does not bite.
+```toml
+# the producer's sidecar — names the key it needs; asking for the text
+[[ios.requires.usage_descriptions]]
+key = "NSLocationWhenInUseUsageDescription"
+reason = "requestWhenInUseAuthorization() traps if this key is absent"
+```
+
+```toml
+# the application's own configuration — supplies the actual sentence
+[tool.examplebuild.ios.usage_descriptions]
+NSLocationWhenInUseUsageDescription = "Shows trails near you."
+```
+
+The consumer writes that sentence into `Info.plist` under the requested key,
+verbatim and unmodified; it never sees or generates the text itself (§2.2).
 
 ##### `application_files`
 
@@ -1743,16 +1777,23 @@ name = "GoogleService-Info.plist"
 reason = "Download from the Firebase console; Analytics reads it from the bundle and has no programmatic alternative"
 ```
 
-`name` is the file's name in the bundle. A consumer **MUST NOT** create, fetch,
-or synthesize one — these are account-specific, sometimes credential-adjacent,
-and always the application's.
+`name` is the file's name in the bundle. **Obtaining the file is the
+application developer's job, done by hand outside the build** — downloading it
+from a vendor console, typically — **and placing it where the consumer's
+project expects such files; the consumer's build then includes it under that
+name, and checks only that a file of that name is wired into the bundle.** A
+consumer **MUST NOT** create, fetch, or synthesize the file's contents itself —
+these are account-specific, sometimes credential-adjacent, and always the
+application's to provide.
 
 A producer **SHOULD NOT** declare a file here when the SDK offers a programmatic
-path. Most application configuration reaches a producer through the
-application's Python code; this table is for the residual case where the vendor
-leaves no choice. Firebase is the motivating example — most of its services
-accept `FirebaseOptions` programmatically, and Analytics on Apple platforms does
-not.
+path.
+
+> Rationale. Most application configuration reaches a producer through the
+> application's Python code; this table is for the residual case where the
+> vendor leaves no choice. Firebase is the motivating example — most of its
+> services accept `FirebaseOptions` programmatically, and Analytics on Apple
+> platforms does not.
 
 ##### `app_extensions`
 
