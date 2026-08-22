@@ -1284,8 +1284,10 @@ def test_no_rule_is_declared_and_never_emitted():
     from pathlib import Path as _Path
 
     source = _Path(__file__).resolve().parent.parent / "src" / "native_integration"
-    constants = re.findall(r"^([A-Z_]+) = _rule\(", (source / "rules.py").read_text(), re.M)
-    bodies = {f.read_text() for f in source.glob("*.py") if f.name != "rules.py"}
+    constants = re.findall(
+        r"^([A-Z_]+) = _rule\(", (source / "rules.py").read_text(encoding="utf-8"), re.M
+    )
+    bodies = {f.read_text(encoding="utf-8") for f in source.glob("*.py") if f.name != "rules.py"}
     unused = [c for c in constants if not any(re.search(rf"rules\.{c}\b", b) for b in bodies)]
     assert unused == []
 
