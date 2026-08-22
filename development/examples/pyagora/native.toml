@@ -1,0 +1,102 @@
+# pyagora — HYPOTHETICAL. Agora's real-time voice and video SDK, chosen as the
+# first RTC-shaped integration in the set: many permissions, two hardware
+# features, a binary-vending Swift package, and a screen-share path that needs
+# a foreground service on one platform and an extension target on the other.
+#
+# Voice and video are expressible on both platforms. Screen sharing is not
+# expressible on either. See NOTES.md.
+
+contract = "1"
+platforms = ["android", "ios"]
+
+# ---------------------------------------------------------------- Android ---
+
+[android.owns]
+java_namespaces = ["org.pyagora"]
+
+[android.requires]
+min_sdk = 21
+compile_sdk = 35
+
+[[android.contributes.gradle_dependencies]]
+module = "io.agora.rtc:full-sdk"
+version = { at_least = "4.5.0", below = "5.0.0" }
+
+[[android.contributes.permissions]]
+name = "android.permission.INTERNET"
+reason = "Media transport and signalling"
+
+[[android.contributes.permissions]]
+name = "android.permission.RECORD_AUDIO"
+reason = "Capturing the local audio track"
+
+[[android.contributes.permissions]]
+name = "android.permission.CAMERA"
+reason = "Capturing the local video track"
+
+[[android.contributes.permissions]]
+name = "android.permission.MODIFY_AUDIO_SETTINGS"
+reason = "Switching between earpiece, speaker and headset routing during a call"
+
+[[android.contributes.permissions]]
+name = "android.permission.ACCESS_NETWORK_STATE"
+reason = "Adapting bitrate to the current network transport"
+
+[[android.contributes.permissions]]
+name = "android.permission.BLUETOOTH_CONNECT"
+reason = "Routing call audio to a connected Bluetooth headset on Android 12+"
+
+# The features Agora uses when present. §6.7 registers both required="false",
+# which is right: whether a video-calling application refuses to install on a
+# camera-less device is the application's decision, not this package's.
+[[android.contributes.features]]
+name = "android.hardware.camera"
+
+[[android.contributes.features]]
+name = "android.hardware.microphone"
+
+# Agora's documented shrinker rule. The pattern is `io.agora.**` while the
+# Maven group is `io.agora.rtc`, which is the case §6.9 checks against the
+# resolved archive rather than against the group ID.
+[[android.contributes.r8.keep]]
+pattern = "io.agora.**"
+from_dependency = "io.agora.rtc:full-sdk"
+
+# -------------------------------------------------------------------- iOS ---
+
+[ios.requires]
+deployment_target = "13.0"
+
+[[ios.requires.usage_descriptions]]
+key = "NSCameraUsageDescription"
+reason = "The camera is opened when the local video track starts; the application terminates without this key"
+
+[[ios.requires.usage_descriptions]]
+key = "NSMicrophoneUsageDescription"
+reason = "The microphone is opened on joining a channel; the application terminates without this key"
+
+[[ios.requires.plist_capabilities]]
+key = "UIBackgroundModes"
+value = "audio"
+reason = """\
+Keeping a call alive when the user leaves the application. Without it the \
+audio session is suspended and the remote party hears silence."""
+
+[[ios.contributes.swift_packages]]
+name = "AgoraRtcEngine"
+url = "https://github.com/AgoraIO/AgoraRtcEngine_iOS"
+requirement = { from = "4.5.0" }
+products = ["RtcBasic"]
+
+# ------------------------------------------------------------ NOT EXPRESSIBLE
+#
+# AG1  The screen-capture foreground service. Android 14 requires
+#      android:foregroundServiceType="mediaProjection" on a service the
+#      application declares; §6.8 has no attribute for it, so the component
+#      cannot be registered validly. BLOCKING for screen share.
+# AG2  A Broadcast Upload Extension, which is where iOS screen capture must
+#      run. `kind` offers notification_service and location_push.
+#      BLOCKING for screen share.
+# AG3  libc++_shared.so, shipped by this SDK and by several others. Two such
+#      packages in one application collide at packaging time, and no producer
+#      can declare its way out of a conflict it cannot see.

@@ -1,8 +1,9 @@
 # How the specification was tested
 
-Ten integrations expressed as `native.toml` sidecars while the specification was
-being written, with the gaps recorded beside each. The purpose was to find out
-whether version 1 had the right primitives **before** a consumer implemented it.
+Fourteen integrations expressed as `native.toml` sidecars while the
+specification was being written, with the gaps recorded beside each. The purpose
+was to find out whether version 1 had the right primitives **before** a consumer
+implemented it.
 
 This is the working record. The curated example a reader should start from is
 [`examples/pystripe/`](../examples/pystripe/), which carries both halves of one
@@ -24,6 +25,10 @@ of this convention.
 | [Sentry](examples/pysentry/) | a check on §11's build-script exclusion | **mostly clean** — and the first live use of §6.3 |
 | [Stripe](../examples/pystripe/) | `view_links`, and a financial SDK's demands | **clean on Android**; iOS has no browser-return form. **The only worked pair** — see `app-pyproject.toml` beside the sidecar |
 | [Mapbox](examples/pymapbox/) | §6.6, the only table with no coverage | **§6.6 holds** — but cannot express the repository's credential |
+| [Meta SDK](examples/pyfacebook/) | round five: iOS application values | **Android clean; iOS blocked** — three account keys with no declaration form |
+| [Airship](examples/pyairship/) | round five: Android configuration | **iOS clean; Android blocked twice** — one fact, two unstateable paths |
+| [Agora](examples/pyagora/) | round five: real-time media | **calls clean; screen share blocked** on both platforms |
+| [Health Connect](examples/pyhealthconnect/) | round five: an app-owned class | **blocked** — device detection and a Play-required rationale activity |
 
 The first four are existing packages from one toolchain lineage. Firebase,
 Sentry, Stripe and Mapbox are **clean-sheet**: sidecars written against each
@@ -52,12 +57,22 @@ It runs in CI on every push and pull request.
 
 Proposed remedies live in [PROPOSALS.md](PROPOSALS.md). Gap identifiers are
 per-example: `A*`/`B*`/`C*` (PyOneSignal), `L*` (PyCoreLocation), `W*`
-(PyWebViews), `G*` (PyGMA), `F*` (Firebase), `S*` (Sentry), `T*` (Stripe), `M*` (Mapbox).
+(PyWebViews), `G*` (PyGMA), `F*` (Firebase), `S*` (Sentry), `T*` (Stripe), `M*`
+(Mapbox). Round five uses two letters, the single ones being taken: `FB*`
+(Meta), `AS*` (Airship), `AG*` (Agora), `HC*` (Health Connect).
 
-[SURVEY.md](SURVEY.md) is the other kind of evidence: no sidecars, forty
-further SDKs read for what they ask of a build, and `N*` identifiers for what
-this specification cannot say. Depth found the refusals above; breadth found
-the missing tables.
+[SURVEY.md](SURVEY.md) is the other kind of evidence: forty further SDKs read
+for what they ask of a build, with `N*` identifiers for what this specification
+cannot say. Depth found the refusals above; breadth found the missing tables.
+
+**Round five is where the two meet.** The four sidecars above were written to
+put depth behind the survey's most consequential findings before any of them is
+allowed to change SPEC.md — and three of the four changed the finding they were
+testing. FB2 narrowed N6 (an `.aar` merges its own `<queries>`), AG1 removed
+the hedge from N5 (a capture service is the producer's to declare, so the gap is
+not narrow), and HC2 showed §6.8's single-action stereotype does not generalize
+the way its rationale assumes. Two findings — FB3 and FB4 — appear in no survey
+at all, because they only surface when you try to write the entry.
 
 > **Reading these after the fact.** Each `NOTES.md` describes SPEC.md **as it
 > stood when that example was run**. For the four PyPlatformPackages examples

@@ -1,0 +1,54 @@
+# pyhealthconnect — HYPOTHETICAL. Android's Health Connect client, chosen for
+# the case the survey found in WeChat and did not expect to find in a Google
+# library: an SDK that requires the *application* to own a class, at a path the
+# producer cannot write to.
+#
+# The data half is expressible and validates §6.7's canonical-permission rule
+# on a whole family of vendor permissions. The permission-rationale half, which
+# Google Play requires for a health app, is not expressible at all.
+
+contract = "1"
+platforms = ["android"]
+
+[android.owns]
+java_namespaces = ["org.pyhealthconnect"]
+
+[android.requires]
+# connect-client supports API 26; the Health Connect application itself needs
+# API 28, so a lower-API device sees the SDK report Health Connect unavailable.
+min_sdk = 26
+compile_sdk = 35
+
+[[android.contributes.gradle_dependencies]]
+coordinate = "androidx.health.connect:connect-client:1.1.0"
+
+# Health Connect permissions are ordinary manifest strings under a vendor
+# prefix. §6.7 defines no prefix expansion, which is what lets these be
+# declared with no additional rule — the choice paying for itself.
+[[android.contributes.permissions]]
+name = "android.permission.health.READ_STEPS"
+reason = "Reading step counts written by other applications"
+
+[[android.contributes.permissions]]
+name = "android.permission.health.WRITE_STEPS"
+reason = "Writing step counts recorded by this application"
+
+[[android.contributes.permissions]]
+name = "android.permission.health.READ_HEART_RATE"
+reason = "Reading heart-rate samples written by other applications"
+
+[android.contributes.r8]
+keep_classes = ["org.pyhealthconnect.**"]
+
+# ------------------------------------------------------------ NOT EXPRESSIBLE
+#
+# HC1  <queries><package android:name="com.google.android.apps.healthdata"/>.
+#      Without it the client reports Health Connect as not installed on every
+#      device, and reports it silently. BLOCKING.
+# HC2  A permissions-rationale activity, owned by the application, plus an
+#      activity-alias guarded by android.permission.START_VIEW_PERMISSION_USAGE
+#      and filtered on action VIEW_PERMISSION_USAGE with category
+#      HEALTH_PERMISSIONS. Three separate gaps in one requirement: a class in
+#      the application's namespace, a component attribute, and an intent filter
+#      carrying both an action and a category. BLOCKING, and required by Play
+#      policy rather than merely by the SDK.

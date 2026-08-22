@@ -17,8 +17,10 @@ The ten worked examples were chosen for *pressure* — each was picked to break
 something. This survey is the opposite: it takes the SDKs an application is
 statistically likely to acquire, reads each vendor's own integration
 instructions, and asks only whether SPEC.md can say what the vendor asks for.
-No sidecars were written. A finding here is a claim about **expressiveness**,
-not about whether a wrapper would be worth shipping.
+No sidecars were written for the survey itself. A finding here is a claim about
+**expressiveness**, not about whether a wrapper would be worth shipping — and
+four of them have since been put to a sidecar, which changed three of the four
+it touched (see [Since this survey](#since-this-survey), below).
 
 Selection is by prevalence within category — ads, attribution, engagement,
 analytics, crash/APM, identity, payments, maps, media/RTC, support, ML,
@@ -215,6 +217,15 @@ The design tension is real — §6.8 deliberately models stereotypes, not the
 manifest grammar — but `foregroundServiceType` and `authorities` are not
 grammar, they are **validity**.
 
+*Amended by the sidecars.* [pyagora](examples/pyagora/NOTES.md) (AG1) removes
+the "an `.aar` brings its own declaration" hedge: a media-projection capture
+service is the **producer's** to declare, because it is the producer's capture
+lifecycle that runs inside it. The permission half of that requirement is
+already expressible, which makes the declaration look complete while the
+attribute that gives it meaning is missing. The `authorities` half was settled
+the other way and has landed — `provider` left the §6.8 vocabulary rather than
+gaining a field it could not validly carry.
+
 ### N6 — Android `<queries>`
 
 Android 11+ package visibility means a producer's own Java (§6.4) that resolves
@@ -233,6 +244,13 @@ reasoning belongs in `contributes`.
 own `<queries>` through manifest merging, which covers most of the vendors
 above. The hole is for §6.4 source contributions — and there the failure is
 silent, because `PackageManager` reports "not installed" rather than an error.
+
+*Amended by the sidecars.* [pyfacebook](examples/pyfacebook/NOTES.md) (FB2)
+confirms the narrowing — Meta's entry does arrive from `facebook-common`. But
+[pyhealthconnect](examples/pyhealthconnect/NOTES.md) (HC1) is the case where
+nothing merges anything in: the entry is the application's to declare, and its
+absence makes `getSdkStatus()` return a wrong answer rather than an error, on
+every device, for the API the whole SDK is gated behind.
 
 ### N7 — producer-fixed manifest `meta-data` *(P3's deferred half, now a finding)*
 
@@ -492,6 +510,36 @@ Findings are more legible against what did not move.
 - **§2.2's join-key model absorbed every new prerequisite shape** the survey
   produced. Where something was inexpressible it was always a missing *table*,
   never a missing way for the application to answer.
+
+## Since this survey
+
+**Six corrections have landed in SPEC.md** — the batch that fixes something
+wrong rather than adding capability: `provider` left §6.8's vocabulary (it
+cannot carry a device-unique authority a producer could know), §7.6 gained the
+application-wins rule §6.3 always had, §11 gained a third build-time outcome
+for instrumentation SDKs and two new exclusion rows (arbitrary fragments,
+CocoaPods-only vendors), and §7.6's dictionary paragraph now names
+`SKAdNetworkItems` as the counter-case it has rather than implying none exists.
+
+**Four sidecars were then written** against the findings with the most at stake
+— [Meta](examples/pyfacebook/), [Airship](examples/pyairship/),
+[Agora](examples/pyagora/) and [Health Connect](examples/pyhealthconnect/) —
+before any of the remaining findings is allowed to change the specification.
+Three of the four changed the finding they were testing (N5 and N6 above), and
+two findings appeared that no amount of reading documentation produced:
+
+- **FB3** — `from_dependency` may only name a dependency the sidecar declares
+  itself, but SDK families put the class in a transitive module. Meta's
+  `CustomTabActivity` lives in `facebook-common`, arriving under
+  `facebook-login`, so the sidecar must declare the internal module purely to
+  have something to point at.
+- **FB4** — an application value cannot be **derived** from another. Meta's
+  login scheme is the app ID with `fb` prepended, so the application answers the
+  same fact twice with nothing checking that the two agree.
+
+Both are warts with workarounds rather than blockers, and both are the kind of
+finding that only exists once someone writes the entry — which is the argument
+for not landing the seven new tables on survey evidence alone.
 
 ## Suggested disposition
 

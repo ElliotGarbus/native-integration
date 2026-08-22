@@ -9,9 +9,10 @@
 > design can be argued over; feedback from maintainers of other toolchains is
 > the point — see [Getting involved](#getting-involved).
 >
-> The spec has been stress-tested against **ten integration cases** — four
-> existing Python packages, and six clean-sheet sidecars covering Firebase,
-> Sentry, Stripe and Mapbox — which changed it substantially. See
+> The spec has been stress-tested against **fourteen integration cases** — four
+> existing Python packages, and ten clean-sheet sidecars covering Firebase,
+> Sentry, Stripe, Mapbox, Meta, Airship, Agora and Health Connect — which
+> changed it substantially, plus a survey of forty further SDKs. See
 > [Tested against real packages](#tested-against-real-packages).
 
 ## The problem
@@ -231,9 +232,9 @@ interoperability specification rather than a PEP.
 
 ## Tested against real packages
 
-Before asking anyone to implement a consumer, **ten integration cases** were
+Before asking anyone to implement a consumer, **fourteen integration cases** were
 expressed against this spec as `native.toml` sidecars — four existing Python
-packages, and six clean-sheet sidecars written from vendor documentation.
+packages, and ten clean-sheet sidecars written from vendor documentation.
 
 | Case | Pressure on the spec | Outcome |
 | --- | --- | --- |
@@ -245,6 +246,10 @@ packages, and six clean-sheet sidecars written from vendor documentation.
 | **Sentry** | build-script exclusion, app values | first live use of application values; §11 corrected |
 | **Stripe** | browser return, payments | `view_links` validated; iOS URL prerequisite added |
 | **Mapbox** | private Maven repository | repository credentials, and a secrets rule for the record |
+| **Meta SDK** | iOS account values, browser return | Android clean; iOS **blocked** — no iOS application-value table |
+| **Airship** | Android configuration, two paths | iOS clean; Android **blocked** on both paths to one app key |
+| **Agora** | real-time media, screen capture | calls clean; screen share **blocked** on both platforms |
+| **Health Connect** | an application-owned class | **blocked** — package visibility, and a Play-required rationale activity |
 
 **PyGMA was the one that fit without a workaround.** The other three round-one
 packages each needed either a change to the package or a capability that did not
@@ -263,6 +268,15 @@ six could not, and two results are worth pulling out:
 - **Examples caught claims this project had made too strongly** — that
   build-script SDKs were one uniform category, and that application values had
   no live use. Both were corrected by a vendor, not by argument.
+
+**Round five went wider before going deeper.** A survey of the next forty SDKs
+([development/SURVEY.md](development/SURVEY.md)) asked only what each vendor's
+integration guide requires and whether this convention can say it. Fifteen of
+its twenty-one findings are missing vocabulary that the existing shapes already
+accommodate, which is the most useful thing it established — the four that are
+not are collected as proposals. Meta, Airship, Agora and Health Connect were
+then written as sidecars against the costliest findings, and three of the four
+amended the finding they were testing.
 
 [**examples/**](examples/) carries one integration in full — the package's
 declaration and the application's reply side by side — if you would rather see
@@ -340,7 +354,7 @@ publish it.
 ## Checks
 
 `python3 tools/check_spec.py` validates the specification against itself and
-against the ten worked examples: that every `§` reference and link resolves, the
+against the fourteen worked examples: that every `§` reference and link resolves, the
 consumer requirements are sequentially numbered and fully indexed, every TOML
 block parses, every documented sidecar obeys the rules the specification states,
 every key appears in the reference table, and no RFC 2119 keyword is left
@@ -357,7 +371,7 @@ section is worse than none.
 
 `python3 -m pytest` runs the reference reader's own suite, which asks a
 different question of the same files: not whether the documents agree with each
-other, but whether all ten sidecars survive an implementation of the rules the
+other, but whether all fourteen sidecars survive an implementation of the rules the
 specification states. Both run in CI on every push and pull request.
 
 ## Planned

@@ -85,7 +85,7 @@ motivating example is a hypothesis; a proposal with several is a finding.
 | P27 | Repository credentials, and keeping them out of the record | M2 | Mapbox |
 | P34 | The factoring pass: modes, merge rules, authority classes | the growth law | [SURVEY.md](SURVEY.md), 15 findings |
 | P35 | The host contract — a requirement the **consumer** satisfies | N10, N20 | Stripe, WeChat, Health Connect |
-| P36 | Close the escape hatch, and say why | all of SURVEY.md | Cordova, Expo |
+| P36 | ~~Close the escape hatch, and say why~~ **landed** | all of SURVEY.md | Cordova, Expo |
 
 Gap identifiers refer to the NOTES.md beside each example:
 [PyOneSignal](examples/pyonesignal/NOTES.md) (A*, B*, C*),
@@ -97,8 +97,12 @@ Gap identifiers refer to the NOTES.md beside each example:
 [Stripe](examples/pystripe/NOTES.md) (T*).
 
 `N*` identifiers refer to [SURVEY.md](SURVEY.md), which is breadth rather than
-depth: forty further SDKs read for what they ask of a build, with no sidecars
-written.
+depth: forty further SDKs read for what they ask of a build. Round five's four
+sidecars use two-letter prefixes, the single ones being taken:
+[Meta](examples/pyfacebook/NOTES.md) (`FB*`),
+[Airship](examples/pyairship/NOTES.md) (`AS*`),
+[Agora](examples/pyagora/NOTES.md) (`AG*`),
+[Health Connect](examples/pyhealthconnect/NOTES.md) (`HC*`).
 
 P6 and P11 each gained a second example from PyGMA (G2, G4).
 
@@ -1747,6 +1751,21 @@ P28–P33 came from writing a consumer. P34–P36 come from
 are the only three of its twenty-one findings that are about the **model**
 rather than about missing vocabulary.
 
+> **Landed from this round.** The corrections batch is in SPEC.md: `provider`
+> removed from §6.8's vocabulary, §7.6's missing application-wins rule, §11's
+> third build-time outcome, §11's two new exclusion rows, §7.6's
+> `SKAdNetworkItems` counter-case, and **P36 in full**. None adds producer
+> capability; each fixes something that was wrong, unimplementable, or claimed
+> too strongly.
+>
+> **Four sidecars followed** — [Meta](examples/pyfacebook/),
+> [Airship](examples/pyairship/), [Agora](examples/pyagora/) and
+> [Health Connect](examples/pyhealthconnect/) — written to put depth behind the
+> survey's costliest findings before any of them changes the specification.
+> Three of the four amended the finding they tested, and two new ones (FB3,
+> FB4) appeared that reading documentation had not produced. **P34 and P35
+> remain undecided.**
+
 ## P34 — The factoring pass: satisfaction modes, merge rules, authority classes
 
 **The problem is the growth law, not the decomposition.** Sort SURVEY.md's
@@ -1881,7 +1900,7 @@ diverge on an `Info.plist` key the application set itself.
    contract-minor registry (P31); a new key names its mode or its merge rule and
    authority class in Appendix F at the same time. That is what turns the
    sixteenth mechanism into a row.
-3. **Fix §7.6's missing application-wins rule** as a straight correction.
+3. **Fix §7.6's missing application-wins rule** as a straight correction. *(Landed.)*
 4. **Do not rewrite §6.x and §7.x as views over the registry.** The tables stay
    as they are. The registry is the thing that makes the *next* fifteen cheap,
    not a reorganisation of the fourteen that exist.
@@ -1960,7 +1979,7 @@ integrate with a conforming consumer. That is the intended behaviour — it is
 toolchains whose bootstrap cannot change, and the vocabulary must therefore be
 small, concrete, and argued one token at a time.
 
-## P36 — Close the escape hatch, and say why
+## P36 — Close the escape hatch, and say why *(DECIDED: landed, §11 + Appendix C)*
 
 *Motivated by all of SURVEY.md: the question every reviewer asks after reading
 twenty-one gaps.*

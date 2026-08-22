@@ -1,0 +1,119 @@
+# pyfacebook — HYPOTHETICAL. Meta's Login and Share SDK, run against the spec
+# after round-five's Batch 0 corrections. Chosen for the iOS application-value
+# case, and for a second live use of `view_links` under a different vendor.
+#
+# The Android half is expressible. The iOS half builds and cannot work: three
+# account-specific Info.plist keys have no declaration form. See NOTES.md,
+# finding FB1.
+
+contract = "1"
+platforms = ["android", "ios"]
+
+# ---------------------------------------------------------------- Android ---
+
+[android.owns]
+java_namespaces = ["org.pyfacebook"]
+
+[android.requires]
+min_sdk = 24
+compile_sdk = 35
+
+# FacebookSdk reads both of these from <meta-data> during initialization, before
+# any Python runs — §6.3's build-embedded test, met twice.
+[[android.requires.application_values]]
+id = "facebook_app_id"
+reason = """\
+Your Meta app ID, from developers.facebook.com → App Dashboard → Settings → \
+Basic."""
+manifest_meta_data = "com.facebook.sdk.ApplicationId"
+
+[[android.requires.application_values]]
+id = "facebook_client_token"
+reason = """\
+Your client token, from App Dashboard → Settings → Advanced → Client Token. \
+Required since SDK 13; Login fails without it."""
+manifest_meta_data = "com.facebook.sdk.ClientToken"
+
+# Finding FB4. The login return scheme is the app ID with an "fb" prefix.
+# Nothing here can derive one value from another, so the application answers
+# the same fact twice, in two shapes.
+[[android.requires.application_values]]
+id = "facebook_login_scheme"
+reason = """\
+Your Meta app ID prefixed with "fb" — for app ID 1234567890, "fb1234567890". \
+This is the scheme the browser returns the login to."""
+
+[[android.contributes.gradle_dependencies]]
+module = "com.facebook.android:facebook-login"
+version = { at_least = "18.0.0", below = "19.0.0" }
+
+# Finding FB3. Declared only so the component below can name it: the class
+# lives in facebook-common, which arrives transitively, and `from_dependency`
+# may only name a dependency this sidecar declares itself.
+[[android.contributes.gradle_dependencies]]
+module = "com.facebook.android:facebook-common"
+version = { at_least = "18.0.0", below = "19.0.0" }
+
+[[android.contributes.permissions]]
+name = "android.permission.INTERNET"
+reason = "Graph API calls and the Login flow"
+
+# The Custom Tabs return target. Meta's own instructions have the application
+# write this activity and its filter by hand into AndroidManifest.xml; this is
+# the transcription §6.8 exists to remove.
+[[android.contributes.components]]
+kind = "activity"
+name = "com.facebook.CustomTabActivity"
+from_dependency = "com.facebook.android:facebook-common"
+exported_required = true
+reason = "Receives the Login redirect back from the browser or the Facebook app"
+
+  [[android.contributes.components.view_links]]
+  scheme = { application_value = "facebook_login_scheme" }
+
+# -------------------------------------------------------------------- iOS ---
+
+[ios.requires]
+deployment_target = "15.0"
+
+[[ios.requires.url_schemes]]
+id = "facebook_login_return"
+reason = """\
+Register "fb<your-app-id>" in CFBundleURLTypes and forward \
+application(_:open:options:) to \
+ApplicationDelegate.shared.application(_:open:options:)."""
+
+[[ios.requires.usage_descriptions]]
+key = "NSUserTrackingUsageDescription"
+conditional = true
+reason = """\
+Required only if you enable advertiser tracking; the ATT prompt is shown \
+before the identifier is read."""
+
+# Lets the SDK detect the Facebook and Messenger applications so login can hand
+# off to them. Grants the application nothing — §7.6's own example of an
+# ordinary contribution.
+[ios.contributes.info_plist.append]
+LSApplicationQueriesSchemes = [
+  "fbapi",
+  "fb-messenger-share-api",
+  "fbauth2",
+  "fbshareextension",
+]
+
+[[ios.contributes.swift_packages]]
+name = "FacebookIOS"
+url = "https://github.com/facebook/facebook-ios-sdk"
+requirement = { from = "18.0.3" }
+products = ["FacebookLogin", "FacebookShare"]
+
+# ------------------------------------------------------------ NOT EXPRESSIBLE
+#
+# FB1  FacebookAppID, FacebookClientToken, FacebookDisplayName — account
+#      values read from Info.plist at launch. No iOS counterpart to §6.3
+#      exists, so the requirement cannot even be stated. BLOCKING.
+# FB2  <queries> for com.facebook.katana. Arrives from the AAR on Android;
+#      unreachable for anything this sidecar's own code would resolve.
+# FB5  NSPrivacyTrackingDomains in the application's privacy manifest.
+# FB6  The -ObjC linker flag, where a producer links the SDK any way other
+#      than through the vendor's Swift package.

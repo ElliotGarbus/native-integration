@@ -1,0 +1,110 @@
+# pyairship — HYPOTHETICAL. Airship's push and messaging SDK, chosen because
+# the survey said its Android configuration has two paths and this convention
+# can express neither.
+#
+# The iOS half is complete and needs nothing new. The Android half below is a
+# torso: the dependency, the permission and the floors are all declarable, and
+# every way of telling Airship its app key is not. See NOTES.md, findings AS1
+# and AS2.
+
+contract = "1"
+platforms = ["android", "ios"]
+
+# ---------------------------------------------------------------- Android ---
+
+[android.owns]
+java_namespaces = ["org.pyairship"]
+
+[android.requires]
+min_sdk = 23
+compile_sdk = 35
+# POST_NOTIFICATIONS is requested at runtime only when targetSdk >= 33; below
+# that, a push package's runtime request silently does nothing.
+target_sdk = 33
+
+[[android.contributes.gradle_dependencies]]
+module = "com.urbanairship.android:urbanairship-fcm"
+version = { at_least = "20.0.0", below = "21.0.0" }
+
+[[android.contributes.permissions]]
+name = "android.permission.POST_NOTIFICATIONS"
+reason = "Displaying Airship push notifications on Android 13+"
+
+# Finding AS1. PyAirshipAutopilot extends Autopilot and supplies
+# AirshipConfigOptions from values the application passes in. The class can be
+# contributed; the one <meta-data> line that makes Airship load it cannot, so
+# what is staged here is dead code.
+[android.contributes.src]
+java = ["java"]
+
+[android.contributes.r8]
+keep_classes = ["org.pyairship.**"]
+
+[[android.contributes.r8.keep]]
+pattern = "com.urbanairship.**"
+from_dependency = "com.urbanairship.android:urbanairship-fcm"
+
+# -------------------------------------------------------------------- iOS ---
+
+[ios]
+swift_symbol_prefixes = ["PyAirship"]
+
+[ios.requires]
+deployment_target = "15.0"
+
+[[ios.requires.entitlements]]
+key = "aps-environment"
+reason = "APNs delivery"
+
+[[ios.requires.entitlements]]
+key = "com.apple.security.application-groups"
+conditional = true
+reason = """\
+Required only if you add the notification service extension below. The group \
+must be configured identically on the application and the extension target, \
+so Airship can share delivery state between them."""
+
+# The iOS answer to exactly the configuration problem the Android half cannot
+# state. §7.3's application_files fits it without argument.
+[[ios.requires.application_files]]
+name = "AirshipConfig.plist"
+reason = """\
+App key and app secret from the Airship dashboard. Airship.takeOff reads it \
+from the bundle; the programmatic alternative runs too late for a push \
+received at launch."""
+
+[[ios.requires.app_extensions]]
+id = "airship_nse"
+kind = "notification_service"
+conditional = true
+reason = """\
+Required only if you send notifications with images, or need delivery \
+confirmation. Add AirshipServiceExtension to the target and share an app \
+group with the application."""
+
+[[ios.requires.plist_capabilities]]
+key = "UIBackgroundModes"
+value = "remote-notification"
+reason = """\
+Background delivery of silent pushes. You must also implement the background \
+handler; App Store review asks what the application does with it."""
+
+[[ios.contributes.swift_packages]]
+name = "Airship"
+url = "https://github.com/urbanairship/ios-library"
+requirement = { from = "20.0.0" }
+products = ["AirshipCore", "AirshipMessageCenter", "AirshipAutomation"]
+
+# ------------------------------------------------------------ NOT EXPRESSIBLE
+#
+# AS1  <meta-data android:name="com.urbanairship.autopilot"
+#                 android:value="org.pyairship.PyAirshipAutopilot"/>
+#      A producer-fixed manifest value naming a producer-owned class. BLOCKING,
+#      and the declarative initialization path §11 says it is waiting for.
+# AS2  airshipconfig.properties in assets/ — the Android twin of the
+#      AirshipConfig.plist prerequisite above, which has no Android form.
+#      BLOCKING, and blocking for the same integration twice over.
+# AS3  The notification icon and accent colour, which are drawable and colour
+#      resources the application supplies and Airship reads by name.
+# AS4  A notification content extension, for rich push UI. `kind` has two
+#      values and this is not one of them.

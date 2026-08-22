@@ -43,7 +43,7 @@ def platforms_of(path: Path) -> list[Platform]:
 
 
 def test_the_example_set_is_not_empty():
-    assert len(EXAMPLES) == 10
+    assert len(EXAMPLES) == 14
 
 
 @pytest.mark.parametrize("path", EXAMPLES, ids=lambda p: str(p.relative_to(ROOT)))
