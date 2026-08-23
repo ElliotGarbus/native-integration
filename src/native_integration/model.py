@@ -103,6 +103,22 @@ class GradleRepository:
 
 
 @dataclass(frozen=True)
+class ContributedMetaData:
+    """§6.10 — a `<meta-data>` entry whose value the producer knows."""
+
+    key: str
+    value: str | int | bool
+    reason: str
+
+    @property
+    def rendered(self) -> str:
+        """The literal written to `android:value` (§6.10's mapping)."""
+        if isinstance(self.value, bool):
+            return "true" if self.value else "false"
+        return str(self.value)
+
+
+@dataclass(frozen=True)
 class Permission:
     name: str
     reason: str | None = None
@@ -171,6 +187,7 @@ class AndroidSection:
     gradle_repositories: tuple[GradleRepository, ...] = ()
     permissions: tuple[Permission, ...] = ()
     features: tuple[Feature, ...] = ()
+    meta_data: tuple[ContributedMetaData, ...] = ()
     components: tuple[Component, ...] = ()
     keep_classes: tuple[str, ...] = ()
     dependency_keeps: tuple[DependencyKeep, ...] = ()
@@ -406,6 +423,10 @@ def build_android(table: Mapping[str, Any]) -> AndroidSection:
             for p in contributes.get("permissions", [])
         ),
         features=tuple(Feature(name=f["name"]) for f in contributes.get("features", [])),
+        meta_data=tuple(
+            ContributedMetaData(key=m["key"], value=m["value"], reason=m["reason"])
+            for m in contributes.get("meta_data", [])
+        ),
         components=tuple(components),
         keep_classes=tuple(r8.get("keep_classes", [])),
         dependency_keeps=tuple(

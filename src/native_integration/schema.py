@@ -65,6 +65,15 @@ def nonempty_string_list(value: Any) -> str | None:
     return None if value else "must not be empty"
 
 
+def meta_data_value(value: Any) -> str | None:
+    """§6.10 — a string, integer or boolean, and never a resource reference."""
+    if isinstance(value, bool) or isinstance(value, int):
+        return None
+    if isinstance(value, str):
+        return None if value.strip() else "must not be empty"
+    return "must be a string, an integer or a boolean"
+
+
 def one_of(*allowed: str) -> Check:
     def check(value: Any) -> str | None:
         if not isinstance(value, str):
@@ -234,6 +243,13 @@ ANDROID = Table(
                         "groups": Field(string_list),
                         "modules": Field(string_list),
                         "credentials_required": Field(a_bool),
+                    }
+                ),
+                "meta_data": Table(
+                    fields={
+                        "key": Field(nonempty_string, required=True),
+                        "value": Field(meta_data_value, required=True),
+                        "reason": Field(nonempty_string, required=True),
                     }
                 ),
                 "permissions": Table(

@@ -1497,6 +1497,88 @@ def test_the_application_keeps_its_own_plist_key_and_the_override_is_reported(tm
     assert delivery.value == "9999999999" and delivery.overridden_by_application
 
 
+AUTOPILOT = """
+contract = "1"
+platforms = ["android"]
+[android.owns]
+java_namespaces = ["org.pyairship"]
+[[android.contributes.meta_data]]
+key = "com.urbanairship.autopilot"
+value = "org.pyairship.PyAirshipAutopilot"
+reason = "Loads Airship before any component receives an intent"
+"""
+
+FIXED_AND_SUPPLIED = """
+contract = "1"
+platforms = ["android"]
+[[android.requires.application_values]]
+id = "airship_key"
+reason = "Your Airship app key"
+manifest_meta_data = "com.urbanairship.autopilot"
+"""
+
+
+def test_a_fixed_meta_data_entry_reaches_the_manifest(tmp_path):
+    """§6.10 — the declarative initialization path §11 said it was waiting for."""
+    integration = read(
+        platform=Platform.ANDROID,
+        closure=Closure.direct("py-airship"),
+        application=Application(android_sdk={"min_sdk": 24, "compile_sdk": 35}),
+        profile=PROFILE,
+        sources=[build(tmp_path, AUTOPILOT, name="py-airship", module="py_airship._native")],
+        accept_current_surface=True,
+    )
+    assert [d.rule.code for d in integration.diagnostics] == []
+    (contribution,) = integration.effective.contributions
+    (entry,) = contribution.meta_data
+    assert entry.key == "com.urbanairship.autopilot"
+    assert entry.value == "org.pyairship.PyAirshipAutopilot"
+
+
+def test_a_fixed_entry_and_a_delivered_one_share_a_key_space(tmp_path):
+    """§6.10 — set here and delivered there are the same manifest entry.
+
+    Two distributions putting different values under one key fail, whichever
+    half of §6.3 each of them used. Before this table the collision could not
+    arise, because a producer had no way to set a key it knew the value of.
+    """
+    integration = read(
+        platform=Platform.ANDROID,
+        closure=Closure.direct("py-airship", "py-other"),
+        application=Application(
+            android_sdk={"min_sdk": 24, "compile_sdk": 35},
+            answers=MappingAnswers(application_values={"py-other": {"airship_key": "zzz"}}),
+        ),
+        profile=PROFILE,
+        sources=[
+            build(tmp_path, AUTOPILOT, name="py-airship", module="py_airship._native"),
+            build(tmp_path, FIXED_AND_SUPPLIED, name="py-other", module="py_other._native"),
+        ],
+    )
+    conflict = [d for d in integration.diagnostics if d.rule.code == "meta-data-conflict"]
+    assert conflict, [d.rule.code for d in integration.diagnostics]
+    assert set(conflict[0].distributions) == {"py-airship", "py-other"}
+
+
+def test_the_application_keeps_its_own_meta_data_key(tmp_path):
+    """§6.10's veto: setting the key is how an application refuses."""
+    integration = read(
+        platform=Platform.ANDROID,
+        closure=Closure.direct("py-airship"),
+        application=Application(
+            android_sdk={"min_sdk": 24, "compile_sdk": 35},
+            manifest_meta_data={"com.urbanairship.autopilot": "com.example.MyAutopilot"},
+        ),
+        profile=PROFILE,
+        sources=[build(tmp_path, AUTOPILOT, name="py-airship", module="py_airship._native")],
+        accept_current_surface=True,
+    )
+    assert [d.rule.code for d in integration.diagnostics] == ["meta-data-application-override"]
+    (contribution,) = integration.effective.contributions
+    (entry,) = contribution.meta_data
+    assert entry.value == "com.example.MyAutopilot" and entry.overridden_by_application
+
+
 # --- requirement coverage ---------------------------------------------------
 
 

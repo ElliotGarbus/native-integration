@@ -451,6 +451,27 @@ def _one(
                     )
                 )
 
+        for entry in android.meta_data:
+            # §6.10 — one key space with §6.3's delivery, so the same override
+            # rule applies: a key the application sets itself is the
+            # application's, kept and reported.
+            override = application.manifest_meta_data.get(entry.key)
+            if override is not None:
+                bag.add(
+                    rules.META_DATA_APPLICATION_OVERRIDE,
+                    f"<meta-data {entry.key}> is also set by the application, whose "
+                    "value is kept",
+                    name,
+                )
+            meta_data.append(
+                MetaDataEntry(
+                    key=entry.key,
+                    value=override if override is not None else entry.rendered,
+                    distributions=(name,),
+                    overridden_by_application=override is not None,
+                )
+            )
+
         for permission in android.permissions:
             permissions.append(
                 PermissionEntry(

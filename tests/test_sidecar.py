@@ -396,6 +396,58 @@ core_library_desugaring = true
     assert codes == [] and sidecar.android.core_library_desugaring
 
 
+def test_contributed_meta_data_takes_three_value_types(parse):
+    """§6.10 — string, integer, boolean; the consumer renders the literal."""
+    text = """
+contract = "1"
+[[android.contributes.meta_data]]
+key = "com.google.mlkit.vision.DEPENDENCIES"
+value = "barcode,face"
+reason = "Bundles the models rather than downloading them on first use"
+
+[[android.contributes.meta_data]]
+key = "com.example.RetryCount"
+value = 3
+reason = "Vendor default is 0, which drops the first event"
+
+[[android.contributes.meta_data]]
+key = "io.branch.sdk.TestMode"
+value = false
+reason = "Live keys, not test keys"
+"""
+    sidecar, codes, _ = parse(text)
+    assert codes == []
+    models, retries, test_mode = sidecar.android.meta_data
+    assert models.rendered == "barcode,face"
+    assert retries.rendered == "3"
+    assert test_mode.rendered == "false"
+
+
+def test_meta_data_may_not_name_a_resource(parse):
+    """§6.10 — the notification-icon case, and why it stays out of reach."""
+    text = """
+contract = "1"
+[[android.contributes.meta_data]]
+key = "com.google.firebase.messaging.default_notification_icon"
+value = "@drawable/ic_stat_notify"
+reason = "The status bar icon"
+"""
+    _, codes, _ = parse(text)
+    assert codes == ["meta-data-resource-reference"]
+
+
+def test_meta_data_needs_a_reason(parse):
+    """The key is global and its effect is invisible in Python."""
+    text = """
+contract = "1"
+[[android.contributes.meta_data]]
+key = "com.example.Flag"
+value = true
+"""
+    _, codes, _ = parse(text)
+    assert codes == ["key-required"]
+
+
 # --- §6.6 repositories ------------------------------------------------------
 
 

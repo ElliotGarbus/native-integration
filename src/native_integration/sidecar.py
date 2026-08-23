@@ -355,6 +355,19 @@ def _check_dependencies(
     sidecar: Sidecar, android: AndroidSection, *, profile: ConsumerProfile, bag: DiagnosticBag
 ) -> None:
     name = sidecar.distribution
+    for entry in android.meta_data:
+        # §6.10 — a resource reference names something the producer cannot
+        # supply and the application has not been asked for; it fails in AAPT
+        # with no trace back to the sidecar.
+        if isinstance(entry.value, str) and entry.value[:1] in ("@", "?"):
+            bag.add(
+                rules.META_DATA_RESOURCE_REFERENCE,
+                f"sets <meta-data {entry.key}> to `{entry.value}`, a resource "
+                "reference; contributed resources are out of scope (§11), so the "
+                "value must be a literal",
+                name,
+            )
+
     for dependency in android.gradle_dependencies:
         versions = [v for v in (dependency.exact_version, dependency.at_least, dependency.below) if v]
         for version in versions:

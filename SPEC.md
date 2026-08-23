@@ -70,6 +70,7 @@ checklist, and §§3–7 are what it refers to.
   - [6.7 Permissions and features](#67-permissions-and-features-androidcontributespermissions-androidcontributesfeatures)
   - [6.8 Manifest components](#68-manifest-components-androidcontributescomponents)
   - [6.9 Shrinker keep patterns](#69-shrinker-keep-patterns-androidcontributesr8)
+  - [6.10 Manifest meta-data](#610-manifest-meta-data-androidcontributesmetadata)
 - [7. iOS](#7-ios)
   - [7.1 Symbol prefixes](#71-symbol-prefixes-ios)
   - [7.2 Build requirements](#72-build-requirements-iosrequires)
@@ -864,6 +865,7 @@ platforms = ["android", "ios"]   # §4.5 — optional; where the distribution wo
   [[android.contributes.components]]            # §6.8  + view_links, intent_filters
   [android.contributes.r8]                      # §6.9  keep_classes
   [[android.contributes.r8.keep]]               # §6.9  + from_dependency
+  [[android.contributes.meta_data]]             # §6.10 key, value, reason
 
 [ios]                                       # §7.1  swift_symbol_prefixes
 [ios.requires]                              # §7.2  deployment_target
@@ -1764,6 +1766,70 @@ shrinking.
 > the entire application. The bounded worst case here is a producer exempting a
 > library it itself declared — a size cost, not an application-wide
 > shrink-disable.
+
+### 6.10 Manifest meta-data: `[[android.contributes.meta_data]]`
+
+*For a `<meta-data>` entry whose value the **producer** knows — a vendor flag, a
+model list, a class name the SDK loads reflectively. §6.3 delivers a value the
+**application** supplies to the same place; this is the other half, and the two
+share one key space.*
+
+```toml
+[[android.contributes.meta_data]]
+key = "com.google.mlkit.vision.DEPENDENCIES"
+value = "barcode,face"
+reason = "Bundles the barcode and face models rather than downloading them on first use"
+```
+
+- `key` is the manifest entry's name, written exactly as the vendor code reads
+  it. It is **not** scoped by the declaring distribution — it is a real,
+  platform-global name — so the merge rules below are §6.3's, unchanged.
+- `reason` is **REQUIRED**. The key is global, its effect is invisible in Python,
+  and §9's report is where an application sees what a transitive dependency
+  turned on.
+- `value` is a **string, integer or boolean**, mapped to the manifest as:
+
+| TOML type | `android:value` |
+| --- | --- |
+| string | the text, verbatim |
+| integer | the digits |
+| boolean | `true` / `false` |
+
+- A value **MUST NOT** be a **resource reference** — anything beginning `@` or
+  `?`. A consumer **MUST** reject one, naming the distribution and the key.
+- Entries are written into the `<application>` element. Version 1 does not model
+  `<meta-data>` on a component.
+
+**Merging is §6.3's rule, over one key space.** A key set here and delivered
+there are the same manifest entry, so both are merged together: equal values
+coalesce with every provenance record kept, different values **MUST** fail
+naming both distributions, and a key the **application** sets itself is the
+application's — the consumer keeps that value and reports the override.
+
+> Rationale. Six vendors need a fixed entry that no application supplies:
+> Firebase Messaging's notification defaults, ML Kit's model list, Airship's
+> Autopilot class, Branch's test-mode flag, Google Mobile Ads' initialization
+> flags, and AndroidX Startup's initializer registration. Before this table the
+> only `<meta-data>` a producer could reach was one carrying an
+> application-supplied value, so a producer needing a constant had to ask the
+> application for a value it already knew — or ship a README.
+>
+> **Why the application's value still wins.** A `<meta-data>` key is global, and
+> nothing stops a producer writing one that belongs to another vendor's SDK —
+> turning analytics collection on, say, in an application that turned it off.
+> The rule that the application's own entry is kept, and the requirement that
+> every entry appears in §9's report against the distribution that asked for it,
+> are together the answer: the producer states a need, the application sees it,
+> and setting the key itself is how the application refuses. This is §6.7's
+> disclosure-and-veto shape, reached without a second mechanism.
+>
+> **Why resource references are excluded.** `@drawable/ic_stat_notify` names a
+> resource, and §11 excludes contributed resources because resource names are a
+> flat namespace with no ownership rule. A producer pointing at one is naming
+> something it cannot supply and the application has not been asked for, which
+> fails at build time in AAPT with no trace back to the sidecar. The notification
+> icon Firebase Messaging wants is the standing example, and it stays out of
+> reach until a required-resource prerequisite exists.
 
 ## 7. iOS
 
@@ -3219,6 +3285,8 @@ key is 1.0, which is why nothing below carries a mark yet.
 | **`[android.contributes.r8]`** §6.9 — *union*, non-exclusive; **free** | |
 | `keep_classes` | Class patterns the shrinker must keep; the consumer generates the `-keep` rules itself. Each must fall within an owned namespace |
 | `[[…r8.keep]]` — `pattern`, `from_dependency` | Keeps a *dependency's* classes instead. Checked against what the resolved artifact actually contains, since a Maven group ID need not match the Java packages inside it |
+| **`[[android.contributes.meta_data]]`** §6.10 — *unique key with a value*, shared with §6.3's delivery; **disclosed** | |
+| `key`, `value`, `reason` | A `<meta-data>` entry the producer knows the value of. `reason` **required**; `value` is a string, integer or boolean, never a resource reference; the application's own entry wins |
 | **`[ios]`** §7.1 | |
 | `swift_symbol_prefixes` | Prefixes the producer puts on its Swift type names. Guidance only — nothing enforces it, and it does not cover file-scope functions or extension members |
 | **`[ios.requires]`** §7.2 — *floor* | |
