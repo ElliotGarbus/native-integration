@@ -288,7 +288,8 @@ version = { at_least = "1.0" }
     assert sidecar is None and codes == ["type-invalid"]
 
 
-def test_an_unimplemented_configuration_is_rejected(parse):
+def test_the_widened_configuration_set_is_accepted(parse):
+    """§6.5 defines four; `api` is one of them and no longer an error."""
     text = """
 contract = "1"
 [[android.contributes.gradle_dependencies]]
@@ -296,7 +297,36 @@ coordinate = "g:a:1.0"
 configuration = "api"
 """
     _, codes, _ = parse(text)
+    assert codes == []
+
+
+def test_an_unimplemented_configuration_is_rejected(parse):
+    """§4.4 — a value outside what this consumer implements fails closed."""
+    text = """
+contract = "1"
+[[android.contributes.gradle_dependencies]]
+coordinate = "g:a:1.0"
+configuration = "wibble"
+"""
+    _, codes, _ = parse(text)
     assert codes == ["dependency-configuration"]
+
+
+def test_a_processor_configuration_is_rejected_whatever_the_profile(parse):
+    """§6.5 — a processor runs code from the artifact at build time (§2.1).
+
+    This is the reason the configuration set stays closed while §7.3's
+    extension kinds open: the value selects behaviour the *consumer performs*.
+    """
+    text = """
+contract = "1"
+[[android.contributes.gradle_dependencies]]
+coordinate = "g:a:1.0"
+configuration = "annotationProcessor"
+"""
+    _, codes, bag = parse(text)
+    assert codes == ["dependency-configuration"]
+    assert any("run code" in d.message for d in bag)
 
 
 # --- §6.6 repositories ------------------------------------------------------
@@ -481,16 +511,30 @@ reason = "payment return"
     assert codes == [] and len(sidecar.ios.prerequisites) == 2
 
 
-def test_an_unknown_app_extension_kind_is_rejected(parse):
+def test_an_extension_kind_beyond_the_original_two_is_accepted(parse):
+    """§7.3's `kind` is open (§4.4): Apple owns the vocabulary, not this spec."""
     text = """
 contract = "1"
 [[ios.requires.app_extensions]]
-id = "widget"
-kind = "widget"
+id = "rich_push"
+kind = "notification_content"
 reason = "because"
 """
     sidecar, codes, _ = parse(text, platform=Platform.IOS)
-    assert sidecar is None and codes == ["type-invalid"]
+    assert codes == [] and len(sidecar.ios.prerequisites) == 1
+
+
+def test_an_extension_kind_this_consumer_cannot_check_is_rejected(parse):
+    """Open does not mean unchecked — the consumer fails closed on its own set."""
+    text = """
+contract = "1"
+[[ios.requires.app_extensions]]
+id = "odd"
+kind = "com_example_not_an_extension_point"
+reason = "because"
+"""
+    _, codes, _ = parse(text, platform=Platform.IOS)
+    assert codes == ["extension-kind-unimplemented"]
 
 
 def test_a_conditional_reason_should_state_the_condition(parse):

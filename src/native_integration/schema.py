@@ -254,10 +254,20 @@ ANDROID = Table(
                     },
                     arrays={
                         "view_links": Table(
+                            # §6.8 — Android's own <data> attributes, snake-cased.
+                            # The set is open per §4.4: a consumer rejects an
+                            # attribute it does not implement rather than
+                            # dropping it, which is what UNIMPLEMENTED_DATA
+                            # below turns into a diagnostic.
                             fields={
                                 "scheme": Field(value_or_reference, required=True),
                                 "host": Field(value_or_reference),
                                 "path_prefix": Field(value_or_reference),
+                                "port": Field(value_or_reference),
+                                "mime_type": Field(value_or_reference),
+                                "path": Field(value_or_reference),
+                                "path_pattern": Field(value_or_reference),
+                                "path_suffix": Field(value_or_reference),
                             }
                         ),
                         "intent_filters": Table(
@@ -293,7 +303,10 @@ IOS = Table(
                 "usage_descriptions": _prerequisite(key=Field(nonempty_string, required=True)),
                 "app_extensions": _prerequisite(
                     id=Field(nonempty_string, required=True),
-                    kind=Field(one_of("notification_service", "location_push"), required=True),
+                    # §7.3 — an Apple extension point identifier, snake-cased.
+                    # Open per §4.4; the consumer profile decides which it
+                    # implements, so the schema only requires a value.
+                    kind=Field(nonempty_string, required=True),
                 ),
                 "application_files": _prerequisite(name=Field(nonempty_string, required=True)),
                 "url_schemes": _prerequisite(id=Field(nonempty_string, required=True)),

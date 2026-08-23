@@ -35,6 +35,11 @@ from .model import (
 from .naming import contains, is_single_label, reserved_prefix
 from .resources import ResourceError, SidecarSource, normalize
 
+#: §6.5 — configurations that make the build run code from the artifact, which
+#: §2.1 excludes however it arrives. Not profile-driven: a consumer rejects
+#: these whether or not it implements them.
+PROCESSOR_CONFIGURATIONS = frozenset({"annotationProcessor", "kapt", "ksp"})
+
 #: §6.6 — what a consumer can reject deterministically it must; the rest is a
 #: warning, because "is `abc123` a secret?" has no general algorithm and an
 #: unsatisfiable MUST teaches implementers to skim the rest.
@@ -367,7 +372,18 @@ def _check_dependencies(
                     "`coordinate`, or `module` with a bounded { at_least, below }",
                     name,
                 )
-        if dependency.configuration not in profile.gradle_configurations:
+        if dependency.configuration in PROCESSOR_CONFIGURATIONS:
+            # §6.5 — closed set, and this is why. A coordinate on a processor
+            # configuration is code the build runs, which §2.1 excludes however
+            # it arrives; a consumer rejects it whether or not it implements it.
+            bag.add(
+                rules.DEPENDENCY_CONFIGURATION,
+                f"`{dependency.render()}` asks for configuration "
+                f"`{dependency.configuration}`, which makes the build run code from "
+                "that artifact; processor configurations may not be declared (§2.1)",
+                name,
+            )
+        elif dependency.configuration not in profile.gradle_configurations:
             bag.add(
                 rules.DEPENDENCY_CONFIGURATION,
                 f"`{dependency.render()}` asks for configuration "
@@ -531,6 +547,17 @@ def _check_ios(
 
     for kind in PrerequisiteKind:
         entries = ios.of_kind(kind)
+        if kind is PrerequisiteKind.APP_EXTENSION:
+            # §7.3 — an open vocabulary (§4.4): the consumer rejects an
+            # extension point it cannot check for, rather than dropping it.
+            for entry in entries:
+                if entry.extension_kind not in profile.extension_kinds:
+                    bag.add(
+                        rules.EXTENSION_KIND_UNIMPLEMENTED,
+                        f"declares app extension kind `{entry.extension_kind}`, which "
+                        "this consumer does not implement",
+                        name,
+                    )
         if kind in (PrerequisiteKind.APP_EXTENSION, PrerequisiteKind.URL_SCHEME):
             seen: set[str] = set()
             for entry in entries:

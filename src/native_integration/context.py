@@ -30,10 +30,21 @@ class ConsumerProfile:
     #: ``Info.plist`` keys the consumer manages itself; a producer setting one
     #: is an error rather than a silent overwrite (§7.6).
     managed_plist_keys: frozenset[str] = frozenset()
-    #: Gradle configurations this consumer implements. Version 1 defines only
-    #: ``implementation``; a consumer must reject a value it does not
-    #: implement rather than treat it as the default (§6.5).
-    gradle_configurations: frozenset[str] = frozenset({"implementation"})
+    #: Gradle configurations this consumer implements. §6.5 defines a closed
+    #: set — ``implementation``, ``api``, ``compileOnly``, ``runtimeOnly`` — and
+    #: excludes processor configurations, which would execute code at build time
+    #: (§2.1). What a producer may declare is not what every consumer supports:
+    #: a consumer rejects a value it does not implement rather than treating it
+    #: as the default (§4.4, §6.5).
+    gradle_configurations: frozenset[str] = frozenset(
+        {"implementation", "api", "compileOnly", "runtimeOnly"}
+    )
+    #: Extension point identifiers this consumer can check for (§7.3). Open per
+    #: §4.4, so this is the consumer's own list, not the specification's.
+    extension_kinds: frozenset[str] = frozenset(
+        {"notification_service", "location_push", "notification_content",
+         "broadcast_upload", "share", "widget"}
+    )
     #: Whether declared resources are read from disk. A real build **must**
     #: leave this on: §4.1's containment and symlink rules, §6.1 rule 1's check
     #: that contributed source declares a package under an owned namespace, and

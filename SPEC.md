@@ -602,6 +602,22 @@ Within a platform table the consumer is **building for**, an unrecognized key
 **MUST** be rejected, naming the distribution and the key. A consumer **MUST
 NOT** ignore a declaration it does not understand in order to proceed.
 
+**Values fail closed on the same terms.** Several keys take a value from a
+vocabulary the *platform* owns and this specification does not enumerate — a
+Gradle configuration name, an Apple extension point identifier, an Android
+`<data>` attribute. Where a key is defined that way, a consumer **MUST** reject
+a value it does not implement, naming the distribution and the value, and
+**MUST NOT** substitute a default it does understand. A consumer **SHOULD** say
+which values it does implement, so a producer can tell an unsupported
+declaration from a misspelled one.
+
+> Rationale: an open vocabulary keeps a producer's pace tied to the platform's
+> releases rather than to this document's, which is the point of not
+> enumerating. It is safe only where the value names something the *application*
+> or the platform provides. Where a value instead selects behaviour the
+> **consumer performs**, the set stays enumerated here and the enumeration is
+> doing security work — §6.5's configurations are the worked case.
+
 Platform tables for platforms the consumer is **not** building — an `[ios]`
 table during an Android build — are legitimately outside its concern and **MAY**
 be ignored. A consumer **SHOULD** warn about a top-level table it does not
@@ -1055,10 +1071,26 @@ version = { at_least = "5.6.1", below = "6.0.0" }
   unbounded dynamic versions (`+`, `latest.release`) and any range spelled
   inside `coordinate`. A version whose content can change under a fixed spelling
   defeats the record of §9, and no lock can repair it.
-- `configuration` defaults to `implementation`, the only value defined in
-  version 1. Other Gradle configurations (`api`, `compileOnly`, `runtimeOnly`,
-  annotation processors) may be added in a minor revision; per §4.4 a consumer
-  **MUST** reject a value it does not implement, naming the distribution.
+- `configuration` defaults to `implementation`. Version 1 additionally defines
+  `api`, `compileOnly` and `runtimeOnly`. Per §4.4 a consumer **MUST** reject a
+  value it does not implement, naming the distribution — the set above is what
+  a producer may *declare*, not what every consumer must support.
+
+**This set is closed, and deliberately not the platform's own.** Gradle's
+configuration names are otherwise exactly the kind of open vocabulary §4.4
+describes, and this one stays enumerated because some of its members select
+behaviour the **consumer performs**: adding a coordinate to
+`annotationProcessor`, `kapt` or `ksp` makes the build *run code from that
+artifact*. A producer **MUST NOT** declare a processor configuration, and a
+consumer **MUST** reject one, naming the distribution — this is §2.1's
+exclusion of build-time execution, reached through a field rather than through a
+script. The four names above add a dependency to the build and execute nothing.
+
+> Rationale: `api` differs from `implementation` only in exposing the dependency
+> on the application's own compile classpath, `compileOnly` keeps it out of the
+> package, and `runtimeOnly` keeps it off the compile classpath. None is a
+> capability. A processor is, and it arrives under a field that looks like a
+> spelling choice.
 
 **A declared version is a requirement, not a pin.** Gradle treats the version in
 a dependency declaration as the version that module *requires*, and its conflict
@@ -1401,6 +1433,20 @@ the intent-filter grammar:
   path_prefix = "/callback"                                 # optional
 ```
 
+**The fields are Android's own `<data>` attribute names**, in this
+specification's snake-case spelling, and the set is **open** per §4.4: `port`,
+`mime_type`, `path`, `path_pattern` and `path_suffix` are as declarable as the
+three shown, and a consumer rejects an attribute it does not implement rather
+than dropping it. Only `scheme` is **REQUIRED**. Every attribute may take a
+literal or an inline application value (§6.3), as `scheme` does.
+
+> Rationale: nothing is gained by curating this list. The attributes are the
+> platform's, their meaning is Android's to define, and each one only narrows
+> or widens matching *within* a filter the application has already approved as
+> exported. What the stereotype is actually for — generating the action and the
+> `DEFAULT`/`BROWSABLE` categories, so nobody omits one by hand — is untouched
+> by which `<data>` attributes it carries.
+
 - Valid only on `kind = "activity"` entries that declare
   `exported_required = true` — a link target that is not exported is
   unreachable, and a consumer **MUST** reject the inconsistent combination.
@@ -1414,11 +1460,11 @@ the intent-filter grammar:
   which is registered per-application with the identity provider.
 - The record and report of §9 **MUST** show the link data alongside the export
   (`exported activity, matching scheme ${oauth_redirect_scheme}`).
-- **Not expressible in v1**: verified App Links (`android:autoVerify` — requires
-  `assetlinks.json` on the application's domain, which is application
-  infrastructure), mimeTypes, and path patterns. Anticipated as minor revisions
-  (§10); per §4.3 a producer needing them declares the contract that provides
-  them.
+- **Not expressible in v1**: verified App Links. `android:autoVerify` is an
+  attribute of the filter rather than of `<data>`, and it requires
+  `assetlinks.json` on the application's own domain — application
+  infrastructure, so a producer may state the need but not contribute it (§7.3
+  is the shape that fits, and §10 anticipates it).
 
 **Putting the pieces together.** The component, the `application_values`
 entry `scheme` refers to, and `view_links` itself are three declarations in
@@ -1861,10 +1907,25 @@ path.
 
 ##### `app_extensions`
 
-`id` names the requirement, and `kind` is a closed
-vocabulary: `notification_service` and `location_push` in version 1. The
+`id` names the requirement. `kind` names the **extension point**, and the
+vocabulary is **open** per §4.4: any of Apple's extension point identifiers may
+be declared, in this specification's snake-case spelling —
+`notification_service` and `location_push`, and equally
+`notification_content`, `broadcast_upload`, `share` or `widget`. A consumer
+**MUST** reject a `kind` it does not implement, naming the distribution. The
 application creates the target, writes its source, and configures its bundle
 identifier, entitlements and `Info.plist`.
+
+> Rationale for an open set here, where §6.5's is closed. This table is a
+> *requires*: the value lets a producer state what it needs and gives it nothing
+> — the application decides whether to build the target at all, and no consumer
+> acts on the value except to check and report. Opening it also improves the
+> check rather than weakening it, because Apple's extension point identifiers
+> are what a built target carries in its own `Info.plist`, where a consumer can
+> match them exactly. A spec-invented label had nothing to compare against.
+>
+> The one-per-kind constraint below is Apple's and holds for every identifier,
+> so nothing in the acknowledgement rule depends on the set being short.
 
 > Rationale for the `requires` form. An app extension is a separate signed
 > executable with its own bundle identifier and entitlements, launched by the
@@ -2894,7 +2955,7 @@ key is 1.0, which is why nothing below carries a mark yet.
 | **`[[android.contributes.gradle_dependencies]]`** §6.5 | |
 | `coordinate` | `group:artifact:version` with an exact version. **Recommended**, because the version is visible here — with the range form below, finding what was actually used means opening the integration record (§9) |
 | `module` + `version` | `group:artifact` with a bounded `{ at_least, below }` range. Open-ended and changing versions are invalid |
-| `configuration` | Optional; `implementation` is the only value defined in version 1 |
+| `configuration` | Optional; `implementation` (default), `api`, `compileOnly`, `runtimeOnly`. A **closed** set: processor configurations are excluded because they execute code at build time (§2.1) |
 | **`[[android.contributes.gradle_repositories]]`** §6.6 | |
 | `url` | A Maven repository to add to the application's resolution. The most powerful thing a sidecar can contribute, which is why the next two rows are mandatory |
 | `reason` | **Required.** Why the artifacts are not available from the default repositories, and — when authenticated — which credential is needed and where to get it |
@@ -2910,7 +2971,7 @@ key is 1.0, which is why nothing below carries a mark yet.
 | `name` | The class. Under an owned namespace unless `from_dependency` says otherwise |
 | `from_dependency` | `group:artifact` of a declared dependency that owns the class |
 | `exported_required` + `reason` | Requests export. The build fails without explicit application approval — it never falls back to unexported |
-| `[[…view_links]]` — `scheme`, `host`, `path_prefix` | Generates the browser-return filter. Valid only on an exported activity; `scheme` is required |
+| `[[…view_links]]` — `scheme`, `host`, `path_prefix`, and Android's other `<data>` attributes (`port`, `mime_type`, `path`, `path_pattern`, `path_suffix`) | Generates the browser-return filter. Valid only on an exported activity; `scheme` is required, the attribute set is open (§4.4), and each may take an inline application value |
 | `[[…intent_filters]]` — `action` | One vendor-defined action, on a component that is neither exported nor carrying `view_links` |
 | **`[android.contributes.r8]`** §6.9 | |
 | `keep_classes` | Class patterns the shrinker must keep; the consumer generates the `-keep` rules itself. Each must fall within an owned namespace |
@@ -2922,7 +2983,7 @@ key is 1.0, which is why nothing below carries a mark yet.
 | **`[ios.requires.*]` — prerequisites** §7.3 | Every entry takes `reason` (**required**) and `conditional` (optional). Unconditional and unsatisfied fails the build; conditional and unsatisfied is recorded |
 | `[[…entitlements]]` — `key` | Satisfied by the key's presence; v1 does not model its value |
 | `[[…usage_descriptions]]` — `key` | The application writes the sentence; §7.6 rejects one offered as a contribution |
-| `[[…app_extensions]]` — `id`, `kind` | `notification_service` or `location_push`. The application builds the target and acknowledges this `id`, since one target cannot be assumed to serve two producers |
+| `[[…app_extensions]]` — `id`, `kind` | `kind` is an Apple extension point identifier, snake-cased; the set is open (§4.4). The application builds the target and acknowledges this `id`, since one target cannot be assumed to serve two producers |
 | `[[…application_files]]` — `name` | A file the SDK reads from the bundle. Declare only when no programmatic path exists |
 | `[[…url_schemes]]` — `id` | Says the application must register a URL scheme and forward the callback. `id` names the requirement, not the scheme — the application chooses that — so a package may declare several |
 | `[[…plist_capabilities]]` — `key`, `value` | An `Info.plist` key that grants a capability or restricts installation. A closed list, given in §7.6, which rejects the same keys as contributions |

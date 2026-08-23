@@ -119,6 +119,7 @@ PREREQUISITE_UNSATISFIED = _rule("prerequisite-unsatisfied", "§7.3", ERROR, 8, 
 PREREQUISITE_CONDITIONAL = _rule("prerequisite-conditional", "§7.3", NOTE, 22)
 PREREQUISITE_CONDITION_UNSTATED = _rule("prerequisite-condition-unstated", "§7.3", WARN, 1)
 PREREQUISITE_ID_DUPLICATE = _rule("prerequisite-id-duplicate", "§7.3", ERROR, 26)
+EXTENSION_KIND_UNIMPLEMENTED = _rule("extension-kind-unimplemented", "§7.3", ERROR, 1)
 
 # --- Info.plist (§7.6) ------------------------------------------------------
 PLIST_USAGE_DESCRIPTION = _rule("plist-usage-description", "§7.6", ERROR, 6)
