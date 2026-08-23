@@ -2049,6 +2049,14 @@ than it first appeared to.
 > deprecated — so the requirement tracks Android's direction rather than one
 > vendor's API.
 >
+> **Where the shape might still return.** N11's toolchain floors — AGP, Gradle,
+> Kotlin, Xcode — are chosen by the consumer and, unlike a host capability, are
+> not table stakes: consumers legitimately differ and the versions move monthly,
+> so no baseline written here would stay true. That, not N10, is the case that
+> would genuinely motivate a requirement the consumer answers. N11 is deferred
+> with a trigger ([SURVEY.md](SURVEY.md)); if it fires, this proposal's reasoning
+> is unfinished rather than wrong.
+>
 > **Nothing else here was adopted.** No capability vocabulary, no second answerer
 > in §2.2, and no contended-singleton concept; P34's five satisfaction modes are
 > unchanged, and §11's lifecycle exclusion is explicitly untouched by §2.3. The

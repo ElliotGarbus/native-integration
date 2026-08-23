@@ -366,6 +366,31 @@ compiler-plugin SDKs (Realm's Kotlin 2.0 lag is the documented case). A floor
 is the shape this specification already trusts most: fail when lower, never
 raise.
 
+**Deferred**, on the standard applied to N10: three vendors, and none of round
+five's four sidecars needed it. Closing one finding as a hypothesis and adopting
+another on the same evidence would be inconsistent.
+
+**The trigger to reopen it:** a producer whose floor a current consumer
+genuinely cannot meet — not a floor every consumer already exceeds, which is
+what the three known cases look like today.
+
+**And the part worth carrying forward.** All six of these floors are chosen by
+the **consumer**, not the application: the build tool generates the Gradle
+project and invokes the toolchain, so this is not §6.2-shaped at all. That makes
+N11 — **not N10** — the case that would genuinely motivate a requirement the
+consumer answers. A host capability turned out to be table stakes, which is why
+[P35](PROPOSALS.md) collapsed into a §2.3 obligation; a toolchain version is not,
+because consumers legitimately differ and versions move monthly, so no baseline
+written into this document would stay true. If the consumer-answered shape ever
+returns, this is its evidence, and P35's reasoning should be read as unfinished
+rather than as wrong.
+
+The shape it would take is a `requires.toolchain` table answered by the
+consumer. The alternative worth weighing against it is disclosure only —
+recorded per §9, never blocking — which needs no answerer concept and still
+converts a Gradle error naming an unfamiliar version into a line naming the
+distribution that required it.
+
 ### N12 — core library desugaring
 
 Media3 documents that consuming applications must enable
@@ -579,7 +604,7 @@ outstanding.
 | **N6** `<queries>` | new contribution table | small | 5 |
 | **N17** extension kinds | ~~extend a closed vocabulary~~ **closed** — `kind` opened to Apple's identifiers, §7.3 | — | 6 |
 | **N12** desugaring | ~~one boolean under `[android.requires]`~~ **landed** — `core_library_desugaring` | — | 2 |
-| **N11** toolchain floors | fields under both `requires` tables | small | 3 |
+| **N11** toolchain floors | ~~fields under both `requires` tables~~ **deferred**, with a trigger — see below | — | 3 |
 | **N21** §11 taxonomy | ~~documentation only~~ **landed** — §11's third build-time outcome | — | 3 |
 | **N16** CocoaPods | ~~one §11 row~~ **landed** — §11 now carries the row | — | 2 |
 | **N19** verified App Links | prerequisite form. `view_links` has since opened to Android's other `<data>` attributes, which does **not** reach `autoVerify` | medium | 4 |
