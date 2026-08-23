@@ -121,6 +121,9 @@ class AnswerSource(Protocol):
     # §6.11 — a resource the application declares, joined by (type, name)
     def resource_declared(self, resource_type: str, name: str) -> bool: ...
 
+    # §9.1 — which artifact supplies a colliding packaged path, joined by path
+    def packaging_choice(self, path: str) -> str | None: ...
+
     # §7.3 — a capability key, joined by (key, value). Not distribution-scoped:
     # one application declaring `remote-notification` satisfies every producer
     # that needed it.
@@ -149,6 +152,9 @@ class MappingAnswers:
     application_files: Sequence[str] = ()
     extension_targets: Sequence[str] = ()
     acknowledged_ids: Mapping[str, Sequence[str]] = field(default_factory=dict)
+    #: §9.1 — colliding packaged paths the application has chosen a source for,
+    #: keyed by path, valued by the winning artifact coordinate.
+    packaging_choices: Mapping[str, str] = field(default_factory=dict)
     #: §6.11 — asset file names the application has wired into the build.
     android_assets: Sequence[str] = ()
     #: §6.11 — resources the application declares, as ``("drawable", "name")``.
@@ -197,6 +203,9 @@ class MappingAnswers:
     def acknowledged(self, distribution: str, entry_id: str) -> bool:
         acked = self._per_distribution(self.acknowledged_ids, distribution) or ()
         return entry_id in acked  # type: ignore[operator]
+
+    def packaging_choice(self, path: str) -> str | None:
+        return self.packaging_choices.get(path)
 
     def android_asset_configured(self, name: str) -> bool:
         return name in self.android_assets

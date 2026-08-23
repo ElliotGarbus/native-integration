@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from importlib.metadata import EntryPoint
 from pathlib import Path
 
@@ -93,6 +93,10 @@ class FakeArtifacts:
     manifests: dict
     classes: dict
     classpath: list
+    files: dict = field(default_factory=dict)
+
+    def files_of(self, artifact):
+        return self.files.get(artifact.coordinate, [])
 
     def manifest_of(self, artifact):
         return self.manifests.get(artifact.coordinate)
@@ -1686,6 +1690,95 @@ def test_queries_are_recorded_and_app_links_block_until_acknowledged(tmp_path):
         for distribution in acknowledged.record.distributions
         for line in distribution.entries
     )
+
+
+RTC = """
+contract = "1"
+platforms = ["android"]
+[[android.contributes.gradle_dependencies]]
+coordinate = "io.agora.rtc:full-sdk:4.5.0"
+"""
+
+VISION = """
+contract = "1"
+platforms = ["android"]
+[[android.contributes.gradle_dependencies]]
+coordinate = "org.tensorflow:tensorflow-lite:2.16.1"
+"""
+
+
+def _composed(tmp_path, *, answers=None):
+    from native_integration.testing import stub_resolvers
+
+    return dict(
+        platform=Platform.ANDROID,
+        closure=Closure.direct("py-rtc", "py-vision"),
+        application=Application(
+            android_sdk={"min_sdk": 24, "compile_sdk": 35},
+            answers=answers or MappingAnswers(),
+        ),
+        sources=[
+            build(tmp_path, RTC, name="py-rtc", module="py_rtc._native"),
+            build(tmp_path, VISION, name="py-vision", module="py_vision._native"),
+        ],
+        resolvers=stub_resolvers(
+            files={
+                "io.agora.rtc:full-sdk:4.5.0": [
+                    "lib/arm64-v8a/libc++_shared.so",
+                    "META-INF/LICENSE",
+                ],
+                "org.tensorflow:tensorflow-lite:2.16.1": [
+                    "lib/arm64-v8a/libc++_shared.so",
+                    "META-INF/LICENSE",
+                ],
+            }
+        ),
+    )
+
+
+def test_a_colliding_native_library_fails_and_names_both_distributions(tmp_path):
+    """§9.1 — two C++ runtimes is a coin toss between two ABIs, not a default."""
+    integration = read(profile=PROFILE, **_composed(tmp_path))
+    collisions = [d for d in integration.diagnostics if d.rule.code == "packaging-collision"]
+    assert len(collisions) == 1
+    assert set(collisions[0].distributions) == {"py-rtc", "py-vision"}
+    assert "libc++_shared.so" in collisions[0].message
+    # The mapping back to distributions is what a Gradle duplicate-path error
+    # cannot supply, so it must be in the message.
+    assert "py-rtc" in collisions[0].message and "py-vision" in collisions[0].message
+
+
+def test_packaging_metadata_is_resolved_without_asking(tmp_path):
+    """A licence text is identical in effect whichever copy wins."""
+    integration = read(profile=PROFILE, **_composed(tmp_path))
+    resolved = [
+        d for d in integration.diagnostics if d.rule.code == "packaging-collision-resolved"
+    ]
+    assert [d.message for d in resolved if "META-INF/LICENSE" in d.message]
+    assert not [d for d in resolved if "libc++_shared" in d.message]
+
+
+def test_the_application_may_choose_which_artifact_supplies_the_library(tmp_path):
+    """Only the application knows whether the two SDKs tolerate one runtime."""
+    integration = read(
+        profile=PROFILE,
+        accept_current_surface=True,
+        **_composed(
+            tmp_path,
+            answers=MappingAnswers(
+                packaging_choices={
+                    "lib/arm64-v8a/libc++_shared.so": "io.agora.rtc:full-sdk:4.5.0"
+                }
+            ),
+        ),
+    )
+    assert [d.rule.code for d in integration.diagnostics if d.rule.code == "packaging-collision"] == []
+    chosen = [
+        d
+        for d in integration.diagnostics
+        if d.rule.code == "packaging-collision-resolved" and "libc++_shared" in d.message
+    ]
+    assert chosen and "the application chose io.agora.rtc:full-sdk:4.5.0" in chosen[0].message
 
 
 # --- requirement coverage ---------------------------------------------------

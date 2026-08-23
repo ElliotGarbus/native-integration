@@ -95,6 +95,7 @@ checklist, and §§3–7 are what it refers to.
   - [What resolved artifacts bring with them](#what-resolved-artifacts-bring-with-them)
   - [Secrets are never recorded](#secrets-are-never-recorded)
   - [What a record is, and what it must contain](#what-a-record-is-and-what-it-must-contain)
+  - [9.1 Packaging collisions](#91-packaging-collisions)
 - [10. Versioning](#10-versioning)
 - [11. Out of scope](#11-out-of-scope)
 - [12. Guidance for package authors](#12-guidance-for-package-authors)
@@ -2845,6 +2846,7 @@ gives the thematic reading:
 | Platform applicability | 18 |
 | The application's side of the contract | 7, 26 |
 | The host the consumer generates | 28, 29 |
+| Composition between distributions | 16, 30 |
 
 **Three outcomes, and no others.** What a consumer finds falls into exactly
 three kinds, named here so that two implementations classify the same condition
@@ -2949,6 +2951,10 @@ A conforming consumer **MUST**:
 29. When it generates the application's iOS app delegate, provide a documented
     means for application code to observe a URL callback delivered to
     `application(_:open:options:)`, rather than consuming it (§2.3).
+30. Detect packaging collisions between the resolved artifacts of different
+    distributions; resolve only packaging metadata on its own authority, fail on
+    a colliding native library the application has not chosen between, and
+    record every collision against the distributions responsible (§9.1).
 
 > Rationale for 16. Every other rule here assumes native resolution *succeeds*.
 > It need not: two distributions in one closure can declare native dependencies
@@ -3171,6 +3177,50 @@ that a second implementer is not obliged to rediscover the same decisions.
 > entitlements (§7.3), and repository content constraints (§6.6) — are the ones
 > where a contribution opens an externally reachable surface, cannot be
 > satisfied by the consumer at all, or reshapes artifact resolution itself.
+
+### 9.1 Packaging collisions
+
+*Two independently-authored packages composing is what this convention is for,
+and Android packaging is where that composition breaks first. The producers
+cannot see the collision; the consumer is the only party that can.*
+
+Two resolved artifacts from **different distributions** may carry a file at the
+same path — `lib/arm64-v8a/libc++_shared.so` from two SDKs that each bundle a
+C++ runtime, or `META-INF/LICENSE` from almost any pair of libraries. A
+consumer **MUST** detect such a collision across the artifacts of the effective
+set, and **MUST** treat the two cases differently:
+
+- **Packaging metadata** — files under `META-INF/` that are not code, such as
+  licence texts and build fingerprints. A consumer **MAY** resolve these itself,
+  by a rule that does not depend on resolution order, and **MUST** record what
+  it did.
+- **Anything else, and every native library** — a consumer **MUST NOT** choose
+  silently. It **MUST** fail, naming the path and **both declaring
+  distributions**, unless the application has chosen which artifact supplies the
+  file; where the application has chosen, the consumer **MUST** record the
+  choice.
+
+A consumer **MUST** record every collision it detected and how it was resolved,
+attributed to the distributions whose declarations pulled the artifacts in.
+
+> Rationale. `pickFirst` is what an application writes by hand today, and for a
+> licence file it is right. For two copies of a C++ runtime it is a coin toss
+> between two ABIs, decided by declaration order, and the symptom is a crash in
+> native code with no path back to either package. Failing is the honest
+> outcome, and the choice belongs to the application because only it can know
+> whether the two SDKs tolerate one runtime.
+>
+> **Why this is a consumer obligation and not a declaration.** Every other rule
+> here lets a producer describe itself. A collision is not a property of any
+> producer: it exists only in a combination, and no producer can know what it
+> will be composed with. A declaration would be a guess, and the one party that
+> holds both artifacts is the consumer.
+>
+> **What the consumer adds that the build system cannot.** Gradle already fails
+> on a duplicate path, in a message naming two artifacts. What it cannot say is
+> which *Python distributions* asked for them — that mapping is the consumer's
+> alone, and supplying it is the same obligation requirement 8.16 places on a
+> resolution conflict.
 
 ## 10. Versioning
 

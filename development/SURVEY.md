@@ -610,7 +610,7 @@ outstanding.
 | **N19** verified App Links | ~~prerequisite form~~ **landed**, §6.11 `app_links` — acknowledgement, since verification is a fact about a domain | — | 4 |
 | **N13** configurations | ~~extend §6.5's `configuration`~~ **closed** — `api`/`compileOnly`/`runtimeOnly` added; processor configurations refused, since they run code at build time | — | — |
 | **N15** `-ObjC` | closed vocabulary; revisit §11 | medium | 3 |
-| **N14** packaging collisions | **consumer obligation**, not a declaration | medium | 3 |
+| **N14** packaging collisions | ~~**consumer obligation**, not a declaration~~ **landed**, §9.1 + requirement 8.30 | — | 3 |
 | **N20** application-owned class | ~~prerequisite form~~ **landed**, §6.11 — acknowledgement, per §2.4's rule | — | 2 |
 
 Six of these are single-field or documentation-only changes with multi-vendor

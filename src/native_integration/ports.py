@@ -203,6 +203,15 @@ class ArtifactInspector(Protocol):
         """Fully qualified class names inside the artifact (§6.9)."""
         ...
 
+    def files_of(self, artifact: ResolvedArtifact) -> Sequence[str]:
+        """Packaged file paths inside the artifact (§9.1).
+
+        The paths as they would land in the application — ``META-INF/LICENSE``,
+        ``lib/arm64-v8a/libc++_shared.so`` — because a collision is a collision
+        of destinations, not of archive members.
+        """
+        ...
+
     def classpath_classes(self) -> Sequence[str]:
         """Every class on the effective compilation classpath (§6.9).
 

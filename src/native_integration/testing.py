@@ -99,6 +99,7 @@ class EmptyArtifactInspector:
 
     manifests: Mapping[str, ArtifactManifest] = field(default_factory=dict)
     classes: Mapping[str, Sequence[str]] = field(default_factory=dict)
+    files: Mapping[str, Sequence[str]] = field(default_factory=dict)
 
     def manifest_of(self, artifact: ResolvedArtifact) -> ArtifactManifest | None:
         return self.manifests.get(artifact.coordinate)
@@ -109,6 +110,9 @@ class EmptyArtifactInspector:
     def classpath_classes(self) -> Sequence[str]:
         return tuple(c for classes in self.classes.values() for c in classes)
 
+    def files_of(self, artifact: ResolvedArtifact) -> Sequence[str]:
+        return self.files.get(artifact.coordinate, ())
+
 
 def stub_resolvers(**kwargs: object) -> Resolvers:
     """Every port, stubbed. Tests only."""
@@ -118,5 +122,6 @@ def stub_resolvers(**kwargs: object) -> Resolvers:
         artifacts=EmptyArtifactInspector(
             kwargs.get("manifests", {}),  # type: ignore[arg-type]
             kwargs.get("classes", {}),  # type: ignore[arg-type]
+            kwargs.get("files", {}),  # type: ignore[arg-type]
         ),
     )

@@ -62,6 +62,7 @@ returning a clean result.
 | 8.27 | Compile contributed `.java` sources with UTF-8 forced, never the platform default (§6.4). | *beyond this reader* — compiling contributed `.java` is the consumer's own build step (§6.4) |
 | 8.28 | When it generates the application's Android activity, make it an `androidx.activity.ComponentActivity` or a subclass (§2.3). | *beyond this reader* — generating the application's Android activity (§2.3) |
 | 8.29 | When it generates the application's iOS app delegate, provide a documented means for application code to observe a URL callback delivered to `application(_:open:options:)`, rather than consuming it (§2.3). | *beyond this reader* — generating the application's iOS app delegate (§2.3) |
+| 8.30 | Detect packaging collisions between the resolved artifacts of different distributions; resolve only packaging metadata on its own authority, fail on a colliding native library the application has not chosen between, and record every collision against the distributions responsible (§9.1). | `packaging-collision`, `packaging-collision-resolved` |
 
 ## Advisory obligations (§8's SHOULD list)
 

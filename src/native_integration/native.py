@@ -137,6 +137,8 @@ def _android(
     findings: list[ArtifactFinding] = []
     if graph.artifacts:
         findings.extend(_artifact_manifests(graph, requests, application, resolvers, bag))
+    if graph.artifacts:
+        findings.extend(_packaging_collisions(graph, requests, application, resolvers, bag))
     findings.extend(_dependency_keeps(sidecars, graph, resolvers, application, bag))
     _component_classes(sidecars, graph, resolvers, bag)
     return NativeResolution(gradle=graph, artifact_findings=tuple(findings))
@@ -258,6 +260,90 @@ def _artifact_manifests(
                 "application's shrinker configuration without passing through §6.9's scoping",
                 *blame,
             )
+
+    return findings
+
+
+#: §9.1 — packaging metadata a consumer may resolve on its own authority. Not
+#: code, not loaded at runtime, and identical in effect whichever copy wins.
+_METADATA_PREFIXES = ("META-INF/",)
+#: …with the exception of what *is* code or behaviour under that prefix.
+_METADATA_EXCEPTIONS = ("META-INF/services/", "META-INF/native/")
+
+
+def _is_metadata(path: str) -> bool:
+    if any(path.startswith(prefix) for prefix in _METADATA_EXCEPTIONS):
+        return False
+    return any(path.startswith(prefix) for prefix in _METADATA_PREFIXES)
+
+
+def _packaging_collisions(
+    graph: GradleGraph,
+    requests: Sequence[DependencyRequest],
+    application: Application,
+    resolvers: Resolvers,
+    bag: DiagnosticBag,
+) -> list[ArtifactFinding]:
+    """§9.1 — one packaged path claimed by two distributions' artifacts.
+
+    The producers cannot see this: a collision exists only in a combination,
+    and neither of them knows what it will be composed with. What the consumer
+    adds over the build system's own duplicate-path error is the mapping back
+    to the *distributions* that asked for the artifacts.
+    """
+    declarers = sorted({r.distribution for r in requests})
+    inspector = resolvers.require_artifacts(
+        declarers, "listing the resolved artifacts' packaged files (§9.1)"
+    )
+
+    claims: dict[str, dict[str, str]] = {}
+    for artifact in sorted(graph.artifacts, key=lambda a: a.coordinate):
+        blame = _declarers_of(requests, artifact.module) or artifact.declared_by or tuple(declarers)
+        for path in inspector.files_of(artifact):
+            for distribution in blame:
+                claims.setdefault(path, {})[distribution] = artifact.coordinate
+
+    findings: list[ArtifactFinding] = []
+    for path in sorted(claims):
+        by_distribution = claims[path]
+        if len(by_distribution) < 2:
+            continue
+        blame = tuple(sorted(by_distribution))
+        sources = ", ".join(f"{d} → {by_distribution[d]}" for d in blame)
+
+        if _is_metadata(path):
+            # Deterministic, and not by resolution order: the first artifact in
+            # normalized distribution order supplies it.
+            winner = by_distribution[blame[0]]
+            findings.append(
+                ArtifactFinding(winner, "packaging", f"{path} (metadata, kept {winner})", blame[0])
+            )
+            bag.add(
+                rules.PACKAGING_COLLISION_RESOLVED,
+                f"`{path}` is carried by more than one artifact ({sources}); kept "
+                f"{winner} as packaging metadata",
+                *blame,
+            )
+            continue
+
+        chosen = application.answers.packaging_choice(path)
+        if chosen is None:
+            bag.add(
+                rules.PACKAGING_COLLISION,
+                f"`{path}` is carried by more than one artifact ({sources}); choosing "
+                "one silently would decide at random which native code the "
+                "application runs, so the application must choose",
+                *blame,
+            )
+            continue
+
+        findings.append(ArtifactFinding(chosen, "packaging", f"{path} (chosen {chosen})", blame[0]))
+        bag.add(
+            rules.PACKAGING_COLLISION_RESOLVED,
+            f"`{path}` is carried by more than one artifact ({sources}); the "
+            f"application chose {chosen}",
+            *blame,
+        )
 
     return findings
 

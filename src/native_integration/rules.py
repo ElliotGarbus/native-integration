@@ -144,6 +144,8 @@ ARTIFACT_PERMISSION = _rule("artifact-permission", "§9", NOTE, 19)
 ARTIFACT_FEATURE_OVERRIDDEN = _rule("artifact-feature-overridden", "§9", WARN, 19)
 ARTIFACT_EXPORTED_COMPONENT = _rule("artifact-exported-component", "§9", WARN, 19)
 ARTIFACT_PROGUARD_RULES = _rule("artifact-proguard-rules", "§9", WARN, 19)
+PACKAGING_COLLISION = _rule("packaging-collision", "§9.1", ERROR, 30)
+PACKAGING_COLLISION_RESOLVED = _rule("packaging-collision-resolved", "§9.1", NOTE, 30)
 SECRET_WITHHELD = _rule("secret-withheld", "§9", NOTE, 25)
 
 
