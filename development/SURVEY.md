@@ -609,7 +609,7 @@ outstanding.
 | **N16** CocoaPods | ~~one §11 row~~ **landed** — §11 now carries the row | — | 2 |
 | **N19** verified App Links | ~~prerequisite form~~ **landed**, §6.11 `app_links` — acknowledgement, since verification is a fact about a domain | — | 4 |
 | **N13** configurations | ~~extend §6.5's `configuration`~~ **closed** — `api`/`compileOnly`/`runtimeOnly` added; processor configurations refused, since they run code at build time | — | — |
-| **N15** `-ObjC` | closed vocabulary; revisit §11 | medium | 3 |
+| **N15** `-ObjC` | ~~closed vocabulary; revisit §11~~ **landed**, §7.8 — one boolean naming a behaviour, and §11's row amended | — | 3 |
 | **N14** packaging collisions | ~~**consumer obligation**, not a declaration~~ **landed**, §9.1 + requirement 8.30 | — | 3 |
 | **N20** application-owned class | ~~prerequisite form~~ **landed**, §6.11 — acknowledgement, per §2.4's rule | — | 2 |
 

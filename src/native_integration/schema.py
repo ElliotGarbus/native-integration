@@ -368,6 +368,9 @@ IOS = Table(
             },
         ),
         "contributes": Table(
+            # §7.8 — one boolean naming one behaviour. A key taking flag
+            # strings would be the escape hatch §11 closes.
+            fields={"objc_categories": Field(a_bool)},
             tables={
                 "src": Table(fields={"swift": Field(string_list)}),
                 "info_plist": Table(

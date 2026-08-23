@@ -1781,6 +1781,62 @@ def test_the_application_may_choose_which_artifact_supplies_the_library(tmp_path
     assert chosen and "the application chose io.agora.rtc:full-sdk:4.5.0" in chosen[0].message
 
 
+ADAPTER_A = """
+contract = "1"
+platforms = ["ios"]
+[ios.contributes]
+objc_categories = true
+"""
+
+ADAPTER_B = """
+contract = "1"
+platforms = ["ios"]
+[ios.contributes]
+objc_categories = true
+"""
+
+PLAIN_IOS = """
+contract = "1"
+platforms = ["ios"]
+[ios.requires]
+deployment_target = "15.0"
+"""
+
+
+def test_objc_categories_unions_and_names_who_asked(tmp_path):
+    """§7.8 — one asking is enough, and §9 names them because it changes the link."""
+    integration = read(
+        platform=Platform.IOS,
+        closure=Closure.direct("py-ads-a", "py-ads-b", "py-quiet"),
+        application=Application(deployment_target="15.0"),
+        profile=PROFILE,
+        sources=[
+            build(tmp_path, ADAPTER_A, name="py-ads-a", module="py_ads_a._native"),
+            build(tmp_path, ADAPTER_B, name="py-ads-b", module="py_ads_b._native"),
+            build(tmp_path, PLAIN_IOS, name="py-quiet", module="py_quiet._native"),
+        ],
+        accept_current_surface=True,
+    )
+    assert integration.effective.objc_categories() == ("py-ads-a", "py-ads-b")
+    assert any(
+        "objc-categories loaded at link time" in line
+        for distribution in integration.record.distributions
+        for line in distribution.entries
+    )
+
+
+def test_nothing_asks_and_the_link_is_untouched(tmp_path):
+    integration = read(
+        platform=Platform.IOS,
+        closure=Closure.direct("py-quiet"),
+        application=Application(deployment_target="15.0"),
+        profile=PROFILE,
+        sources=[build(tmp_path, PLAIN_IOS, name="py-quiet", module="py_quiet._native")],
+        accept_current_surface=True,
+    )
+    assert integration.effective.objc_categories() == ()
+
+
 # --- requirement coverage ---------------------------------------------------
 
 

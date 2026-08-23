@@ -347,6 +347,8 @@ class IosSection:
     info_plist_append: Mapping[str, Sequence[Any]] = field(default_factory=dict)
     #: §7.6 — ad network identifiers the consumer renders SKAdNetworkItems from.
     skadnetwork_identifiers: tuple[str, ...] = ()
+    #: §7.8 — link so Objective-C categories in static libraries are loaded.
+    objc_categories: bool = False
     python_modules: tuple[PythonModule, ...] = ()
 
     def of_kind(self, kind: PrerequisiteKind) -> tuple[Prerequisite, ...]:
@@ -563,6 +565,7 @@ def build_ios(table: Mapping[str, Any]) -> IosSection:
         info_plist_values=dict(plist.get("values", {})),
         info_plist_append={k: tuple(v) for k, v in plist.get("append", {}).items()},
         skadnetwork_identifiers=tuple(plist.get("skadnetwork_identifiers", [])),
+        objc_categories=bool(contributes.get("objc_categories", False)),
         python_modules=tuple(
             PythonModule(name=m["name"], swift_package=m["swift_package"], init=m.get("init"))
             for m in contributes.get("python_modules", [])

@@ -181,6 +181,8 @@ class Contribution:
     plist_deliveries: tuple[MetaDataEntry, ...] = ()
     #: §6.12 — `<queries>` entries, as (target, reason) pairs.
     queries: tuple[tuple[str, str], ...] = ()
+    #: §7.8 — this distribution asked for Objective-C category loading.
+    objc_categories: bool = False
     source_files: tuple[str, ...] = ()
     prerequisites: tuple[PrerequisiteStatus, ...] = ()
     #: SHA-256 per integration input, keyed by normalized relative path (§9).
@@ -304,6 +306,21 @@ class EffectiveSet:
                 seen.append(identifier)
         return tuple({"SKAdNetworkIdentifier": identifier} for identifier in seen)
 
+    def objc_categories(self) -> tuple[str, ...]:
+        """§7.8 — the distributions asking for category loading, in name order.
+
+        A union: one asking is enough. Returning *who* asked rather than a
+        boolean is what lets §9 name them, since the setting changes how the
+        whole application links.
+        """
+        return tuple(
+            sorted(
+                normalize_name(c.distribution)
+                for c in self.contributions
+                if c.objc_categories
+            )
+        )
+
     def python_payload_exclusions(self) -> tuple[str, ...]:
         """What must not reach the device (requirement 8.14, §7.7).
 
@@ -379,6 +396,7 @@ def _one(
     plist_values: Mapping[str, object] = {}
     plist_append: Mapping[str, Sequence[object]] = {}
     skadnetwork: tuple[str, ...] = ()
+    objc_categories = False
     plist_deliveries: list[MetaDataEntry] = []
     queries: tuple[tuple[str, str], ...] = ()
     statuses: list[PrerequisiteStatus] = []
@@ -642,6 +660,7 @@ def _one(
         plist_values = dict(ios.info_plist_values)
         plist_append = dict(ios.info_plist_append)
         skadnetwork = tuple(ios.skadnetwork_identifiers)
+        objc_categories = ios.objc_categories
 
     source_files = list(_staged_sources(sidecar, platform))
     inputs = _hash_inputs(sidecar, source_files)
@@ -664,6 +683,7 @@ def _one(
         info_plist_values=plist_values,
         info_plist_append=plist_append,
         skadnetwork_identifiers=skadnetwork,
+        objc_categories=objc_categories,
         plist_deliveries=tuple(plist_deliveries),
         queries=queries,
         source_files=tuple(source_files),

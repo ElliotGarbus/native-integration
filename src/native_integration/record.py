@@ -249,6 +249,9 @@ def _entries(contribution: Contribution, resolution: NativeResolution) -> tuple[
         suffix = " (application override)" if meta.overridden_by_application else ""
         out.append(f"meta-data {meta.key} = {meta.value}{suffix}")
 
+    if contribution.objc_categories:
+        out.append("objc-categories loaded at link time")
+
     for target, reason in contribution.queries:
         out.append(f"queries {target}  (\"{reason}\")")
 

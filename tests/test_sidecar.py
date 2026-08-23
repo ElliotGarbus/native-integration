@@ -828,6 +828,28 @@ info_plist_key = "UIBackgroundModes"
     assert codes == ["plist-capability-key"]
 
 
+def test_objc_categories_is_one_boolean_not_a_flag_list(parse):
+    """§7.8 — the bounded exception to §11's linker-flag exclusion."""
+    text = """
+contract = "1"
+[ios.contributes]
+objc_categories = true
+"""
+    sidecar, codes, _ = parse(text, platform=Platform.IOS)
+    assert codes == [] and sidecar.ios.objc_categories
+
+
+def test_a_flag_string_is_not_a_way_in(parse):
+    """The key names a behaviour; anything else is the escape hatch §11 closes."""
+    text = """
+contract = "1"
+[ios.contributes]
+objc_categories = "-ObjC -all_load"
+"""
+    _, codes, _ = parse(text, platform=Platform.IOS)
+    assert codes == ["type-invalid"]
+
+
 def test_skadnetwork_identifiers_are_declarable(parse):
     """§7.6 — the narrow primitive, not dictionary support."""
     text = """

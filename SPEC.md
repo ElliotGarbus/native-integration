@@ -87,6 +87,7 @@ checklist, and §§3–7 are what it refers to.
   - [7.5 Source](#75-source-ioscontributessrc)
   - [7.6 Info.plist](#76-infoplist-ioscontributesinfoplist)
   - [7.7 Python modules](#77-python-modules-ioscontributespythonmodules)
+  - [7.8 Objective-C categories](#78-objective-c-categories-ioscontributes)
 - [8. Consuming tool requirements](#8-consuming-tool-requirements)
 - [9. Recording and review](#9-recording-and-review)
   - [The lifecycle](#the-lifecycle)
@@ -886,7 +887,7 @@ platforms = ["android", "ios"]   # §4.5 — optional; where the distribution wo
   [[ios.requires.url_schemes]]              # §7.3  │ the consumer
   [[ios.requires.plist_capabilities]]       # §7.3  │
   [[ios.requires.application_values]]       # §7.3 ─┘
-[ios.contributes]
+[ios.contributes]                           # §7.8  objc_categories
   [[ios.contributes.swift_packages]]        # §7.4
   [ios.contributes.src]                     # §7.5  swift
   [ios.contributes.info_plist]              # §7.6  values, append,
@@ -2820,6 +2821,56 @@ the same reasoning as requirement 8.14.
 > The table is iOS-only because that is where the shape occurs. On Android the
 > §11 answer holds.
 
+### 7.8 Objective-C categories: `[ios.contributes]`
+
+*For the one link-time setting a producer cannot work around and the
+application cannot guess: a static library whose Objective-C **categories** are
+dropped by the linker unless the application target asks for them.*
+
+```toml
+[ios.contributes]
+objc_categories = true
+```
+
+- A consumer **MUST** link the application target so that Objective-C
+  categories in statically linked libraries are loaded. In Apple's toolchain
+  that is the `-ObjC` flag; the key names the **effect**, not the flag, so a
+  consumer whose toolchain spells it differently is still conforming.
+- Entries merge as a **union**: one producer asking is enough, and there is
+  nothing to conflict over.
+- A consumer **MUST** report it in the record of §9, naming the distributions
+  that asked. It changes how the whole application links, and the application
+  is entitled to see which dependency caused that.
+- There is **no veto**, for §6.12's reason: withholding it does not reduce what
+  the application may do, it makes the producer's code fail at runtime with a
+  message pointing nowhere.
+
+> Rationale, and why this does not reopen §11's exclusion. §11 excludes
+> compiler and linker flags as arbitrary build mutation, and invites revisiting
+> "with a concrete, bounded need". This is that need, and the boundary is the
+> whole point: **one boolean, naming one behaviour**, not a list of flags a
+> producer may put anything into. A key that took flag strings would be the
+> escape hatch §11 closes.
+>
+> The failure it prevents is the worst-shaped one this specification deals with.
+> Categories in a static library are not referenced by any symbol the linker can
+> see, so it discards them; the application builds, links, ships, and then dies
+> on `unrecognized selector sent to instance` the first time the SDK calls its
+> own method. Nothing in the message names the library, let alone the Python
+> distribution that brought it in.
+>
+> **Why the producer cannot solve this in its own package.** Swift Package
+> Manager rejects raw linker flags in a package consumed by version — they are
+> `unsafeFlags`, which a versioned dependency may not carry — so a vendor's own
+> package cannot set it, and the setting belongs to the application target
+> regardless. That is what leaves the producer with nothing to say and the
+> application with nothing to go on, which is the gap this closes.
+>
+> **The cost, so a report can state it.** Loading every category also loads the
+> classes carrying them, so the binary grows by whatever the static libraries
+> contain. For most applications that is small, and it is why this is declared
+> by the producers that need it rather than switched on for everyone.
+
 ## 8. Consuming tool requirements
 
 Everything a **consumer** (§1) must do — the build tool that reads sidecars and
@@ -3262,7 +3313,7 @@ further Gradle configurations; and further namespace-scoped shrinker rule forms.
 | **Arbitrary manifest, `Info.plist` or build-file fragments** | The declarative form of the same capability, and excluded on the same principle. A fragment cannot be collision-checked, cannot be refused per-permission (§6.7), cannot be gated per-component (§6.8), and cannot be diffed in a record (§9) — a producer's material stops being reviewable the moment its meaning is a merge nobody computes. Permanent, not a deferral; see below |
 | **CocoaPods-only iOS SDKs** | §7.4 declares Swift packages, and this specification defines no CocoaPods channel. A vendor that publishes only a podspec is out of reach; see below |
 | **Native runtime lifecycle composition** | No way for a producer to run code at application start, or to participate in an app-delegate callback. Deliberate in version 1, and not on principle — see below |
-| Xcode build settings, compiler/linker flags | Arbitrary build mutation; revisit only with a concrete, bounded need |
+| Xcode build settings, compiler/linker flags | Arbitrary build mutation. The exclusion stands for flags in general; §7.8's `objc_categories` is the one bounded exception, and it names a behaviour rather than passing a flag |
 | Application configuration — *writing* it | The application's own build settings are the consumer's concern. **Declaring a requirement on it is in scope** and is most of §7.3; see below |
 
 **What "in the wheel" excludes — and what it does not.** The qualifier on the
@@ -3597,6 +3648,8 @@ key is 1.0, which is why nothing below carries a mark yet.
 | `values` | Scalar keys set verbatim. Collisions fail; `*UsageDescription` keys are rejected |
 | `append` | Array keys merged with the application's and other producers', de-duplicated |
 | `skadnetwork_identifiers` | Ad network identifiers, lowercase and ending `.skadnetwork`. The consumer renders `SKAdNetworkItems` from them; offering that key through `values` or `append` is rejected |
+| **`[ios.contributes]`** §7.8 — *union*; **disclosed** | |
+| `objc_categories` | Optional boolean. The consumer links the application target so Objective-C categories in static libraries are loaded (`-ObjC` in Apple's toolchain). Names the behaviour, not the flag; no veto, for §6.12's reason |
 | **`[[ios.contributes.python_modules]]`** §7.7 — *exclusive claim* on the module name; **free** | |
 | `name` | The name Python imports. A single ASCII identifier, no dots |
 | `swift_package` | A package the same sidecar declares, which implements the module |
