@@ -77,6 +77,13 @@ class Application:
     #: application also sets is the application's — the consumer keeps its
     #: value and reports the override.
     manifest_meta_data: Mapping[str, str] = field(default_factory=dict)
+    #: AGP manifest placeholders the application sets itself. §6.3: a
+    #: placeholder the application also sets is the application's, kept and
+    #: reported as an override, exactly as a ``<meta-data>`` key is.
+    manifest_placeholders: Mapping[str, str] = field(default_factory=dict)
+    #: Whether the application has enabled core library desugaring (§6.2). A
+    #: consumer never enables it to satisfy a producer.
+    core_library_desugaring: bool = False
     #: ``Info.plist`` keys the application sets itself, whose ``append`` entries
     #: come first in the deterministic merge order of §7.6.
     info_plist_append: Mapping[str, Sequence[object]] = field(default_factory=dict)

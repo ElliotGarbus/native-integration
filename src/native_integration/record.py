@@ -214,6 +214,16 @@ class IntegrationRecord:
 # --- building ---------------------------------------------------------------
 
 
+def _attributes(permission) -> str:
+    """§6.7's optional attributes, shown so a review sees what was narrowed."""
+    parts = []
+    if permission.max_sdk_version is not None:
+        parts.append(f"maxSdk {permission.max_sdk_version}")
+    if permission.never_for_location:
+        parts.append("neverForLocation")
+    return f" [{', '.join(parts)}]" if parts else ""
+
+
 def _entries(contribution: Contribution, resolution: NativeResolution) -> tuple[str, ...]:
     out: list[str] = []
 
@@ -222,7 +232,7 @@ def _entries(contribution: Contribution, resolution: NativeResolution) -> tuple[
         if permission.suppressed:
             out.append(f"permission {permission.name} (suppressed by application)")
         else:
-            out.append(f"permission {permission.name}{reason}")
+            out.append(f"permission {permission.name}{_attributes(permission)}{reason}")
 
     for feature in contribution.features:
         out.append(f"feature {feature.name} (required=false)")
@@ -238,6 +248,10 @@ def _entries(contribution: Contribution, resolution: NativeResolution) -> tuple[
     for meta in contribution.meta_data:
         suffix = " (application override)" if meta.overridden_by_application else ""
         out.append(f"meta-data {meta.key} = {meta.value}{suffix}")
+
+    for placeholder in contribution.placeholders:
+        suffix = " (application override)" if placeholder.overridden_by_application else ""
+        out.append(f"placeholder {placeholder.key} = {placeholder.value}{suffix}")
 
     for dependency in contribution.dependencies:
         artifact = resolution.gradle.find(dependency.module)

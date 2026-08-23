@@ -12,7 +12,7 @@ Xcode project is the consumer's job, and this is the description it stages from.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Mapping, Sequence
 
 from . import rules
@@ -42,6 +42,10 @@ class PermissionEntry:
     name: str
     reason: str | None
     suppressed: bool = False
+    #: §6.7 — `android:maxSdkVersion`; None means "needed at every level".
+    max_sdk_version: int | None = None
+    #: §6.7 — `android:usesPermissionFlags="neverForLocation"`.
+    never_for_location: bool = False
 
 
 @dataclass(frozen=True)
@@ -160,6 +164,9 @@ class Contribution:
     features: tuple[FeatureEntry, ...] = ()
     components: tuple[ComponentEntry, ...] = ()
     meta_data: tuple[MetaDataEntry, ...] = ()
+    #: §6.3 — application values delivered as AGP manifest placeholders. Same
+    #: shape and same coalescing rule as `meta_data`; a different destination.
+    placeholders: tuple[MetaDataEntry, ...] = ()
     dependencies: tuple[GradleDependency, ...] = ()
     repositories: tuple[RepositoryEntry, ...] = ()
     keep_patterns: tuple[str, ...] = ()
@@ -182,8 +189,48 @@ class EffectiveSet:
     # --- merged views -------------------------------------------------------
 
     def permissions(self) -> tuple[PermissionEntry, ...]:
-        """Permissions that reach the effective merged manifest."""
-        return tuple(p for c in self.contributions for p in c.permissions if not p.suppressed)
+        """Permissions that reach the effective merged manifest.
+
+        §6.7 — one permission is a single fact about the built application, so
+        where two distributions declare it with different attributes the merged
+        form carries the **widest** need any of them stated: no
+        ``max_sdk_version`` defeats one that has it, a higher bound wins, and
+        ``never_for_location`` holds only when every declaration asserts it.
+        The first declaring distribution is kept as the entry's attribution;
+        :meth:`permission_provenance` names them all.
+        """
+        merged: dict[str, PermissionEntry] = {}
+        for contribution in self.contributions:
+            for entry in contribution.permissions:
+                if entry.suppressed:
+                    continue
+                previous = merged.get(entry.name)
+                if previous is None:
+                    merged[entry.name] = entry
+                    continue
+                if previous.max_sdk_version is None or entry.max_sdk_version is None:
+                    ceiling = None
+                else:
+                    ceiling = max(previous.max_sdk_version, entry.max_sdk_version)
+                merged[entry.name] = replace(
+                    previous,
+                    max_sdk_version=ceiling,
+                    never_for_location=previous.never_for_location and entry.never_for_location,
+                )
+        return tuple(merged[name] for name in sorted(merged))
+
+    def permission_provenance(self, name: str) -> tuple[str, ...]:
+        """Every distribution that declared ``name``, for §9's report."""
+        return tuple(
+            sorted(
+                {
+                    c.distribution
+                    for c in self.contributions
+                    for p in c.permissions
+                    if p.name == name and not p.suppressed
+                }
+            )
+        )
 
     def manifest_removals(self) -> tuple[str, ...]:
         """Permissions needing an explicit ``tools:node="remove"`` (§6.7).
@@ -292,6 +339,7 @@ def _one(
     features: list[FeatureEntry] = []
     components: list[ComponentEntry] = []
     meta_data: list[MetaDataEntry] = []
+    placeholders: list[MetaDataEntry] = []
     repositories: list[RepositoryEntry] = []
     dependencies: tuple[GradleDependency, ...] = ()
     keep_patterns: tuple[str, ...] = ()
@@ -315,6 +363,14 @@ def _one(
                     "never raised for you",
                     name,
                 )
+
+        if android.core_library_desugaring and not application.core_library_desugaring:
+            bag.add(
+                rules.FLOOR_UNMET,
+                "requires core library desugaring, which the application has not "
+                "enabled. A floor is never raised for you",
+                name,
+            )
 
         supplied: dict[str, str] = {}
         for value in android.application_values:
@@ -344,10 +400,31 @@ def _one(
                         overridden_by_application=override is not None,
                     )
                 )
+            if value.manifest_placeholder:
+                # §6.3 — the same supplied value, delivered where a declared
+                # dependency's own manifest can read it.
+                override = application.manifest_placeholders.get(value.manifest_placeholder)
+                if override is not None:
+                    bag.add(
+                        rules.META_DATA_APPLICATION_OVERRIDE,
+                        f"manifest placeholder `{value.manifest_placeholder}` is also set "
+                        "by the application, whose value is kept",
+                        name,
+                    )
+                placeholders.append(
+                    MetaDataEntry(
+                        key=value.manifest_placeholder,
+                        value=override if override is not None else answer,
+                        distributions=(name,),
+                        overridden_by_application=override is not None,
+                    )
+                )
 
         for permission in android.permissions:
             permissions.append(
                 PermissionEntry(
+                    max_sdk_version=permission.max_sdk_version,
+                    never_for_location=permission.never_for_location,
                     distribution=name,
                     name=permission.name,
                     reason=permission.reason,
@@ -478,6 +555,7 @@ def _one(
         features=tuple(features),
         components=tuple(components),
         meta_data=tuple(meta_data),
+        placeholders=tuple(placeholders),
         dependencies=dependencies,
         repositories=tuple(repositories),
         keep_patterns=keep_patterns,
@@ -583,18 +661,36 @@ def _hash_inputs(sidecar: Sidecar, source_files: Sequence[str]) -> dict[str, str
 
 
 def _meta_data_conflicts(effective: EffectiveSet, bag: DiagnosticBag) -> None:
-    """§6.3 — equal values coalesce, preserving both provenance records; different values fail."""
+    """§6.3 — equal values coalesce, preserving both provenance records; different values fail.
+
+    Both delivery destinations take the same rule, because both names are
+    build-global rather than scoped by distribution: two distributions naming
+    one ``<meta-data>`` key, or one manifest placeholder, are necessarily
+    talking about the same entry.
+    """
+    _delivery_conflicts(
+        [e for c in effective.contributions for e in c.meta_data],
+        describe=lambda key: f"<meta-data {key}>",
+        bag=bag,
+    )
+    _delivery_conflicts(
+        [e for c in effective.contributions for e in c.placeholders],
+        describe=lambda key: f"manifest placeholder `{key}`",
+        bag=bag,
+    )
+
+
+def _delivery_conflicts(entries_in, *, describe, bag: DiagnosticBag) -> None:
     by_key: dict[str, list[MetaDataEntry]] = {}
-    for contribution in effective.contributions:
-        for entry in contribution.meta_data:
-            by_key.setdefault(entry.key, []).append(entry)
+    for entry in entries_in:
+        by_key.setdefault(entry.key, []).append(entry)
 
     for key, entries in sorted(by_key.items()):
         values = {entry.value for entry in entries}
         if len(values) > 1 and not any(e.overridden_by_application for e in entries):
             bag.add(
                 rules.META_DATA_CONFLICT,
-                f"deliver different values to <meta-data {key}>",
+                f"deliver different values to {describe(key)}",
                 *sorted({d for entry in entries for d in entry.distributions}),
                 detail=tuple(f"{e.distributions[0]}  →  {e.value}" for e in entries),
             )

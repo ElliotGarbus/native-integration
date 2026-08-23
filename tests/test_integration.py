@@ -1251,6 +1251,138 @@ def test_closure_from_installed_reports_what_it_could_not_find():
     assert closure.missing == ("definitely-not-installed-xyz",)
 
 
+# --- Batch 1: §6.7 attributes, §6.3 placeholders, §6.2's boolean floor ------
+
+
+SCAN_STRICT = """
+contract = "1"
+platforms = ["android"]
+[[android.contributes.permissions]]
+name = "android.permission.BLUETOOTH_SCAN"
+reason = "Beacon discovery, never for location"
+never_for_location = true
+max_sdk_version = 33
+"""
+
+SCAN_LOOSE = """
+contract = "1"
+platforms = ["android"]
+[[android.contributes.permissions]]
+name = "android.permission.BLUETOOTH_SCAN"
+reason = "Scanning, and it does infer position"
+"""
+
+
+def test_one_permission_two_producers_takes_the_widest_need(tmp_path):
+    """§6.7 — a permission is one fact about the built application.
+
+    The strict declaration cannot narrow what the loose one needs: if any
+    producer might derive location from a scan, the application cannot assert
+    that none will, and a ceiling one producer does not want disappears.
+    """
+    integration = read(
+        platform=Platform.ANDROID,
+        closure=Closure.direct("py-strict", "py-loose"),
+        application=Application(android_sdk={"min_sdk": 24, "compile_sdk": 35}),
+        profile=PROFILE,
+        sources=[
+            build(tmp_path, SCAN_STRICT, name="py-strict", module="py_strict._native"),
+            build(tmp_path, SCAN_LOOSE, name="py-loose", module="py_loose._native"),
+        ],
+        accept_current_surface=True,
+    )
+    (permission,) = integration.effective.permissions()
+    assert permission.name == "android.permission.BLUETOOTH_SCAN"
+    assert permission.never_for_location is False
+    assert permission.max_sdk_version is None
+    assert integration.effective.permission_provenance(permission.name) == (
+        "py-loose",
+        "py-strict",
+    )
+
+
+def test_an_attribute_survives_when_nothing_contradicts_it(tmp_path):
+    integration = read(
+        platform=Platform.ANDROID,
+        closure=Closure.direct("py-strict"),
+        application=Application(android_sdk={"min_sdk": 24, "compile_sdk": 35}),
+        profile=PROFILE,
+        sources=[build(tmp_path, SCAN_STRICT, name="py-strict", module="py_strict._native")],
+        accept_current_surface=True,
+    )
+    (permission,) = integration.effective.permissions()
+    assert permission.never_for_location and permission.max_sdk_version == 33
+
+
+DESUGARING = """
+contract = "1"
+platforms = ["android"]
+[android.requires]
+core_library_desugaring = true
+"""
+
+
+def test_the_desugaring_floor_blocks_until_the_application_enables_it(tmp_path):
+    """§6.2 — the consumer never enables it on the producer's behalf."""
+    source = build(tmp_path, DESUGARING, name="py-media", module="py_media._native")
+    unset = read(
+        platform=Platform.ANDROID,
+        closure=Closure.direct("py-media"),
+        application=Application(android_sdk={"min_sdk": 24, "compile_sdk": 35}),
+        profile=PROFILE,
+        sources=[source],
+    )
+    assert "floor-unmet" in [d.rule.code for d in unset.diagnostics]
+
+    enabled = read(
+        platform=Platform.ANDROID,
+        closure=Closure.direct("py-media"),
+        application=Application(
+            android_sdk={"min_sdk": 24, "compile_sdk": 35}, core_library_desugaring=True
+        ),
+        profile=PROFILE,
+        sources=[source],
+        accept_current_surface=True,
+    )
+    assert "floor-unmet" not in [d.rule.code for d in enabled.diagnostics]
+
+
+PLACEHOLDER = """
+contract = "1"
+platforms = ["android"]
+[[android.requires.application_values]]
+id = "auth0_domain"
+reason = "Your Auth0 tenant domain"
+manifest_placeholder = "auth0Domain"
+"""
+
+
+def test_a_placeholder_is_delivered_and_recorded(tmp_path):
+    """§6.3 — the value reaches a declared dependency's own manifest."""
+    integration = read(
+        platform=Platform.ANDROID,
+        closure=Closure.direct("py-auth0"),
+        application=Application(
+            android_sdk={"min_sdk": 24, "compile_sdk": 35},
+            answers=MappingAnswers(
+                application_values={"py-auth0": {"auth0_domain": "example.eu.auth0.com"}}
+            ),
+        ),
+        profile=PROFILE,
+        sources=[build(tmp_path, PLACEHOLDER, name="py-auth0", module="py_auth0._native")],
+        accept_current_surface=True,
+    )
+    (contribution,) = integration.effective.contributions
+    (placeholder,) = contribution.placeholders
+    assert (placeholder.key, placeholder.value) == ("auth0Domain", "example.eu.auth0.com")
+    record = integration.record
+    assert any(
+        "placeholder auth0Domain = example.eu.auth0.com" in line
+        for distribution in record.distributions
+        for line in distribution.entries
+    )
+
+
 # --- requirement coverage ---------------------------------------------------
 
 

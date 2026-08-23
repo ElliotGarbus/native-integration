@@ -329,6 +329,73 @@ configuration = "annotationProcessor"
     assert any("run code" in d.message for d in bag)
 
 
+def test_a_manifest_placeholder_is_a_second_delivery(parse):
+    """§6.3 — for a value a declared dependency's own manifest reads (Auth0)."""
+    text = """
+contract = "1"
+[[android.requires.application_values]]
+id = "auth0_domain"
+reason = "Your Auth0 tenant domain"
+manifest_placeholder = "auth0Domain"
+"""
+    sidecar, codes, _ = parse(text)
+    assert codes == []
+    value = sidecar.android.application_values[0]
+    assert value.manifest_placeholder == "auth0Domain"
+    assert value.manifest_meta_data is None
+
+
+def test_both_deliveries_may_appear_on_one_value(parse):
+    """The same supplied value reaching the manifest twice is legitimate."""
+    text = """
+contract = "1"
+[[android.requires.application_values]]
+id = "domain"
+reason = "because"
+manifest_meta_data = "com.example.Domain"
+manifest_placeholder = "exampleDomain"
+"""
+    sidecar, codes, _ = parse(text)
+    assert codes == []
+    value = sidecar.android.application_values[0]
+    assert (value.manifest_meta_data, value.manifest_placeholder) == (
+        "com.example.Domain",
+        "exampleDomain",
+    )
+
+
+def test_permission_attributes_are_read(parse):
+    """§6.7 — maxSdkVersion and neverForLocation, both minimization."""
+    text = """
+contract = "1"
+[[android.contributes.permissions]]
+name = "android.permission.BLUETOOTH_SCAN"
+reason = "Scanning for the vendor's beacons"
+never_for_location = true
+
+[[android.contributes.permissions]]
+name = "android.permission.BLUETOOTH"
+reason = "Legacy transport below API 31"
+max_sdk_version = 30
+"""
+    sidecar, codes, _ = parse(text)
+    assert codes == []
+    scan, legacy = sidecar.android.permissions
+    assert scan.never_for_location and scan.max_sdk_version is None
+    assert legacy.max_sdk_version == 30 and not legacy.never_for_location
+
+
+def test_core_library_desugaring_is_declarable(parse):
+    """§6.2 — a floor whose axis is boolean."""
+    text = """
+contract = "1"
+[android.requires]
+core_library_desugaring = true
+"""
+    sidecar, codes, _ = parse(text)
+    assert codes == [] and sidecar.android.core_library_desugaring
+
+
 # --- §6.6 repositories ------------------------------------------------------
 
 

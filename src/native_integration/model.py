@@ -56,6 +56,10 @@ class ApplicationValue:
     id: str
     reason: str
     manifest_meta_data: str | None = None
+    #: §6.3 — an AGP manifest placeholder, for a value a declared dependency's
+    #: own manifest reads. Build-global like `manifest_meta_data`, so the two
+    #: share one coalescing rule.
+    manifest_placeholder: str | None = None
 
 
 @dataclass(frozen=True)
@@ -102,6 +106,10 @@ class GradleRepository:
 class Permission:
     name: str
     reason: str | None = None
+    #: §6.7 — `android:maxSdkVersion`, above which the permission is not needed.
+    max_sdk_version: int | None = None
+    #: §6.7 — `android:usesPermissionFlags="neverForLocation"`.
+    never_for_location: bool = False
 
 
 @dataclass(frozen=True)
@@ -153,6 +161,9 @@ class AndroidSection:
     compile_sdk: int | None = None
     min_sdk: int | None = None
     target_sdk: int | None = None
+    #: §6.2 — a floor whose axis is boolean: the application has enabled core
+    #: library desugaring, and the consumer never enables it for the producer.
+    core_library_desugaring: bool = False
     application_values: tuple[ApplicationValue, ...] = ()
     src_java: tuple[str, ...] = ()
     src_kotlin: tuple[str, ...] = ()
@@ -352,9 +363,13 @@ def build_android(table: Mapping[str, Any]) -> AndroidSection:
         compile_sdk=requires.get("compile_sdk"),
         min_sdk=requires.get("min_sdk"),
         target_sdk=requires.get("target_sdk"),
+        core_library_desugaring=bool(requires.get("core_library_desugaring", False)),
         application_values=tuple(
             ApplicationValue(
-                id=v["id"], reason=v["reason"], manifest_meta_data=v.get("manifest_meta_data")
+                id=v["id"],
+                reason=v["reason"],
+                manifest_meta_data=v.get("manifest_meta_data"),
+                manifest_placeholder=v.get("manifest_placeholder"),
             )
             for v in requires.get("application_values", [])
         ),
@@ -372,7 +387,12 @@ def build_android(table: Mapping[str, Any]) -> AndroidSection:
             for r in contributes.get("gradle_repositories", [])
         ),
         permissions=tuple(
-            Permission(name=p["name"], reason=p.get("reason"))
+            Permission(
+                name=p["name"],
+                reason=p.get("reason"),
+                max_sdk_version=p.get("max_sdk_version"),
+                never_for_location=bool(p.get("never_for_location", False)),
+            )
             for p in contributes.get("permissions", [])
         ),
         features=tuple(Feature(name=f["name"]) for f in contributes.get("features", [])),

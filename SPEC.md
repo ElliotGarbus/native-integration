@@ -777,7 +777,8 @@ contract = "1"                   # §4.3 — required
 platforms = ["android", "ios"]   # §4.5 — optional; where the distribution works
 
 [android.owns]                              # §6.1  java_namespaces
-[android.requires]                          # §6.2  compile_sdk, min_sdk
+[android.requires]                          # §6.2  compile_sdk, min_sdk,
+                                            #       core_library_desugaring
   [[android.requires.application_values]]   # §6.3
 [android.contributes]
   [android.contributes.src]                 # §6.4  java, kotlin
@@ -883,6 +884,28 @@ These are **floors**, not settings. A consumer **MUST** fail, naming the
 distribution, when the application's configured value is lower. A consumer
 **MUST NOT** raise the application's configuration to satisfy them.
 
+**`core_library_desugaring`** is a boolean requirement on the same terms,
+declared when the producer's code — or a dependency it declares — calls a Java
+API the platform provides only above the application's `min_sdk`:
+
+```toml
+[android.requires]
+# Media3 uses java.time below API 26, which desugaring backfills.
+core_library_desugaring = true
+```
+
+A consumer **MUST** fail, naming the distribution, when the application has not
+enabled core library desugaring, and **MUST NOT** enable it on the producer's
+behalf — it changes how the application's own code compiles, and it adds a
+dependency to the build. Declaring `false` is the same as declaring nothing.
+
+> Rationale: this is a floor whose axis happens to be boolean rather than
+> numeric. It earns a key of its own because the failure is otherwise a
+> `NoClassDefFoundError` on a device below the floor, long after the build, from
+> a library the application never named — and because it cannot be expressed as
+> an SDK floor: raising `min_sdk` to avoid desugaring drops devices, which is
+> the application's decision and a far larger one than a build flag.
+
 `target_sdk` is a floor on the same terms:
 
 ```toml
@@ -938,6 +961,28 @@ manifest_meta_data = "io.sentry.dsn"
   application gave for this `id` — never anything the producer or consumer
   originates. When absent, the consumer emits no manifest entry for this
   value.
+
+**`manifest_placeholder`** is **OPTIONAL** and names an AGP manifest
+placeholder the consumer supplies the value as. It exists for a value a
+**declared dependency's own manifest** reads, which `manifest_meta_data` cannot
+reach: Auth0's and AppAuth's Android libraries ship the intent filter
+pre-written with `${auth0Domain}` and `${auth0Scheme}` holes in it, and the
+application fills them through `manifestPlaceholders` in its build file. Like
+`manifest_meta_data`, the name is **not** scoped by distribution — it is a
+build-global name that vendor code already reads — so the coalescing rule above
+governs it identically: equal supplied values coalesce with both provenance
+records kept, different values **MUST** fail naming both, and a placeholder the
+application sets itself is the application's, kept and reported as an override.
+An entry **MAY** declare both delivery fields; the same supplied value then
+reaches the manifest twice, once as `<meta-data>` and once as a substitution.
+
+> Rationale: §6.8 already cites this mechanism approvingly — AppAuth "ships the
+> intent filter pre-written, with a placeholder for the one value the
+> application supplies via `manifestPlaceholders`" — and version 1 gave a
+> producer no way to use it. Without this field the application is back to
+> transcribing a value into its own build file, which is the problem this
+> specification exists to remove, and the dependency's filter cannot be reached
+> any other way.
 
 The  manifest key, when there is one, is fixed by whatever vendor code reads it —
 it is not this specification's to name or scope. The `id` is this
@@ -1266,6 +1311,36 @@ name = "android.hardware.bluetooth_le"
   vendor permissions with no additional rule.
 - `reason` on a permission is **RECOMMENDED**; consumers **SHOULD** carry it
   into the record and report of §9.
+- **`max_sdk_version`** is **OPTIONAL**, an integer, and becomes
+  `android:maxSdkVersion`. It says the permission is needed only up to that API
+  level — `WRITE_EXTERNAL_STORAGE` through 28, the legacy Bluetooth permissions
+  through 30 — so a device above it is never asked.
+- **`never_for_location`** is **OPTIONAL**, a boolean, and becomes
+  `android:usesPermissionFlags="neverForLocation"`. It asserts that the
+  producer's scanning will not be used to derive the device's location, which is
+  the difference between asking for Bluetooth and asking for the user's
+  whereabouts. A consumer passes it through without interpreting which
+  permissions it is meaningful on, for the same reason `name` takes no prefix
+  expansion.
+
+**Attributes are merged least-restrictively, and the merge is reported.** Two
+distributions may declare one permission with different attributes. A consumer
+**MUST** register the permission with the **widest** need any of them stated:
+an entry with no `max_sdk_version` defeats one that has it, a lower
+`max_sdk_version` gives way to a higher, and `never_for_location` holds only
+when **every** declaration of that permission asserts it. The result **MUST**
+appear in the record and report of §9 with the distributions that produced it.
+
+> Rationale: a permission is a single fact about the built application — it is
+> requested or it is not — so the merged form has to satisfy every producer that
+> asked. The `never_for_location` direction is the one worth stating explicitly:
+> if any producer might derive location from a scan, the application cannot
+> truthfully assert that none will, and the flag is a claim made to the platform
+> and to Play policy rather than a preference.
+>
+> Both attributes exist for **minimization**, which is what §6.7 is for. Without
+> them a producer over-asks on every modern device, and the application carries
+> a permission prompt neither party wanted.
 - Declared permissions **are staged into the generated manifest**, not held
   back for a standalone prompt. What actually gates them is §9's acceptance
   step: a new or changed permission must appear in the report and be
@@ -2946,10 +3021,12 @@ key is 1.0, which is why nothing below carries a mark yet.
 | `java_namespaces` | Java package namespaces this distribution claims exclusively; two distributions claiming overlapping ones fail the build. Required when contributing Java/Kotlin, producer-sourced components, or keep patterns |
 | **`[android.requires]`** §6.2 | |
 | `compile_sdk`, `min_sdk`, `target_sdk` | Floors. The build fails when the application is lower; the consumer never raises the application to match. `target_sdk` is the most invasive — it changes behaviour app-wide — so declare it only when a behaviour depends on it |
+| `core_library_desugaring` | Optional boolean. A floor on a boolean axis: the build fails when the application has not enabled desugaring, and the consumer never enables it |
 | **`[[android.requires.application_values]]`** §6.3 | |
 | `id` | A logical name for the value, unique within the sidecar; full identity is (distribution, `id`). The application supplies the value under it, and contributions reference it as `{ application_value = "…" }`. Values are non-empty strings |
 | `reason` | **Required.** What the value is and where to obtain it |
 | `manifest_meta_data` | Optional. The `<meta-data>` key the SDK reads; the consumer writes the supplied value there |
+| `manifest_placeholder` | Optional. An AGP manifest placeholder the consumer supplies the value as, for a value a **declared dependency's own manifest** reads (Auth0, AppAuth). Merged like `manifest_meta_data`, and the two may both appear |
 | **`[android.contributes.src]`** §6.4 | |
 | `java`, `kotlin` | Directories whose `.java` / `.kt` files the application's own toolchain compiles |
 | **`[[android.contributes.gradle_dependencies]]`** §6.5 | |
@@ -2964,6 +3041,7 @@ key is 1.0, which is why nothing below carries a mark yet.
 | **`[[android.contributes.permissions]]`** §6.7 | |
 | `name` | The canonical manifest string — `android.permission.INTERNET`, never a shorthand |
 | `reason` | Recommended; carried into the report of §9 |
+| `max_sdk_version`, `never_for_location` | Optional. `android:maxSdkVersion` and `android:usesPermissionFlags="neverForLocation"`. Both are minimization; where two distributions differ, the **widest** need wins and the merge is reported |
 | **`[[android.contributes.features]]`** §6.7 | |
 | `name` | Always registered `required="false"`; only the application may promote a feature |
 | **`[[android.contributes.components]]`** §6.8 | |

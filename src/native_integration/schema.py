@@ -190,6 +190,7 @@ ANDROID = Table(
                 "compile_sdk": Field(an_int),
                 "min_sdk": Field(an_int),
                 "target_sdk": Field(an_int),
+                "core_library_desugaring": Field(a_bool),
             },
             arrays={
                 "application_values": Table(
@@ -197,6 +198,7 @@ ANDROID = Table(
                         "id": Field(nonempty_string, required=True),
                         "reason": Field(nonempty_string, required=True),
                         "manifest_meta_data": Field(nonempty_string),
+                        "manifest_placeholder": Field(nonempty_string),
                     }
                 )
             },
@@ -238,6 +240,8 @@ ANDROID = Table(
                     fields={
                         "name": Field(nonempty_string, required=True),
                         "reason": Field(nonempty_string),
+                        "max_sdk_version": Field(an_int),
+                        "never_for_location": Field(a_bool),
                     }
                 ),
                 "features": Table(
