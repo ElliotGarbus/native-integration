@@ -202,6 +202,7 @@ class PrerequisiteKind(str, enum.Enum):
     APPLICATION_FILE = "application_files"
     URL_SCHEME = "url_schemes"
     PLIST_CAPABILITY = "plist_capabilities"
+    APPLICATION_VALUE = "application_values"
 
     def __str__(self) -> str:  # pragma: no cover - trivial
         return self.value
@@ -210,7 +211,11 @@ class PrerequisiteKind(str, enum.Enum):
 #: Which tables are joined on a key the platform supplies, and which on an `id`
 #: the producer invents. §2.2: both are scoped by the declaring distribution;
 #: only the source of the local part differs.
-PRODUCER_LOCAL_IDS = (PrerequisiteKind.APP_EXTENSION, PrerequisiteKind.URL_SCHEME)
+PRODUCER_LOCAL_IDS = (
+    PrerequisiteKind.APP_EXTENSION,
+    PrerequisiteKind.URL_SCHEME,
+    PrerequisiteKind.APPLICATION_VALUE,
+)
 
 
 @dataclass(frozen=True)
@@ -224,6 +229,9 @@ class Prerequisite:
     extension_kind: str | None = None
     #: The single plist array entry a `plist_capabilities` prerequisite needs.
     value: str | None = None
+    #: §7.3 — where an `application_values` answer is written. Required there,
+    #: because iOS has no inline reference site for a value with no key.
+    info_plist_key: str | None = None
 
     @property
     def producer_local(self) -> bool:
@@ -414,6 +422,7 @@ _PREREQUISITE_KEY = {
     PrerequisiteKind.APPLICATION_FILE: "name",
     PrerequisiteKind.URL_SCHEME: "id",
     PrerequisiteKind.PLIST_CAPABILITY: "key",
+    PrerequisiteKind.APPLICATION_VALUE: "id",
 }
 
 
@@ -432,6 +441,7 @@ def build_ios(table: Mapping[str, Any]) -> IosSection:
                     reason=entry["reason"],
                     conditional=bool(entry.get("conditional", False)),
                     extension_kind=entry.get("kind"),
+                    info_plist_key=entry.get("info_plist_key"),
                     value=entry.get("value"),
                 )
             )

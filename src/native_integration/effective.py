@@ -176,6 +176,9 @@ class Contribution:
     info_plist_append: Mapping[str, Sequence[object]] = field(default_factory=dict)
     #: §7.6 — ad network identifiers; the consumer renders the dictionaries.
     skadnetwork_identifiers: tuple[str, ...] = ()
+    #: §7.3 — application values delivered to `Info.plist` keys. Same shape and
+    #: same coalescing rule as §6.3's `meta_data`; a different destination.
+    plist_deliveries: tuple[MetaDataEntry, ...] = ()
     source_files: tuple[str, ...] = ()
     prerequisites: tuple[PrerequisiteStatus, ...] = ()
     #: SHA-256 per integration input, keyed by normalized relative path (§9).
@@ -257,6 +260,11 @@ class EffectiveSet:
         merged: dict[str, object] = {}
         for contribution in self.contributions:
             merged.update(contribution.info_plist_values)
+        # §7.3's application values, whose destination is a plist key. The
+        # entry already carries the application's own value where it set one.
+        for contribution in self.contributions:
+            for delivery in contribution.plist_deliveries:
+                merged[delivery.key] = delivery.value
 
         appended: dict[str, list[object]] = {
             key: list(values) for key, values in application.info_plist_append.items()
@@ -369,6 +377,7 @@ def _one(
     plist_values: Mapping[str, object] = {}
     plist_append: Mapping[str, Sequence[object]] = {}
     skadnetwork: tuple[str, ...] = ()
+    plist_deliveries: list[MetaDataEntry] = []
     statuses: list[PrerequisiteStatus] = []
     source_files: list[str] = []
 
@@ -543,6 +552,28 @@ def _one(
         for prerequisite in ios.prerequisites:
             satisfied = _satisfied(prerequisite, distribution=name, application=application)
             statuses.append(PrerequisiteStatus(name, prerequisite, satisfied))
+            if (
+                satisfied
+                and prerequisite.kind is PrerequisiteKind.APPLICATION_VALUE
+                and prerequisite.info_plist_key
+            ):
+                answer = application.answers.application_value(name, prerequisite.key)
+                override = application.info_plist_values.get(prerequisite.info_plist_key)
+                if override is not None:
+                    bag.add(
+                        rules.META_DATA_APPLICATION_OVERRIDE,
+                        f"Info.plist `{prerequisite.info_plist_key}` is also set by the "
+                        "application, whose value is kept",
+                        name,
+                    )
+                plist_deliveries.append(
+                    MetaDataEntry(
+                        key=prerequisite.info_plist_key,
+                        value=override if override is not None else (answer or ""),
+                        distributions=(name,),
+                        overridden_by_application=override is not None,
+                    )
+                )
             if satisfied:
                 continue
             if prerequisite.conditional:
@@ -587,6 +618,7 @@ def _one(
         info_plist_values=plist_values,
         info_plist_append=plist_append,
         skadnetwork_identifiers=skadnetwork,
+        plist_deliveries=tuple(plist_deliveries),
         source_files=tuple(source_files),
         prerequisites=tuple(statuses),
         inputs=inputs,
@@ -647,6 +679,8 @@ def _satisfied(prerequisite: Prerequisite, *, distribution: str, application: Ap
         ) and answers.acknowledged(distribution, prerequisite.key)
     if kind is PrerequisiteKind.URL_SCHEME:
         return answers.acknowledged(distribution, prerequisite.key)
+    if kind is PrerequisiteKind.APPLICATION_VALUE:
+        return answers.application_value(distribution, prerequisite.key) is not None
     if kind is PrerequisiteKind.PLIST_CAPABILITY:
         return bool(prerequisite.value) and answers.plist_capability_configured(
             prerequisite.key, prerequisite.value
@@ -700,6 +734,11 @@ def _meta_data_conflicts(effective: EffectiveSet, bag: DiagnosticBag) -> None:
     _delivery_conflicts(
         [e for c in effective.contributions for e in c.placeholders],
         describe=lambda key: f"manifest placeholder `{key}`",
+        bag=bag,
+    )
+    _delivery_conflicts(
+        [e for c in effective.contributions for e in c.plist_deliveries],
+        describe=lambda key: f"Info.plist `{key}`",
         bag=bag,
     )
 

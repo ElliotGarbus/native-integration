@@ -1433,6 +1433,70 @@ def test_skadnetwork_identifiers_merge_like_append(tmp_path):
     ]
 
 
+META = """
+contract = "1"
+platforms = ["ios"]
+[[ios.requires.application_values]]
+id = "facebook_app_id"
+reason = "Your Meta app ID, from the App Dashboard"
+info_plist_key = "FacebookAppID"
+"""
+
+
+def test_an_unsupplied_ios_application_value_blocks(tmp_path):
+    """§7.3 — before this table the requirement could not even be stated."""
+    integration = read(
+        platform=Platform.IOS,
+        closure=Closure.direct("py-meta"),
+        application=Application(deployment_target="15.0"),
+        profile=PROFILE,
+        sources=[build(tmp_path, META, name="py-meta", module="py_meta._native")],
+    )
+    assert "prerequisite-unsatisfied" in [d.rule.code for d in integration.diagnostics]
+
+
+def test_a_supplied_ios_application_value_reaches_the_plist(tmp_path):
+    integration = read(
+        platform=Platform.IOS,
+        closure=Closure.direct("py-meta"),
+        application=Application(
+            deployment_target="15.0",
+            answers=MappingAnswers(
+                application_values={"py-meta": {"facebook_app_id": "1234567890"}}
+            ),
+        ),
+        profile=PROFILE,
+        sources=[build(tmp_path, META, name="py-meta", module="py_meta._native")],
+        accept_current_surface=True,
+    )
+    assert [d.rule.code for d in integration.diagnostics] == []
+    plist = integration.effective.info_plist(Application(deployment_target="15.0"))
+    assert plist["FacebookAppID"] == "1234567890"
+
+
+def test_the_application_keeps_its_own_plist_key_and_the_override_is_reported(tmp_path):
+    """§7.3 — the same rule §6.3 states for a manifest key."""
+    integration = read(
+        platform=Platform.IOS,
+        closure=Closure.direct("py-meta"),
+        application=Application(
+            deployment_target="15.0",
+            info_plist_values={"FacebookAppID": "9999999999"},
+            answers=MappingAnswers(
+                application_values={"py-meta": {"facebook_app_id": "1234567890"}}
+            ),
+        ),
+        profile=PROFILE,
+        sources=[build(tmp_path, META, name="py-meta", module="py_meta._native")],
+        accept_current_surface=True,
+    )
+    codes = [d.rule.code for d in integration.diagnostics]
+    assert codes == ["meta-data-application-override"]
+    (contribution,) = integration.effective.contributions
+    (delivery,) = contribution.plist_deliveries
+    assert delivery.value == "9999999999" and delivery.overridden_by_application
+
+
 # --- requirement coverage ---------------------------------------------------
 
 

@@ -77,7 +77,7 @@ checklist, and §§3–7 are what it refers to.
     - [Common rules](#common-rules)
     - [What counts as satisfied](#what-counts-as-satisfied)
     - [Conditional prerequisites](#conditional-prerequisites)
-    - [The six tables](#the-six-tables)
+    - [The seven tables](#the-seven-tables)
   - [7.4 Swift packages](#74-swift-packages-ioscontributesswiftpackages)
   - [7.5 Source](#75-source-ioscontributessrc)
   - [7.6 Info.plist](#76-infoplist-ioscontributesinfoplist)
@@ -872,7 +872,8 @@ platforms = ["android", "ios"]   # §4.5 — optional; where the distribution wo
   [[ios.requires.app_extensions]]           # §7.3  │ application supplies;
   [[ios.requires.application_files]]        # §7.3  │ never satisfied by
   [[ios.requires.url_schemes]]              # §7.3  │ the consumer
-  [[ios.requires.plist_capabilities]]       # §7.3 ─┘
+  [[ios.requires.plist_capabilities]]       # §7.3  │
+  [[ios.requires.application_values]]       # §7.3 ─┘
 [ios.contributes]
   [[ios.contributes.swift_packages]]        # §7.4
   [ios.contributes.src]                     # §7.5  swift
@@ -1847,8 +1848,8 @@ unavailable. The extension must share an app group with the application."""
 #### Common rules
 
 Binding on every table in this section — `entitlements`, `usage_descriptions`,
-`app_extensions`, `application_files`, `url_schemes` and `plist_capabilities`
-alike:
+`app_extensions`, `application_files`, `url_schemes`, `plist_capabilities` and
+`application_values` alike:
 
 1. `reason` is **REQUIRED**.
 2. An entry **MAY** declare `conditional = true` (default `false`), whose
@@ -1892,6 +1893,7 @@ Per table, stated because two conforming readers would otherwise diverge:
 | `app_extensions` | …declares an extension target of the requested `kind` **and** acknowledges this entry by `(distribution, id)` |
 | `url_schemes` | …**explicitly acknowledges** this entry by `(distribution, id)` |
 | `plist_capabilities` | …configures the declared `value` under the declared `key` in its own `Info.plist` |
+| `application_values` | …supplies a **non-empty** value for the `id`, which the consumer then writes to the declared `info_plist_key` |
 
 **Why `app_extensions` and `url_schemes` use an `id` instead of a platform
 key.** Neither has a single string iOS defines the way an entitlement or an
@@ -1975,7 +1977,7 @@ that it survives to be read later.
 > failure that names the problem into a line in a report instead — exactly
 > the misuse §12.1 warns against.
 
-#### The six tables
+#### The seven tables
 
 The common rules above govern every table below. What follows covers only
 what differs per table.
@@ -2159,6 +2161,62 @@ as contributions. Version 1 names two:
 > nothing and is exactly what §7.6's `append` is for. What earns a key a place
 > here is that a producer's entry changes what the application may do, or who may
 > install it.
+
+##### `application_values`
+
+*The iOS counterpart to §6.3, and the same shape for the same reason: a value
+only the application has, that the **build** must embed because the SDK reads it
+before any Python runs.*
+
+```toml
+[[ios.requires.application_values]]
+id = "facebook_app_id"
+reason = """\
+Your Meta app ID, from developers.facebook.com → App Dashboard → \
+Settings → Basic."""
+info_plist_key = "FacebookAppID"
+```
+
+- **`id`** is a **logical identifier**, unique within the sidecar, and its
+  identity is the pair (distribution, `id`) exactly as in §6.3. Two
+  distributions may each declare `client_id` without collision.
+- **`info_plist_key`** is **REQUIRED**, and names the `Info.plist` key the SDK
+  itself reads. Unlike `id` it is **not** scoped by distribution: it is a real,
+  platform-global key, so two distributions naming it are necessarily talking
+  about the same entry. Equal supplied values coalesce, preserving both
+  provenance records; different values **MUST** fail, naming both. A key the
+  **application** sets itself is the application's — the consumer keeps that
+  value and reports the override.
+- The supplied value is a **non-empty string**, per §6.3.
+- `info_plist_key` **MUST NOT** be a `*UsageDescription` key or one of §7.6's
+  capability keys; a consumer **MUST** reject either, naming the distribution
+  and directing the producer to `usage_descriptions` or `plist_capabilities`.
+  Those are application-authored text and application-granted capabilities, and
+  neither is an account identifier.
+- A key delivered here is **consumer-managed** for §7.6's purposes, so a
+  producer contributing the same key through `info_plist.values` fails.
+
+**Why `info_plist_key` is required here and `manifest_meta_data` is optional in
+§6.3.** On Android a value with no manifest key is still useful, because a
+contribution can reference it inline — §6.8's `view_links` splices one into a
+filter. iOS has no such site: a value that names no key reaches nothing, and
+declaring one would produce a prerequisite the application answers into a void.
+
+> Rationale, and the prediction this fulfils. §6.3's rationale said that when an
+> iOS case appeared the shape would be "a parallel `[[ios.requires.application_values]]`
+> table with its own delivery field", and not §6.3 promoted to the top level with
+> one delivery field per platform. Five vendors have appeared —
+> Meta (`FacebookAppID`, `FacebookClientToken`, `FacebookDisplayName`), Branch
+> (`branch_key`), CleverTap (`CleverTapAccountID`, `CleverTapToken`), Google
+> Sign-In (`GIDClientID`) and Meta Audience Network — and they confirm the
+> argument rather than merely the shape: Meta issues a **different application
+> ID per platform**, so a single entry answered once would be wrong on one of
+> them.
+>
+> Before this table there was no way to state the requirement at all. The
+> application built, linked, launched, and failed on first use — or worse,
+> reported to nobody's project — which is the failure mode this specification
+> exists to convert into a build-time diagnostic.
 
 ### 7.4 Swift packages: `[[ios.contributes.swift_packages]]`
 
@@ -2880,7 +2938,7 @@ reporting optional, the two would differ only by whether the consumer bothered.
 cannot write the application's entitlements, `Info.plist`, bundle contents,
 build targets or URL registrations — but it can and should *declare that it
 needs them*, and a consumer must report those requirements and fail when they
-are unmet. That is what §7.3 is: six kinds of prerequisite, plus §6.6's
+are unmet. That is what §7.3 is: seven kinds of prerequisite, plus §6.6's
 repository credentials. The excluded thing is the producer reaching into the
 application's configuration, not the producer having a say in it.
 
@@ -3172,6 +3230,7 @@ key is 1.0, which is why nothing below carries a mark yet.
 | `[[…application_files]]` — `name` | *presence*. A file the SDK reads from the bundle. Declare only when no programmatic path exists |
 | `[[…url_schemes]]` — `id` | *acknowledgement*. Says the application must register a URL scheme and forward the callback. `id` names the requirement, not the scheme — the application chooses that — so a package may declare several |
 | `[[…plist_capabilities]]` — `key`, `value` | *presence*. An `Info.plist` key that grants a capability or restricts installation. A closed list, given in §7.6, which rejects the same keys as contributions |
+| `[[…application_values]]` — `id`, `info_plist_key` | *supplied value*; delivery merges as a *unique key with a value*. The iOS counterpart to §6.3, with the delivery field **required**, since iOS has no inline reference site |
 | **`[[ios.contributes.swift_packages]]`** §7.4 — *delegate to the resolver*; **free** | |
 | `name` | Local handle, unique within the sidecar; §7.7 and §7.3 refer to packages by it |
 | `url`, `products` | The repository, and which of its products to link |

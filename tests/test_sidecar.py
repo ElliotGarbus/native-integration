@@ -604,6 +604,59 @@ reason = "because"
     assert codes == ["extension-kind-unimplemented"]
 
 
+def test_an_ios_application_value_is_declarable(parse):
+    """§7.3 — the parallel table §6.3's rationale predicted."""
+    text = """
+contract = "1"
+[[ios.requires.application_values]]
+id = "facebook_app_id"
+reason = "Your Meta app ID, from the App Dashboard"
+info_plist_key = "FacebookAppID"
+"""
+    sidecar, codes, _ = parse(text, platform=Platform.IOS)
+    assert codes == []
+    (prerequisite,) = sidecar.ios.prerequisites
+    assert prerequisite.key == "facebook_app_id"
+    assert prerequisite.info_plist_key == "FacebookAppID"
+
+
+def test_an_ios_application_value_needs_its_delivery_key(parse):
+    """Required here, unlike §6.3: iOS has no inline reference site."""
+    text = """
+contract = "1"
+[[ios.requires.application_values]]
+id = "facebook_app_id"
+reason = "Your Meta app ID"
+"""
+    _, codes, _ = parse(text, platform=Platform.IOS)
+    assert codes == ["key-required"]
+
+
+def test_an_application_value_may_not_deliver_a_purpose_string(parse):
+    """An account identifier is not application-authored text."""
+    text = """
+contract = "1"
+[[ios.requires.application_values]]
+id = "why"
+reason = "because"
+info_plist_key = "NSCameraUsageDescription"
+"""
+    _, codes, _ = parse(text, platform=Platform.IOS)
+    assert codes == ["plist-usage-description"]
+
+
+def test_an_application_value_may_not_deliver_a_capability_key(parse):
+    text = """
+contract = "1"
+[[ios.requires.application_values]]
+id = "modes"
+reason = "because"
+info_plist_key = "UIBackgroundModes"
+"""
+    _, codes, _ = parse(text, platform=Platform.IOS)
+    assert codes == ["plist-capability-key"]
+
+
 def test_skadnetwork_identifiers_are_declarable(parse):
     """§7.6 — the narrow primitive, not dictionary support."""
     text = """

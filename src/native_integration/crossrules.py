@@ -118,11 +118,35 @@ def _python_modules(sidecars: Sequence[Sidecar], bag: DiagnosticBag) -> None:
 
 
 def _plist_values(sidecars: Sequence[Sidecar], bag: DiagnosticBag) -> None:
-    """§7.6 — two distributions setting one scalar key to different values fail."""
+    """§7.6 — two distributions setting one scalar key to different values fail.
+
+    A key an `application_values` entry delivers to (§7.3) is consumer-managed,
+    so a *contribution* of the same key collides with it here rather than
+    silently losing to whichever ran last. The delivered value itself is not
+    known until the application answers, so the collision is on the key.
+    """
+    delivered: dict[str, str] = {}
+    for sidecar in sidecars:
+        if not sidecar.ios:
+            continue
+        for prerequisite in sidecar.ios.prerequisites:
+            if prerequisite.info_plist_key:
+                delivered.setdefault(prerequisite.info_plist_key, sidecar.distribution)
+
     setters: dict[str, tuple[str, object]] = {}
     for sidecar in sidecars:
         if not sidecar.ios:
             continue
+        for key in sidecar.ios.info_plist_values:
+            owner = delivered.get(key)
+            if owner is not None:
+                bag.add(
+                    rules.PLIST_VALUE_CONFLICT,
+                    f"contributes Info.plist `{key}`, which an application value "
+                    "already delivers to; one key has one source",
+                    owner,
+                    sidecar.distribution,
+                )
         for key, value in sidecar.ios.info_plist_values.items():
             previous = setters.get(key)
             if previous is None:

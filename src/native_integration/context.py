@@ -87,6 +87,10 @@ class Application:
     #: ``Info.plist`` keys the application sets itself, whose ``append`` entries
     #: come first in the deterministic merge order of §7.6.
     info_plist_append: Mapping[str, Sequence[object]] = field(default_factory=dict)
+    #: ``Info.plist`` keys the application sets itself. §7.3: a key an
+    #: application value would deliver to is the application's, kept and
+    #: reported as an override, exactly as a ``<meta-data>`` key is.
+    info_plist_values: Mapping[str, object] = field(default_factory=dict)
     #: The application's own SKAdNetwork identifiers, which come first in the
     #: deterministic merge order of §7.6.
     skadnetwork_identifiers: tuple[str, ...] = ()

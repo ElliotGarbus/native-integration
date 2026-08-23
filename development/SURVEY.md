@@ -591,7 +591,7 @@ outstanding.
 
 | Finding | Shape | Size | Vendors |
 | --- | --- | --- | --- |
-| **N1** iOS application values | new `[[ios.requires.application_values]]` | medium | 5 |
+| **N1** iOS application values | ~~new `[[ios.requires.application_values]]`~~ **landed**, §7.3, with `info_plist_key` required | — | 5 |
 | **N2** SKAdNetwork ids | ~~one narrow contribution key~~ **landed** — `skadnetwork_identifiers`, with `SKAdNetworkItems` redirected to it | — | 6 |
 | **N7** fixed `meta-data` | new contribution table (P3's deferred half) | medium | 6 |
 | **N5** component attributes | fields on §6.8 — the `provider` half **landed** (removed from the vocabulary); the attributes half is open | medium | 4 |

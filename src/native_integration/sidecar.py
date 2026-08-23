@@ -547,6 +547,28 @@ def _check_ios(
 
     for kind in PrerequisiteKind:
         entries = ios.of_kind(kind)
+        if kind is PrerequisiteKind.APPLICATION_VALUE:
+            # §7.3 — an account identifier is neither application-authored text
+            # nor an application-granted capability; both have their own table.
+            for entry in entries:
+                key = entry.info_plist_key or ""
+                if key.endswith("UsageDescription"):
+                    bag.add(
+                        rules.PLIST_USAGE_DESCRIPTION,
+                        f"delivers an application value to `{key}`; a purpose string is "
+                        "user-facing text the application authors — declare it under "
+                        "[[ios.requires.usage_descriptions]] instead",
+                        name,
+                    )
+                elif key in schema.CAPABILITY_KEYS:
+                    bag.add(
+                        rules.PLIST_CAPABILITY_KEY,
+                        f"delivers an application value to `{key}`, which grants the "
+                        "application a capability or restricts who may install it — "
+                        "declare it under [[ios.requires.plist_capabilities]] instead",
+                        name,
+                    )
+
         if kind is PrerequisiteKind.APP_EXTENSION:
             # §7.3 — an open vocabulary (§4.4): the consumer rejects an
             # extension point it cannot check for, rather than dropping it.

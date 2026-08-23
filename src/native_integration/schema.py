@@ -318,6 +318,13 @@ IOS = Table(
                     key=Field(one_of(*CAPABILITY_KEYS), required=True),
                     value=Field(nonempty_string, required=True),
                 ),
+                # §7.3 — the iOS counterpart to §6.3. `info_plist_key` is
+                # required, unlike §6.3's optional manifest_meta_data: iOS has
+                # no inline reference site, so a value naming no key is inert.
+                "application_values": _prerequisite(
+                    id=Field(nonempty_string, required=True),
+                    info_plist_key=Field(nonempty_string, required=True),
+                ),
             },
         ),
         "contributes": Table(
