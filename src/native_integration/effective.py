@@ -451,6 +451,26 @@ def _one(
                     )
                 )
 
+        for prerequisite in android.prerequisites:
+            satisfied = _satisfied(prerequisite, distribution=name, application=application)
+            statuses.append(PrerequisiteStatus(name, prerequisite, satisfied))
+            if satisfied:
+                continue
+            if prerequisite.conditional:
+                bag.add(
+                    rules.PREREQUISITE_CONDITIONAL,
+                    f"{prerequisite.kind.table} `{prerequisite.key}` unresolved "
+                    f"(conditional): {prerequisite.reason}",
+                    name,
+                )
+            else:
+                bag.add(
+                    rules.PREREQUISITE_UNSATISFIED,
+                    f"{prerequisite.kind.table} `{prerequisite.key}` is not satisfied: "
+                    f"{prerequisite.reason}",
+                    name,
+                )
+
         for entry in android.meta_data:
             # §6.10 — one key space with §6.3's delivery, so the same override
             # rule applies: a key the application sets itself is the
@@ -699,6 +719,14 @@ def _satisfied(prerequisite: Prerequisite, *, distribution: str, application: Ap
             prerequisite.extension_kind
         ) and answers.acknowledged(distribution, prerequisite.key)
     if kind is PrerequisiteKind.URL_SCHEME:
+        return answers.acknowledged(distribution, prerequisite.key)
+    if kind is PrerequisiteKind.ANDROID_FILE:
+        return answers.android_asset_configured(prerequisite.key)
+    if kind is PrerequisiteKind.RESOURCE:
+        return bool(prerequisite.resource_type) and answers.resource_declared(
+            prerequisite.resource_type, prerequisite.key
+        )
+    if kind is PrerequisiteKind.APPLICATION_CLASS:
         return answers.acknowledged(distribution, prerequisite.key)
     if kind is PrerequisiteKind.APPLICATION_VALUE:
         return answers.application_value(distribution, prerequisite.key) is not None

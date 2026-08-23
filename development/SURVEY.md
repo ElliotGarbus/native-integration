@@ -596,8 +596,8 @@ outstanding.
 | **N7** fixed `meta-data` | ~~new contribution table (P3's deferred half)~~ **landed**, §6.10 — one key space with §6.3 | — | 6 |
 | **N5** component attributes | fields on §6.8 — the `provider` half **landed** (removed from the vocabulary); the attributes half is open | medium | 4 |
 | **N3** privacy manifests | contribution + prerequisite pair | large | many |
-| **N4** Android `requires` family | structural: `application_files` + N9 + N20 | large | 5 |
-| **N9** required resources | new `requires` table | medium | 6 |
+| **N4** Android `requires` family | ~~structural: `application_files` + N9 + N20~~ **landed**, §6.11 — all three in one section | — | 5 |
+| **N9** required resources | ~~new `requires` table~~ **landed**, §6.11 — and it is the one thing §6.10 may reference | — | 6 |
 | **N10** host-activity contract | ~~new `requires` key~~ **closed** — landed as a consumer obligation, §2.3 | — | 1 |
 | **N8** manifest placeholders | ~~one optional field on §6.3~~ **landed** — `manifest_placeholder` | — | 2 |
 | **N18** permission attributes | ~~two optional fields on §6.7~~ **landed** — `max_sdk_version`, `never_for_location`, with a least-restrictive merge | — | 3 |
@@ -611,7 +611,7 @@ outstanding.
 | **N13** configurations | ~~extend §6.5's `configuration`~~ **closed** — `api`/`compileOnly`/`runtimeOnly` added; processor configurations refused, since they run code at build time | — | — |
 | **N15** `-ObjC` | closed vocabulary; revisit §11 | medium | 3 |
 | **N14** packaging collisions | **consumer obligation**, not a declaration | medium | 3 |
-| **N20** application-owned class | prerequisite form | medium | 2 |
+| **N20** application-owned class | ~~prerequisite form~~ **landed**, §6.11 — acknowledgement, per §2.4's rule | — | 2 |
 
 Six of these are single-field or documentation-only changes with multi-vendor
 evidence behind them — N8, N18, N12, N2, N21, N16 — and three of those correct

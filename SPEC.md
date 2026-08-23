@@ -71,6 +71,9 @@ checklist, and §§3–7 are what it refers to.
   - [6.8 Manifest components](#68-manifest-components-androidcontributescomponents)
   - [6.9 Shrinker keep patterns](#69-shrinker-keep-patterns-androidcontributesr8)
   - [6.10 Manifest meta-data](#610-manifest-meta-data-androidcontributesmetadata)
+  - [6.11 Application prerequisites](#611-application-prerequisites-androidrequires)
+    - [Common rules](#common-rules)
+    - [What counts as satisfied](#what-counts-as-satisfied)
 - [7. iOS](#7-ios)
   - [7.1 Symbol prefixes](#71-symbol-prefixes-ios)
   - [7.2 Build requirements](#72-build-requirements-iosrequires)
@@ -856,6 +859,9 @@ platforms = ["android", "ios"]   # §4.5 — optional; where the distribution wo
 [android.requires]                          # §6.2  compile_sdk, min_sdk,
                                             #       core_library_desugaring
   [[android.requires.application_values]]   # §6.3
+  [[android.requires.application_files]]    # §6.11 ─┐ prerequisites the
+  [[android.requires.resources]]            # §6.11  │ application supplies
+  [[android.requires.application_classes]]  # §6.11 ─┘
 [android.contributes]
   [android.contributes.src]                 # §6.4  java, kotlin
   [[android.contributes.gradle_dependencies]]   # §6.5
@@ -1796,7 +1802,9 @@ reason = "Bundles the barcode and face models rather than downloading them on fi
 | boolean | `true` / `false` |
 
 - A value **MUST NOT** be a **resource reference** — anything beginning `@` or
-  `?`. A consumer **MUST** reject one, naming the distribution and the key.
+  `?` — **unless** it names a resource the same sidecar declares under §6.11's
+  `resources`. A consumer **MUST** reject any other reference, naming the
+  distribution and the key.
 - Entries are written into the `<application>` element. Version 1 does not model
   `<meta-data>` on a component.
 
@@ -1823,13 +1831,156 @@ application's — the consumer keeps that value and reports the override.
 > and setting the key itself is how the application refuses. This is §6.7's
 > disclosure-and-veto shape, reached without a second mechanism.
 >
-> **Why resource references are excluded.** `@drawable/ic_stat_notify` names a
-> resource, and §11 excludes contributed resources because resource names are a
-> flat namespace with no ownership rule. A producer pointing at one is naming
-> something it cannot supply and the application has not been asked for, which
-> fails at build time in AAPT with no trace back to the sidecar. The notification
-> icon Firebase Messaging wants is the standing example, and it stays out of
-> reach until a required-resource prerequisite exists.
+> **Why resource references are excluded, and where the exception comes from.**
+> `@drawable/ic_stat_notify` names a resource, and §11 excludes contributed
+> resources because resource names are a flat namespace with no ownership rule.
+> A producer pointing at one is naming something it cannot supply and the
+> application has not been asked for, which fails in AAPT with no trace back to
+> the sidecar. That argument stops applying the moment the sidecar *has* asked:
+> §6.11's `resources` is the request, and a reference to one it declares is
+> pointing at something the application agreed to provide. Firebase Messaging's
+> notification icon is the case, and it needs both halves — a resource nothing
+> points at, or a pointer to a resource nobody asked for, is the half
+> requirement §2.1 warns against.
+
+### 6.11 Application prerequisites: `[android.requires.*]`
+
+*For what an Android application must supply and a producer must not write: a
+configuration file, a resource, a class at a path the vendor fixes. §6.2's
+floors and §6.3's values are the same family; this completes it, and §7.3 is
+the iOS counterpart these tables are modelled on.*
+
+#### Common rules
+
+Binding on `application_files`, `resources` and `application_classes` alike, and
+identical to §7.3's, which is why they are stated by reference rather than
+rewritten:
+
+1. `reason` is **REQUIRED**.
+2. An entry **MAY** declare `conditional = true` (default `false`), whose
+   `reason` **MUST** state the condition that makes the prerequisite apply.
+3. A consumer **MUST** report every entry as a prerequisite, naming the
+   distribution.
+4. An **unconditional** prerequisite that is unsatisfied **MUST** fail the
+   build, naming the distribution and the `reason`.
+5. A **conditional** prerequisite that is unsatisfied **MUST** be recorded in
+   the integration record (§9) and **MUST NOT** fail the build.
+6. **A producer declaration MUST NOT cause a consumer to originate
+   application-owned material.** No entry here is satisfied by the consumer
+   writing a file, generating a resource, or synthesizing a class on the
+   producer's authority.
+
+#### What counts as satisfied
+
+| Table | Satisfied when the application… |
+| --- | --- |
+| `application_files` | …configures a file of that name for inclusion in the application's assets |
+| `resources` | …declares a resource of that type and name |
+| `application_classes` | …**explicitly acknowledges** this entry by `(distribution, id)` |
+
+##### `application_files`
+
+Some SDKs read a configuration file from the packaged application:
+
+```toml
+[[android.requires.application_files]]
+name = "airshipconfig.properties"
+reason = """\
+App key and secret from the Airship dashboard. Place it in your assets \
+directory; Airship reads it at takeOff, before any Python runs."""
+```
+
+`name` is the file's name in the application's **assets**. Obtaining the file is
+the application developer's job, done by hand outside the build — downloading it
+from a vendor console, typically — and the consumer's build then includes it and
+checks only that a file of that name is wired in. A consumer **MUST NOT** create,
+fetch, or synthesize its contents: these are account-specific, sometimes
+credential-adjacent, and always the application's to provide.
+
+Assets are the only location version 1 models, because they are the only one a
+producer can name without naming a resource (§11) or a file some excluded build
+plugin consumes. A producer **SHOULD NOT** declare a file here when the SDK
+offers a programmatic path.
+
+> Rationale, and the asymmetry this closes. §7.3's `application_files` was
+> written for `GoogleService-Info.plist` and its reasoning is not iOS-shaped: a
+> vendor that leaves no programmatic path leaves none on either platform.
+> Airship is the case that shows the gap mattering — its Android SDK reads
+> `airshipconfig.properties` from assets, and the only alternative is an
+> initialization class it registers through §6.10, so before these two tables an
+> Airship integration could not be configured at all.
+
+##### `resources`
+
+A resource the SDK reads by name, which the application must supply because
+§11 excludes contributing one:
+
+```toml
+[[android.requires.resources]]
+type = "drawable"
+name = "ic_stat_notify"
+reason = """\
+The status bar icon for notifications. Android draws a white square when it \
+is missing, on your application's branding."""
+```
+
+- `type` is an Android resource type — `drawable`, `string`, `color`, `xml` —
+  and the vocabulary is **open** per §4.4: the platform owns these names, this
+  table is a `requires`, and the value gives a producer nothing that the
+  application does not decide to provide. A consumer **MUST** reject a `type` it
+  does not implement.
+- `name` is the resource name the SDK expects. A consumer **MUST NOT** generate
+  the resource.
+
+**A required resource is the one thing §6.10 may point at.** §6.10 rejects a
+resource reference as a `<meta-data>` value, because a producer naming a
+resource is naming something it cannot supply. That argument stops applying when
+the same sidecar has declared the resource as a prerequisite, so:
+
+```toml
+[[android.contributes.meta_data]]
+key = "com.google.firebase.messaging.default_notification_icon"
+value = "@drawable/ic_stat_notify"
+```
+
+is valid **exactly when** `@drawable/ic_stat_notify` names a `resources` entry in
+that sidecar, and rejected otherwise. Without this pairing each half is useless:
+a resource nothing points at, or a pointer to a resource nobody asked for —
+which §2.1 calls out as worse than a prerequisite naming both.
+
+##### `application_classes`
+
+A few SDKs require a class the **application** owns, at a path the vendor fixes
+and a producer may not write into (§6.1):
+
+```toml
+[[android.requires.application_classes]]
+id = "wechat_entry"
+package_suffix = "wxapi"
+name = "WXEntryActivity"
+reason = """\
+WeChat resolves this class by name under your own application ID. It must \
+extend Activity, implement IWXAPIEventHandler, and forward to the SDK."""
+```
+
+- `id` names the requirement and is the join key, since the class itself is not
+  one: the application chooses it where the vendor does not.
+- `package_suffix` and `name` are **OPTIONAL** and describe a path the vendor
+  fixes, relative to the application's own ID — the consumer reports
+  `<applicationId>.wxapi.WXEntryActivity`, and never templates it into anything
+  it generates. Where the vendor fixes only the behaviour, as Health Connect
+  does for its permissions-rationale activity, both are omitted and `reason`
+  carries the requirement.
+- Satisfaction is **acknowledgement**, per the table above.
+
+> Rationale for acknowledgement rather than presence. §2.4's rule is that when a
+> consumer cannot inspect the whole of what was asked, the mode is
+> acknowledgement and never partial presence. A consumer could check that a
+> class of that name exists in the application's source; it cannot check that
+> the class extends what the vendor requires, or that it forwards what the
+> vendor sends. §7.3 makes the same judgment for `url_schemes`, for the same
+> reason, and treating the inspectable half as sufficient would prove half of
+> what was asked while reporting success.
 
 ## 7. iOS
 
@@ -3285,6 +3436,10 @@ key is 1.0, which is why nothing below carries a mark yet.
 | **`[android.contributes.r8]`** §6.9 — *union*, non-exclusive; **free** | |
 | `keep_classes` | Class patterns the shrinker must keep; the consumer generates the `-keep` rules itself. Each must fall within an owned namespace |
 | `[[…r8.keep]]` — `pattern`, `from_dependency` | Keeps a *dependency's* classes instead. Checked against what the resolved artifact actually contains, since a Maven group ID need not match the Java packages inside it |
+| **`[android.requires.*]` — prerequisites** §6.11 — **application-only**; modes per table below | Every entry takes `reason` (**required**) and `conditional` (optional), on §7.3's rules |
+| `[[…application_files]]` — `name` | *presence*. A file the application configures into its assets; the consumer never creates one |
+| `[[…resources]]` — `type`, `name` | *presence*. `type` is an open vocabulary (§4.4). A resource declared here is the one thing §6.10 may reference |
+| `[[…application_classes]]` — `id`, `package_suffix`, `name` | *acknowledgement*. A class the application owns at a vendor-fixed path; §2.4's rule, since the behaviour is uninspectable |
 | **`[[android.contributes.meta_data]]`** §6.10 — *unique key with a value*, shared with §6.3's delivery; **disclosed** | |
 | `key`, `value`, `reason` | A `<meta-data>` entry the producer knows the value of. `reason` **required**; `value` is a string, integer or boolean, never a resource reference; the application's own entry wins |
 | **`[ios]`** §7.1 | |

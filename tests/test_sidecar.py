@@ -448,6 +448,69 @@ value = true
     assert codes == ["key-required"]
 
 
+def test_the_android_prerequisite_family_parses(parse):
+    """§6.11 — files, resources and classes, on §7.3's common rules."""
+    text = """
+contract = "1"
+[[android.requires.application_files]]
+name = "airshipconfig.properties"
+reason = "App key and secret from the Airship dashboard"
+
+[[android.requires.resources]]
+type = "drawable"
+name = "ic_stat_notify"
+reason = "The status bar icon; Android draws a white square without it"
+
+[[android.requires.application_classes]]
+id = "wechat_entry"
+package_suffix = "wxapi"
+name = "WXEntryActivity"
+reason = "WeChat resolves this class by name under your own application ID"
+"""
+    sidecar, codes, _ = parse(text)
+    assert codes == []
+    kinds = [p.kind.table for p in sidecar.android.prerequisites]
+    assert kinds == ["application_files", "resources", "application_classes"]
+    wechat = sidecar.android.prerequisites[2]
+    assert (wechat.package_suffix, wechat.class_name) == ("wxapi", "WXEntryActivity")
+
+
+def test_a_declared_resource_is_the_one_thing_meta_data_may_reference(parse):
+    """§6.10's rejection stops applying once the sidecar has asked for it."""
+    text = """
+contract = "1"
+[[android.requires.resources]]
+type = "drawable"
+name = "ic_stat_notify"
+reason = "The status bar icon"
+
+[[android.contributes.meta_data]]
+key = "com.google.firebase.messaging.default_notification_icon"
+value = "@drawable/ic_stat_notify"
+reason = "Points Firebase at the icon the application supplies"
+"""
+    _, codes, _ = parse(text)
+    assert codes == []
+
+
+def test_an_undeclared_resource_reference_is_still_rejected(parse):
+    """The exception is exact: a different resource is still a pointer to nothing."""
+    text = """
+contract = "1"
+[[android.requires.resources]]
+type = "drawable"
+name = "ic_stat_notify"
+reason = "The status bar icon"
+
+[[android.contributes.meta_data]]
+key = "com.google.firebase.messaging.default_notification_color"
+value = "@color/brand"
+reason = "Tints the notification"
+"""
+    _, codes, _ = parse(text)
+    assert codes == ["meta-data-resource-reference"]
+
+
 # --- §6.6 repositories ------------------------------------------------------
 
 

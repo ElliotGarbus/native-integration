@@ -359,7 +359,16 @@ def _check_dependencies(
         # §6.10 — a resource reference names something the producer cannot
         # supply and the application has not been asked for; it fails in AAPT
         # with no trace back to the sidecar.
-        if isinstance(entry.value, str) and entry.value[:1] in ("@", "?"):
+        declared_resources = {
+            f"@{p.resource_type}/{p.key}"
+            for p in android.prerequisites
+            if p.kind is PrerequisiteKind.RESOURCE
+        }
+        if (
+            isinstance(entry.value, str)
+            and entry.value[:1] in ("@", "?")
+            and entry.value not in declared_resources
+        ):
             bag.add(
                 rules.META_DATA_RESOURCE_REFERENCE,
                 f"sets <meta-data {entry.key}> to `{entry.value}`, a resource "

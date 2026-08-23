@@ -191,6 +191,17 @@ class Table:
     since: ContractVersion = V1_0
 
 
+def _prerequisite(**extra: Field) -> Table:
+    """The §7.3 common rules as a table: ``reason`` required, ``conditional`` optional."""
+    return Table(
+        fields={
+            "reason": Field(nonempty_string, required=True),
+            "conditional": Field(a_bool),
+            **extra,
+        }
+    )
+
+
 ANDROID = Table(
     tables={
         "owns": Table(fields={"java_namespaces": Field(nonempty_string_list)}),
@@ -209,6 +220,20 @@ ANDROID = Table(
                         "manifest_meta_data": Field(nonempty_string),
                         "manifest_placeholder": Field(nonempty_string),
                     }
+                ),
+                # §6.11 — the Android prerequisite family, on §7.3's rules.
+                "application_files": _prerequisite(
+                    name=Field(nonempty_string, required=True)
+                ),
+                "resources": _prerequisite(
+                    # `type` is the platform's vocabulary, open per §4.4.
+                    type=Field(nonempty_string, required=True),
+                    name=Field(nonempty_string, required=True),
+                ),
+                "application_classes": _prerequisite(
+                    id=Field(nonempty_string, required=True),
+                    package_suffix=Field(nonempty_string),
+                    name=Field(nonempty_string),
                 )
             },
         ),
@@ -300,17 +325,6 @@ ANDROID = Table(
         ),
     }
 )
-
-
-def _prerequisite(**extra: Field) -> Table:
-    """The §7.3 common rules as a table: ``reason`` required, ``conditional`` optional."""
-    return Table(
-        fields={
-            "reason": Field(nonempty_string, required=True),
-            "conditional": Field(a_bool),
-            **extra,
-        }
-    )
 
 
 IOS = Table(

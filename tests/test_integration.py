@@ -1579,6 +1579,68 @@ def test_the_application_keeps_its_own_meta_data_key(tmp_path):
     assert entry.value == "com.example.MyAutopilot" and entry.overridden_by_application
 
 
+FAMILY = """
+contract = "1"
+platforms = ["android"]
+[[android.requires.application_files]]
+name = "airshipconfig.properties"
+reason = "App key and secret from the Airship dashboard"
+
+[[android.requires.resources]]
+type = "drawable"
+name = "ic_stat_notify"
+reason = "The status bar icon"
+
+[[android.requires.application_classes]]
+id = "wechat_entry"
+package_suffix = "wxapi"
+name = "WXEntryActivity"
+reason = "WeChat resolves this class by name under your own application ID"
+"""
+
+
+def test_the_android_family_blocks_until_the_application_answers(tmp_path):
+    """§6.11 — three prerequisites, three unmet, each naming its distribution."""
+    integration = read(
+        platform=Platform.ANDROID,
+        closure=Closure.direct("py-family"),
+        application=Application(android_sdk={"min_sdk": 24, "compile_sdk": 35}),
+        profile=PROFILE,
+        sources=[build(tmp_path, FAMILY, name="py-family", module="py_family._native")],
+    )
+    unsatisfied = [
+        d for d in integration.diagnostics if d.rule.code == "prerequisite-unsatisfied"
+    ]
+    assert len(unsatisfied) == 3
+    assert all(d.distributions == ("py-family",) for d in unsatisfied)
+
+
+def test_the_android_family_is_satisfied_the_way_each_table_says(tmp_path):
+    """A file wired in, a resource declared, and a class acknowledged.
+
+    The class is acknowledgement rather than presence because the behaviour a
+    vendor fixes -- what it extends, what it forwards -- is uninspectable, which
+    is §2.4's rule and §7.3's judgment for url_schemes.
+    """
+    integration = read(
+        platform=Platform.ANDROID,
+        closure=Closure.direct("py-family"),
+        application=Application(
+            android_sdk={"min_sdk": 24, "compile_sdk": 35},
+            answers=MappingAnswers(
+                android_assets=["airshipconfig.properties"],
+                resources=[("drawable", "ic_stat_notify")],
+                acknowledged_ids={"py-family": ["wechat_entry"]},
+            ),
+        ),
+        profile=PROFILE,
+        sources=[build(tmp_path, FAMILY, name="py-family", module="py_family._native")],
+        accept_current_surface=True,
+    )
+    assert [d.rule.code for d in integration.diagnostics] == []
+    assert len(integration.effective.prerequisites()) == 3
+
+
 # --- requirement coverage ---------------------------------------------------
 
 

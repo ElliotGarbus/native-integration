@@ -188,6 +188,8 @@ class AndroidSection:
     permissions: tuple[Permission, ...] = ()
     features: tuple[Feature, ...] = ()
     meta_data: tuple[ContributedMetaData, ...] = ()
+    #: §6.11 — application_files, resources and application_classes.
+    prerequisites: tuple[Prerequisite, ...] = ()
     components: tuple[Component, ...] = ()
     keep_classes: tuple[str, ...] = ()
     dependency_keeps: tuple[DependencyKeep, ...] = ()
@@ -220,9 +222,25 @@ class PrerequisiteKind(str, enum.Enum):
     URL_SCHEME = "url_schemes"
     PLIST_CAPABILITY = "plist_capabilities"
     APPLICATION_VALUE = "application_values"
+    ANDROID_FILE = "android:application_files"
+    RESOURCE = "resources"
+    APPLICATION_CLASS = "application_classes"
+
+    @property
+    def table(self) -> str:
+        """The TOML table this kind is declared in.
+
+        ANDROID_FILE and APPLICATION_FILE share the spelling `application_files`
+        and differ only in where the file goes — a bundle on iOS, the assets
+        directory on Android. Identical enum *values* would make one a silent
+        alias of the other, so the value carries a platform prefix and this is
+        what a sidecar and a diagnostic use.
+        """
+        _, _, name = self.value.rpartition(":")
+        return name
 
     def __str__(self) -> str:  # pragma: no cover - trivial
-        return self.value
+        return self.table
 
 
 #: Which tables are joined on a key the platform supplies, and which on an `id`
@@ -232,6 +250,7 @@ PRODUCER_LOCAL_IDS = (
     PrerequisiteKind.APP_EXTENSION,
     PrerequisiteKind.URL_SCHEME,
     PrerequisiteKind.APPLICATION_VALUE,
+    PrerequisiteKind.APPLICATION_CLASS,
 )
 
 
@@ -249,6 +268,13 @@ class Prerequisite:
     #: §7.3 — where an `application_values` answer is written. Required there,
     #: because iOS has no inline reference site for a value with no key.
     info_plist_key: str | None = None
+    #: §6.11 — a resource type, for a `resources` entry.
+    resource_type: str | None = None
+    #: §6.11 — the vendor-fixed path of an application-owned class, relative to
+    #: the application's own ID. Both halves are optional: some vendors fix only
+    #: the behaviour.
+    package_suffix: str | None = None
+    class_name: str | None = None
 
     @property
     def producer_local(self) -> bool:
@@ -265,6 +291,8 @@ class Prerequisite:
         """How the application's answer is looked up (§2.2)."""
         if self.kind is PrerequisiteKind.PLIST_CAPABILITY:
             return f"{self.key}={self.value}"
+        if self.kind is PrerequisiteKind.RESOURCE:
+            return f"{self.resource_type}/{self.key}"
         return self.key
 
 
@@ -385,8 +413,28 @@ def build_android(table: Mapping[str, Any]) -> AndroidSection:
             )
         )
 
+    android_prerequisites: list[Prerequisite] = []
+    for kind in (
+        PrerequisiteKind.ANDROID_FILE,
+        PrerequisiteKind.RESOURCE,
+        PrerequisiteKind.APPLICATION_CLASS,
+    ):
+        for entry in requires.get(kind.table, []):
+            android_prerequisites.append(
+                Prerequisite(
+                    kind=kind,
+                    key=entry[_PREREQUISITE_KEY[kind]],
+                    reason=entry["reason"],
+                    conditional=bool(entry.get("conditional", False)),
+                    resource_type=entry.get("type"),
+                    package_suffix=entry.get("package_suffix"),
+                    class_name=entry.get("name") if kind is PrerequisiteKind.APPLICATION_CLASS else None,
+                )
+            )
+
     return AndroidSection(
         java_namespaces=tuple(owns.get("java_namespaces", [])),
+        prerequisites=tuple(android_prerequisites),
         compile_sdk=requires.get("compile_sdk"),
         min_sdk=requires.get("min_sdk"),
         target_sdk=requires.get("target_sdk"),
@@ -444,6 +492,9 @@ _PREREQUISITE_KEY = {
     PrerequisiteKind.URL_SCHEME: "id",
     PrerequisiteKind.PLIST_CAPABILITY: "key",
     PrerequisiteKind.APPLICATION_VALUE: "id",
+    PrerequisiteKind.ANDROID_FILE: "name",
+    PrerequisiteKind.RESOURCE: "name",
+    PrerequisiteKind.APPLICATION_CLASS: "id",
 }
 
 
