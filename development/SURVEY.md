@@ -320,11 +320,21 @@ producer never writes into `res/`.
 
 ### N10 — the host-activity contract
 
-Stripe's `PaymentSession` requires a `ComponentActivity`; Stripe Identity
-requires an `AppCompatActivity` with a Material theme; anything built on
-`ActivityResultContracts` or on fragments requires the same. On iOS the
-analogue is an SDK that needs a presenting `UIViewController`, or that expects
-URL callbacks forwarded from a `UISceneDelegate` rather than the app delegate.
+Stripe's `PaymentSession` requires a `ComponentActivity`, and Stripe Identity
+requires an `AppCompatActivity` with a Material theme. On iOS the analogue is
+an SDK that needs a presenting `UIViewController`, or that expects URL
+callbacks forwarded from a `UISceneDelegate` rather than the app delegate.
+
+**The evidence is one vendor, and it did not grow.** This entry first claimed
+that anything built on `ActivityResultContracts` or on fragments needs the same
+— a category inferred rather than observed, and the obvious candidates do not
+hold: Facebook Login routes through its own callback manager and the legacy
+result callback, and Google Pay's documented path uses a helper doing the same.
+Both work against a plain platform activity. Round five then wrote four sidecars
+against Meta, Airship, Agora and Health Connect, and **none needed a host
+capability**. By this directory's own rule that makes N10 a hypothesis rather
+than a finding, which is a reason to leave the specification alone until a
+second vendor appears.
 
 For this specification's actual audience this is not a footnote. A
 Python-mobile toolchain owns exactly one activity, and whether that singleton
@@ -554,7 +564,7 @@ Ordered by evidence weight, not by implementation cost. Sizes are estimates.
 | **N3** privacy manifests | contribution + prerequisite pair | large | many |
 | **N4** Android `requires` family | structural: `application_files` + N9 + N20 | large | 5 |
 | **N9** required resources | new `requires` table | medium | 6 |
-| **N10** host-activity contract | new `requires` key | medium | 3+ |
+| **N10** host-activity contract | new `requires` key | medium | **1** |
 | **N8** manifest placeholders | one optional field on §6.3 | **small** | 2 |
 | **N18** permission attributes | two optional fields on §6.7 | **small** | 3 |
 | **N6** `<queries>` | new contribution table | small | 5 |
