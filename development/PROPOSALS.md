@@ -84,7 +84,7 @@ motivating example is a hypothesis; a proposal with several is a finding.
 | P26 | Entitlements that carry values | T5, B3 | Stripe, PyOneSignal, PyCoreLocation |
 | P27 | Repository credentials, and keeping them out of the record | M2 | Mapbox |
 | P34 | The factoring pass: modes, merge rules, authority classes | the growth law | [SURVEY.md](SURVEY.md), 15 findings |
-| P35 | The host contract — a requirement the **consumer** satisfies | N10, N20 | Stripe, WeChat, Health Connect |
+| P35 | ~~The host contract — a requirement the **consumer** satisfies~~ **withdrawn** | N10 | Stripe |
 | P36 | ~~Close the escape hatch, and say why~~ **landed** | all of SURVEY.md | Cordova, Expo |
 
 Gap identifiers refer to the NOTES.md beside each example:
@@ -1763,8 +1763,9 @@ rather than about missing vocabulary.
 > [Health Connect](examples/pyhealthconnect/) — written to put depth behind the
 > survey's costliest findings before any of them changes the specification.
 > Three of the four amended the finding they tested, and two new ones (FB3,
-> FB4) appeared that reading documentation had not produced. **P34 and P35
-> remain undecided.**
+> FB4) appeared that reading documentation had not produced. **P35 has since
+> been withdrawn**, with §2.3 landing its requirement as a consumer obligation;
+> **P34 remains undecided.**
 
 ## P34 — The factoring pass: satisfaction modes, merge rules, authority classes
 
@@ -1913,7 +1914,34 @@ normative and the registry derived, exactly as Appendix D is today.
 into a mode or into a merge rule plus an authority class, the framing is wrong
 and the tables are irreducibly bespoke. Forty-three SDKs produced none.
 
-## P35 — The host contract: a requirement the **consumer** satisfies
+## P35 — The host contract *(DECIDED: withdrawn — §2.3 landed instead)*
+
+> **Decision.** Withdrawn, and the underlying requirement landed on the other
+> side of the boundary. §2.3 now obliges a consumer **that generates the host**
+> to make its Android activity an `androidx.activity.ComponentActivity`, and to
+> expose rather than consume iOS URL callbacks; §8 restates both as requirements
+> 28 and 29.
+>
+> **The proposal asked the wrong party.** A host capability is table stakes for
+> integrating current SDKs, not a variable to negotiate per package — so it
+> belongs where the capability lives, with the tool that writes the host. The
+> declaration form would have put the burden on the party with the least
+> information: a wrapper author knows they wrap Stripe, not that Stripe's Android
+> SDK calls a method declared only on the AndroidX class.
+>
+> **The vendor count did not carry this, and should not be read as if it had.**
+> One vendor requires it today (§SURVEY N10, corrected from an inferred category
+> to Stripe alone). What carried it is that the activity-result contract is how
+> current Android SDKs return results at all, and the path it replaced is
+> deprecated — so the requirement tracks Android's direction rather than one
+> vendor's API.
+>
+> **Nothing else here was adopted.** No capability vocabulary, no second answerer
+> in §2.2, and no contended-singleton concept; P34's five satisfaction modes are
+> unchanged, and §11's lifecycle exclusion is explicitly untouched by §2.3. The
+> cost accepted is that conformance is more expensive for a consumer, and that
+> naming a class dates the obligation.
+
 
 *Motivated by N10 (Stripe, Stripe Identity), with N20 (WeChat, Health Connect)
 as its application-side cousin.*

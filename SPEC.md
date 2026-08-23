@@ -43,6 +43,7 @@ checklist, and §§3–7 are what it refers to.
     - [What a consumer must be able to ask](#what-a-consumer-must-be-able-to-ask)
     - [The join key is not the consumer's to choose](#the-join-key-is-not-the-consumers-to-choose)
     - [Three answers, end to end](#three-answers-end-to-end)
+  - [2.3 The host the consumer generates](#23-the-host-the-consumer-generates)
 - [3. Discovery](#3-discovery)
   - [3.1 The entry point](#31-the-entry-point)
   - [3.2 Resolution](#32-resolution)
@@ -332,6 +333,51 @@ the natural choice; everything beneath it — nesting, naming, whether you key
 by distribution first or by `id` first — is yours to design. What is fixed is
 only the leaf: the literal join key from the declaration, scoped by the
 declaring distribution wherever the table above requires it.
+
+### 2.3 The host the consumer generates
+
+*For the two properties of the generated native entry point — an Android
+activity, an iOS app delegate — that material declared under this convention
+depends on, and that no producer can check. §2.2 covers what the application
+answers; this covers what the consumer provides before any sidecar is read.*
+
+Both obligations are **scoped to a consumer that generates the host**. A
+consumer whose application author writes their own activity or app delegate has
+nothing here to make conform, and neither clause applies to it.
+
+**Android.** A consumer that generates the application's Android activity
+**MUST** make it an `androidx.activity.ComponentActivity`, or a subclass of one.
+
+> Rationale. Current Android SDKs return their results through the
+> activity-result contract — `registerForActivityResult` — which is declared on
+> `ComponentActivity` and not on the platform's own `Activity`; the older
+> `onActivityResult` path it replaced is deprecated. An SDK reached through §6.5
+> that opens a screen of its own, such as a payment sheet or an identity check,
+> then has nowhere to hand its result back to. What the application sees is a
+> compile error inside generated glue, or a cast failure at first use, with
+> nothing tying either to the distribution that declared the dependency.
+>
+> This names a class, which dates the obligation, and that is accepted
+> deliberately: the alternative spellings all describe the same type in more
+> words. A minor revision revisits it when Android's mainstream moves.
+
+**iOS.** A consumer that generates the application's app delegate **MUST NOT**
+consume a URL callback delivered to `application(_:open:options:)` without
+providing a documented means for application code to observe it.
+
+> Rationale. §7.3's `url_schemes` asks the application for two things: register
+> a scheme, and forward the resulting callback to the SDK's handler. In this
+> ecosystem the application author writes Python and the app delegate belongs to
+> the consumer, so a generated delegate that swallows the callback — dispatching
+> it as something else, or dropping it — leaves a prerequisite nobody can
+> satisfy. An application acknowledging that it forwarded the callback would
+> then be wrong through no fault of its own, which turns §7.3's disclosure into
+> the opposite of disclosure.
+
+Neither clause gives a producer a way to run code at startup or to participate
+in a lifecycle callback. §11's exclusion of runtime lifecycle composition is
+untouched: what is required here is a property of a host the consumer already
+writes, not a seam for producer code to enter.
 
 ## 3. Discovery
 
@@ -2204,6 +2250,7 @@ gives the thematic reading:
 | Recording, disclosure, attribution | 9, 15, 19, 25 |
 | Platform applicability | 18 |
 | The application's side of the contract | 7, 26 |
+| The host the consumer generates | 28, 29 |
 
 **Three outcomes, and no others.** What a consumer finds falls into exactly
 three kinds, named here so that two implementations classify the same condition
@@ -2303,6 +2350,11 @@ A conforming consumer **MUST**:
     under one `id`, which the application could not answer separately (§7.3).
 27. Compile contributed `.java` sources with UTF-8 forced, never the platform
     default (§6.4).
+28. When it generates the application's Android activity, make it an
+    `androidx.activity.ComponentActivity` or a subclass (§2.3).
+29. When it generates the application's iOS app delegate, provide a documented
+    means for application code to observe a URL callback delivered to
+    `application(_:open:options:)`, rather than consuming it (§2.3).
 
 > Rationale for 16. Every other rule here assumes native resolution *succeeds*.
 > It need not: two distributions in one closure can declare native dependencies

@@ -336,6 +336,12 @@ capability**. By this directory's own rule that makes N10 a hypothesis rather
 than a finding, which is a reason to leave the specification alone until a
 second vendor appears.
 
+*Closed.* Not by vendor count, which never grew, but by deciding the question
+belonged to the consumer: §2.3 obliges a consumer that generates the host to
+make its Android activity an `androidx.activity.ComponentActivity` and to expose
+iOS URL callbacks rather than consume them. No producer declaration exists or is
+proposed — see [PROPOSALS.md](PROPOSALS.md) P35, withdrawn.
+
 For this specification's actual audience this is not a footnote. A
 Python-mobile toolchain owns exactly one activity, and whether that singleton
 extends `Activity` or `AppCompatActivity` decides whether a whole tier of SDKs
@@ -564,7 +570,7 @@ Ordered by evidence weight, not by implementation cost. Sizes are estimates.
 | **N3** privacy manifests | contribution + prerequisite pair | large | many |
 | **N4** Android `requires` family | structural: `application_files` + N9 + N20 | large | 5 |
 | **N9** required resources | new `requires` table | medium | 6 |
-| **N10** host-activity contract | new `requires` key | medium | **1** |
+| **N10** host-activity contract | ~~new `requires` key~~ **closed** — landed as a consumer obligation, §2.3 | — | 1 |
 | **N8** manifest placeholders | one optional field on §6.3 | **small** | 2 |
 | **N18** permission attributes | two optional fields on §6.7 | **small** | 3 |
 | **N6** `<queries>` | new contribution table | small | 5 |
