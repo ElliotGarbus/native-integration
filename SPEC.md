@@ -44,6 +44,7 @@ checklist, and §§3–7 are what it refers to.
     - [The join key is not the consumer's to choose](#the-join-key-is-not-the-consumers-to-choose)
     - [Three answers, end to end](#three-answers-end-to-end)
   - [2.3 The host the consumer generates](#23-the-host-the-consumer-generates)
+  - [2.4 The patterns behind the tables](#24-the-patterns-behind-the-tables)
 - [3. Discovery](#3-discovery)
   - [3.1 The entry point](#31-the-entry-point)
   - [3.2 Resolution](#32-resolution)
@@ -379,6 +380,79 @@ in a lifecycle callback. §11's exclusion of runtime lifecycle composition is
 untouched: what is required here is a property of a host the consumer already
 writes, not a seam for producer code to enter.
 
+### 2.4 The patterns behind the tables
+
+*For the small number of shapes §§6–7's tables are instances of. This section
+adds no obligation: everything here is already true of the body, which governs.
+It exists so that the next declaration is classified rather than argued from
+scratch, and so §4.4 has something to point at when it asks whether a
+vocabulary may be open.*
+
+**How a `requires` is satisfied.** An entry **MAY** carry more than one mode,
+met together — §7.3's `app_extensions` is presence **and** acknowledgement.
+
+| Mode | The application… | Answered through |
+| --- | --- | --- |
+| **floor** | is configured at or above a value | its own build configuration |
+| **supplied value** | provides a value the consumer then delivers | the consumer's configuration (§2.2) |
+| **presence** | has configured an artifact the consumer can inspect | its own project |
+| **acknowledgement** | states it did something the consumer cannot inspect | the consumer's configuration |
+| **approval** | grants something the consumer then emits differently | the consumer's configuration |
+
+Permission suppression (§6.7) is not here: it is the application's **veto over a
+contribution**, not the satisfaction of a requirement.
+
+**How contributions merge.** What happens when two distributions declare into
+one place.
+
+| Rule | On collision |
+| --- | --- |
+| **exclusive claim** | a second claimant fails, naming both |
+| **unique key with a value** | equal values coalesce; differing values fail; a value the application sets itself wins and is reported |
+| **union** | no collision is possible; order is fixed where it could otherwise vary |
+| **delegate to the resolver** | the platform's own resolution decides, and both requested and resolved are recorded |
+
+What separates the first two is whether the declaration **carries a value**: two
+distributions registering one component class have nothing to compare, while two
+setting one `Info.plist` key are asking for the same thing when the values
+agree.
+
+**Rendering is not merging.** `view_links`, `intent_filters`, §6.9's `-keep`
+synthesis and §7.7's module registration decide what text a consumer emits from
+*one* declaration, before anything merges. That is where those tables remove a
+footgun — a hand-written filter missing `DEFAULT` — and it is a separate
+question from what happens when a second distribution declares the same thing.
+
+**What a producer may say about a key.**
+
+| Class | Meaning |
+| --- | --- |
+| **free** | contributable; grants the application nothing |
+| **disclosed, vetoable** | contributable, but reported and refusable |
+| **approval-gated** | contributable only with an explicit application grant |
+| **application-only** | never contributable; a producer may only *require* it |
+
+A key added by a later minor **MUST** name its pattern and its class in
+Appendix D, alongside the *Since 1.n* mark §4.3 requires.
+
+> Rationale. Version 1 argued each table out on its own, and two of them came
+> out inconsistent: §7.6 carried the same merge rule as §6.3 without §6.3's
+> application-wins half, so two conforming consumers could produce different
+> `Info.plist` files from one sidecar. Naming the shapes is what makes that
+> visible before a section is written rather than after it ships.
+>
+> The class column is the one that does more than describe. §4.4 lets a
+> vocabulary stay open where the platform owns the names, and that rests on
+> whether a value selects behaviour the **consumer performs** — the judgment
+> behind opening `app_extensions.kind` and `view_links` while keeping §6.5's
+> configurations enumerated. Recorded per key it is a decision made once;
+> re-derived per section it is a decision made repeatedly, which is how
+> `UIBackgroundModes` reached `append` before §7.6 closed that door.
+>
+> What this deliberately is not: a contract a consumer implements. The patterns
+> classify tables; the work inside one is its conflict predicate and its join
+> key, and naming a pattern supplies neither.
+
 ## 3. Discovery
 
 ### 3.1 The entry point
@@ -614,7 +688,8 @@ declaration from a misspelled one.
 > Rationale: an open vocabulary keeps a producer's pace tied to the platform's
 > releases rather than to this document's, which is the point of not
 > enumerating. It is safe only where the value names something the *application*
-> or the platform provides. Where a value instead selects behaviour the
+> or the platform provides — §2.4's authority classes are where that is recorded
+> per key, rather than re-derived per section. Where a value instead selects behaviour the
 > **consumer performs**, the set stays enumerated here and the enumeration is
 > doing security work — §6.5's configurations are the worked case.
 
@@ -3032,7 +3107,11 @@ the latter.
 
 ## Appendix D: declaration reference
 
-Every key a sidecar may contain, with the section that defines it. Descriptions
+Every key a sidecar may contain, with the section that defines it. Each group
+header names the table's **pattern** — its satisfaction mode, or its merge rule —
+and its **authority class**, both defined in §2.4. The classification is a
+property of the table rather than of any single key, which is why it sits on the
+header rather than in a column each key would repeat. Descriptions
 are summaries; where this table and the body differ, the body governs.
 
 **This table is also the contract-minor registry** (§4.3). Every entry below is
@@ -3045,65 +3124,65 @@ key is 1.0, which is why nothing below carries a mark yet.
 | **Top level** | |
 | `contract` | **Required.** Major of this specification, optionally with a minor — `"1"` or `"1.1"`. §4.3 |
 | `platforms` | Optional. Where the distribution *functions*, not merely where it contributes; a build for an omitted platform fails. §4.5 |
-| **`[android.owns]`** §6.1 | |
+| **`[android.owns]`** §6.1 — *exclusive claim* | |
 | `java_namespaces` | Java package namespaces this distribution claims exclusively; two distributions claiming overlapping ones fail the build. Required when contributing Java/Kotlin, producer-sourced components, or keep patterns |
-| **`[android.requires]`** §6.2 | |
+| **`[android.requires]`** §6.2 — *floor* | |
 | `compile_sdk`, `min_sdk`, `target_sdk` | Floors. The build fails when the application is lower; the consumer never raises the application to match. `target_sdk` is the most invasive — it changes behaviour app-wide — so declare it only when a behaviour depends on it |
 | `core_library_desugaring` | Optional boolean. A floor on a boolean axis: the build fails when the application has not enabled desugaring, and the consumer never enables it |
-| **`[[android.requires.application_values]]`** §6.3 | |
+| **`[[android.requires.application_values]]`** §6.3 — *supplied value*; delivery merges as a *unique key with a value* | |
 | `id` | A logical name for the value, unique within the sidecar; full identity is (distribution, `id`). The application supplies the value under it, and contributions reference it as `{ application_value = "…" }`. Values are non-empty strings |
 | `reason` | **Required.** What the value is and where to obtain it |
 | `manifest_meta_data` | Optional. The `<meta-data>` key the SDK reads; the consumer writes the supplied value there |
 | `manifest_placeholder` | Optional. An AGP manifest placeholder the consumer supplies the value as, for a value a **declared dependency's own manifest** reads (Auth0, AppAuth). Merged like `manifest_meta_data`, and the two may both appear |
-| **`[android.contributes.src]`** §6.4 | |
+| **`[android.contributes.src]`** §6.4 — *exclusive claim*, through §6.1's namespaces; **free** | |
 | `java`, `kotlin` | Directories whose `.java` / `.kt` files the application's own toolchain compiles |
-| **`[[android.contributes.gradle_dependencies]]`** §6.5 | |
+| **`[[android.contributes.gradle_dependencies]]`** §6.5 — *delegate to the resolver*; **free**, with `configuration` enumerated because some values select build behaviour | |
 | `coordinate` | `group:artifact:version` with an exact version. **Recommended**, because the version is visible here — with the range form below, finding what was actually used means opening the integration record (§9) |
 | `module` + `version` | `group:artifact` with a bounded `{ at_least, below }` range. Open-ended and changing versions are invalid |
 | `configuration` | Optional; `implementation` (default), `api`, `compileOnly`, `runtimeOnly`. A **closed** set: processor configurations are excluded because they execute code at build time (§2.1) |
-| **`[[android.contributes.gradle_repositories]]`** §6.6 | |
+| **`[[android.contributes.gradle_repositories]]`** §6.6 — *exclusive claim* over the declared scope; **disclosed**, and credentials are a *supplied value* | |
 | `url` | A Maven repository to add to the application's resolution. The most powerful thing a sidecar can contribute, which is why the next two rows are mandatory |
 | `reason` | **Required.** Why the artifacts are not available from the default repositories, and — when authenticated — which credential is needed and where to get it |
 | `groups`, `modules` | **At least one required.** Bounds what the repository may serve |
 | `credentials_required` | Optional. Declares the repository authenticated. A sidecar **MUST NOT** contain the credential itself |
-| **`[[android.contributes.permissions]]`** §6.7 | |
+| **`[[android.contributes.permissions]]`** §6.7 — *union*; **disclosed, vetoable** | |
 | `name` | The canonical manifest string — `android.permission.INTERNET`, never a shorthand |
 | `reason` | Recommended; carried into the report of §9 |
 | `max_sdk_version`, `never_for_location` | Optional. `android:maxSdkVersion` and `android:usesPermissionFlags="neverForLocation"`. Both are minimization; where two distributions differ, the **widest** need wins and the merge is reported |
-| **`[[android.contributes.features]]`** §6.7 | |
+| **`[[android.contributes.features]]`** §6.7 — *union*; **disclosed** | |
 | `name` | Always registered `required="false"`; only the application may promote a feature |
-| **`[[android.contributes.components]]`** §6.8 | |
+| **`[[android.contributes.components]]`** §6.8 — *exclusive claim* on the class; **free**, escalating to **approval-gated** where `exported_required` is declared | |
 | `kind` | `service`, `activity` or `receiver`. `provider` is deliberately absent: an authority is mandatory and must be unique device-wide, so only the application ID can supply it |
 | `name` | The class. Under an owned namespace unless `from_dependency` says otherwise |
 | `from_dependency` | `group:artifact` of a declared dependency that owns the class |
 | `exported_required` + `reason` | Requests export. The build fails without explicit application approval — it never falls back to unexported |
 | `[[…view_links]]` — `scheme`, `host`, `path_prefix`, and Android's other `<data>` attributes (`port`, `mime_type`, `path`, `path_pattern`, `path_suffix`) | Generates the browser-return filter. Valid only on an exported activity; `scheme` is required, the attribute set is open (§4.4), and each may take an inline application value |
 | `[[…intent_filters]]` — `action` | One vendor-defined action, on a component that is neither exported nor carrying `view_links` |
-| **`[android.contributes.r8]`** §6.9 | |
+| **`[android.contributes.r8]`** §6.9 — *union*, non-exclusive; **free** | |
 | `keep_classes` | Class patterns the shrinker must keep; the consumer generates the `-keep` rules itself. Each must fall within an owned namespace |
 | `[[…r8.keep]]` — `pattern`, `from_dependency` | Keeps a *dependency's* classes instead. Checked against what the resolved artifact actually contains, since a Maven group ID need not match the Java packages inside it |
 | **`[ios]`** §7.1 | |
 | `swift_symbol_prefixes` | Prefixes the producer puts on its Swift type names. Guidance only — nothing enforces it, and it does not cover file-scope functions or extension members |
-| **`[ios.requires]`** §7.2 | |
+| **`[ios.requires]`** §7.2 — *floor* | |
 | `deployment_target` | Minimum iOS version the producer needs. A floor: the build fails if the application targets lower, and the consumer never raises it |
-| **`[ios.requires.*]` — prerequisites** §7.3 | Every entry takes `reason` (**required**) and `conditional` (optional). Unconditional and unsatisfied fails the build; conditional and unsatisfied is recorded |
-| `[[…entitlements]]` — `key` | Satisfied by the key's presence; v1 does not model its value |
-| `[[…usage_descriptions]]` — `key` | The application writes the sentence; §7.6 rejects one offered as a contribution |
-| `[[…app_extensions]]` — `id`, `kind` | `kind` is an Apple extension point identifier, snake-cased; the set is open (§4.4). The application builds the target and acknowledges this `id`, since one target cannot be assumed to serve two producers |
-| `[[…application_files]]` — `name` | A file the SDK reads from the bundle. Declare only when no programmatic path exists |
-| `[[…url_schemes]]` — `id` | Says the application must register a URL scheme and forward the callback. `id` names the requirement, not the scheme — the application chooses that — so a package may declare several |
-| `[[…plist_capabilities]]` — `key`, `value` | An `Info.plist` key that grants a capability or restricts installation. A closed list, given in §7.6, which rejects the same keys as contributions |
-| **`[[ios.contributes.swift_packages]]`** §7.4 | |
+| **`[ios.requires.*]` — prerequisites** §7.3 — **application-only** throughout; modes per table below | Every entry takes `reason` (**required**) and `conditional` (optional). Unconditional and unsatisfied fails the build; conditional and unsatisfied is recorded |
+| `[[…entitlements]]` — `key` | *presence*. Satisfied by the key's presence; v1 does not model its value |
+| `[[…usage_descriptions]]` — `key` | *supplied value*. The application writes the sentence; §7.6 rejects one offered as a contribution |
+| `[[…app_extensions]]` — `id`, `kind` | *presence* **and** *acknowledgement*. `kind` is an Apple extension point identifier, snake-cased; the set is open (§4.4). The application builds the target and acknowledges this `id`, since one target cannot be assumed to serve two producers |
+| `[[…application_files]]` — `name` | *presence*. A file the SDK reads from the bundle. Declare only when no programmatic path exists |
+| `[[…url_schemes]]` — `id` | *acknowledgement*. Says the application must register a URL scheme and forward the callback. `id` names the requirement, not the scheme — the application chooses that — so a package may declare several |
+| `[[…plist_capabilities]]` — `key`, `value` | *presence*. An `Info.plist` key that grants a capability or restricts installation. A closed list, given in §7.6, which rejects the same keys as contributions |
+| **`[[ios.contributes.swift_packages]]`** §7.4 — *delegate to the resolver*; **free** | |
 | `name` | Local handle, unique within the sidecar; §7.7 and §7.3 refer to packages by it |
 | `url`, `products` | The repository, and which of its products to link |
 | `requirement` | Exactly one of `{ exact }`, `{ from }`, `{ revision }`. `branch` is invalid |
-| **`[ios.contributes.src]`** §7.5 | |
+| **`[ios.contributes.src]`** §7.5 — no merge rule: §7.1 has nothing to enforce; **free** | |
 | `swift` | Directories of `.swift` staged into the application target. For small shims only |
-| **`[ios.contributes.info_plist]`** §7.6 | |
+| **`[ios.contributes.info_plist]`** §7.6 — `values` is a *unique key with a value*, `append` and `skadnetwork_identifiers` are *union*; **free**, less the keys §7.6 rejects as **application-only** | |
 | `values` | Scalar keys set verbatim. Collisions fail; `*UsageDescription` keys are rejected |
 | `append` | Array keys merged with the application's and other producers', de-duplicated |
 | `skadnetwork_identifiers` | Ad network identifiers, lowercase and ending `.skadnetwork`. The consumer renders `SKAdNetworkItems` from them; offering that key through `values` or `append` is rejected |
-| **`[[ios.contributes.python_modules]]`** §7.7 | |
+| **`[[ios.contributes.python_modules]]`** §7.7 — *exclusive claim* on the module name; **free** | |
 | `name` | The name Python imports. A single ASCII identifier, no dots |
 | `swift_package` | A package the same sidecar declares, which implements the module |
 | `init` | Optional initialization symbol; defaults to `PyInit_<name>` |

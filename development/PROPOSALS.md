@@ -83,7 +83,7 @@ motivating example is a hypothesis; a proposal with several is a finding.
 | P25 | iOS URL schemes — a `view_links` counterpart | T2, T3 | Stripe |
 | P26 | Entitlements that carry values | T5, B3 | Stripe, PyOneSignal, PyCoreLocation |
 | P27 | Repository credentials, and keeping them out of the record | M2 | Mapbox |
-| P34 | The factoring pass — **narrowed**: two Appendix D columns | the growth law | [SURVEY.md](SURVEY.md), 15 findings |
+| P34 | ~~The factoring pass~~ **adopted narrowed** — §2.4 + Appendix D | the growth law | [SURVEY.md](SURVEY.md), 15 findings |
 | P35 | ~~The host contract — a requirement the **consumer** satisfies~~ **withdrawn** | N10 | Stripe |
 | P36 | ~~Close the escape hatch, and say why~~ **landed** | all of SURVEY.md | Cordova, Expo |
 
@@ -1765,11 +1765,35 @@ rather than about missing vocabulary.
 > Three of the four amended the finding they tested, and two new ones (FB3,
 > FB4) appeared that reading documentation had not produced. **P35 has since
 > been withdrawn**, with §2.3 landing its requirement as a consumer obligation.
-> **P34 remains undecided**, narrowed after Experiment 1 to two columns on
-> Appendix D — with the authority-class column, not the pattern columns, as
-> the reason to adopt it.
+> **P34 is adopted**, narrowed after Experiment 1 — with the authority class,
+> not the patterns, as the reason. Round five is closed.
 
-## P34 — The factoring pass *(NARROWED after Experiment 1; still undecided)*
+## P34 — The factoring pass *(DECIDED: adopted narrowed, §2.4 + Appendix D)*
+
+> **Decision.** Adopted in the narrowed form below. §2.4 defines the five
+> satisfaction modes, the four merge rules and the four authority classes;
+> Appendix D names each table's pattern and class; §4.4's open-vocabulary
+> rationale now points at the classes rather than re-deriving the judgment.
+>
+> **Two deviations from the drafted proposal, both found while writing it.**
+> The classification is a property of the **table**, not of a key — every key in
+> §6.3 shares one mode — so two columns would have repeated the same value down
+> every row. It lands on the group header instead, which is smaller and reads
+> better. And the definitions went to **§2.4** rather than beside Appendix D,
+> because §4.4 leans on the concept and comes first: an appendix definition
+> would have been a backward reference from the rule that needs it.
+>
+> **Adopted for the class column, not the pattern columns.** Experiment 1
+> established that naming a pattern saves a specification author work and saves
+> a consumer none. What justifies the section is §4.4: opening a vocabulary is
+> safe only where a value does not select behaviour the consumer performs, that
+> judgment was made three times by hand in one week, and recording it per key is
+> what stops the fourth being made wrong.
+>
+> **The decision rule stands.** If drafting Batch 2's first two tables surfaces
+> no inconsistency this classification would have caught — as the pass caught
+> §7.6's missing application-wins rule — it is decoration, and §2.4 should be
+> dropped rather than maintained.
 
 **The problem is the growth law, not the decomposition.** Sort SURVEY.md's
 twenty-one findings by what each costs the *model*:
