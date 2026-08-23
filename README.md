@@ -190,9 +190,12 @@ Three properties follow from that, and they are the reason for the design:
 | Prebuilt `.aar` **embedded in the wheel** | Carries its own `AndroidManifest.xml`, which merges into the app's — a binary nobody reviews contributing permissions and exported components. (A *declared Maven coordinate* resolving to an `.aar` is in scope: it arrives through Gradle, locked and surfaced in the report.) |
 | Prebuilt iOS binaries **carried by the wheel** | Forces a platform tag onto an otherwise pure-Python wheel, and is opaque to this convention's source-and-provenance checks |
 | Extension modules and frameworks **shipped as binaries in wheels** | Already solved by platform-tagged wheels — [PEP 738](https://peps.python.org/pep-0738/) on Android, [PEP 730](https://peps.python.org/pep-0730/) on iOS |
-| Android resources (`res/`) | Resource names are one flat namespace per type, so no ownership rule can be built for them — a package shipping `values/strings.xml` with `app_name` would rename your app. They arrive through an `.aar` instead |
+| Android resources (`res/`) | Resource names are one flat namespace per type, so no ownership rule can be built for them — a package shipping `values/strings.xml` with `app_name` would rename your app. They arrive through an `.aar` instead. A package may still *require* one it cannot write — a notification icon, say — and point a manifest entry at it |
 | Build plugins, run-script phases, hooks | Excluded **on principle**: a sidecar is data, and nothing in it is executed. This is permanent, and it puts one whole category of SDK out of reach — see below |
-| Startup and lifecycle participation | A package cannot run code at launch or join an app-delegate callback. **Deferred, not refused**: real SDKs want it, and the shape it should take is not settled |
+| **Arbitrary manifest, `Info.plist` or build-file fragments** | The declarative form of the same capability, excluded on the same principle. A fragment cannot be collision-checked, refused per-permission, gated per-component, or diffed in a record — a package's material stops being reviewable the moment its meaning is a merge nobody computes. Cordova's `plugin.xml` is fifteen years of evidence |
+| **CocoaPods-only iOS SDKs** | Swift packages are the channel; nothing here resolves podspecs, and a second dependency channel is a larger commitment than any single vendor justifies. Google's ML Kit is the standing example |
+| Compiler and linker flags | Arbitrary build mutation. One bounded exception: a package may ask that Objective-C categories in static libraries be loaded, which is a behaviour with a name rather than a flag to pass |
+| Startup and lifecycle participation | A package cannot run code at launch or join an app-delegate callback. **Deferred, not refused**: real SDKs want it, and the shape it should take is not settled. The *declarative* route is now open, though — several vendors initialize from a manifest entry naming a class, which a package can contribute |
 
 Everything the Python packaging ecosystem already handles stays there. This
 convention covers only what wheels have no story for: the Gradle/JVM and
@@ -286,6 +289,33 @@ The other nine, and the design history behind every decision including what was
 cut back, deferred or withdrawn, are under
 [**development/**](development/): [the sidecars](development/examples/) with
 their findings, and [PROPOSALS.md](development/PROPOSALS.md).
+
+## What the survey changed
+
+The forty-SDK survey ([development/SURVEY.md](development/SURVEY.md)) produced
+twenty-one findings. Fifteen landed, three closed without a change, and three
+are deferred with a stated trigger. What a package can say grew in these places:
+
+| Added | For |
+| --- | --- |
+| iOS application values | An account identifier the SDK reads from `Info.plist` at launch — Meta's app ID, Branch's key, a Google client ID. §6.3's iOS counterpart, and the table §6.3 predicted |
+| Manifest `meta-data` a package knows the value of | Firebase's notification defaults, ML Kit's model list, a vendor's initialization flags. One key space with the values an app supplies, so a collision between the two halves fails |
+| An Android prerequisite family | A config file in `assets`, a resource the app must supply, a class the vendor fixes the path of. iOS had six such tables; Android had none |
+| Package visibility (`<queries>`) | Android 11 made it opt-in, and without it `PackageManager` answers "not installed" — silently — for everything a package's own code looks for |
+| Verified App Links | A prerequisite rather than a manifest attribute: verification is a fact about a domain, and `assetlinks.json` is the application's to host |
+| SKAdNetwork identifiers, permission attributes, manifest placeholders, core-library desugaring, Objective-C category loading | Five smaller gaps, each with more than one vendor behind it |
+
+Two things landed that are **obligations on build tools** rather than new
+declarations: a consumer that generates the app's host must make its Android
+activity a modern one and must not swallow iOS URL callbacks, and a consumer
+must detect packaging collisions between two packages' artifacts and refuse to
+pick between two native libraries on its own.
+
+Three vocabularies **opened**: where the platform owns the names — Apple's
+extension points, Android's `<data>` attributes — a package may use any of them
+and a tool rejects what it does not implement, rather than waiting for this
+document to enumerate one more. The Gradle configurations stayed closed, because
+some of those values would make the build run code.
 
 ## Getting involved
 
