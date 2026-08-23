@@ -103,6 +103,15 @@ class GradleRepository:
 
 
 @dataclass(frozen=True)
+class AccessedApiType:
+    """§7.5 — a required-reason API the contributed Swift touches."""
+
+    type: str
+    reasons: tuple[str, ...]
+    reason: str | None = None
+
+
+@dataclass(frozen=True)
 class Query:
     """§6.12 — one `<queries>` entry: a package, or a provider authority."""
 
@@ -349,6 +358,8 @@ class IosSection:
     skadnetwork_identifiers: tuple[str, ...] = ()
     #: §7.8 — link so Objective-C categories in static libraries are loaded.
     objc_categories: bool = False
+    #: §7.5 — required-reason APIs, merged into the application's manifest.
+    accessed_api_types: tuple[AccessedApiType, ...] = ()
     python_modules: tuple[PythonModule, ...] = ()
 
     def of_kind(self, kind: PrerequisiteKind) -> tuple[Prerequisite, ...]:
@@ -566,6 +577,14 @@ def build_ios(table: Mapping[str, Any]) -> IosSection:
         info_plist_append={k: tuple(v) for k, v in plist.get("append", {}).items()},
         skadnetwork_identifiers=tuple(plist.get("skadnetwork_identifiers", [])),
         objc_categories=bool(contributes.get("objc_categories", False)),
+        accessed_api_types=tuple(
+            AccessedApiType(
+                type=a["type"],
+                reasons=tuple(a["reasons"]),
+                reason=a.get("reason"),
+            )
+            for a in contributes.get("accessed_api_types", [])
+        ),
         python_modules=tuple(
             PythonModule(name=m["name"], swift_package=m["swift_package"], init=m.get("init"))
             for m in contributes.get("python_modules", [])

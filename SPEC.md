@@ -890,6 +890,7 @@ platforms = ["android", "ios"]   # §4.5 — optional; where the distribution wo
 [ios.contributes]                           # §7.8  objc_categories
   [[ios.contributes.swift_packages]]        # §7.4
   [ios.contributes.src]                     # §7.5  swift
+  [[ios.contributes.accessed_api_types]]    # §7.5  type, reasons
   [ios.contributes.info_plist]              # §7.6  values, append,
                                             #       skadnetwork_identifiers
   [[ios.contributes.python_modules]]        # §7.7
@@ -2439,27 +2440,8 @@ needs, and the pair is the join key — a natural platform key, so an applicatio
 that already declares `remote-notification` for its own reasons satisfies every
 producer that asked for it.
 
-The keys this applies to are a **closed list**, given in §7.6, which rejects them
-as contributions. Version 1 names two:
-
-| Key | Why it is not contributable |
-| --- | --- |
-| `UIBackgroundModes` | Grants background execution. It is a claim about what the application does when the user is not looking, it costs battery, and App Store review scrutinizes it |
-| `UIRequiredDeviceCapabilities` | **Restricts installation.** A producer adding an entry silently removes the application from devices lacking that hardware — precisely the harm §6.7 forbids by refusing to let a producer promote a feature to `required` |
-
-> Rationale. This is §2.1's rule applied to a boundary a type constraint cannot
-> draw: *when the application owns the artifact, state the need rather than
-> contributing.* A background mode written by a producer is half a requirement —
-> the handler, the battery cost and the review answer all remain the
-> application's — and §2.1 says plainly that half a requirement is worse than a
-> prerequisite naming both, because it looks finished.
->
-> The list is closed and short on purpose. Most array-valued plist keys are
-> ordinary contributions and stay that way: `LSApplicationQueriesSchemes` lets an
-> SDK ask whether a wallet application is installed, which grants the application
-> nothing and is exactly what §7.6's `append` is for. What earns a key a place
-> here is that a producer's entry changes what the application may do, or who may
-> install it.
+The keys this applies to are a **closed list**; §7.6 gives it in full, along
+with why each key earns a place on it and why the list stays short on purpose.
 
 ##### `application_values`
 
@@ -2645,6 +2627,58 @@ A producer whose Swift declares anything at file scope beyond prefixed types
 confined to its own module. In practice this is nearly every producer with more
 than a shim, which is what the SHOULD NOT above intends.
 
+**Required-reason APIs: `[[ios.contributes.accessed_api_types]]`.** Contributed
+Swift compiles into the application's target, so by Apple's rule it **is
+application code**: an SDK's own privacy manifest reports the SDK's usage, and
+nothing reports code that has no target of its own. A producer whose contributed
+source touches a required-reason API declares it here, and the consumer merges
+it into the application's `PrivacyInfo.xcprivacy`:
+
+```toml
+[[ios.contributes.accessed_api_types]]
+type = "NSPrivacyAccessedAPICategoryUserDefaults"
+reasons = ["CA92.1"]
+reason = "Caches the last selected region so the shim can restore it"
+```
+
+- This table is valid **only** where the same sidecar contributes Swift under
+  `[ios.contributes.src]`. A consumer **MUST** reject it otherwise, naming the
+  distribution and directing the producer to §7.4 — a Swift package carries its
+  own `PrivacyInfo.xcprivacy` in its resources, which is both the better answer
+  and the one Apple documents.
+- `type` and `reasons` are **Apple's canonical strings**, written exactly as
+  Apple defines them. No expansion or shorthand is defined, for §6.7's reason:
+  the vocabulary is the platform's and it changes on Apple's schedule, not this
+  specification's.
+- `reason` is **RECOMMENDED** prose. Apple's codes are opaque by design, and
+  §9's record is where an application reads what its dependencies claim.
+- Entries merge as a **union**: the application's own entries first, then each
+  distribution's in normalized distribution-name order, with the `reasons` for
+  one `type` unioned and de-duplicated. Two producers touching `UserDefaults`
+  for different reasons are both telling the truth.
+
+> Rationale, and the one thing a consumer cannot do. Apple's rule is that app
+> code declares in the app's manifest and an SDK declares in its own, and
+> contributed source falls on the first side of that line while belonging to a
+> producer the application has never read. The application author cannot know
+> that a shim touched a file timestamp; the producer cannot ship a manifest,
+> because it has no target to put one in. That gap is the whole of this table.
+>
+> **A consumer cannot verify the declaration.** Nothing here checks that the
+> declared categories match what the contributed Swift actually calls, and
+> nothing could without implementing Apple's static analysis. An omission is
+> therefore invisible at build time and surfaces as an **App Store rejection of
+> the application**, weeks later, naming an API rather than a package. Recording
+> the claim under §9 is what makes the omission attributable after the fact,
+> which is the same disclosure-in-place-of-verification §7.3 accepts for an
+> acknowledgement.
+>
+> **This is another reason to prefer §7.4.** The paragraph above says
+> contributed source is for shims and that a producer with more should ship a
+> Swift package. A package resolves this entirely — it carries its own privacy
+> manifest, declares its own APIs, and needs nothing from this table. A producer
+> weighing the two should count that.
+
 ### 7.6 Info.plist: `[ios.contributes.info_plist]`
 
 *For the `Info.plist` keys an SDK genuinely needs set — and deliberately not
@@ -2705,7 +2739,7 @@ directing the producer to §7.3's `plist_capabilities`:
 | Key | What a producer's entry would do |
 | --- | --- |
 | `UIBackgroundModes` | grant the application background execution |
-| `UIRequiredDeviceCapabilities` | remove the application from devices lacking the hardware |
+| `UIRequiredDeviceCapabilities` | **restrict installation** — silently remove the application from devices lacking that hardware, precisely the harm §6.7 forbids by refusing to let a producer promote a feature to `required` |
 
 The list is closed, and a minor revision may extend it. What puts a key on it is
 that a producer's entry **changes what the application may do, or who may install
@@ -3644,6 +3678,7 @@ key is 1.0, which is why nothing below carries a mark yet.
 | `requirement` | Exactly one of `{ exact }`, `{ from }`, `{ revision }`. `branch` is invalid |
 | **`[ios.contributes.src]`** §7.5 — no merge rule: §7.1 has nothing to enforce; **free** | |
 | `swift` | Directories of `.swift` staged into the application target. For small shims only |
+| `[[…accessed_api_types]]` — `type`, `reasons` | *union*; **disclosed**. Required-reason APIs the contributed Swift touches, merged into the application's `PrivacyInfo.xcprivacy`. Valid only alongside contributed Swift, since a §7.4 package carries its own manifest |
 | **`[ios.contributes.info_plist]`** §7.6 — `values` is a *unique key with a value*, `append` and `skadnetwork_identifiers` are *union*; **free**, less the keys §7.6 rejects as **application-only** | |
 | `values` | Scalar keys set verbatim. Collisions fail; `*UsageDescription` keys are rejected |
 | `append` | Array keys merged with the application's and other producers', de-duplicated |

@@ -249,6 +249,10 @@ def _entries(contribution: Contribution, resolution: NativeResolution) -> tuple[
         suffix = " (application override)" if meta.overridden_by_application else ""
         out.append(f"meta-data {meta.key} = {meta.value}{suffix}")
 
+    for api_type, reasons, why in contribution.accessed_api_types:
+        note = f'  ("{why}")' if why else ""
+        out.append(f"privacy-api {api_type} = {', '.join(reasons)}{note}")
+
     if contribution.objc_categories:
         out.append("objc-categories loaded at link time")
 

@@ -176,6 +176,23 @@ manifest (defensible — the codes are facts about the producer's own code), and
 a **prerequisite** for `NSPrivacyTrackingDomains`, which is a claim about what
 the application does and is the application's to make.
 
+*Narrowed, then landed.* The check that decided it: **a Swift package can carry
+its own `PrivacyInfo.xcprivacy`** in its target resources, so §7.4 and §7.7 are
+the producer's own job and never were a specification gap. What remains is
+§7.5, and Apple's own rule draws the line there — app code declares in the
+application's manifest, an SDK declares in its own, and contributed source is
+app code by that definition while belonging to a producer the application has
+never read. §7.5 now carries `accessed_api_types` for exactly that case, valid
+only alongside contributed Swift.
+
+Two things recorded rather than fixed. **`NSPrivacyTrackingDomains` is
+deferred**: it is a claim about what the *application* does, so it would be a
+prerequisite rather than a contribution, and the evidence is documentation from
+attribution vendors rather than anything a producer here has needed. The trigger
+is a producer whose own contributed code contacts a tracking domain. And
+**SwiftPM loses the privacy manifest from static `binaryTarget` XCFrameworks**
+— a real hole on the §7.4 path, but SwiftPM's to fix, not this specification's.
+
 ### N4 — Android has no `requires` family
 
 iOS has six prerequisite tables; Android has SDK floors and
@@ -595,7 +612,7 @@ outstanding.
 | **N2** SKAdNetwork ids | ~~one narrow contribution key~~ **landed** — `skadnetwork_identifiers`, with `SKAdNetworkItems` redirected to it | — | 6 |
 | **N7** fixed `meta-data` | ~~new contribution table (P3's deferred half)~~ **landed**, §6.10 — one key space with §6.3 | — | 6 |
 | **N5** component attributes | fields on §6.8 — the `provider` half **landed** (removed from the vocabulary); the attributes half is open | medium | 4 |
-| **N3** privacy manifests | contribution + prerequisite pair | large | many |
+| **N3** privacy manifests | ~~contribution + prerequisite pair~~ **landed narrowed**, §7.5 — the accessed-API half only; tracking domains deferred | — | many |
 | **N4** Android `requires` family | ~~structural: `application_files` + N9 + N20~~ **landed**, §6.11 — all three in one section | — | 5 |
 | **N9** required resources | ~~new `requires` table~~ **landed**, §6.11 — and it is the one thing §6.10 may reference | — | 6 |
 | **N10** host-activity contract | ~~new `requires` key~~ **closed** — landed as a consumer obligation, §2.3 | — | 1 |

@@ -263,12 +263,18 @@ reason = "Receives the 3D Secure redirect"
 """
 
 
-def build(tmp_path, body=SIDE, *, name="pystripe", module="pystripe._native"):
+def build(
+    tmp_path, body=SIDE, *, name="pystripe", module="pystripe._native", files=None
+):
     from native_integration import source_from_path
 
     root = tmp_path / name / module.replace(".", "/")
     root.mkdir(parents=True, exist_ok=True)
     (root / "native.toml").write_text(body, encoding="utf-8")
+    for relative, content in (files or {}).items():
+        target = root / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(content, encoding="utf-8")
     return source_from_path(root, distribution=name, version="1.0.0", module=module)
 
 
@@ -1835,6 +1841,73 @@ def test_nothing_asks_and_the_link_is_untouched(tmp_path):
         accept_current_surface=True,
     )
     assert integration.effective.objc_categories() == ()
+
+
+SHIM_A = """
+contract = "1"
+platforms = ["ios"]
+[ios.contributes.src]
+swift = ["swift"]
+
+[[ios.contributes.accessed_api_types]]
+type = "NSPrivacyAccessedAPICategoryUserDefaults"
+reasons = ["CA92.1"]
+reason = "Caches the last selected region"
+"""
+
+SHIM_B = """
+contract = "1"
+platforms = ["ios"]
+[ios.contributes.src]
+swift = ["swift"]
+
+[[ios.contributes.accessed_api_types]]
+type = "NSPrivacyAccessedAPICategoryUserDefaults"
+reasons = ["1C8F.1"]
+reason = "Reads a value the host application wrote"
+
+[[ios.contributes.accessed_api_types]]
+type = "NSPrivacyAccessedAPICategoryFileTimestamp"
+reasons = ["C617.1"]
+"""
+
+
+def test_two_shims_touching_one_api_category_both_tell_the_truth(tmp_path):
+    """§7.5 — reasons for one type union; the application's entries come first."""
+    integration = read(
+        platform=Platform.IOS,
+        closure=Closure.direct("py-shim-a", "py-shim-b"),
+        application=Application(
+            deployment_target="15.0",
+            accessed_api_types=(("NSPrivacyAccessedAPICategoryDiskSpace", ("E174.1",)),),
+        ),
+        profile=PROFILE,
+        sources=[
+            build(tmp_path, SHIM_A, name="py-shim-a", module="py_shim_a._native",
+                  files={"swift/A.swift": "// a"}),
+            build(tmp_path, SHIM_B, name="py-shim-b", module="py_shim_b._native",
+                  files={"swift/B.swift": "// b"}),
+        ],
+        accept_current_surface=True,
+    )
+    merged = dict(
+        integration.effective.accessed_api_types(
+            Application(
+                deployment_target="15.0",
+                accessed_api_types=(
+                    ("NSPrivacyAccessedAPICategoryDiskSpace", ("E174.1",)),
+                ),
+            )
+        )
+    )
+    assert merged["NSPrivacyAccessedAPICategoryUserDefaults"] == ("CA92.1", "1C8F.1")
+    assert merged["NSPrivacyAccessedAPICategoryFileTimestamp"] == ("C617.1",)
+    assert merged["NSPrivacyAccessedAPICategoryDiskSpace"] == ("E174.1",)
+    assert any(
+        "privacy-api NSPrivacyAccessedAPICategoryUserDefaults" in line
+        for distribution in integration.record.distributions
+        for line in distribution.entries
+    )
 
 
 # --- requirement coverage ---------------------------------------------------

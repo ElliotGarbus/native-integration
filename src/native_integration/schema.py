@@ -382,6 +382,16 @@ IOS = Table(
                 ),
             },
             arrays={
+                # §7.5 — Apple's canonical strings, verbatim. No expansion is
+                # defined: the vocabulary is the platform's and changes on
+                # Apple's schedule, not this specification's (§6.7's rule).
+                "accessed_api_types": Table(
+                    fields={
+                        "type": Field(nonempty_string, required=True),
+                        "reasons": Field(nonempty_string_list, required=True),
+                        "reason": Field(nonempty_string),
+                    }
+                ),
                 "swift_packages": Table(
                     fields={
                         "name": Field(nonempty_string, required=True),

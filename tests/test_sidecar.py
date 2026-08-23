@@ -828,6 +828,39 @@ info_plist_key = "UIBackgroundModes"
     assert codes == ["plist-capability-key"]
 
 
+def test_accessed_api_types_ride_with_contributed_swift(parse):
+    """§7.5 — contributed source is app code by Apple's rule, so it declares here."""
+    text = """
+contract = "1"
+[ios.contributes.src]
+swift = ["swift"]
+
+[[ios.contributes.accessed_api_types]]
+type = "NSPrivacyAccessedAPICategoryUserDefaults"
+reasons = ["CA92.1"]
+reason = "Caches the last selected region"
+"""
+    sidecar, codes, _ = parse(
+        text, platform=Platform.IOS, files={"swift/Shim.swift": "// shim"}
+    )
+    assert codes == []
+    (api,) = sidecar.ios.accessed_api_types
+    assert api.type == "NSPrivacyAccessedAPICategoryUserDefaults"
+    assert api.reasons == ("CA92.1",)
+
+
+def test_accessed_api_types_without_source_is_rejected(parse):
+    """A §7.4 package carries its own manifest and needs no declaration here."""
+    text = """
+contract = "1"
+[[ios.contributes.accessed_api_types]]
+type = "NSPrivacyAccessedAPICategoryFileTimestamp"
+reasons = ["C617.1"]
+"""
+    _, codes, _ = parse(text, platform=Platform.IOS)
+    assert codes == ["accessed-api-without-source"]
+
+
 def test_objc_categories_is_one_boolean_not_a_flag_list(parse):
     """§7.8 — the bounded exception to §11's linker-flag exclusion."""
     text = """

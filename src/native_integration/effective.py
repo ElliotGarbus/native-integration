@@ -183,6 +183,8 @@ class Contribution:
     queries: tuple[tuple[str, str], ...] = ()
     #: §7.8 — this distribution asked for Objective-C category loading.
     objc_categories: bool = False
+    #: §7.5 — required-reason APIs, as (type, reasons, reason) triples.
+    accessed_api_types: tuple[tuple[str, tuple[str, ...], str | None], ...] = ()
     source_files: tuple[str, ...] = ()
     prerequisites: tuple[PrerequisiteStatus, ...] = ()
     #: SHA-256 per integration input, keyed by normalized relative path (§9).
@@ -306,6 +308,29 @@ class EffectiveSet:
                 seen.append(identifier)
         return tuple({"SKAdNetworkIdentifier": identifier} for identifier in seen)
 
+    def accessed_api_types(
+        self, application: Application
+    ) -> tuple[tuple[str, tuple[str, ...]], ...]:
+        """§7.5 — the application's `PrivacyInfo.xcprivacy` API declarations.
+
+        A union on §7.6's ordering rule: the application's own entries first,
+        then each distribution's in normalized name order, with the reasons for
+        one type unioned. Two producers touching `UserDefaults` for different
+        reasons are both telling the truth.
+        """
+        merged: dict[str, list[str]] = {
+            api_type: list(reasons) for api_type, reasons in application.accessed_api_types
+        }
+        for contribution in sorted(
+            self.contributions, key=lambda c: normalize_name(c.distribution)
+        ):
+            for api_type, reasons, _ in contribution.accessed_api_types:
+                bucket = merged.setdefault(api_type, [])
+                for code in reasons:
+                    if code not in bucket:
+                        bucket.append(code)
+        return tuple((api_type, tuple(merged[api_type])) for api_type in sorted(merged))
+
     def objc_categories(self) -> tuple[str, ...]:
         """§7.8 — the distributions asking for category loading, in name order.
 
@@ -397,6 +422,7 @@ def _one(
     plist_append: Mapping[str, Sequence[object]] = {}
     skadnetwork: tuple[str, ...] = ()
     objc_categories = False
+    accessed_api_types: tuple[tuple[str, tuple[str, ...], str | None], ...] = ()
     plist_deliveries: list[MetaDataEntry] = []
     queries: tuple[tuple[str, str], ...] = ()
     statuses: list[PrerequisiteStatus] = []
@@ -661,6 +687,9 @@ def _one(
         plist_append = dict(ios.info_plist_append)
         skadnetwork = tuple(ios.skadnetwork_identifiers)
         objc_categories = ios.objc_categories
+        accessed_api_types = tuple(
+            (a.type, a.reasons, a.reason) for a in ios.accessed_api_types
+        )
 
     source_files = list(_staged_sources(sidecar, platform))
     inputs = _hash_inputs(sidecar, source_files)
@@ -684,6 +713,7 @@ def _one(
         info_plist_append=plist_append,
         skadnetwork_identifiers=skadnetwork,
         objc_categories=objc_categories,
+        accessed_api_types=accessed_api_types,
         plist_deliveries=tuple(plist_deliveries),
         queries=queries,
         source_files=tuple(source_files),

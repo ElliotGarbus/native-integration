@@ -91,6 +91,9 @@ class Application:
     #: application value would deliver to is the application's, kept and
     #: reported as an override, exactly as a ``<meta-data>`` key is.
     info_plist_values: Mapping[str, object] = field(default_factory=dict)
+    #: §7.5 — the application's own required-reason API declarations, which
+    #: come first in the deterministic merge order.
+    accessed_api_types: tuple[tuple[str, tuple[str, ...]], ...] = ()
     #: The application's own SKAdNetwork identifiers, which come first in the
     #: deterministic merge order of §7.6.
     skadnetwork_identifiers: tuple[str, ...] = ()

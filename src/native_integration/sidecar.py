@@ -683,6 +683,18 @@ def _check_ios(
                 name,
             )
 
+    if ios.accessed_api_types and not ios.src_swift:
+        # §7.5 — a Swift package carries its own PrivacyInfo.xcprivacy, which is
+        # both the better answer and the one Apple documents. This table exists
+        # only for source that has no target of its own.
+        bag.add(
+            rules.ACCESSED_API_WITHOUT_SOURCE,
+            "declares accessed_api_types without contributing Swift; a Swift "
+            "package (§7.4) carries its own privacy manifest and needs no "
+            "declaration here",
+            name,
+        )
+
     for identifier in ios.skadnetwork_identifiers:
         # §7.6 — a mistyped identifier does not fail; it silently matches no
         # network and loses that network's attribution, which is exactly the
