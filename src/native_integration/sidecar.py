@@ -626,7 +626,28 @@ def _check_ios(
                 name,
             )
 
+    for identifier in ios.skadnetwork_identifiers:
+        # §7.6 — a mistyped identifier does not fail; it silently matches no
+        # network and loses that network's attribution, which is exactly the
+        # quiet wrong answer this specification converts into a diagnostic.
+        if identifier != identifier.lower() or not identifier.endswith(".skadnetwork"):
+            bag.add(
+                rules.SKADNETWORK_IDENTIFIER_INVALID,
+                f"declares SKAdNetwork identifier `{identifier}`, which is not an "
+                "ad network identifier: Apple's form is lowercase and ends "
+                "`.skadnetwork`",
+                name,
+            )
+
     for key in (*ios.info_plist_values, *ios.info_plist_append):
+        if key == "SKAdNetworkItems":
+            bag.add(
+                rules.SKADNETWORK_ITEMS_KEY,
+                "contributes `SKAdNetworkItems` directly; declare the identifiers "
+                "under [ios.contributes.info_plist] skadnetwork_identifiers and let "
+                "the consumer render the dictionaries",
+                name,
+            )
         if key in schema.CAPABILITY_KEYS:
             bag.add(
                 rules.PLIST_CAPABILITY_KEY,

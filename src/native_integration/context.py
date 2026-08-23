@@ -87,6 +87,9 @@ class Application:
     #: ``Info.plist`` keys the application sets itself, whose ``append`` entries
     #: come first in the deterministic merge order of §7.6.
     info_plist_append: Mapping[str, Sequence[object]] = field(default_factory=dict)
+    #: The application's own SKAdNetwork identifiers, which come first in the
+    #: deterministic merge order of §7.6.
+    skadnetwork_identifiers: tuple[str, ...] = ()
     #: How the application answers every ``requires`` (§2.2).
     answers: AnswerSource = field(default_factory=MappingAnswers)
 

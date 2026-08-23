@@ -1383,6 +1383,56 @@ def test_a_placeholder_is_delivered_and_recorded(tmp_path):
     )
 
 
+ADS_A = """
+contract = "1"
+platforms = ["ios"]
+[ios.contributes.info_plist]
+skadnetwork_identifiers = ["su67r6k2v3.skadnetwork", "shared00id.skadnetwork"]
+"""
+
+ADS_B = """
+contract = "1"
+platforms = ["ios"]
+[ios.contributes.info_plist]
+skadnetwork_identifiers = ["shared00id.skadnetwork", "4fzdc2evr5.skadnetwork"]
+"""
+
+
+def test_skadnetwork_identifiers_merge_like_append(tmp_path):
+    """§7.6 — application first, then distributions in name order, de-duplicated.
+
+    Two mediation wrappers sharing a network is the ordinary case, not the
+    exception: the shared identifier appears once, and the dictionary shape is
+    the consumer's to render.
+    """
+    integration = read(
+        platform=Platform.IOS,
+        closure=Closure.direct("py-ads-a", "py-ads-b"),
+        application=Application(
+            deployment_target="15.0",
+            skadnetwork_identifiers=("app00000id.skadnetwork",),
+        ),
+        profile=PROFILE,
+        sources=[
+            build(tmp_path, ADS_A, name="py-ads-a", module="py_ads_a._native"),
+            build(tmp_path, ADS_B, name="py-ads-b", module="py_ads_b._native"),
+        ],
+        accept_current_surface=True,
+    )
+    items = integration.effective.skadnetwork_items(
+        Application(
+            deployment_target="15.0",
+            skadnetwork_identifiers=("app00000id.skadnetwork",),
+        )
+    )
+    assert [entry["SKAdNetworkIdentifier"] for entry in items] == [
+        "app00000id.skadnetwork",
+        "su67r6k2v3.skadnetwork",
+        "shared00id.skadnetwork",
+        "4fzdc2evr5.skadnetwork",
+    ]
+
+
 # --- requirement coverage ---------------------------------------------------
 
 

@@ -174,6 +174,8 @@ class Contribution:
     python_modules: tuple[PythonModule, ...] = ()
     info_plist_values: Mapping[str, object] = field(default_factory=dict)
     info_plist_append: Mapping[str, Sequence[object]] = field(default_factory=dict)
+    #: §7.6 — ad network identifiers; the consumer renders the dictionaries.
+    skadnetwork_identifiers: tuple[str, ...] = ()
     source_files: tuple[str, ...] = ()
     prerequisites: tuple[PrerequisiteStatus, ...] = ()
     #: SHA-256 per integration input, keyed by normalized relative path (§9).
@@ -273,6 +275,25 @@ class EffectiveSet:
             merged[key] = deduplicated
         return merged
 
+    def skadnetwork_items(self, application: Application) -> tuple[dict[str, str], ...]:
+        """§7.6 — `SKAdNetworkItems`, rendered from the declared identifiers.
+
+        Merged on `append`'s rule: the application's own entries first, then
+        each distribution's in normalized distribution-name order,
+        de-duplicated. The dictionary shape is the consumer's to render, which
+        is what keeps this a narrow primitive rather than dictionary support.
+        """
+        ordered: list[str] = list(application.skadnetwork_identifiers)
+        for contribution in sorted(
+            self.contributions, key=lambda c: normalize_name(c.distribution)
+        ):
+            ordered.extend(contribution.skadnetwork_identifiers)
+        seen: list[str] = []
+        for identifier in ordered:
+            if identifier not in seen:
+                seen.append(identifier)
+        return tuple({"SKAdNetworkIdentifier": identifier} for identifier in seen)
+
     def python_payload_exclusions(self) -> tuple[str, ...]:
         """What must not reach the device (requirement 8.14, §7.7).
 
@@ -347,6 +368,7 @@ def _one(
     python_modules: tuple[PythonModule, ...] = ()
     plist_values: Mapping[str, object] = {}
     plist_append: Mapping[str, Sequence[object]] = {}
+    skadnetwork: tuple[str, ...] = ()
     statuses: list[PrerequisiteStatus] = []
     source_files: list[str] = []
 
@@ -542,6 +564,7 @@ def _one(
         python_modules = ios.python_modules
         plist_values = dict(ios.info_plist_values)
         plist_append = dict(ios.info_plist_append)
+        skadnetwork = tuple(ios.skadnetwork_identifiers)
 
     source_files = list(_staged_sources(sidecar, platform))
     inputs = _hash_inputs(sidecar, source_files)
@@ -563,6 +586,7 @@ def _one(
         python_modules=python_modules,
         info_plist_values=plist_values,
         info_plist_append=plist_append,
+        skadnetwork_identifiers=skadnetwork,
         source_files=tuple(source_files),
         prerequisites=tuple(statuses),
         inputs=inputs,

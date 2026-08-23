@@ -801,7 +801,8 @@ platforms = ["android", "ios"]   # §4.5 — optional; where the distribution wo
 [ios.contributes]
   [[ios.contributes.swift_packages]]        # §7.4
   [ios.contributes.src]                     # §7.5  swift
-  [ios.contributes.info_plist]              # §7.6  values, append
+  [ios.contributes.info_plist]              # §7.6  values, append,
+                                            #       skadnetwork_identifiers
   [[ios.contributes.python_modules]]        # §7.7
 ```
 
@@ -2296,17 +2297,44 @@ what the application loads and is not the producer's to declare at all. A
 general form would hand producers the ability to write arbitrary structured
 application configuration for cases that keep turning out to be something else.
 
-**One key is a genuine counter-case, and version 1 cannot express it.**
+**`skadnetwork_identifiers` is the one narrower primitive that case needed.**
 `SKAdNetworkItems` is an array of single-entry dictionaries, one per ad network,
 which every advertising and mediation SDK requires and which runs to around a
 hundred entries for a mediated integration. It is producer-known, it grants the
 application nothing, and it merges by de-duplicating on the identifier — the
-shape `append` exists for, blocked by a restriction on types rather than by any
-argument about authority. The remedy is the narrower primitive named above and
-not general dictionary support: a list of identifier strings the consumer
-renders into the dictionary array. **Not expressible in v1**; anticipated as a
-minor revision (§10), and recorded here so the paragraph above is read as the
-rule it is rather than as a claim that no counter-case exists.
+shape `append` exists for, reachable only because the type restriction above
+would otherwise block it:
+
+```toml
+[ios.contributes.info_plist]
+skadnetwork_identifiers = ["su67r6k2v3.skadnetwork", "4fzdc2evr5.skadnetwork"]
+```
+
+- Each entry is an **ad network identifier**: lowercase, and ending in
+  `.skadnetwork`, which is the form Apple defines. A consumer **MUST** reject an
+  entry that is not, naming the distribution and the entry.
+- The consumer renders `SKAdNetworkItems`, one `SKAdNetworkIdentifier`
+  dictionary per identifier. A producer never writes the dictionary itself.
+- Merging follows `append` exactly: the application's own identifiers first,
+  then each distribution's in normalized distribution-name order,
+  de-duplicated.
+- A consumer **MUST** reject `SKAdNetworkItems` offered through `values` or
+  `append`, naming the distribution and directing the producer here — the same
+  redirection §7.6 already performs for usage descriptions and capability keys,
+  and for the same reason: one destination, one merge rule, one place to look.
+
+> Rationale, and why this is not the dictionary support refused above. The
+> paragraph above says a structured case is better served by a narrower
+> primitive; this is that primitive rather than an exception to the rule. What
+> makes it narrow is that the producer declares a **flat list of identifiers**
+> and the dictionary shape is the consumer's to render, so nothing here lets a
+> producer write arbitrary structure into the application's `Info.plist`.
+>
+> Validating the form is worth the two conditions it costs. A mistyped
+> identifier does not fail: it sits in the plist, matches no network, and
+> silently loses attribution for that network's installs — a quiet wrong answer
+> of exactly the kind this specification exists to convert into a build-time
+> diagnostic.
 
 ### 7.7 Python modules: `[[ios.contributes.python_modules]]`
 
@@ -3074,6 +3102,7 @@ key is 1.0, which is why nothing below carries a mark yet.
 | **`[ios.contributes.info_plist]`** §7.6 | |
 | `values` | Scalar keys set verbatim. Collisions fail; `*UsageDescription` keys are rejected |
 | `append` | Array keys merged with the application's and other producers', de-duplicated |
+| `skadnetwork_identifiers` | Ad network identifiers, lowercase and ending `.skadnetwork`. The consumer renders `SKAdNetworkItems` from them; offering that key through `values` or `append` is rejected |
 | **`[[ios.contributes.python_modules]]`** §7.7 | |
 | `name` | The name Python imports. A single ASCII identifier, no dots |
 | `swift_package` | A package the same sidecar declares, which implements the module |

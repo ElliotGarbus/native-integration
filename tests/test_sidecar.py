@@ -604,6 +604,43 @@ reason = "because"
     assert codes == ["extension-kind-unimplemented"]
 
 
+def test_skadnetwork_identifiers_are_declarable(parse):
+    """§7.6 — the narrow primitive, not dictionary support."""
+    text = """
+contract = "1"
+[ios.contributes.info_plist]
+skadnetwork_identifiers = ["su67r6k2v3.skadnetwork", "4fzdc2evr5.skadnetwork"]
+"""
+    sidecar, codes, _ = parse(text, platform=Platform.IOS)
+    assert codes == []
+    assert sidecar.ios.skadnetwork_identifiers == (
+        "su67r6k2v3.skadnetwork",
+        "4fzdc2evr5.skadnetwork",
+    )
+
+
+def test_a_malformed_skadnetwork_identifier_is_rejected(parse):
+    """A mistyped identifier otherwise matches no network, silently."""
+    text = """
+contract = "1"
+[ios.contributes.info_plist]
+skadnetwork_identifiers = ["SU67R6K2V3.skadnetwork", "4fzdc2evr5"]
+"""
+    _, codes, _ = parse(text, platform=Platform.IOS)
+    assert codes == ["skadnetwork-identifier-invalid", "skadnetwork-identifier-invalid"]
+
+
+def test_skadnetworkitems_offered_directly_is_redirected(parse):
+    """§7.6 — one destination, one merge rule, one place to look."""
+    text = """
+contract = "1"
+[ios.contributes.info_plist.append]
+SKAdNetworkItems = ["su67r6k2v3.skadnetwork"]
+"""
+    _, codes, _ = parse(text, platform=Platform.IOS)
+    assert codes == ["skadnetwork-items-key"]
+
+
 def test_a_conditional_reason_should_state_the_condition(parse):
     text = """
 contract = "1"

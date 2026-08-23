@@ -324,10 +324,11 @@ IOS = Table(
             tables={
                 "src": Table(fields={"swift": Field(string_list)}),
                 "info_plist": Table(
+                    fields={"skadnetwork_identifiers": Field(string_list)},
                     tables={
                         "values": Table(open_values=plist_value),
                         "append": Table(open_values=plist_array),
-                    }
+                    },
                 ),
             },
             arrays={
