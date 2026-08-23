@@ -601,13 +601,13 @@ outstanding.
 | **N10** host-activity contract | ~~new `requires` key~~ **closed** — landed as a consumer obligation, §2.3 | — | 1 |
 | **N8** manifest placeholders | ~~one optional field on §6.3~~ **landed** — `manifest_placeholder` | — | 2 |
 | **N18** permission attributes | ~~two optional fields on §6.7~~ **landed** — `max_sdk_version`, `never_for_location`, with a least-restrictive merge | — | 3 |
-| **N6** `<queries>` | new contribution table | small | 5 |
+| **N6** `<queries>` | ~~new contribution table~~ **landed**, §6.12 — package and provider authority; the `<intent>` form stays out | — | 5 |
 | **N17** extension kinds | ~~extend a closed vocabulary~~ **closed** — `kind` opened to Apple's identifiers, §7.3 | — | 6 |
 | **N12** desugaring | ~~one boolean under `[android.requires]`~~ **landed** — `core_library_desugaring` | — | 2 |
 | **N11** toolchain floors | ~~fields under both `requires` tables~~ **deferred**, with a trigger — see below | — | 3 |
 | **N21** §11 taxonomy | ~~documentation only~~ **landed** — §11's third build-time outcome | — | 3 |
 | **N16** CocoaPods | ~~one §11 row~~ **landed** — §11 now carries the row | — | 2 |
-| **N19** verified App Links | prerequisite form. `view_links` has since opened to Android's other `<data>` attributes, which does **not** reach `autoVerify` | medium | 4 |
+| **N19** verified App Links | ~~prerequisite form~~ **landed**, §6.11 `app_links` — acknowledgement, since verification is a fact about a domain | — | 4 |
 | **N13** configurations | ~~extend §6.5's `configuration`~~ **closed** — `api`/`compileOnly`/`runtimeOnly` added; processor configurations refused, since they run code at build time | — | — |
 | **N15** `-ObjC` | closed vocabulary; revisit §11 | medium | 3 |
 | **N14** packaging collisions | **consumer obligation**, not a declaration | medium | 3 |

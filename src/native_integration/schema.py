@@ -234,7 +234,8 @@ ANDROID = Table(
                     id=Field(nonempty_string, required=True),
                     package_suffix=Field(nonempty_string),
                     name=Field(nonempty_string),
-                )
+                ),
+                "app_links": _prerequisite(id=Field(nonempty_string, required=True))
             },
         ),
         "contributes": Table(
@@ -268,6 +269,15 @@ ANDROID = Table(
                         "groups": Field(string_list),
                         "modules": Field(string_list),
                         "credentials_required": Field(a_bool),
+                    }
+                ),
+                "queries": Table(
+                    fields={
+                        # §6.12 — exactly one target; the pairing is checked in
+                        # sidecar.py, where the diagnostic can name both fields.
+                        "package": Field(nonempty_string),
+                        "provider_authority": Field(nonempty_string),
+                        "reason": Field(nonempty_string, required=True),
                     }
                 ),
                 "meta_data": Table(

@@ -511,6 +511,62 @@ reason = "Tints the notification"
     assert codes == ["meta-data-resource-reference"]
 
 
+def test_queries_take_a_package_or_an_authority(parse):
+    """§6.12 — the two forms version 1 models."""
+    text = """
+contract = "1"
+[[android.contributes.queries]]
+package = "com.google.android.apps.healthdata"
+reason = "Health Connect availability check"
+
+[[android.contributes.queries]]
+provider_authority = "com.facebook.katana.provider.PlatformProvider"
+reason = "Detects the Facebook application for login handoff"
+"""
+    sidecar, codes, _ = parse(text)
+    assert codes == []
+    health, facebook = sidecar.android.queries
+    assert health.target == "com.google.android.apps.healthdata"
+    assert facebook.target == "com.facebook.katana.provider.PlatformProvider"
+
+
+def test_a_query_declaring_both_forms_is_rejected(parse):
+    text = """
+contract = "1"
+[[android.contributes.queries]]
+package = "com.example.app"
+provider_authority = "com.example.provider"
+reason = "because"
+"""
+    _, codes, _ = parse(text)
+    assert codes == ["query-form"]
+
+
+def test_a_query_declaring_neither_form_is_rejected(parse):
+    """Visibility of nothing, reading as though it declared something."""
+    text = """
+contract = "1"
+[[android.contributes.queries]]
+reason = "because"
+"""
+    _, codes, _ = parse(text)
+    assert codes == ["query-form"]
+
+
+def test_app_links_are_a_prerequisite_not_a_filter_attribute(parse):
+    """§6.11 — the domain is the application's, and so is assetlinks.json."""
+    text = """
+contract = "1"
+[[android.requires.app_links]]
+id = "branch_deep_links"
+reason = "Register your Branch link domain and host assetlinks.json on it"
+"""
+    sidecar, codes, _ = parse(text)
+    assert codes == []
+    (prerequisite,) = sidecar.android.prerequisites
+    assert prerequisite.kind.table == "app_links"
+
+
 # --- §6.6 repositories ------------------------------------------------------
 
 

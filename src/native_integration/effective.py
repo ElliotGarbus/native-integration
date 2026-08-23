@@ -179,6 +179,8 @@ class Contribution:
     #: §7.3 — application values delivered to `Info.plist` keys. Same shape and
     #: same coalescing rule as §6.3's `meta_data`; a different destination.
     plist_deliveries: tuple[MetaDataEntry, ...] = ()
+    #: §6.12 — `<queries>` entries, as (target, reason) pairs.
+    queries: tuple[tuple[str, str], ...] = ()
     source_files: tuple[str, ...] = ()
     prerequisites: tuple[PrerequisiteStatus, ...] = ()
     #: SHA-256 per integration input, keyed by normalized relative path (§9).
@@ -378,6 +380,7 @@ def _one(
     plist_append: Mapping[str, Sequence[object]] = {}
     skadnetwork: tuple[str, ...] = ()
     plist_deliveries: list[MetaDataEntry] = []
+    queries: tuple[tuple[str, str], ...] = ()
     statuses: list[PrerequisiteStatus] = []
     source_files: list[str] = []
 
@@ -470,6 +473,8 @@ def _one(
                     f"{prerequisite.reason}",
                     name,
                 )
+
+        queries = tuple((q.target, q.reason) for q in android.queries)
 
         for entry in android.meta_data:
             # §6.10 — one key space with §6.3's delivery, so the same override
@@ -660,6 +665,7 @@ def _one(
         info_plist_append=plist_append,
         skadnetwork_identifiers=skadnetwork,
         plist_deliveries=tuple(plist_deliveries),
+        queries=queries,
         source_files=tuple(source_files),
         prerequisites=tuple(statuses),
         inputs=inputs,
@@ -726,7 +732,7 @@ def _satisfied(prerequisite: Prerequisite, *, distribution: str, application: Ap
         return bool(prerequisite.resource_type) and answers.resource_declared(
             prerequisite.resource_type, prerequisite.key
         )
-    if kind is PrerequisiteKind.APPLICATION_CLASS:
+    if kind in (PrerequisiteKind.APPLICATION_CLASS, PrerequisiteKind.APP_LINK):
         return answers.acknowledged(distribution, prerequisite.key)
     if kind is PrerequisiteKind.APPLICATION_VALUE:
         return answers.application_value(distribution, prerequisite.key) is not None

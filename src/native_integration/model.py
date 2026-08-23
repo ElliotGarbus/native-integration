@@ -103,6 +103,19 @@ class GradleRepository:
 
 
 @dataclass(frozen=True)
+class Query:
+    """§6.12 — one `<queries>` entry: a package, or a provider authority."""
+
+    reason: str
+    package: str | None = None
+    provider_authority: str | None = None
+
+    @property
+    def target(self) -> str:
+        return self.package or self.provider_authority or ""
+
+
+@dataclass(frozen=True)
 class ContributedMetaData:
     """§6.10 — a `<meta-data>` entry whose value the producer knows."""
 
@@ -190,6 +203,8 @@ class AndroidSection:
     meta_data: tuple[ContributedMetaData, ...] = ()
     #: §6.11 — application_files, resources and application_classes.
     prerequisites: tuple[Prerequisite, ...] = ()
+    #: §6.12 — package visibility for the producer's own code.
+    queries: tuple[Query, ...] = ()
     components: tuple[Component, ...] = ()
     keep_classes: tuple[str, ...] = ()
     dependency_keeps: tuple[DependencyKeep, ...] = ()
@@ -225,6 +240,7 @@ class PrerequisiteKind(str, enum.Enum):
     ANDROID_FILE = "android:application_files"
     RESOURCE = "resources"
     APPLICATION_CLASS = "application_classes"
+    APP_LINK = "app_links"
 
     @property
     def table(self) -> str:
@@ -251,6 +267,7 @@ PRODUCER_LOCAL_IDS = (
     PrerequisiteKind.URL_SCHEME,
     PrerequisiteKind.APPLICATION_VALUE,
     PrerequisiteKind.APPLICATION_CLASS,
+    PrerequisiteKind.APP_LINK,
 )
 
 
@@ -418,6 +435,7 @@ def build_android(table: Mapping[str, Any]) -> AndroidSection:
         PrerequisiteKind.ANDROID_FILE,
         PrerequisiteKind.RESOURCE,
         PrerequisiteKind.APPLICATION_CLASS,
+        PrerequisiteKind.APP_LINK,
     ):
         for entry in requires.get(kind.table, []):
             android_prerequisites.append(
@@ -475,6 +493,14 @@ def build_android(table: Mapping[str, Any]) -> AndroidSection:
             ContributedMetaData(key=m["key"], value=m["value"], reason=m["reason"])
             for m in contributes.get("meta_data", [])
         ),
+        queries=tuple(
+            Query(
+                reason=q["reason"],
+                package=q.get("package"),
+                provider_authority=q.get("provider_authority"),
+            )
+            for q in contributes.get("queries", [])
+        ),
         components=tuple(components),
         keep_classes=tuple(r8.get("keep_classes", [])),
         dependency_keeps=tuple(
@@ -495,6 +521,7 @@ _PREREQUISITE_KEY = {
     PrerequisiteKind.ANDROID_FILE: "name",
     PrerequisiteKind.RESOURCE: "name",
     PrerequisiteKind.APPLICATION_CLASS: "id",
+    PrerequisiteKind.APP_LINK: "id",
 }
 
 

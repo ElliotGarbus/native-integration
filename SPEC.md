@@ -74,6 +74,7 @@ checklist, and §§3–7 are what it refers to.
   - [6.11 Application prerequisites](#611-application-prerequisites-androidrequires)
     - [Common rules](#common-rules)
     - [What counts as satisfied](#what-counts-as-satisfied)
+  - [6.12 Package visibility](#612-package-visibility-androidcontributesqueries)
 - [7. iOS](#7-ios)
   - [7.1 Symbol prefixes](#71-symbol-prefixes-ios)
   - [7.2 Build requirements](#72-build-requirements-iosrequires)
@@ -861,7 +862,8 @@ platforms = ["android", "ios"]   # §4.5 — optional; where the distribution wo
   [[android.requires.application_values]]   # §6.3
   [[android.requires.application_files]]    # §6.11 ─┐ prerequisites the
   [[android.requires.resources]]            # §6.11  │ application supplies
-  [[android.requires.application_classes]]  # §6.11 ─┘
+  [[android.requires.application_classes]]  # §6.11  │
+  [[android.requires.app_links]]            # §6.11 ─┘
 [android.contributes]
   [android.contributes.src]                 # §6.4  java, kotlin
   [[android.contributes.gradle_dependencies]]   # §6.5
@@ -872,6 +874,7 @@ platforms = ["android", "ios"]   # §4.5 — optional; where the distribution wo
   [android.contributes.r8]                      # §6.9  keep_classes
   [[android.contributes.r8.keep]]               # §6.9  + from_dependency
   [[android.contributes.meta_data]]             # §6.10 key, value, reason
+  [[android.contributes.queries]]               # §6.12 package | provider_authority
 
 [ios]                                       # §7.1  swift_symbol_prefixes
 [ios.requires]                              # §7.2  deployment_target
@@ -1620,11 +1623,11 @@ literal or an inline application value (§6.3), as `scheme` does.
   which is registered per-application with the identity provider.
 - The record and report of §9 **MUST** show the link data alongside the export
   (`exported activity, matching scheme ${oauth_redirect_scheme}`).
-- **Not expressible in v1**: verified App Links. `android:autoVerify` is an
+- **Not contributable**: verified App Links. `android:autoVerify` is an
   attribute of the filter rather than of `<data>`, and it requires
   `assetlinks.json` on the application's own domain — application
-  infrastructure, so a producer may state the need but not contribute it (§7.3
-  is the shape that fits, and §10 anticipates it).
+  infrastructure. A producer states the need through §6.11's `app_links`
+  instead.
 
 **Putting the pieces together.** The component, the `application_values`
 entry `scheme` refers to, and `view_links` itself are three declarations in
@@ -1773,6 +1776,40 @@ shrinking.
 > library it itself declared — a size cost, not an application-wide
 > shrink-disable.
 
+##### `app_links`
+
+An SDK whose links open the application directly — rather than through a browser
+— needs a **verified** App Link, which Android grants only when a file on the
+application's own domain says so:
+
+```toml
+[[android.requires.app_links]]
+id = "branch_deep_links"
+reason = """\
+Register your Branch link domain as a verified App Link: add an autoVerify \
+intent filter for it, and host assetlinks.json with your signing certificate \
+fingerprint at https://<domain>/.well-known/."""
+```
+
+- `id` names the requirement and is the join key. The **domain is the
+  application's**, so a producer cannot name it, and a package needing more than
+  one declares an entry each.
+- Satisfaction is **acknowledgement**.
+
+> Rationale, and why this is not a contribution. §6.8 records `android:autoVerify`
+> as not expressible, on the ground that `assetlinks.json` is application
+> infrastructure — and that is exactly what makes this a prerequisite rather
+> than a missing attribute. Verification is a fact about a **domain**, not about
+> a manifest: Android fetches the file over the network at install time, so a
+> consumer that wrote the attribute would still be waiting on something it
+> cannot see or supply.
+>
+> Acknowledgement follows from §2.4's rule. A consumer could fetch the domain's
+> file at build time, and should not: it would make builds depend on the network
+> and on whatever the domain served that minute, and it still could not verify
+> the intent filter and the fingerprint together. Half a check reported as
+> success is worse than a disclosure that says what was asked for.
+
 ### 6.10 Manifest meta-data: `[[android.contributes.meta_data]]`
 
 *For a `<meta-data>` entry whose value the **producer** knows — a vendor flag, a
@@ -1852,9 +1889,9 @@ the iOS counterpart these tables are modelled on.*
 
 #### Common rules
 
-Binding on `application_files`, `resources` and `application_classes` alike, and
-identical to §7.3's, which is why they are stated by reference rather than
-rewritten:
+Binding on `application_files`, `resources`, `application_classes` and
+`app_links` alike, and identical to §7.3's, which is why they are stated by
+reference rather than rewritten:
 
 1. `reason` is **REQUIRED**.
 2. An entry **MAY** declare `conditional = true` (default `false`), whose
@@ -1877,6 +1914,7 @@ rewritten:
 | `application_files` | …configures a file of that name for inclusion in the application's assets |
 | `resources` | …declares a resource of that type and name |
 | `application_classes` | …**explicitly acknowledges** this entry by `(distribution, id)` |
+| `app_links` | …**explicitly acknowledges** this entry by `(distribution, id)` |
 
 ##### `application_files`
 
@@ -1981,6 +2019,48 @@ extend Activity, implement IWXAPIEventHandler, and forward to the SDK."""
 > vendor sends. §7.3 makes the same judgment for `url_schemes`, for the same
 > reason, and treating the inspectable half as sufficient would prove half of
 > what was asked while reporting success.
+
+### 6.12 Package visibility: `[[android.contributes.queries]]`
+
+*For the `<queries>` entries a producer's own code needs in order to see that
+another application exists at all. Android 11 made package visibility opt-in;
+without a declaration `PackageManager` answers "not installed" for everything,
+and answers it silently.*
+
+```toml
+[[android.contributes.queries]]
+package = "com.google.android.apps.healthdata"
+reason = "Health Connect availability check; the client reports it absent without this"
+```
+
+- Exactly one of **`package`** (an application ID) or **`provider_authority`**
+  (a content provider authority) is **REQUIRED**; a consumer **MUST** reject an
+  entry declaring both or neither.
+- `reason` is **REQUIRED**. This is a producer asking what else is installed on
+  the user's device, and §9's report is where an application sees that a
+  transitive dependency does so.
+- Entries merge as a **union**: two distributions naming one package are asking
+  for the same visibility, and there is nothing to conflict over.
+
+**Not expressible in v1**: the `<intent>` form, which matches by action and data
+rather than by name. It is an intent-filter grammar, and §6.8's reasons for
+modelling stereotypes instead apply unchanged. The common case does not need it
+— resolving a browser for Custom Tabs is declared by `androidx.browser`'s own
+manifest, and arrives through §6.5 with the dependency.
+
+> Rationale, and the severity this carries. An SDK reached through §6.5 brings
+> its own `<queries>` in the `.aar`'s manifest, which AGP merges — so this table
+> is for a producer's **own** Java (§6.4) resolving an intent or checking for an
+> installed application. There the failure is silent: `PackageManager` reports
+> "not installed" rather than raising, so a wallet handoff simply never happens
+> and a Health Connect client reports the platform unavailable on every device.
+>
+> **Why there is no veto, where §6.7 has one.** A permission is user-visible,
+> policy-relevant, and refusing it leaves the application working with less. A
+> `<queries>` entry is none of those: removing it does not reduce what the
+> application may do, it makes the producer's code quietly get a wrong answer.
+> Disclosure is the whole of what the application needs here, and a suppression
+> switch would only offer a way to break a dependency invisibly.
 
 ## 7. iOS
 
@@ -3440,8 +3520,11 @@ key is 1.0, which is why nothing below carries a mark yet.
 | `[[…application_files]]` — `name` | *presence*. A file the application configures into its assets; the consumer never creates one |
 | `[[…resources]]` — `type`, `name` | *presence*. `type` is an open vocabulary (§4.4). A resource declared here is the one thing §6.10 may reference |
 | `[[…application_classes]]` — `id`, `package_suffix`, `name` | *acknowledgement*. A class the application owns at a vendor-fixed path; §2.4's rule, since the behaviour is uninspectable |
+| `[[…app_links]]` — `id` | *acknowledgement*. A verified App Link on the application's own domain, which needs `assetlinks.json` served from it |
 | **`[[android.contributes.meta_data]]`** §6.10 — *unique key with a value*, shared with §6.3's delivery; **disclosed** | |
 | `key`, `value`, `reason` | A `<meta-data>` entry the producer knows the value of. `reason` **required**; `value` is a string, integer or boolean, never a resource reference; the application's own entry wins |
+| **`[[android.contributes.queries]]`** §6.12 — *union*; **disclosed** | |
+| `package`, `provider_authority`, `reason` | Package visibility for the producer's own code. Exactly one of the first two; `reason` **required**. No veto, because removing one breaks the producer silently rather than reducing what the application may do |
 | **`[ios]`** §7.1 | |
 | `swift_symbol_prefixes` | Prefixes the producer puts on its Swift type names. Guidance only — nothing enforces it, and it does not cover file-scope functions or extension members |
 | **`[ios.requires]`** §7.2 — *floor* | |

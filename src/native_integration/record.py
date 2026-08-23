@@ -249,6 +249,9 @@ def _entries(contribution: Contribution, resolution: NativeResolution) -> tuple[
         suffix = " (application override)" if meta.overridden_by_application else ""
         out.append(f"meta-data {meta.key} = {meta.value}{suffix}")
 
+    for target, reason in contribution.queries:
+        out.append(f"queries {target}  (\"{reason}\")")
+
     for delivery in contribution.plist_deliveries:
         suffix = " (application override)" if delivery.overridden_by_application else ""
         out.append(f"info-plist {delivery.key} = {delivery.value}{suffix}")

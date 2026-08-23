@@ -355,6 +355,19 @@ def _check_dependencies(
     sidecar: Sidecar, android: AndroidSection, *, profile: ConsumerProfile, bag: DiagnosticBag
 ) -> None:
     name = sidecar.distribution
+    for query in android.queries:
+        # §6.12 — exactly one target. Both is ambiguous; neither declares
+        # visibility of nothing while reading as though it declared something.
+        declared = [bool(query.package), bool(query.provider_authority)]
+        if sum(declared) != 1:
+            bag.add(
+                rules.QUERY_FORM,
+                "declares a <queries> entry with "
+                + ("both `package` and `provider_authority`" if all(declared) else "neither")
+                + "; exactly one is required",
+                name,
+            )
+
     for entry in android.meta_data:
         # §6.10 — a resource reference names something the producer cannot
         # supply and the application has not been asked for; it fails in AAPT

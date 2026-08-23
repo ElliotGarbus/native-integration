@@ -1641,6 +1641,53 @@ def test_the_android_family_is_satisfied_the_way_each_table_says(tmp_path):
     assert len(integration.effective.prerequisites()) == 3
 
 
+VISIBILITY = """
+contract = "1"
+platforms = ["android"]
+[[android.contributes.queries]]
+package = "com.google.android.apps.healthdata"
+reason = "Health Connect availability check"
+
+[[android.requires.app_links]]
+id = "branch_deep_links"
+reason = "Register your Branch link domain and host assetlinks.json on it"
+"""
+
+
+def test_queries_are_recorded_and_app_links_block_until_acknowledged(tmp_path):
+    """§6.12 discloses; §6.11's app_links is acknowledgement, so it blocks first."""
+    unanswered = read(
+        platform=Platform.ANDROID,
+        closure=Closure.direct("py-branch"),
+        application=Application(android_sdk={"min_sdk": 24, "compile_sdk": 35}),
+        profile=PROFILE,
+        sources=[build(tmp_path, VISIBILITY, name="py-branch", module="py_branch._native")],
+    )
+    assert "prerequisite-unsatisfied" in [d.rule.code for d in unanswered.diagnostics]
+
+    acknowledged = read(
+        platform=Platform.ANDROID,
+        closure=Closure.direct("py-branch"),
+        application=Application(
+            android_sdk={"min_sdk": 24, "compile_sdk": 35},
+            answers=MappingAnswers(acknowledged_ids={"py-branch": ["branch_deep_links"]}),
+        ),
+        profile=PROFILE,
+        sources=[build(tmp_path, VISIBILITY, name="py-branch", module="py_branch._native")],
+        accept_current_surface=True,
+    )
+    assert [d.rule.code for d in acknowledged.diagnostics] == []
+    (contribution,) = acknowledged.effective.contributions
+    assert contribution.queries == (
+        ("com.google.android.apps.healthdata", "Health Connect availability check"),
+    )
+    assert any(
+        "queries com.google.android.apps.healthdata" in line
+        for distribution in acknowledged.record.distributions
+        for line in distribution.entries
+    )
+
+
 # --- requirement coverage ---------------------------------------------------
 
 
