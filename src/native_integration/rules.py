@@ -162,6 +162,20 @@ STRUCTURAL: dict[int, str] = {
 }
 
 
+#: Requirements this library cannot discharge, because they bind a consumer at
+#: the point where it **generates a project** — compiling contributed source,
+#: writing the application's Android activity, writing its iOS app delegate.
+#: This library reads sidecars and computes an effective set; it builds nothing.
+#: Naming them is the same discipline as :data:`ADVISORY`'s "not implemented"
+#: entries: a requirement that is silently outside a test's range is how
+#: coverage decays one addition at a time.
+BEYOND_THE_READER: dict[int, str] = {
+    27: "compiling contributed `.java` is the consumer's own build step (§6.4)",
+    28: "generating the application's Android activity (§2.3)",
+    29: "generating the application's iOS app delegate (§2.3)",
+}
+
+
 #: §8's **SHOULD** obligations, by the stable identifier the specification gives
 #: them, against the rule that discharges each — or a plain statement that this
 #: library does not. An advisory obligation quietly unimplemented is how a

@@ -560,13 +560,16 @@ for not landing the seven new tables on survey evidence alone.
 ## Suggested disposition
 
 Ordered by evidence weight, not by implementation cost. Sizes are estimates.
+A struck-through shape has **landed or closed**; what replaced it is named in
+the same cell, and the vendor count is dropped once a row is no longer
+outstanding.
 
 | Finding | Shape | Size | Vendors |
 | --- | --- | --- | --- |
 | **N1** iOS application values | new `[[ios.requires.application_values]]` | medium | 5 |
-| **N2** SKAdNetwork ids | one narrow contribution key | small | 6 |
+| **N2** SKAdNetwork ids | one narrow contribution key — **named in §7.6** as the counter-case, not yet added | small | 6 |
 | **N7** fixed `meta-data` | new contribution table (P3's deferred half) | medium | 6 |
-| **N5** component attributes | fields on §6.8; **`provider` is a defect** | medium | 4 |
+| **N5** component attributes | fields on §6.8 — the `provider` half **landed** (removed from the vocabulary); the attributes half is open | medium | 4 |
 | **N3** privacy manifests | contribution + prerequisite pair | large | many |
 | **N4** Android `requires` family | structural: `application_files` + N9 + N20 | large | 5 |
 | **N9** required resources | new `requires` table | medium | 6 |
@@ -574,13 +577,13 @@ Ordered by evidence weight, not by implementation cost. Sizes are estimates.
 | **N8** manifest placeholders | one optional field on §6.3 | **small** | 2 |
 | **N18** permission attributes | two optional fields on §6.7 | **small** | 3 |
 | **N6** `<queries>` | new contribution table | small | 5 |
-| **N17** extension kinds | extend a closed vocabulary | small | 6 |
+| **N17** extension kinds | ~~extend a closed vocabulary~~ **closed** — `kind` opened to Apple's identifiers, §7.3 | — | 6 |
 | **N12** desugaring | one boolean under `[android.requires]` | **small** | 2 |
 | **N11** toolchain floors | fields under both `requires` tables | small | 3 |
-| **N21** §11 taxonomy | documentation only | **small** | 3 |
-| **N16** CocoaPods | one §11 row, documentation only | **small** | 2 |
-| **N19** verified App Links | prerequisite form | medium | 4 |
-| **N13** configurations | extend §6.5's `configuration` | small | — |
+| **N21** §11 taxonomy | ~~documentation only~~ **landed** — §11's third build-time outcome | — | 3 |
+| **N16** CocoaPods | ~~one §11 row~~ **landed** — §11 now carries the row | — | 2 |
+| **N19** verified App Links | prerequisite form. `view_links` has since opened to Android's other `<data>` attributes, which does **not** reach `autoVerify` | medium | 4 |
+| **N13** configurations | ~~extend §6.5's `configuration`~~ **closed** — `api`/`compileOnly`/`runtimeOnly` added; processor configurations refused, since they run code at build time | — | — |
 | **N15** `-ObjC` | closed vocabulary; revisit §11 | medium | 3 |
 | **N14** packaging collisions | **consumer obligation**, not a declaration | medium | 3 |
 | **N20** application-owned class | prerequisite form | medium | 2 |

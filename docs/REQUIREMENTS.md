@@ -13,12 +13,17 @@ Severity is not the reader's invention: §8 names three outcomes — **blocking*
 in one place, so "MUST fail" cannot decay into a warning through an edit at a
 call site.
 
-Two kinds of entry:
+Three kinds of entry:
 
 - a **rule code** is a check that produces a diagnostic.
 - a **structural** entry is an obligation discharged by the shape of the API
   rather than by a check — you cannot construct a `Diagnostic` without naming a
   distribution, so requirement 8.15 has no rule and cannot be forgotten either.
+- **beyond this reader** marks an obligation that binds a consumer where it
+  *generates a project* — compiling contributed source, writing the
+  application's activity or app delegate. This library reads sidecars and
+  computes an effective set; it builds nothing, so those are named rather than
+  left as a blank a later reader would mistake for an oversight.
 
 Four requirements need something only a build tool has: a resolved dependency
 graph, an archive listing, the manifest inside a resolved `.aar`. Those are
@@ -54,9 +59,9 @@ returning a clean result.
 | 8.24 | Generate `intent_filters` only on components that are neither exported nor declaring `view_links`, and show each action in the record (§6.8). | `intent-filter-invalid` |
 | 8.25 | Fail when a repository declaring `credentials_required` has no credentials configured, and never write a supplied credential into the generated project, the record, or a diagnostic (§6.6, §9). | `repository-credentials-missing`, `secret-withheld` |
 | 8.26 | Provide a means for the application to answer every `requires`, joined to the declaration by the key §2.2 names, and accept a build-time credential by indirection rather than only as a literal in a committed file (§2.2). Reject a sidecar declaring two `app_extensions` or `url_schemes` entries under one `id`, which the application could not answer separately (§7.3). | `application-value-unsupplied`, `prerequisite-id-duplicate`, `repository-credentials-missing`<br>*structural* — answers.AnswerSource — every requires is answered under (distribution, key) |
-| 8.27 | Compile contributed `.java` sources with UTF-8 forced, never the platform default (§6.4). | — |
-| 8.28 | When it generates the application's Android activity, make it an `androidx.activity.ComponentActivity` or a subclass (§2.3). | — |
-| 8.29 | When it generates the application's iOS app delegate, provide a documented means for application code to observe a URL callback delivered to `application(_:open:options:)`, rather than consuming it (§2.3). | — |
+| 8.27 | Compile contributed `.java` sources with UTF-8 forced, never the platform default (§6.4). | *beyond this reader* — compiling contributed `.java` is the consumer's own build step (§6.4) |
+| 8.28 | When it generates the application's Android activity, make it an `androidx.activity.ComponentActivity` or a subclass (§2.3). | *beyond this reader* — generating the application's Android activity (§2.3) |
+| 8.29 | When it generates the application's iOS app delegate, provide a documented means for application code to observe a URL callback delivered to `application(_:open:options:)`, rather than consuming it (§2.3). | *beyond this reader* — generating the application's iOS app delegate (§2.3) |
 
 ## Advisory obligations (§8's SHOULD list)
 

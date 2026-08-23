@@ -34,7 +34,12 @@ from native_integration import (
     read,
 )
 from native_integration.naming import Module
-from native_integration.rules import RULES, STRUCTURAL, rules_for_requirement
+from native_integration.rules import (
+    BEYOND_THE_READER,
+    RULES,
+    STRUCTURAL,
+    rules_for_requirement,
+)
 
 PROFILE = ConsumerProfile(verify_resources=False)
 
@@ -1250,11 +1255,41 @@ def test_closure_from_installed_reports_what_it_could_not_find():
 
 
 def test_every_requirement_is_discharged_somewhere():
-    """§8 numbers 1..26. A requirement in neither table has fallen out of the library."""
+    """Every §8 requirement is discharged, structural, or named as beyond a reader.
+
+    The count comes from SPEC.md rather than a literal, because a hardcoded
+    bound does not fail when the specification grows — it quietly covers less,
+    which is how requirements 27 to 29 went unchecked.
+    """
+    import re
+    from pathlib import Path as _Path
+
+    spec = (_Path(__file__).resolve().parent.parent / "SPEC.md").read_text(encoding="utf-8")
+    block = spec.split("A conforming consumer **MUST**:")[1].split(
+        "A conforming consumer **SHOULD**:"
+    )[0]
+    numbers = sorted(int(n) for n in re.findall(r"^(\d+)\.\s", block, re.M))
+    assert numbers, "no §8 requirements found — the parse, not the library, is broken"
+    assert numbers == list(range(1, len(numbers) + 1)), "§8 is not numbered 1..N"
+
     missing = [
-        n for n in range(1, 27) if not rules_for_requirement(n) and n not in STRUCTURAL
+        n
+        for n in numbers
+        if not rules_for_requirement(n)
+        and n not in STRUCTURAL
+        and n not in BEYOND_THE_READER
     ]
     assert missing == []
+
+
+def test_nothing_claims_to_be_beyond_the_reader_and_is_not():
+    """A requirement listed as out of reach must genuinely have no rule.
+
+    Without this, BEYOND_THE_READER becomes a place to put a requirement that
+    was merely inconvenient to implement.
+    """
+    overlap = [n for n in BEYOND_THE_READER if rules_for_requirement(n) or n in STRUCTURAL]
+    assert overlap == []
 
 
 def test_every_advisory_obligation_is_accounted_for():

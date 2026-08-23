@@ -20,7 +20,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
-from native_integration.rules import ADVISORY, RULES, STRUCTURAL  # noqa: E402
+from native_integration.rules import (  # noqa: E402
+    ADVISORY,
+    BEYOND_THE_READER,
+    RULES,
+    STRUCTURAL,
+)
 
 OUTPUT = ROOT / "docs" / "REQUIREMENTS.md"
 
@@ -39,12 +44,17 @@ Severity is not the reader's invention: §8 names three outcomes — **blocking*
 in one place, so "MUST fail" cannot decay into a warning through an edit at a
 call site.
 
-Two kinds of entry:
+Three kinds of entry:
 
 - a **rule code** is a check that produces a diagnostic.
 - a **structural** entry is an obligation discharged by the shape of the API
   rather than by a check — you cannot construct a `Diagnostic` without naming a
   distribution, so requirement 8.15 has no rule and cannot be forgotten either.
+- **beyond this reader** marks an obligation that binds a consumer where it
+  *generates a project* — compiling contributed source, writing the
+  application's activity or app delegate. This library reads sidecars and
+  computes an effective set; it builds nothing, so those are named rather than
+  left as a blank a later reader would mistake for an oversight.
 
 Four requirements need something only a build tool has: a resolved dependency
 graph, an archive listing, the manifest inside a resolved `.aar`. Those are
@@ -92,6 +102,8 @@ def build() -> str:
         if number in STRUCTURAL:
             structural = f"*structural* — {STRUCTURAL[number]}"
             where = f"{where}<br>{structural}" if where else structural
+        if not where and number in BEYOND_THE_READER:
+            where = f"*beyond this reader* — {BEYOND_THE_READER[number]}"
         lines.append(f"| 8.{number} | {requirements[number]} | {where or '—'} |")
     advisory = advisory_text()
     lines.append("")
