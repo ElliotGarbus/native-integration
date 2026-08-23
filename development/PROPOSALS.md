@@ -83,7 +83,7 @@ motivating example is a hypothesis; a proposal with several is a finding.
 | P25 | iOS URL schemes — a `view_links` counterpart | T2, T3 | Stripe |
 | P26 | Entitlements that carry values | T5, B3 | Stripe, PyOneSignal, PyCoreLocation |
 | P27 | Repository credentials, and keeping them out of the record | M2 | Mapbox |
-| P34 | The factoring pass: modes, merge rules, authority classes | the growth law | [SURVEY.md](SURVEY.md), 15 findings |
+| P34 | The factoring pass — **narrowed**: two Appendix D columns | the growth law | [SURVEY.md](SURVEY.md), 15 findings |
 | P35 | ~~The host contract — a requirement the **consumer** satisfies~~ **withdrawn** | N10 | Stripe |
 | P36 | ~~Close the escape hatch, and say why~~ **landed** | all of SURVEY.md | Cordova, Expo |
 
@@ -1764,10 +1764,12 @@ rather than about missing vocabulary.
 > survey's costliest findings before any of them changes the specification.
 > Three of the four amended the finding they tested, and two new ones (FB3,
 > FB4) appeared that reading documentation had not produced. **P35 has since
-> been withdrawn**, with §2.3 landing its requirement as a consumer obligation;
-> **P34 remains undecided.**
+> been withdrawn**, with §2.3 landing its requirement as a consumer obligation.
+> **P34 remains undecided**, narrowed after Experiment 1 to two columns on
+> Appendix D — with the authority-class column, not the pattern columns, as
+> the reason to adopt it.
 
-## P34 — The factoring pass: satisfaction modes, merge rules, authority classes
+## P34 — The factoring pass *(NARROWED after Experiment 1; still undecided)*
 
 **The problem is the growth law, not the decomposition.** Sort SURVEY.md's
 twenty-one findings by what each costs the *model*:
@@ -1890,29 +1892,140 @@ keeps its value and reports the override" — and §7.6's `values` carries the s
 merge rule with the application-wins half missing. Two conforming consumers can
 diverge on an `Info.plist` key the application set itself.
 
-### The proposal
+### The experiment: does the reference reader collapse?
 
-1. **Add Appendix F: the mechanism registry.** One row per declarable table, with
-   its mode (prerequisites) or merge rule and authority class (contributions).
-   Descriptive of v1 as it stands — it must not change a single existing
-   behaviour, and if it cannot be written without changing one, this proposal is
-   wrong and should be dropped.
-2. **Require a new minor to classify.** §4.3 already makes Appendix D the
-   contract-minor registry (P31); a new key names its mode or its merge rule and
-   authority class in Appendix F at the same time. That is what turns the
-   sixteenth mechanism into a row.
-3. **Fix §7.6's missing application-wins rule** as a straight correction. *(Landed.)*
-4. **Do not rewrite §6.x and §7.x as views over the registry.** The tables stay
-   as they are. The registry is the thing that makes the *next* fifteen cheap,
-   not a reorganisation of the fourteen that exist.
+The pass above was run against the specification's **prose**, which is the
+weaker test — P28–P33 all came from an implementation disagreeing with the text.
+So the question that settles this proposal is whether
+[`src/native_integration/`](../src/native_integration/) can be re-expressed as
+five modes and four merge rules without changing a behaviour. It was run.
 
-**Cost.** One appendix and one corrected paragraph. **Risk**: a registry that
-drifts from the body is worse than none, which is why item 4 keeps the body
-normative and the registry derived, exactly as Appendix D is today.
+**It collapses conceptually, with nothing left over.** Every satisfaction path
+maps to one of the five modes, every cross-distribution check to one of the four
+rules, and no path needed a sixth of either. `effective.py` already contains the
+dispatcher this proposal imagined — keyed by kind, under the comment *"§7.3's
+satisfaction table, stated once because two readers would diverge."* The code
+also independently confirms the correction made above: `_components` and
+`_python_modules` are the same algorithm, so component names and module names
+are exclusive claims rather than unique keys with values.
+
+**Three things the code says that the prose pass did not:**
+
+1. **A prerequisite can carry a conjunction of modes.** `APP_EXTENSION` is
+   presence **and** acknowledgement, ANDed — a target of the requested kind
+   exists, *and* this producer's entry is acknowledged. A classification holding
+   one mode per table misdescribes that row.
+2. **The answerer channel differs by mode.** Floors are read from the
+   application's build configuration; every other mode goes through the answer
+   surface. Naming a mode therefore implies nothing about where the answer comes
+   from, and the two are separate facts.
+3. **"Exclusive claim" hides three different conflict predicates** — containment
+   for namespaces, equality for component and module names, set intersection
+   with an equality exemption for repository scopes. The *concept* collapses; the
+   implementations do not, because the predicate is the per-table logic.
+
+**The verdict, and what it costs this proposal.** Finding 3 is the one that
+matters. The payoff originally claimed — that a consumer implements five modes
+once and a new table then costs it nothing — is not supported: the work in a new
+table is its predicate and its join, and naming the pattern supplies neither.
+Making the classification authoritative for implementations would also mean
+turning the answer surface's eleven typed methods into about three generic ones
+keyed by an enum, with tuple joins and `object | None` returns, which trades a
+build tool's compile-time guidance for runtime failure. **The registry is for
+whoever writes the specification, not for whoever implements it.**
+
+### The proposal, narrowed
+
+1. **Two columns on Appendix D, not a new appendix.** Appendix D is already a row
+   per key and already the contract-minor registry (P31); a second registry that
+   can disagree with it is worse than none. Each declaration gains its
+   **pattern** — a satisfaction mode for a `requires`, a merge rule for a
+   `contributes` — and its **authority class**.
+2. **One definitions subsection in §2**, beside the authority model it belongs
+   to, defining the modes, the rules and the classes. Draft below.
+3. **Require a new minor to classify.** A key added by a later minor names its
+   pattern and class in Appendix D at the same time. A proposal that fits no
+   pattern is a design problem surfaced early, which is the whole benefit.
+4. **Do not rewrite §6.x and §7.x**, and do not restate the classification as an
+   obligation on consumers. The body stays normative; Appendix D stays derived
+   from it, on the tiebreak it already carries — *where this table and the body
+   differ, the body governs*.
+
+**Dropped from the original proposal:** the claim that this makes new mechanisms
+cheap for consumers (Experiment 1), and Appendix F (folded into Appendix D).
+**Landed separately:** §7.6's missing application-wins rule, which the pass
+found.
+
+### Draft: the definitions subsection
+
+**Satisfaction modes.** How a `requires` is met. An entry **MAY** carry more than
+one, met together — §7.3's `app_extensions` is presence **and** acknowledgement.
+
+| Mode | The application… | Answered through | Instances |
+| --- | --- | --- | --- |
+| **floor** | is configured at or above a value | its own build configuration | §6.2, §7.2 |
+| **supplied value** | provides a value the consumer then delivers | the consumer's configuration (§2.2) | §6.3, §7.3 `usage_descriptions`, §6.6 credentials |
+| **presence** | has configured an artifact the consumer can inspect | its own project | §7.3 `entitlements`, `application_files`, `plist_capabilities` |
+| **acknowledgement** | states it did something the consumer cannot inspect | the consumer's configuration | §7.3 `url_schemes`, and the second half of `app_extensions` |
+| **approval** | grants something the consumer then emits differently | the consumer's configuration | §6.8 `exported_required` |
+
+Suppression (§6.7) is deliberately absent: it is the application's **veto over a
+contribution**, not the satisfaction of a requirement.
+
+**Merge rules.** What happens when two distributions declare into one place.
+
+| Rule | On collision | Instances |
+| --- | --- | --- |
+| **exclusive claim** | a second claimant fails, naming both | §6.1 namespaces, §6.6 scopes (same `url` exempted), §6.8 component names, §7.7 module names |
+| **unique key with a value** | equal values coalesce; differing values fail; the application's own value wins and is reported | §6.3 `manifest_meta_data`, §7.6 `values` |
+| **union** | no collision is possible; order fixed where it could vary | §6.7 permissions and features, §7.6 `append`, §6.9 keeps |
+| **delegate to the resolver** | the platform's resolution decides; requested and resolved are both recorded | §6.5, §7.4 |
+
+What separates the first two is whether the declaration **carries a value**: two
+distributions registering one component class have nothing to compare, while two
+setting one `Info.plist` key are asking for the same thing when the values agree.
+
+**Rendering is not merging.** `view_links`, `intent_filters`, §6.9's `-keep`
+synthesis and §7.7's module registration decide what text the consumer emits from
+one declaration, before anything merges. It is rendering that removes the
+footguns those tables exist for — a hand-written filter missing `DEFAULT` — so a
+classification that folded it into a merge rule would take that away.
+
+**Authority classes.** What a producer may say about a key.
+
+| Class | Meaning | Instances |
+| --- | --- | --- |
+| **free** | contributable; grants the application nothing | §7.6 `LSApplicationQueriesSchemes` |
+| **disclosed, vetoable** | contributable, but reported and refusable | §6.7 permissions |
+| **approval-gated** | contributable only with an explicit application grant | §6.8 exported components |
+| **application-only** | never contributable; a producer may only *require* it | §7.3 throughout, §7.6's capability keys |
+
+### Why the class column is the load-bearing one
+
+§4.4 now permits a vocabulary to be **open** where the platform owns the names,
+and rests that on a judgment: open where a value names something the application
+or the platform provides, enumerated where it selects behaviour the **consumer
+performs**. That judgment was made three times by hand — `app_extensions.kind`
+opened, `view_links` opened, `configuration` kept closed because
+`annotationProcessor` runs code at build time.
+
+Made by hand each time, it will eventually be made wrong: §7.6's `append` could
+carry `UIBackgroundModes` — a capability — until P28 noticed. **The authority
+class is what turns that judgment into a per-key decision recorded once**, which
+is a different and better argument for this proposal than the one it was first
+written with. The mode and merge columns are documentation; this one is a
+precondition for opening anything else.
+
+**Cost.** Two columns and one subsection. **Risk**: a classification that drifts
+from the body, which item 4 addresses by keeping the body normative — and the
+narrower risk that a class becomes a label applied after the fact rather than a
+decision made before it.
 
 **How to falsify it.** If a mechanism from a future survey cannot be classified
-into a mode or into a merge rule plus an authority class, the framing is wrong
-and the tables are irreducibly bespoke. Forty-three SDKs produced none.
+into a mode or a merge rule plus an authority class, the framing is wrong and the
+tables are irreducibly bespoke. Forty-three SDKs and one implementation produced
+none — though Experiment 1 shows the classification describes less of a table
+than it first appeared to.
 
 ## P35 — The host contract *(DECIDED: withdrawn — §2.3 landed instead)*
 
