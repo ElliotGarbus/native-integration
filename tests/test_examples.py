@@ -173,6 +173,30 @@ MEDIATED = ROOT / "development" / "examples" / "mediated-ads"
 MEDIATED_NAMES = ("pyadmob", "pyadmob-applovin", "pyadmob-mintegral")
 
 
+APP_CONFIG = MEDIATED / "app-pyproject.toml"
+
+
+def _answers_from_the_application(platform: Platform) -> MappingAnswers:
+    """Read the application's own file, the way a consumer would read its config.
+
+    The nesting is `examplebuild`'s and illustrative; what is not illustrative
+    is that every answer is filed under (platform, distribution, key). §2.2's
+    join, read back out.
+    """
+    config = tomllib.loads(APP_CONFIG.read_text(encoding="utf-8"))
+    native = config["tool"]["examplebuild"]["native"]
+    values = {
+        distribution: per_platform[platform.value]["application_values"]
+        for distribution, per_platform in native.items()
+        if platform.value in per_platform
+        and "application_values" in per_platform[platform.value]
+    }
+    descriptions = (
+        config["tool"]["examplebuild"].get(platform.value, {}).get("usage_descriptions", {})
+    )
+    return MappingAnswers(application_values=values, usage_descriptions=descriptions)
+
+
 def _mediated(platform: Platform):
     sources = [
         source_from_path(
@@ -183,16 +207,7 @@ def _mediated(platform: Platform):
         )
         for name in MEDIATED_NAMES
     ]
-    answers = MappingAnswers(
-        application_values={
-            "pyadmob": {"admob_app_id": "ca-app-pub-0000000000000000~0000000000"},
-            "pyadmob-applovin": {"applovin_sdk_key": "applovin-key"},
-            "pyadmob-mintegral": {
-                "mintegral_app_id": "1000000",
-                "mintegral_app_key": "mintegral-key",
-            },
-        }
-    )
+    answers = _answers_from_the_application(platform)
     application = Application(
         android_sdk={"min_sdk": 24, "compile_sdk": 35},
         deployment_target="15.0",
@@ -290,7 +305,11 @@ def test_each_package_answers_its_own_vendor_key():
         for entry in contribution.meta_data
     }
     assert delivered["com.google.android.gms.ads.APPLICATION_ID"].startswith("ca-app-pub-")
-    assert delivered["applovin.sdk.key"] == "applovin-key"
+    # Whatever the application wrote, verbatim — the consumer never originates it.
+    supplied = _answers_from_the_application(Platform.ANDROID)
+    assert delivered["applovin.sdk.key"] == supplied.application_value(
+        "pyadmob-applovin", "applovin_sdk_key"
+    )
 
 
 # --- the native-runtime collision -------------------------------------------
@@ -372,3 +391,42 @@ def test_the_application_chooses_and_the_choice_is_recorded():
         if d.rule.code == "packaging-collision-resolved" and "libc++" in d.message
     ]
     assert chosen and AGORA_COORDINATE in chosen[0].message
+
+
+def test_the_application_file_answers_all_three_packages():
+    """The other half of §2.2, at N > 1.
+
+    `examples/pystripe/` answers one package; this answers three, on both
+    platforms, from the file an application would actually write. Nothing in
+    the set is left unsatisfied, which is the claim the file makes.
+    """
+    for platform in (Platform.ANDROID, Platform.IOS):
+        integration = _mediated(platform)
+        unmet = [
+            d.rule.code
+            for d in integration.diagnostics
+            if d.rule.code in ("prerequisite-unsatisfied", "application-value-unsupplied")
+        ]
+        assert unmet == [], platform
+
+
+def test_one_id_two_platforms_two_values():
+    """§2.2 — the join is scoped by platform, which two `application_values` make load-bearing.
+
+    pyadmob declares `admob_app_id` on both platforms and the AdMob console
+    issues a different ID for each. An application answering once would satisfy
+    the requirement and ship the wrong identifier on one build.
+    """
+    android = _answers_from_the_application(Platform.ANDROID)
+    ios = _answers_from_the_application(Platform.IOS)
+    on_android = android.application_value("pyadmob", "admob_app_id")
+    on_ios = ios.application_value("pyadmob", "admob_app_id")
+    assert on_android and on_ios and on_android != on_ios
+
+    # And the value each build embeds is the one for that build.
+    delivered = {
+        entry.key: entry.value
+        for contribution in _mediated(Platform.ANDROID).effective.contributions
+        for entry in contribution.meta_data
+    }
+    assert delivered["com.google.android.gms.ads.APPLICATION_ID"] == on_android

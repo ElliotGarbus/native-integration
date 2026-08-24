@@ -82,6 +82,37 @@ nobody wants every adapter. The example is evidence that the guidance describes
 something real rather than a hypothetical — and that a thin sidecar stays
 legible, which is the property that makes reviewing six of them feasible.
 
+## MA5 — the join is scoped by platform, and §2.2 did not say so *(a correction)*
+
+The set has an [`app-pyproject.toml`](app-pyproject.toml) beside it — the second
+worked application half in the repository, after `examples/pystripe/`, and the
+first answering more than one package. Writing it produced the finding that a
+sidecar could not.
+
+`pyadmob` declares `admob_app_id` in **both** §6.3 and §7.3, because the SDK
+needs one on each platform and the AdMob console issues a *different* ID for
+each. §2.2 said the join key for a producer-local `id` is the pair
+*(declaring distribution, `id`)*. Under that reading the two declarations are
+one requirement, and an application answering it once satisfies both builds
+while shipping the wrong identifier on one of them — silently, because the value
+is well-formed and the wrong account's.
+
+In practice a consumer builds one platform at a time and reads answers for that
+build, which is what `examples/pystripe/` already does by nesting under
+`.android` and `.ios`. So the behaviour was right and the **statement** was
+wrong. §2.2 now says the join is additionally scoped by platform, and gives the
+reason §6.3's rationale already had: an AdMob, Firebase or Meta application ID
+differs between platforms, which is why a single platform-neutral table was
+declined in the first place.
+
+Two smaller things came with it. §2.2's join table had gone **stale** — it was
+missing §7.3's application values, all four of §6.11's tables, and §9.1's
+packaging choice — and is now current. And the application's half turns out to
+be short: three ad packages ask for account credentials and one sentence, where
+one payment package asked for an exported component and a forwarded callback.
+The size of what an application answers tracks what its packages *do*, not how
+many of them there are.
+
 ## What this did not exercise
 
 Recorded so the next composition example is chosen against the gap rather than

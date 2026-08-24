@@ -1,0 +1,90 @@
+# The APPLICATION's pyproject.toml, for the three ad packages beside it.
+#
+# `examples/pystripe/` carries the only other one of these, and it answers a
+# single package. This answers three at once, which is what the set was written
+# for: §2.2's join keys have never been exercised at N > 1, and the surface an
+# application has to answer roughly doubled in the last round.
+#
+# ILLUSTRATIVE SPELLING. §2.2 defines the capability a consuming tool must
+# provide and deliberately not the syntax; `examplebuild` is a placeholder.
+# What is *not* illustrative is the join: every answer is filed under the
+# declaring distribution plus the key the declaration named.
+
+[project]
+name = "trailmap-ads"
+dependencies = ["pyadmob", "pyadmob-applovin", "pyadmob-mintegral"]
+
+# --- floors (§6.2, §7.2) ----------------------------------------------------
+# All three packages require min_sdk 23 and deployment_target 15.0. Floors are
+# checked, never raised: the highest floor any package declares must be met by
+# what is written here, and the build fails naming the package if it is not.
+
+[tool.examplebuild.android]
+min_sdk = 24
+compile_sdk = 35
+
+[tool.examplebuild.ios]
+deployment_target = "15.0"
+
+# --- one value per vendor (§6.3) --------------------------------------------
+# Three packages, three vendor keys, three separate answers. Nothing here is
+# shared between them: the mediation SDK needs the AdMob ID and each adapter
+# needs its own network's credentials. That is why §6.3's per-distribution
+# scoping is not strained by mediation — see NOTES.md, finding MA2.
+
+[tool.examplebuild.native.pyadmob.android.application_values]
+admob_app_id = "ca-app-pub-3940256099942544~3347511713"
+
+[tool.examplebuild.native.pyadmob-applovin.android.application_values]
+applovin_sdk_key = "kQF3nQ4hZ8k5rC7pW2mYxT1vB6dL9sJ0"
+
+[tool.examplebuild.native.pyadmob-mintegral.android.application_values]
+mintegral_app_id = "1000037"
+mintegral_app_key = "7c22942b749fe6a6e361b675e96b3ee9"
+
+# --- the same `id`, a different value (§6.3, §7.3) --------------------------
+# pyadmob declares `admob_app_id` on both platforms, because the SDK needs one
+# on each — and the AdMob console issues a *different* ID per platform. This is
+# the case §6.3's rationale gives for parallel tables rather than one
+# platform-neutral table answered once.
+#
+# So the join is (platform, distribution, id), not (distribution, id): the same
+# key under `ios` carries a different value, and neither answer would be correct
+# for the other build. Writing this file is what made that explicit — see
+# NOTES.md, finding MA5.
+
+[tool.examplebuild.native.pyadmob.ios.application_values]
+admob_app_id = "ca-app-pub-3940256099942544~1458002511"
+
+# --- a conditional prerequisite, answered (§7.3) ----------------------------
+# pyadmob declares NSUserTrackingUsageDescription as `conditional = true`:
+# required only if the application asks for App Tracking Transparency. Leaving
+# it out would not fail the build — the unresolved prerequisite would be
+# recorded instead — so supplying it is a statement that this application does
+# request tracking.
+#
+# The sentence is the application's to write. §7.3 rejects a producer offering
+# one, because it is user-facing text that App Store review reads and no library
+# can write it truthfully on the application's behalf.
+
+[tool.examplebuild.ios.usage_descriptions]
+NSUserTrackingUsageDescription = "Trailmap uses your activity to show ads for gear you might actually want."
+
+# --- what is NOT here -------------------------------------------------------
+#
+# No suppression, no export approval, no acknowledgement, no packaging choice.
+# An ads integration asks the application for account credentials and one
+# sentence, and nothing else — which is worth seeing beside pystripe, where a
+# single package needed an exported component approved and a URL callback
+# acknowledged. The size of the application's half tracks what the packages
+# actually do, not how many of them there are.
+#
+# The AD_ID permission (§6.7) is the one thing an application might want to
+# refuse here, and refusing is a line it would add rather than one it inherits:
+#
+#     [tool.examplebuild.android]
+#     suppress_permissions = ["com.google.android.gms.permission.AD_ID"]
+#
+# That is left out because this application does serve personalized ads. A
+# children's-category application would add it, and §9's report would carry the
+# suppression so the choice stays visible.

@@ -29,7 +29,7 @@ of this convention.
 | [Airship](examples/pyairship/) | round five: Android configuration | **iOS clean; Android blocked twice** — one fact, two unstateable paths |
 | [Agora](examples/pyagora/) | round five: real-time media | **calls clean; screen share blocked** on both platforms |
 | [Health Connect](examples/pyhealthconnect/) | round five: an app-owned class | **blocked** — device detection and a Play-required rationale activity |
-| [Mediated ads](examples/mediated-ads/) ×3 | round six: **composition** — three packages at once | **clean** — and two predicted stresses did not materialize |
+| [Mediated ads](examples/mediated-ads/) ×3 | round six: **composition** — three packages at once, **with the application's half** | **clean** — two predicted stresses did not materialize; the app file corrected §2.2's join |
 | [TensorFlow Lite](examples/pytflite/) | round six: composition — **a native collision** with Agora | **§9.1's first evidence**; a new gap in packaging *options*; iOS out of reach |
 
 The first four are existing packages from one toolchain lineage. Firebase,

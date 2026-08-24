@@ -251,6 +251,10 @@ which it meant.
 | The producer declares | Joined by | The application answers with |
 | --- | --- | --- |
 | `[[android.requires.application_values]]` | distribution + `id` | the value |
+| `[[android.requires.application_files]]` (§6.11) | `name` | the file, in the application's assets |
+| `[[android.requires.resources]]` (§6.11) | `type` + `name` | the resource, declared |
+| `[[android.requires.application_classes]]` (§6.11) | distribution + `id` | acknowledgement |
+| `[[android.requires.app_links]]` (§6.11) | distribution + `id` | acknowledgement |
 | a contributed permission (§6.7) | permission `name` | a suppression |
 | a component with `exported_required` (§6.8) | component `name` | approval |
 | a repository with `credentials_required` (§6.6) | repository `url` | credentials, by indirection |
@@ -260,11 +264,23 @@ which it meant.
 | `[[ios.requires.app_extensions]]` | distribution + `id` | acknowledgement, plus an extension target of that `kind` |
 | `[[ios.requires.url_schemes]]` | distribution + `id` | acknowledgement |
 | `[[ios.requires.plist_capabilities]]` | `key` + `value` | the capability, in its own `Info.plist` |
+| `[[ios.requires.application_values]]` (§7.3) | distribution + `id` | the value |
+| a packaging collision (§9.1) | the packaged `path` | which artifact supplies it |
 
 The platform supplies a natural key for some of these — an entitlement key, a
 plist key, a file name — and for the rest the producer supplies an `id`. Both
 are joined under the declaring distribution; only the source of the local part
 differs.
+
+**Every join above is additionally scoped by platform.** A consumer builds for
+one platform at a time and answers are read for that build, so one distribution
+**MAY** use the same `id` in `[[android.requires.application_values]]` and
+`[[ios.requires.application_values]]` and mean two different values. That is the
+common case rather than an edge: an AdMob application ID, a Firebase
+application ID and a Meta application ID all differ between the platforms, which
+is why §6.3 declined a single platform-neutral table. An application answering
+one `admob_app_id` for both builds would satisfy the requirement and ship the
+wrong identifier on one of them.
 
 #### Three answers, end to end
 
