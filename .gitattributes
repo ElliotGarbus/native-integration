@@ -1,0 +1,3 @@
+# The record hashes file bytes (§9), so a checkout whose line endings differ
+# from the repository produces a different record for identical content.
+* text=auto eol=lf

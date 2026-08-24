@@ -15,7 +15,7 @@
         "dependency com.google.android.gms:play-services-ads  requested [24.0.0, 25.0.0) → resolved 24.0.0"
       ],
       "inputs": {
-        "native.toml": "sha256:ef53ff68519b1a6f5e762eeba2eb77d986680cb09b7969ad15efec2aa70c3918"
+        "native.toml": "sha256:5411f15bf12890e65a018305787249d43b8baff87462594e735dd47934316ae0"
       },
       "name": "pyadmob",
       "origin": "via pyadmob-applovin, pyadmob-mintegral",
@@ -36,7 +36,7 @@
         "dependency com.google.ads.mediation:applovin  requested [13.0.0, 14.0.0) → resolved 13.0.0"
       ],
       "inputs": {
-        "native.toml": "sha256:44c097b21f394def4ff56f365099cc62e6f6ab0f4c562830ab9fa93a4291c9f7"
+        "native.toml": "sha256:cb00afc800eb24392495222acbc4f0eab0bc5e5a125ff1d6f5be7796a79e5ede"
       },
       "name": "pyadmob-applovin",
       "origin": "direct dependency",
@@ -55,7 +55,7 @@
         "REPOSITORY https://dl-maven-android.mintegral.com/repository/mbridge_android_sdk_oversea → com.mbridge.msdk.oversea"
       ],
       "inputs": {
-        "native.toml": "sha256:607044a2129e830d0b5df0bb18a040245c133d51b4dd00e790f1992354af6ef4"
+        "native.toml": "sha256:5e5727fb01bd13744740861abaa580e1e51e1983e53753e13e8e9763cdb6a78c"
       },
       "name": "pyadmob-mintegral",
       "origin": "direct dependency",

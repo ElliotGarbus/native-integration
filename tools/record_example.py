@@ -10,6 +10,11 @@ application never named, which is the case the whole convention exists for.
 
 Regenerate whenever a mediated-ads sidecar or the application file changes; the
 record is a function of both, which is the property that makes it reviewable.
+
+§9 hashes the *bytes* of each input, so a checkout whose line endings differ
+from the repository's produces a different record for identical content. That is
+correct — a sidecar ships inside a wheel, where the bytes are fixed — and it is
+why `.gitattributes` pins this repository to LF.
 """
 
 from __future__ import annotations
@@ -101,7 +106,7 @@ def main() -> int:
             if current != rendered:
                 problems.append(path.relative_to(ROOT))
             continue
-        path.write_text(rendered, encoding="utf-8")
+        path.write_text(rendered, encoding="utf-8", newline=chr(10))
         print(f"wrote {path.relative_to(ROOT)}")
 
     if problems:
