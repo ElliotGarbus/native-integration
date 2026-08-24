@@ -66,13 +66,39 @@ for what they ask of a build, with `N*` identifiers for what this specification
 cannot say. Depth found the refusals above; breadth found the missing tables.
 
 **Round five is where the two meet.** The four sidecars above were written to
-put depth behind the survey's most consequential findings before any of them is
+put depth behind the survey's most consequential findings before any of them was
 allowed to change SPEC.md — and three of the four changed the finding they were
 testing. FB2 narrowed N6 (an `.aar` merges its own `<queries>`), AG1 removed
 the hedge from N5 (a capture service is the producer's to declare, so the gap is
 not narrow), and HC2 showed §6.8's single-action stereotype does not generalize
 the way its rationale assumes. Two findings — FB3 and FB4 — appear in no survey
 at all, because they only surface when you try to write the entry.
+
+### What round five closed, and what it did not
+
+The survey's twenty-one findings resolved as fifteen landed, three closed
+without a change, and three deferred with a stated trigger. Against the four
+sidecars specifically:
+
+| Finding | Now |
+| --- | --- |
+| FB1 — three account keys with no declaration form | **closed**: §7.3's `application_values`, the table §6.3 predicted |
+| AS1, AS2 — Airship configurable by neither path | **closed**: §6.10's `meta_data` and §6.11's `application_files` |
+| AS3 — the notification icon | **closed**: §6.11's `resources`, which §6.10 may point at |
+| AS4, AG2 — rich push and screen-share extensions | **closed**: `app_extensions.kind` is an open vocabulary |
+| HC1 — device detection | **closed**: §6.12's `queries` |
+| HC2 — an application-owned class | **closed in part**: §6.11's `application_classes`; the activity-alias and its `android:permission` are not |
+| AG3 — `libc++_shared.so` twice | **closed**: §9.1, as a consumer obligation |
+| FB6 — `-ObjC` | **closed**: §7.8, §11's one bounded exception |
+| FB5 — tracking domains | **deferred**, with a trigger |
+| AG1 — `foregroundServiceType` | **open**: N5's remaining half, component attributes |
+| FB3 — `from_dependency` cannot name a transitive module | **open** |
+| FB4 — an application value cannot be derived from another | **open**, recorded as a wart with a workaround |
+
+Three of the four sidecars would now express what they could not, and the
+`native.toml` files under [`examples/`](examples/) are **not** rewritten to use
+the new tables: each records the integration as it was attempted, which is what
+makes the gap list evidence rather than illustration.
 
 > **Reading these after the fact.** Each `NOTES.md` describes SPEC.md **as it
 > stood when that example was run**. For the four PyPlatformPackages examples
@@ -104,6 +130,12 @@ evidence:
   globals and `extension Double` show exactly what §7.5 would have broken.
 
 ## What did not
+
+*Written after round one, and left standing — several of these have since been
+answered, and the record is more useful showing where the text stood than
+edited to agree with the text now. §7.7 answers the module-registration half;
+§7.3's application values, §6.10 and §6.11 answer most of the "where a value
+lives" half; startup hooks remain deferred.*
 
 The iOS half is where version 1 runs out, and the failures are structural rather
 than incidental.
@@ -190,3 +222,11 @@ Several rules that looked over-cautious on paper turned out to be load-bearing.
 The discouraging reading is that version 1 was drafted around the Android
 pyjnius shape, and the iOS Swift-module shape — which is what most of this
 organization actually ships — is largely unaddressed.
+
+**Round five reversed that second reading, and produced a new one.** Breadth
+found that the Android half had the structural hole: iOS had six prerequisite
+tables and Android had none, which is why §6.11 exists. What the two readings
+share is their cause — each round found the gaps on whichever platform the
+previous round's examples had not stressed, which is an argument about
+*selection* rather than about either platform. The next round should be chosen
+against that, not against a hunch.
