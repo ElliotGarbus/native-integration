@@ -9,11 +9,16 @@
 > design can be argued over; feedback from maintainers of other toolchains is
 > the point — see [Getting involved](#getting-involved).
 >
-> The spec has been stress-tested against **fourteen integration cases** — four
-> existing Python packages, and ten clean-sheet sidecars covering Firebase,
-> Sentry, Stripe, Mapbox, Meta, Airship, Agora and Health Connect — which
-> changed it substantially, plus a survey of forty further SDKs. See
+> The spec has been stress-tested against **eighteen integration cases** — four
+> existing Python packages, and fourteen clean-sheet sidecars covering Firebase,
+> Sentry, Stripe, Mapbox, Meta, Airship, Agora, Health Connect, TensorFlow Lite
+> and a three-package mediated-ads set — which changed it substantially, plus a
+> survey of forty further SDKs. See
 > [Tested against real packages](#tested-against-real-packages).
+>
+> **The contract is deliberately unfrozen.** Nothing here has been built into a
+> build tool or run on a device yet, and freezing before that would freeze in
+> guesses — see [What happens before a freeze](#what-happens-before-a-freeze).
 
 ## The problem
 
@@ -327,15 +332,25 @@ This is aimed at toolchains that build Python apps for mobile — among them
 [KivyForge](https://github.com/ElliotGarbus/kivyforge). A convention only one
 tool reads is not worth defining.
 
-Particularly wanted:
+Particularly wanted, most useful first:
 
-1. Is the declaration set right — what is missing, what is unnecessary? Ten
-   sidecars have been written, but every one by the same hand. **A sidecar
-   written by someone who did not write the spec** is worth more than another
-   written by someone who did — that is the reading the examples cannot give
-   themselves.
-2. Does the app-keeps-authority split land in the right place?
-3. If you maintain a build tool: is this something you would plausibly read?
+1. **A sidecar written by someone who did not write the spec.** Eighteen have
+   been written and every one by the same hand, which is the gap no further
+   example of mine can close. Pick a package you know and try to declare its
+   native half; where you get stuck is the finding.
+2. **If you maintain a build tool: could you generate the host §2.3 asks for?**
+   That clause requires a tool that generates the application's Android
+   activity to make it an `androidx.activity.ComponentActivity`, and one that
+   generates the iOS app delegate not to swallow URL callbacks. It is the only
+   place this convention makes a demand on a tool's own architecture, and the
+   cost of it is knowable only by whoever would pay it.
+3. **Does the app-keeps-authority split land in the right place?** Where the
+   application owns the artifact, a package states the need rather than writing
+   it. Most of the design follows from that line, so it is the most valuable
+   thing to disagree with.
+4. **Would you plausibly read this at all?** A convention only one tool reads is
+   not worth defining, and a clear "no, and here is why" is a better outcome
+   than silence.
 
 **[Start a discussion](https://github.com/ElliotGarbus/native-integration/discussions)**
 for anything about the design — including "I am not sure this is right" with no
@@ -344,8 +359,11 @@ Issues are for concrete defects: a rule that contradicts another, an example
 that no longer matches the specification, a requirement you could not implement.
 
 Disagreement is more useful than agreement. The specification has been through
-three rounds of external review, and each changed it substantially; the places
-it is wrong now are the places nobody has looked yet.
+six rounds of examples and a forty-SDK survey, and each changed it
+substantially; the places it is wrong now are the places nobody has looked yet.
+The contract stays unfrozen until this has been built and run —
+[what happens before a freeze](#what-happens-before-a-freeze) says in what
+order, and what would make it ready.
 
 ## The reference reader
 
@@ -404,12 +422,54 @@ different question of the same files: not whether the documents agree with each
 other, but whether all fourteen sidecars survive an implementation of the rules the
 specification states. Both run in CI on every push and pull request.
 
+## What happens before a freeze
+
+Version 1 is a draft amended in place, and it stays that way on purpose. §4.3's
+version gate exists so that a producer can declare which contract it needs and a
+consumer can reject what it cannot implement — machinery that starts mattering
+when **producers publish** against a fixed contract, not when a consumer starts
+building. A tool built against a moving draft is cheap to keep in step. A
+contract frozen before anything has been built freezes in guesses.
+
+So, in order:
+
+1. **Review from people who did not write this.** Eighteen sidecars, one hand.
+   The specific asks are in [Getting involved](#getting-involved).
+2. **A real consumer.** [KivyForge](https://github.com/ElliotGarbus/kivyforge) is
+   the intended first one. §8's thirty requirements and
+   [`docs/REQUIREMENTS.md`](docs/REQUIREMENTS.md) are what an implementer works
+   from; the reference reader shows one way to discharge them and is not the
+   only way.
+3. **Real packages, and applications that use them.** Sidecars shipped in
+   wheels, resolved by that consumer, built into an APK and an `.ipa` that runs.
+4. **Then consider a freeze.**
+
+Stages 2 and 3 are also how the open questions get answered rather than argued.
+Every deferral in [development/SURVEY.md](development/SURVEY.md) carries a
+trigger that only a real build can pull: a toolchain floor a consumer genuinely
+cannot meet, a second vendor needing a packaging option, a producer whose own
+code contacts a tracking domain. And §2.3's host obligation lands directly on
+whichever toolchain implements first — the cost of it is knowable only by trying.
+
+**What would make it ready**, so the decision is a check rather than a judgement
+call:
+
+- **Two consumers read one sidecar and agree** — the point at which "conforming"
+  means something. One implementation cannot demonstrate it.
+- **A sidecar authored outside this repository**, by someone who read the spec
+  rather than wrote it.
+- **One integration on a device.** Nothing here has ever been run: twenty
+  sidecars, two hundred tests, zero installed applications.
+- **A round that finds no new table.** Each round so far has added
+  capability; the signal to stop is a round that produces only corrections.
+
 ## Planned
 
 - A conformance test suite any consumer can run against itself. The reference
   reader is the start of one — its rule registry is the list of behaviours a
   suite would have to check — but a suite has to be runnable against a *tool*
-  rather than against this library.
+  rather than against this library. It is also what makes the first exit
+  criterion above checkable.
 
 ## License
 
