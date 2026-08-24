@@ -1,0 +1,56 @@
+# pyadmob-mintegral — HYPOTHETICAL. The Mintegral mediation adapter, chosen as
+# the third package because Mintegral is the adapter in this set that does not
+# publish to Maven Central. It is what puts §6.6 into a composition.
+
+contract = "1"
+platforms = ["android", "ios"]
+
+# ---------------------------------------------------------------- Android ---
+
+[android.requires]
+min_sdk = 23
+compile_sdk = 35
+
+[[android.requires.application_values]]
+id = "mintegral_app_id"
+reason = "Your Mintegral application ID, from the Mintegral dashboard"
+
+[[android.requires.application_values]]
+id = "mintegral_app_key"
+reason = "Your Mintegral application key, issued beside the application ID"
+
+[[android.contributes.gradle_repositories]]
+url = "https://dl-maven-android.mintegral.com/repository/mbridge_android_sdk_oversea"
+reason = """\
+Mintegral does not publish its Android SDK to Maven Central; the adapter's \
+transitive dependency resolves only from this repository. No credential is \
+needed."""
+groups = ["com.mbridge.msdk.oversea"]
+
+[[android.contributes.gradle_dependencies]]
+module = "com.google.ads.mediation:mintegral"
+version = { at_least = "16.9.0", below = "17.0.0" }
+
+[[android.contributes.permissions]]
+name = "android.permission.INTERNET"
+reason = "Ad requests to the Mintegral network"
+
+# -------------------------------------------------------------------- iOS ---
+
+[ios.requires]
+deployment_target = "15.0"
+
+[[ios.contributes.swift_packages]]
+name = "MintegralAdapter"
+url = "https://github.com/googleads/googleads-mobile-ios-mediation-mintegral"
+requirement = { from = "7.7.0" }
+products = ["MintegralAdapter"]
+
+[ios.contributes]
+objc_categories = true
+
+[ios.contributes.info_plist]
+skadnetwork_identifiers = [
+  "kbd757ywx3.skadnetwork",
+  "cstr6suwn9.skadnetwork",
+]

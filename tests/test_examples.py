@@ -43,7 +43,7 @@ def platforms_of(path: Path) -> list[Platform]:
 
 
 def test_the_example_set_is_not_empty():
-    assert len(EXAMPLES) == 14
+    assert len(EXAMPLES) == 17
 
 
 @pytest.mark.parametrize("path", EXAMPLES, ids=lambda p: str(p.relative_to(ROOT)))
@@ -160,3 +160,134 @@ def test_the_readme_kivmob_sidecar_is_valid(tmp_path):
     sidecar, bag = check_sidecar(source, platform=Platform.ANDROID, profile=REVIEW)
     assert sidecar is not None and bag.ok, bag.render()
     assert sidecar.android.application_values[0].id == "admob_app_id"
+
+
+# --- the mediated-ads composition -------------------------------------------
+#
+# Every other example is one producer as a direct dependency. This set is three
+# at once, which is the only way to exercise the rules whose whole justification
+# is cross-distribution — and those are the rules with the least evidence behind
+# them.
+
+MEDIATED = ROOT / "development" / "examples" / "mediated-ads"
+MEDIATED_NAMES = ("pyadmob", "pyadmob-applovin", "pyadmob-mintegral")
+
+
+def _mediated(platform: Platform):
+    sources = [
+        source_from_path(
+            MEDIATED / name,
+            distribution=name,
+            version="1.0.0",
+            module=f"{name.replace('-', '_')}._native",
+        )
+        for name in MEDIATED_NAMES
+    ]
+    answers = MappingAnswers(
+        application_values={
+            "pyadmob": {"admob_app_id": "ca-app-pub-0000000000000000~0000000000"},
+            "pyadmob-applovin": {"applovin_sdk_key": "applovin-key"},
+            "pyadmob-mintegral": {
+                "mintegral_app_id": "1000000",
+                "mintegral_app_key": "mintegral-key",
+            },
+        }
+    )
+    application = Application(
+        android_sdk={"min_sdk": 24, "compile_sdk": 35},
+        deployment_target="15.0",
+        answers=answers,
+    )
+    return read(
+        platform=platform,
+        closure=Closure.direct(*MEDIATED_NAMES),
+        application=application,
+        profile=REVIEW,
+        sources=sources,
+        resolvers=stub_resolvers(),
+        accept_current_surface=True,
+    )
+
+
+def test_three_ad_packages_compose_with_nothing_but_disclosure():
+    """The baseline: nothing conflicts, and every diagnostic is a note.
+
+    Not silence — §8's third outcome. Composing three ad packages produces a
+    contributed repository reported with the prominence §6.6 demands, and a
+    requested-versus-resolved line per dependency. Both are things a reviewer
+    should see and neither is a problem, which is exactly what NOTE is for.
+    """
+    from native_integration import Severity
+
+    for platform in (Platform.ANDROID, Platform.IOS):
+        integration = _mediated(platform)
+        louder = [d.rule.code for d in integration.diagnostics if d.rule.severity > Severity.NOTE]
+        assert louder == [], platform
+
+    android = _mediated(Platform.ANDROID)
+    codes = sorted({d.rule.code for d in android.diagnostics})
+    assert codes == ["dependency-version-substituted", "repository-contributed"]
+
+
+def test_overlapping_skadnetwork_lists_de_duplicate():
+    """§7.6 — three adapters, ~two overlaps, one entry each in the merged plist."""
+    integration = _mediated(Platform.IOS)
+    identifiers = [
+        entry["SKAdNetworkIdentifier"]
+        for entry in integration.effective.skadnetwork_items(Application())
+    ]
+    assert len(identifiers) == len(set(identifiers))
+    # cstr6suwn9 is declared by pyadmob and pyadmob-mintegral; ludvb6z3bs by
+    # pyadmob and pyadmob-applovin. Both appear once.
+    assert identifiers.count("cstr6suwn9.skadnetwork") == 1
+    assert identifiers.count("ludvb6z3bs.skadnetwork") == 1
+    assert set(identifiers) == {
+        "cstr6suwn9.skadnetwork",
+        "ludvb6z3bs.skadnetwork",
+        "4dzt52r2t5.skadnetwork",
+        "5lm9lj6jb7.skadnetwork",
+        "kbd757ywx3.skadnetwork",
+    }
+
+
+def test_objc_categories_unions_across_all_three():
+    """§7.8 — one asking is enough, and §9 names every distribution that did."""
+    integration = _mediated(Platform.IOS)
+    assert integration.effective.objc_categories() == MEDIATED_NAMES
+
+
+def test_one_meta_data_key_set_twice_to_one_value_coalesces():
+    """§6.10 — equal values coalesce; only a disagreement fails."""
+    integration = _mediated(Platform.ANDROID)
+    entries = [
+        entry
+        for contribution in integration.effective.contributions
+        for entry in contribution.meta_data
+        if entry.key == "com.google.android.gms.ads.flag.OPTIMIZE_INITIALIZATION"
+    ]
+    assert len(entries) == 2  # declared twice, agreeing
+    assert {e.value for e in entries} == {"true"}
+
+
+def test_one_permission_declared_by_three_reaches_the_manifest_once():
+    """§6.7 — the merged manifest carries one entry, however many asked."""
+    integration = _mediated(Platform.ANDROID)
+    names = [p.name for p in integration.effective.permissions()]
+    assert names.count("android.permission.INTERNET") == 1
+    assert integration.effective.permission_provenance("android.permission.INTERNET") == (
+        "pyadmob",
+        "pyadmob-applovin",
+        "pyadmob-mintegral",
+    )
+
+
+def test_each_package_answers_its_own_vendor_key():
+    """§6.3's per-distribution scoping, with three vendors in one application."""
+    integration = _mediated(Platform.ANDROID)
+    delivered = {
+        entry.key: entry.value
+        for contribution in integration.effective.contributions
+        for entry in contribution.meta_data
+    }
+    assert delivered["com.google.android.gms.ads.APPLICATION_ID"].startswith("ca-app-pub-")
+    assert delivered["applovin.sdk.key"] == "applovin-key"

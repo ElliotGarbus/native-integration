@@ -1,0 +1,57 @@
+# pyadmob-applovin — HYPOTHETICAL. The AppLovin mediation adapter, added
+# beside pyadmob. An adapter is a thin package: one dependency, one vendor key,
+# and a network identifier list that overlaps its neighbours'.
+
+contract = "1"
+platforms = ["android", "ios"]
+
+# ---------------------------------------------------------------- Android ---
+
+[android.requires]
+min_sdk = 23
+compile_sdk = 35
+
+[[android.requires.application_values]]
+id = "applovin_sdk_key"
+reason = "Your AppLovin SDK key, from the AppLovin dashboard under Account → Keys"
+manifest_meta_data = "applovin.sdk.key"
+
+[[android.contributes.gradle_dependencies]]
+module = "com.google.ads.mediation:applovin"
+version = { at_least = "13.0.0", below = "14.0.0" }
+
+[[android.contributes.permissions]]
+name = "android.permission.INTERNET"
+reason = "Ad requests to the AppLovin network"
+
+[[android.contributes.permissions]]
+name = "android.permission.ACCESS_NETWORK_STATE"
+reason = "Connectivity checks before an ad request"
+
+# Deliberately the same key and the same value as pyadmob's. §6.10 coalesces
+# equal values and keeps both provenance records; only a disagreement fails.
+[[android.contributes.meta_data]]
+key = "com.google.android.gms.ads.flag.OPTIMIZE_INITIALIZATION"
+value = true
+reason = "The adapter initializes through the same path and wants the same behaviour"
+
+# -------------------------------------------------------------------- iOS ---
+
+[ios.requires]
+deployment_target = "15.0"
+
+[[ios.contributes.swift_packages]]
+name = "AppLovinAdapter"
+url = "https://github.com/googleads/googleads-mobile-ios-mediation-applovin"
+requirement = { from = "13.0.0" }
+products = ["AppLovinAdapter"]
+
+[ios.contributes]
+objc_categories = true
+
+[ios.contributes.info_plist]
+# AppLovin's own identifier is already in pyadmob's list; the rest are not.
+skadnetwork_identifiers = [
+  "ludvb6z3bs.skadnetwork",
+  "5lm9lj6jb7.skadnetwork",
+]

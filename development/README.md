@@ -1,6 +1,6 @@
 # How the specification was tested
 
-Fourteen integrations expressed as `native.toml` sidecars while the
+Seventeen integrations expressed as `native.toml` sidecars while the
 specification was being written, with the gaps recorded beside each. The purpose
 was to find out whether version 1 had the right primitives **before** a consumer
 implemented it.
@@ -29,6 +29,7 @@ of this convention.
 | [Airship](examples/pyairship/) | round five: Android configuration | **iOS clean; Android blocked twice** — one fact, two unstateable paths |
 | [Agora](examples/pyagora/) | round five: real-time media | **calls clean; screen share blocked** on both platforms |
 | [Health Connect](examples/pyhealthconnect/) | round five: an app-owned class | **blocked** — device detection and a Play-required rationale activity |
+| [Mediated ads](examples/mediated-ads/) ×3 | round six: **composition** — three packages at once | **clean** — and two predicted stresses did not materialize |
 
 The first four are existing packages from one toolchain lineage. Firebase,
 Sentry, Stripe and Mapbox are **clean-sheet**: sidecars written against each
@@ -59,7 +60,8 @@ Proposed remedies live in [PROPOSALS.md](PROPOSALS.md). Gap identifiers are
 per-example: `A*`/`B*`/`C*` (PyOneSignal), `L*` (PyCoreLocation), `W*`
 (PyWebViews), `G*` (PyGMA), `F*` (Firebase), `S*` (Sentry), `T*` (Stripe), `M*`
 (Mapbox). Round five uses two letters, the single ones being taken: `FB*`
-(Meta), `AS*` (Airship), `AG*` (Agora), `HC*` (Health Connect).
+(Meta), `AS*` (Airship), `AG*` (Agora), `HC*` (Health Connect). Round six is
+`MA*` (mediated ads).
 
 [SURVEY.md](SURVEY.md) is the other kind of evidence: forty further SDKs read
 for what they ask of a build, with `N*` identifiers for what this specification
@@ -99,6 +101,24 @@ Three of the four sidecars would now express what they could not, and the
 `native.toml` files under [`examples/`](examples/) are **not** rewritten to use
 the new tables: each records the integration as it was attempted, which is what
 makes the gap list evidence rather than illustration.
+
+**Round six is the first composition.** Every sidecar before it is one producer
+as a direct dependency, which leaves the rules whose whole justification is
+cross-distribution evidenced only by unit tests written beside the rules they
+test. [Mediated ads](examples/mediated-ads/) is three packages at once because a
+real ads integration holds three to six, so the overlaps are ordinary rather
+than contrived — and the reader composes all three in
+`tests/test_examples.py`, which is what makes the set evidence rather than
+illustration.
+
+It came out **clean**, and two of the three stresses it was chosen for turned
+out to be structurally impossible: adapters cannot contest repository scopes,
+because each vendor's repository serves that vendor's own group, and they cannot
+duplicate an application value, because each needs its own vendor's key. Both
+are arguments *for* the rules as written, arrived at by trying rather than by
+asserting. What it did not reach — packaging collisions, the permission
+attribute merge, namespace exclusivity — is recorded at the end of its NOTES so
+the next composition is chosen against the gap.
 
 > **Reading these after the fact.** Each `NOTES.md` describes SPEC.md **as it
 > stood when that example was run**. For the four PyPlatformPackages examples

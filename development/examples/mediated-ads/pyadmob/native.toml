@@ -1,0 +1,88 @@
+# pyadmob — HYPOTHETICAL. Google Mobile Ads, the mediation SDK an application
+# adds first. Two adapter sidecars sit beside this one; the point of the set is
+# what happens when all three are in one application, not what any one says.
+#
+# Versions and SKAdNetwork identifiers are illustrative, read in August 2026.
+
+contract = "1"
+platforms = ["android", "ios"]
+
+# ---------------------------------------------------------------- Android ---
+
+[android.requires]
+min_sdk = 23
+compile_sdk = 35
+
+# The legacy manifest-read case §6.3 was written for: GMA reads this before any
+# Python runs and fails at startup without it.
+[[android.requires.application_values]]
+id = "admob_app_id"
+reason = """\
+Your AdMob application ID, from the AdMob console. It is per-platform: the \
+Android and iOS consoles issue different IDs."""
+manifest_meta_data = "com.google.android.gms.ads.APPLICATION_ID"
+
+[[android.contributes.gradle_dependencies]]
+module = "com.google.android.gms:play-services-ads"
+version = { at_least = "24.0.0", below = "25.0.0" }
+
+[[android.contributes.permissions]]
+name = "android.permission.INTERNET"
+reason = "Ad requests and creative delivery"
+
+[[android.contributes.permissions]]
+name = "android.permission.ACCESS_NETWORK_STATE"
+reason = "Connectivity checks before an ad request"
+
+[[android.contributes.permissions]]
+name = "com.google.android.gms.permission.AD_ID"
+reason = """\
+Reads the advertising ID for ad personalization. Suppress it (§6.7) if your \
+application is in a children's category."""
+
+# A producer-known constant, not an application value — the case §6.10 exists
+# for. The AppLovin adapter beside this one sets the same key to the same
+# value, which is the coalescing path rather than the conflict path.
+[[android.contributes.meta_data]]
+key = "com.google.android.gms.ads.flag.OPTIMIZE_INITIALIZATION"
+value = true
+reason = "Moves ad initialization off the first frame; both mediation packages want it"
+
+# -------------------------------------------------------------------- iOS ---
+
+[ios.requires]
+deployment_target = "15.0"
+
+# The table §6.3's rationale predicted, and the reason it had to be parallel
+# rather than platform-neutral: this value is *not* the Android one.
+[[ios.requires.application_values]]
+id = "admob_app_id"
+reason = """\
+Your AdMob application ID for iOS, from the AdMob console. Different from the \
+Android ID for the same application."""
+info_plist_key = "GADApplicationIdentifier"
+
+[[ios.requires.usage_descriptions]]
+key = "NSUserTrackingUsageDescription"
+conditional = true
+reason = "Required only if you request App Tracking Transparency for personalized ads"
+
+[[ios.contributes.swift_packages]]
+name = "GoogleMobileAds"
+url = "https://github.com/googleads/swift-package-manager-google-mobile-ads"
+requirement = { from = "12.0.0" }
+products = ["GoogleMobileAds"]
+
+[ios.contributes]
+# Static libraries with Objective-C categories; without this the linker drops
+# them and the SDK dies on an unrecognized selector (§7.8).
+objc_categories = true
+
+[ios.contributes.info_plist]
+# Google's own identifier, plus the mediated networks AdMob's documentation
+# lists. Both adapters repeat some of these — the de-duplication case (§7.6).
+skadnetwork_identifiers = [
+  "cstr6suwn9.skadnetwork",
+  "ludvb6z3bs.skadnetwork",
+  "4dzt52r2t5.skadnetwork",
+]
