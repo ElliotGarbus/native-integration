@@ -1,0 +1,69 @@
+{
+  "contract": "1",
+  "distributions": [
+    {
+      "artifacts": {
+        "com.google.android.gms:play-services-ads:24.0.0": "sha256:2c609d6fb87f45b8dcbc10981718740f6a92a372f7e32b213dc08922a5709c44"
+      },
+      "contract": "1",
+      "entries": [
+        "permission android.permission.INTERNET  (\"Ad requests and creative delivery\")",
+        "permission android.permission.ACCESS_NETWORK_STATE  (\"Connectivity checks before an ad request\")",
+        "permission com.google.android.gms.permission.AD_ID  (\"Reads the advertising ID for ad personalization. Suppress it (§6.7) if your application is in a children's category.\")",
+        "meta-data com.google.android.gms.ads.APPLICATION_ID = ca-app-pub-3940256099942544~3347511713",
+        "meta-data com.google.android.gms.ads.flag.OPTIMIZE_INITIALIZATION = true",
+        "dependency com.google.android.gms:play-services-ads  requested [24.0.0, 25.0.0) → resolved 24.0.0"
+      ],
+      "inputs": {
+        "native.toml": "sha256:ef53ff68519b1a6f5e762eeba2eb77d986680cb09b7969ad15efec2aa70c3918"
+      },
+      "name": "pyadmob",
+      "origin": "via pyadmob-applovin, pyadmob-mintegral",
+      "swift": {},
+      "swift_binaries": {},
+      "version": "1.0.0"
+    },
+    {
+      "artifacts": {
+        "com.google.ads.mediation:applovin:13.0.0": "sha256:099f6466630fc68a92381c7f315aa8a85b98e20873be21c20cf485c4c0477c7d"
+      },
+      "contract": "1",
+      "entries": [
+        "permission android.permission.INTERNET  (\"Ad requests to the AppLovin network\")",
+        "permission android.permission.ACCESS_NETWORK_STATE  (\"Connectivity checks before an ad request\")",
+        "meta-data applovin.sdk.key = kQF3nQ4hZ8k5rC7pW2mYxT1vB6dL9sJ0",
+        "meta-data com.google.android.gms.ads.flag.OPTIMIZE_INITIALIZATION = true",
+        "dependency com.google.ads.mediation:applovin  requested [13.0.0, 14.0.0) → resolved 13.0.0"
+      ],
+      "inputs": {
+        "native.toml": "sha256:44c097b21f394def4ff56f365099cc62e6f6ab0f4c562830ab9fa93a4291c9f7"
+      },
+      "name": "pyadmob-applovin",
+      "origin": "direct dependency",
+      "swift": {},
+      "swift_binaries": {},
+      "version": "1.0.0"
+    },
+    {
+      "artifacts": {
+        "com.google.ads.mediation:mintegral:16.9.0": "sha256:8155458849a1d099fb150e7c7f22015616c8bd4329d8c025004b5af2f5f3ed38"
+      },
+      "contract": "1",
+      "entries": [
+        "permission android.permission.INTERNET  (\"Ad requests to the Mintegral network\")",
+        "dependency com.google.ads.mediation:mintegral  requested [16.9.0, 17.0.0) → resolved 16.9.0",
+        "REPOSITORY https://dl-maven-android.mintegral.com/repository/mbridge_android_sdk_oversea → com.mbridge.msdk.oversea"
+      ],
+      "inputs": {
+        "native.toml": "sha256:607044a2129e830d0b5df0bb18a040245c133d51b4dd00e790f1992354af6ef4"
+      },
+      "name": "pyadmob-mintegral",
+      "origin": "direct dependency",
+      "swift": {},
+      "swift_binaries": {},
+      "version": "1.0.0"
+    }
+  ],
+  "platform": "android",
+  "record": 1
+}

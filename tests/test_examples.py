@@ -430,3 +430,22 @@ def test_one_id_two_platforms_two_values():
         for entry in contribution.meta_data
     }
     assert delivered["com.google.android.gms.ads.APPLICATION_ID"] == on_android
+
+
+def test_the_worked_records_are_current():
+    """§9's record is a function of the sidecars and the application's answers.
+
+    That is the property that makes it reviewable — a `git diff` of the record
+    is the delta a reviewer reads — so the committed artifact has to be
+    regenerated when either side changes. `python3 tools/record_example.py`.
+    """
+    import sys
+
+    sys.path.insert(0, str(ROOT / "tools"))
+    import record_example
+
+    for platform in (Platform.ANDROID, Platform.IOS):
+        path = MEDIATED / f"record-{platform.value}.json"
+        assert path.read_text(encoding="utf-8") == record_example.record_for(platform), (
+            f"{path.name} has drifted; run python3 tools/record_example.py"
+        )
