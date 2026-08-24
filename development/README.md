@@ -1,6 +1,6 @@
 # How the specification was tested
 
-Seventeen integrations expressed as `native.toml` sidecars while the
+Eighteen integrations expressed as `native.toml` sidecars while the
 specification was being written, with the gaps recorded beside each. The purpose
 was to find out whether version 1 had the right primitives **before** a consumer
 implemented it.
@@ -30,6 +30,7 @@ of this convention.
 | [Agora](examples/pyagora/) | round five: real-time media | **calls clean; screen share blocked** on both platforms |
 | [Health Connect](examples/pyhealthconnect/) | round five: an app-owned class | **blocked** — device detection and a Play-required rationale activity |
 | [Mediated ads](examples/mediated-ads/) ×3 | round six: **composition** — three packages at once | **clean** — and two predicted stresses did not materialize |
+| [TensorFlow Lite](examples/pytflite/) | round six: composition — **a native collision** with Agora | **§9.1's first evidence**; a new gap in packaging *options*; iOS out of reach |
 
 The first four are existing packages from one toolchain lineage. Firebase,
 Sentry, Stripe and Mapbox are **clean-sheet**: sidecars written against each
@@ -61,7 +62,7 @@ per-example: `A*`/`B*`/`C*` (PyOneSignal), `L*` (PyCoreLocation), `W*`
 (PyWebViews), `G*` (PyGMA), `F*` (Firebase), `S*` (Sentry), `T*` (Stripe), `M*`
 (Mapbox). Round five uses two letters, the single ones being taken: `FB*`
 (Meta), `AS*` (Airship), `AG*` (Agora), `HC*` (Health Connect). Round six is
-`MA*` (mediated ads).
+`MA*` (mediated ads) and `TF*` (TensorFlow Lite).
 
 [SURVEY.md](SURVEY.md) is the other kind of evidence: forty further SDKs read
 for what they ask of a build, with `N*` identifiers for what this specification
@@ -111,7 +112,14 @@ than contrived — and the reader composes all three in
 `tests/test_examples.py`, which is what makes the set evidence rather than
 illustration.
 
-It came out **clean**, and two of the three stresses it was chosen for turned
+[TensorFlow Lite](examples/pytflite/) is the second half of that round, written
+to be composed with `pyagora` rather than read alone: both bundle a C++ runtime,
+which is the collision §9.1 was landed for and which mediated ads could not
+reach. It is also the first example to land on §11's new CocoaPods row, and it
+found a gap next door to §9.1 — a packaging *option*, `noCompress`, that one
+artifact needs and no rule reaches.
+
+Mediated ads came out **clean**, and two of the three stresses it was chosen for turned
 out to be structurally impossible: adapters cannot contest repository scopes,
 because each vendor's repository serves that vendor's own group, and they cannot
 duplicate an application value, because each needs its own vendor's key. Both

@@ -1,0 +1,40 @@
+# pytflite — HYPOTHETICAL. TensorFlow Lite, written to be composed with
+# ../pyagora/ rather than read alone: both ship a C++ runtime, which is the
+# collision §9.1 was written for and nothing had exercised.
+#
+# Android only, and not by choice — see NOTES.md, finding TF3.
+
+contract = "1"
+platforms = ["android"]
+
+[android.requires]
+min_sdk = 21
+compile_sdk = 35
+
+# The model is the application's: a binding cannot ship the weights its user
+# trained. §6.11's first Android use outside a test.
+[[android.requires.application_files]]
+name = "detector.tflite"
+reason = """\
+Your `.tflite` model, placed in the assets directory. The interpreter memory-maps \
+it by name at load time and there is no programmatic alternative that avoids \
+copying it out first."""
+
+[[android.contributes.gradle_dependencies]]
+coordinate = "org.tensorflow:tensorflow-lite:2.16.1"
+
+# The interpreter reaches its own classes reflectively; the vendor's documented
+# rule, scoped to the dependency that owns them (§6.9).
+[[android.contributes.r8.keep]]
+pattern = "org.tensorflow.lite.**"
+from_dependency = "org.tensorflow:tensorflow-lite"
+
+# ------------------------------------------------------------ NOT EXPRESSIBLE
+#
+# TF2  aaptOptions { noCompress "tflite" }. The interpreter mmaps the model
+#      straight out of the APK, which only works if AAPT left it uncompressed.
+#      A packaging *option*, not a packaging collision, so §9.1 does not reach
+#      it. Without it the model loads on some builds and fails on others.
+# TF3  The whole iOS half. TensorFlow Lite for Apple platforms is published to
+#      CocoaPods and not to Swift Package Manager, which §11 now names as an
+#      exclusion. `platforms = ["android"]` is what says so here (§4.5).

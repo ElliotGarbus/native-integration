@@ -43,7 +43,7 @@ def platforms_of(path: Path) -> list[Platform]:
 
 
 def test_the_example_set_is_not_empty():
-    assert len(EXAMPLES) == 17
+    assert len(EXAMPLES) == 18
 
 
 @pytest.mark.parametrize("path", EXAMPLES, ids=lambda p: str(p.relative_to(ROOT)))
@@ -291,3 +291,84 @@ def test_each_package_answers_its_own_vendor_key():
     }
     assert delivered["com.google.android.gms.ads.APPLICATION_ID"].startswith("ca-app-pub-")
     assert delivered["applovin.sdk.key"] == "applovin-key"
+
+
+# --- the native-runtime collision -------------------------------------------
+#
+# The mediated-ads set ends by recording what it could not reach, and §9.1's
+# packaging collisions was first on that list: ad adapters ship no native code
+# that collides. This pair does. The file listings are stubbed because the
+# reader resolves nothing from the network — what is under test is the rule and
+# its diagnostic, not that these two releases collide today.
+
+AGORA_COORDINATE = "io.agora.rtc:full-sdk:4.5.0"
+TFLITE_COORDINATE = "org.tensorflow:tensorflow-lite:2.16.1"
+SHARED_RUNTIME = "lib/arm64-v8a/libc++_shared.so"
+
+
+def _rtc_and_vision(*, choices=None):
+    from native_integration.answers import MappingAnswers as Answers
+
+    sources = [
+        source_from_path(
+            ROOT / "development" / "examples" / name,
+            distribution=name,
+            version="1.0.0",
+            module=f"{name}._native",
+        )
+        for name in ("pyagora", "pytflite")
+    ]
+    application = Application(
+        android_sdk={"min_sdk": 24, "compile_sdk": 35},
+        answers=Answers(
+            android_assets=["detector.tflite"],
+            packaging_choices=choices or {},
+        ),
+    )
+    return read(
+        platform=Platform.ANDROID,
+        closure=Closure.direct("pyagora", "pytflite"),
+        application=application,
+        profile=REVIEW,
+        sources=sources,
+        resolvers=stub_resolvers(
+            files={
+                AGORA_COORDINATE: [SHARED_RUNTIME, "META-INF/LICENSE"],
+                TFLITE_COORDINATE: [SHARED_RUNTIME, "META-INF/LICENSE"],
+            }
+        ),
+        accept_current_surface=True,
+    )
+
+
+def test_two_sdks_bundling_one_cpp_runtime_block_the_build():
+    """§9.1 — and the diagnostic names the distributions, which Gradle cannot."""
+    integration = _rtc_and_vision()
+    collisions = [d for d in integration.diagnostics if d.rule.code == "packaging-collision"]
+    assert len(collisions) == 1
+    (collision,) = collisions
+    assert set(collision.distributions) == {"pyagora", "pytflite"}
+    assert SHARED_RUNTIME in collision.message
+    assert "pyagora" in collision.message and "pytflite" in collision.message
+
+
+def test_the_licence_file_collides_too_and_is_resolved_silently():
+    """Treating both alike would fail every realistic build, or pick a runtime at random."""
+    integration = _rtc_and_vision()
+    resolved = [
+        d for d in integration.diagnostics if d.rule.code == "packaging-collision-resolved"
+    ]
+    assert [d for d in resolved if "META-INF/LICENSE" in d.message]
+    assert not [d for d in resolved if "libc++" in d.message]
+
+
+def test_the_application_chooses_and_the_choice_is_recorded():
+    """Only the application can know whether the two SDKs tolerate one runtime."""
+    integration = _rtc_and_vision(choices={SHARED_RUNTIME: AGORA_COORDINATE})
+    assert not [d for d in integration.diagnostics if d.rule.code == "packaging-collision"]
+    chosen = [
+        d
+        for d in integration.diagnostics
+        if d.rule.code == "packaging-collision-resolved" and "libc++" in d.message
+    ]
+    assert chosen and AGORA_COORDINATE in chosen[0].message
