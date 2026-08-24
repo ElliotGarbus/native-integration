@@ -306,6 +306,8 @@ ANDROID = Table(
                         "from_dependency": Field(nonempty_string),
                         "exported_required": Field(a_bool),
                         "reason": Field(nonempty_string),
+                        # §6.8 — Android's own vocabulary, open per §4.4.
+                        "foreground_service_type": Field(nonempty_string),
                     },
                     arrays={
                         "view_links": Table(

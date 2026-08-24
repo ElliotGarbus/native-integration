@@ -179,6 +179,9 @@ class Component:
     from_dependency: str | None = None
     exported_required: bool = False
     reason: str | None = None
+    #: §6.8 — `android:foregroundServiceType`, mandatory on Android 14+ for a
+    #: foreground service and valid on nothing else.
+    foreground_service_type: str | None = None
     view_links: tuple[ViewLink, ...] = ()
     intent_filters: tuple[IntentFilter, ...] = ()
 
@@ -429,6 +432,7 @@ def build_android(table: Mapping[str, Any]) -> AndroidSection:
                 from_dependency=entry.get("from_dependency"),
                 exported_required=bool(entry.get("exported_required", False)),
                 reason=entry.get("reason"),
+                foreground_service_type=entry.get("foreground_service_type"),
                 view_links=tuple(
                     ViewLink(
                         scheme=Ref.of(link["scheme"]),

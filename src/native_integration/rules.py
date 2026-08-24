@@ -129,6 +129,10 @@ SKADNETWORK_ITEMS_KEY = _rule("skadnetwork-items-key", "§7.6", ERROR, 1)
 META_DATA_RESOURCE_REFERENCE = _rule("meta-data-resource-reference", "§6.10", ERROR, 1)
 QUERY_FORM = _rule("query-form", "§6.12", ERROR, 1)
 ACCESSED_API_WITHOUT_SOURCE = _rule("accessed-api-without-source", "§7.5", ERROR, 1)
+FOREGROUND_TYPE_ON_NON_SERVICE = _rule("foreground-type-on-non-service", "§6.8", ERROR, 1)
+FOREGROUND_TYPE_WITHOUT_PERMISSION = _rule(
+    "foreground-type-without-permission", "§6.8", WARN, 1
+)
 PLIST_VALUE_CONFLICT = _rule("plist-value-conflict", "§7.6", ERROR, 1)
 PLIST_CONSUMER_MANAGED = _rule("plist-consumer-managed", "§7.6", ERROR, 1)
 
@@ -191,6 +195,7 @@ BEYOND_THE_READER: dict[int, str] = {
 ADVISORY: dict[str, str] = {
     "S1": "unknown-top-level",
     "S2": "component-class-absent",
+    "S4": "foreground-type-without-permission",
     "S3": (
         "not implemented — the fully merged manifest delta needs a manifest merger, "
         "which belongs to the consumer's build system; this library reports the "

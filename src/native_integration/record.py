@@ -239,6 +239,11 @@ def _entries(contribution: Contribution, resolution: NativeResolution) -> tuple[
 
     for entry in contribution.components:
         state = "exported" if entry.exported else "not exported"
+        # §6.8 — a foreground type changes what the component may do while the
+        # user is not looking, so it belongs on the line, not in a footnote.
+        service_type = entry.component.foreground_service_type
+        if service_type:
+            state = f"{state}, foregroundServiceType {service_type}"
         out.append(f"component {entry.kind} {entry.name} ({state})")
         for link in entry.view_links:
             out.append(f"  view_link {entry.name}: {link.render()}")

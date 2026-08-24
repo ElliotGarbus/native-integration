@@ -1559,6 +1559,42 @@ states which:
   artifact. Two distributions registering the same component class **MUST**
   fail, naming both.
 
+**Foreground services: `foreground_service_type`.** Since Android 14 a
+foreground service **must** declare what it is for, and a service that starts
+without one is refused by the platform:
+
+```toml
+[[android.contributes.components]]
+kind = "service"
+name = "org.example.mypkg.ScreenCaptureService"
+foreground_service_type = "mediaProjection"
+```
+
+- Valid **only** on `kind = "service"`; a consumer **MUST** reject it elsewhere,
+  naming the distribution.
+- The value is Android's own, written exactly as the platform defines it, and
+  the vocabulary is **open** per §4.4 — the platform owns these names and adds
+  to them, and a consumer rejects one it does not implement.
+- Android also requires the application to hold the matching
+  `FOREGROUND_SERVICE_*` permission. That is an ordinary §6.7 contribution and
+  the producer declares it there; requirement 8.S4 has a consumer point out a
+  type declared without one, because the pair is easy to half-write and the
+  platform's refusal names neither.
+
+> Rationale. Without this a producer's own foreground service cannot be written
+> into a valid manifest at all — the declaration looks complete, because §6.7
+> already carries the permission, and the attribute that gives it meaning has
+> nowhere to go. The failure is at runtime, when the service starts, and the
+> platform's message names the service rather than the package that needed it.
+>
+> This is the narrowest of the component attributes the survey collected, and
+> deliberately the only one landed. `launchMode` and `taskAffinity` were asked
+> for by a vendor whose entry activity the **application** owns (§6.11), so the
+> application writes those attributes on its own class and a producer never
+> registers the component; the same is true of the permission-guarded
+> activity-alias another vendor needs. An attribute belongs here only when a
+> producer's own component cannot be registered without it.
+
 **Export.** Components are registered `android:exported="false"` by default. A
 producer **MUST NOT** declare `exported = true` directly. A producer **MAY**
 declare `exported_required = true` with a `reason` (**REQUIRED** when present);
@@ -3079,6 +3115,10 @@ A conforming consumer **SHOULD**:
 - **S3.** Report the delta of the **fully merged** Android manifest, beyond the
   per-artifact declarations required by requirement 8.19, and the native effects of Swift
   packages' binary targets (§9, §11).
+- **S4.** Warn when a component declares `foreground_service_type` and the same
+  distribution contributes no `android.permission.FOREGROUND_SERVICE_*`
+  permission (§6.8). The pair is required together by the platform, and half of
+  it fails at service start with a message naming neither.
 
 ## 9. Recording and review
 
@@ -3661,6 +3701,7 @@ key is 1.0, which is why nothing below carries a mark yet.
 | `kind` | `service`, `activity` or `receiver`. `provider` is deliberately absent: an authority is mandatory and must be unique device-wide, so only the application ID can supply it |
 | `name` | The class. Under an owned namespace unless `from_dependency` says otherwise |
 | `from_dependency` | `group:artifact` of a declared dependency that owns the class |
+| `foreground_service_type` | Android's own value, on a `service` only. Mandatory on Android 14+ for a foreground service; the matching `FOREGROUND_SERVICE_*` permission is an ordinary §6.7 contribution (8.S4) |
 | `exported_required` + `reason` | Requests export. The build fails without explicit application approval — it never falls back to unexported |
 | `[[…view_links]]` — `scheme`, `host`, `path_prefix`, and Android's other `<data>` attributes (`port`, `mime_type`, `path`, `path_pattern`, `path_suffix`) | Generates the browser-return filter. Valid only on an exported activity; `scheme` is required, the attribute set is open (§4.4), and each may take an inline application value |
 | `[[…intent_filters]]` — `action` | One vendor-defined action, on a component that is neither exported nor carrying `view_links` |

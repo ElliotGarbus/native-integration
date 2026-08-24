@@ -511,6 +511,60 @@ reason = "Tints the notification"
     assert codes == ["meta-data-resource-reference"]
 
 
+def test_a_foreground_service_declares_its_type(parse):
+    """§6.8 — mandatory on Android 14+, and the reason AG1 was blocking."""
+    text = """
+contract = "1"
+[android.owns]
+java_namespaces = ["org.pyagora"]
+
+[[android.contributes.components]]
+kind = "service"
+name = "org.pyagora.ScreenCaptureService"
+foreground_service_type = "mediaProjection"
+
+[[android.contributes.permissions]]
+name = "android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION"
+reason = "Screen capture runs in a foreground service"
+"""
+    sidecar, codes, _ = parse(text)
+    assert codes == []
+    (component,) = sidecar.android.components
+    assert component.foreground_service_type == "mediaProjection"
+
+
+def test_a_foreground_type_without_its_permission_is_advisory(parse):
+    """8.S4 — the platform requires the pair and refuses naming neither half."""
+    text = """
+contract = "1"
+[android.owns]
+java_namespaces = ["org.pyagora"]
+
+[[android.contributes.components]]
+kind = "service"
+name = "org.pyagora.ScreenCaptureService"
+foreground_service_type = "mediaProjection"
+"""
+    _, codes, bag = parse(text)
+    assert codes == ["foreground-type-without-permission"]
+    assert all(d.rule.severity.name == "WARNING" for d in bag)  # advisory, not blocking
+
+
+def test_only_a_service_runs_in_the_foreground(parse):
+    text = """
+contract = "1"
+[android.owns]
+java_namespaces = ["org.pyagora"]
+
+[[android.contributes.components]]
+kind = "receiver"
+name = "org.pyagora.Receiver"
+foreground_service_type = "mediaProjection"
+"""
+    _, codes, _ = parse(text)
+    assert codes == ["foreground-type-on-non-service"]
+
+
 def test_queries_take_a_package_or_an_authority(parse):
     """§6.12 — the two forms version 1 models."""
     text = """

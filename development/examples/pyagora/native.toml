@@ -46,6 +46,22 @@ reason = "Adapting bitrate to the current network transport"
 name = "android.permission.BLUETOOTH_CONNECT"
 reason = "Routing call audio to a connected Bluetooth headset on Android 12+"
 
+[[android.contributes.permissions]]
+name = "android.permission.FOREGROUND_SERVICE"
+reason = "Screen capture must run in a foreground service"
+
+[[android.contributes.permissions]]
+name = "android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION"
+reason = "The service type Android 14+ requires for media projection"
+
+# Finding AG1, closed. The capture service is the producer's to declare -- it is
+# the producer's capture lifecycle that runs in it -- and Android 14 refuses a
+# foreground service that does not say what it is for.
+[[android.contributes.components]]
+kind = "service"
+name = "org.pyagora.ScreenCaptureService"
+foreground_service_type = "mediaProjection"
+
 # The features Agora uses when present. §6.7 registers both required="false",
 # which is right: whether a video-calling application refuses to install on a
 # camera-less device is the application's decision, not this package's.
@@ -90,10 +106,6 @@ products = ["RtcBasic"]
 
 # ------------------------------------------------------------ NOT EXPRESSIBLE
 #
-# AG1  The screen-capture foreground service. Android 14 requires
-#      android:foregroundServiceType="mediaProjection" on a service the
-#      application declares; §6.8 has no attribute for it, so the component
-#      cannot be registered validly. BLOCKING for screen share.
 # AG2  A Broadcast Upload Extension, which is where iOS screen capture must
 #      run. `kind` offers notification_service and location_push.
 #      BLOCKING for screen share.

@@ -355,6 +355,32 @@ def _check_dependencies(
     sidecar: Sidecar, android: AndroidSection, *, profile: ConsumerProfile, bag: DiagnosticBag
 ) -> None:
     name = sidecar.distribution
+    foreground_permissions = [
+        p.name
+        for p in android.permissions
+        if p.name.startswith("android.permission.FOREGROUND_SERVICE")
+    ]
+    for component in android.components:
+        if not component.foreground_service_type:
+            continue
+        if component.kind != "service":
+            bag.add(
+                rules.FOREGROUND_TYPE_ON_NON_SERVICE,
+                f"declares foreground_service_type on {component.kind} "
+                f"`{component.name}`; only a service runs in the foreground",
+                name,
+            )
+        elif not foreground_permissions:
+            # 8.S4 — the platform requires the pair, and refuses at service
+            # start with a message naming neither half.
+            bag.add(
+                rules.FOREGROUND_TYPE_WITHOUT_PERMISSION,
+                f"`{component.name}` declares foreground_service_type "
+                f"`{component.foreground_service_type}` and this distribution "
+                "contributes no android.permission.FOREGROUND_SERVICE_* permission",
+                name,
+            )
+
     for query in android.queries:
         # §6.12 — exactly one target. Both is ambiguous; neither declares
         # visibility of nothing while reading as though it declared something.

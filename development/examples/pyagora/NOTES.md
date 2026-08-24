@@ -24,6 +24,13 @@ attribute, so a producer-source capture service cannot be written into a valid
 manifest at all — the build fails, or worse, the service is registered without
 a type and the platform kills it the moment capture starts.
 
+> **Closed.** §6.8 now takes `foreground_service_type`, and the sidecar beside
+> this file registers the capture service. It was the last survey finding that
+> blocked a shipping integration, and this example is why it was not narrowed
+> away: the three other component attributes the survey collected turned out to
+> belong to classes the *application* owns (§6.11), where the application writes
+> them itself.
+
 **This corrects a hedge in the survey.** N5 was recorded with the caveat that
 an SDK arriving as an `.aar` brings its own service declaration and dodges the
 gap. Agora is the counter-example: the service is the *producer's* to declare,
