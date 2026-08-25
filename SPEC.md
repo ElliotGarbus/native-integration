@@ -1832,40 +1832,6 @@ shrinking.
 > library it itself declared — a size cost, not an application-wide
 > shrink-disable.
 
-##### `app_links`
-
-An SDK whose links open the application directly — rather than through a browser
-— needs a **verified** App Link, which Android grants only when a file on the
-application's own domain says so:
-
-```toml
-[[android.requires.app_links]]
-id = "branch_deep_links"
-reason = """\
-Register your Branch link domain as a verified App Link: add an autoVerify \
-intent filter for it, and host assetlinks.json with your signing certificate \
-fingerprint at https://<domain>/.well-known/."""
-```
-
-- `id` names the requirement and is the join key. The **domain is the
-  application's**, so a producer cannot name it, and a package needing more than
-  one declares an entry each.
-- Satisfaction is **acknowledgement**.
-
-> Rationale, and why this is not a contribution. §6.8 records `android:autoVerify`
-> as not expressible, on the ground that `assetlinks.json` is application
-> infrastructure — and that is exactly what makes this a prerequisite rather
-> than a missing attribute. Verification is a fact about a **domain**, not about
-> a manifest: Android fetches the file over the network at install time, so a
-> consumer that wrote the attribute would still be waiting on something it
-> cannot see or supply.
->
-> Acknowledgement follows from §2.4's rule. A consumer could fetch the domain's
-> file at build time, and should not: it would make builds depend on the network
-> and on whatever the domain served that minute, and it still could not verify
-> the intent filter and the fingerprint together. Half a check reported as
-> success is worse than a disclosure that says what was asked for.
-
 ### 6.10 Manifest meta-data: `[[android.contributes.meta_data]]`
 
 *For a `<meta-data>` entry whose value the **producer** knows — a vendor flag, a
@@ -1939,9 +1905,10 @@ application's — the consumer keeps that value and reports the override.
 ### 6.11 Application prerequisites: `[android.requires.*]`
 
 *For what an Android application must supply and a producer must not write: a
-configuration file, a resource, a class at a path the vendor fixes. §6.2's
-floors and §6.3's values are the same family; this completes it, and §7.3 is
-the iOS counterpart these tables are modelled on.*
+configuration file, a resource, a class at a path the vendor fixes, a domain
+whose App Links it must verify. §6.2's floors and §6.3's values are the same
+family; this completes it, and §7.3 is the iOS counterpart these tables are
+modelled on.*
 
 #### Common rules
 
@@ -2075,6 +2042,40 @@ extend Activity, implement IWXAPIEventHandler, and forward to the SDK."""
 > vendor sends. §7.3 makes the same judgment for `url_schemes`, for the same
 > reason, and treating the inspectable half as sufficient would prove half of
 > what was asked while reporting success.
+
+##### `app_links`
+
+An SDK whose links open the application directly — rather than through a browser
+— needs a **verified** App Link, which Android grants only when a file on the
+application's own domain says so:
+
+```toml
+[[android.requires.app_links]]
+id = "branch_deep_links"
+reason = """\
+Register your Branch link domain as a verified App Link: add an autoVerify \
+intent filter for it, and host assetlinks.json with your signing certificate \
+fingerprint at https://<domain>/.well-known/."""
+```
+
+- `id` names the requirement and is the join key. The **domain is the
+  application's**, so a producer cannot name it, and a package needing more than
+  one declares an entry each.
+- Satisfaction is **acknowledgement**, per the table above.
+
+> Rationale, and why this is not a contribution. §6.8 records `android:autoVerify`
+> as not expressible, on the ground that `assetlinks.json` is application
+> infrastructure — and that is exactly what makes this a prerequisite rather
+> than a missing attribute. Verification is a fact about a **domain**, not about
+> a manifest: Android fetches the file over the network at install time, so a
+> consumer that wrote the attribute would still be waiting on something it
+> cannot see or supply.
+>
+> Acknowledgement follows from §2.4's rule. A consumer could fetch the domain's
+> file at build time, and should not: it would make builds depend on the network
+> and on whatever the domain served that minute, and it still could not verify
+> the intent filter and the fingerprint together. Half a check reported as
+> success is worse than a disclosure that says what was asked for.
 
 ### 6.12 Package visibility: `[[android.contributes.queries]]`
 
