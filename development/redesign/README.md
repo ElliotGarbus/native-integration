@@ -78,6 +78,15 @@ Five sidecars, chosen as the hardest cases in the existing set:
 Airship is the only one written out in full, as [`pyairship/native.toml`](pyairship/native.toml);
 it is the case the other four could not ask.
 
+> **Revised by [`review-01.md`](review-01.md).** The first outside reading
+> corrected three findings below. **V3** is superseded — a `slot` is the
+> platform's own identifier, not a spelling this document invents. **V4**'s
+> delivery-site rule is restated as *values are what the consumer can place
+> deterministically; actions are outcomes the application must achieve*, which
+> is the same rule with its reason attached and which overturns three
+> placements made here. **V8** is softened: v1 omits alternatives deliberately
+> rather than permanently.
+
 A second pass, [`forward-test.md`](forward-test.md), asks the opposite
 question: four requirements the first attempt **cannot state at all**, to test
 whether the redesign absorbs them without inventing vocabulary. It carries

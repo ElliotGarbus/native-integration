@@ -13,6 +13,14 @@ maintenance claim is weaker than it looks.
 
 All four land. Findings continue the probe's numbering at **V11**.
 
+> **Superseded in part by [`review-01.md`](review-01.md).** FT1's and FT3's
+> fragments put an entitlement value and an app group identifier in
+> `application_value`. Both are **actions carrying a value by `uses`**: a
+> consumer can write an entitlements file but cannot get an entitlement into a
+> provisioning profile, so it cannot place the requirement deterministically.
+> The diagnosis in FT1 — that §7.3's key-only check is a false pass — stands
+> and is the reason the case matters.
+
 Vendor facts are taken from SURVEY.md's rows and findings rather than
 re-derived; anything extrapolated beyond them is marked.
 

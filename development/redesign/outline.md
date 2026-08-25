@@ -85,20 +85,29 @@ The centre of the change. Replaces §6.2, §6.3, §6.11, §7.2 and §7.3.
   `core_library_desugaring`, `deployment_target`. Adapted from §6.2 and §7.2,
   which are the same rule written twice.
 - **6.2 Values the application supplies** — one table. `id`, `kind`, `key`,
-  `reason`, `placeholder`, `conditional`. **A value requires a delivery site**
-  (V4): if there is nowhere for the consumer to write it, it is an action.
-  Carries over §6.3's inline-reference form and its rules about identity being
-  `(distribution, id)` scoped by platform, which the mediated-ads trio proved.
-- **6.3 Actions the application performs** — one table. `id`, optional `kind`,
-  optional `slot`, `summary`, `reason`, optional `instructions`, `conditional`.
-  Carries §7.3's `conditional` semantics unchanged — they are the part of the
-  prerequisite machinery that earned its place twice over.
+  `reason`, `placeholder`, `conditional`. **The consumer can place a value
+  deterministically; anything else is an action** ([review-01](review-01.md)).
+  Every surviving value kind is scalar, which is why no composition mechanism
+  is needed: two values on one `(kind, key)` coalesce when equal and fail when
+  they differ. Carries over §6.3's inline-reference form and its rules about
+  identity being `(distribution, id)` scoped by platform, which the
+  mediated-ads trio proved.
+- **6.3 Actions the application performs** — one table. `id`, `summary`,
+  `reason`, and the optional `instructions`, `acceptance`, `uses`, `verify`,
+  `slot`, `conditional`. `verify` is a separate inline block so that an
+  unrecognized check degrades without the requirement degrading with it;
+  `acceptance` states the end state for whoever does the work; `uses` names the
+  values the action consumes. `template`, `reference` and `destination_hint`
+  are deferred. Carries §7.3's `conditional` semantics unchanged.
 - **6.4 What counts as satisfied** — the three tiers (V7): a value is satisfied
   when its placeholder is gone, an action with a known `kind` by that kind's
   check, an opaque action by acknowledgement. This is where §2.4's one durable
   idea lands.
-- **6.5 Kinds** — the per-platform vocabularies, explicitly **non-normative and
-  open**. A consumer implements what it can and degrades on the rest.
+- **6.5 Kinds and slots** — the per-platform `verify.kind` vocabulary,
+  explicitly **non-normative and open**; and `slot` as an opaque contention key
+  taken from the platform's own identifiers, which the specification never
+  enumerates. A consumer implements what it can, degrades on the rest, and
+  compares slots only for equality.
 - **6.6 Instructions** — the new channel and its rule: data shown to a human, a
   consumer never acts on it, and the file is a declared resource so §10's
   per-file hashing surfaces a change between versions.
@@ -197,14 +206,15 @@ them.
    ordinary. The alternative — provide first, ask second — is the conventional
    order and the first attempt's. Cheap to swap while the document is an
    outline.
-2. **Whether a value can live inside an action** (forward test, FT1 and FT3).
-   An associated domain and an app group are values supplied *within* something
-   the application must separately configure. Splitting them works; it means
-   one requirement appears twice with nothing tying the halves together.
-3. **Whether `kind` values need a registry.** Open-and-degrading is what makes
-   the model cheap and also means two consumers check different things. A
+2. ~~Whether a value can live inside an action.~~ **Answered** in
+   [review-01](review-01.md): the action states the outcome, the value is
+   declared separately, and `uses` ties them. What stays open is whether
+   `verify` and `acceptance` may reference each other.
+3. **Whether `verify.kind` values need a registry.** Open-and-degrading is what
+   makes the model cheap and also means two consumers check different things. A
    non-normative list extended without a version bump is probably right, and it
-   is the seam where this design could regrow what it replaced.
+   is the seam where this design could regrow what it replaced — the most
+   likely way the redesign fails.
 4. **Whether `[[android.contributes.r8.keep]]` earns its cost.** Its
    `from_dependency` check needs an archive-listing port — one of the four
    obligations that need something only a build tool has — to verify a keep
