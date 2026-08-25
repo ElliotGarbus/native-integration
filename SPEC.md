@@ -19,7 +19,7 @@ to do.
 ## Goals
 
 This convention automates the parts of native integration that are portable and
-repeatable, and states the rest as explicit tasks.
+repeatable, and states the rest as explicit tasks for the application author.
 
 A declaration is automated when all three of these hold:
 
@@ -32,10 +32,15 @@ fixed manifest and `Info.plist` entries, and SDK floors all qualify. Those are
 the things an application author would otherwise transcribe out of a README.
 
 Everything else is stated as a requirement on the application. **Manual is a
-first-class outcome, not a gap in this document.** A requirement that this
-convention cannot automate is still worth stating, because a stated requirement
-is reported, attributed and reviewed, and an unstated one is discovered at
-runtime.
+first-class outcome, not a gap in this document.** By **manual** this document
+means the consumer states the requirement — as an action, a value, or a
+placeholder ([§1](#1-terminology)) — and the application author satisfies it.
+A requirement that this convention cannot automate is still worth stating: the
+consumer reports it, and — where the shape is a value — scaffolds it as a
+placeholder in the application's own `pyproject.toml`, a TODO the author
+resolves where they already work
+([§2.3](#23-what-the-consumer-generates)). That makes the requirement
+attributed and reviewed, rather than a gap discovered at runtime.
 
 ## Non-goals
 
@@ -68,6 +73,7 @@ are to be interpreted as described in
 | **Value** | A string the application supplies and the consumer writes to a platform key. |
 | **Action** | An outcome the application must achieve, which the consumer states and does not perform. |
 | **Placeholder** | Text a consumer scaffolds in place of a value it does not have. The build does not proceed while a placeholder stands. |
+| **Fail closed** | On anything unrecognized, invalid, or unverifiable, reject and stop the build — never proceed as though it were absent. The opposite, **fail open**, is never conforming behavior under this document. |
 
 ---
 
@@ -140,9 +146,11 @@ into a file the consumer tells the application to commit.
 
 > **Note:** Ordinary values are different. An analytics DSN or an ad-network
 > application ID is embedded in the shipped application and readable by anyone
-> who unzips it. Committing those is not a leak. A build-time credential never
-> reaches the device, and is the only thing here that must not come to rest in
-> the repository.
+> who unzips it, so committing one is not a leak. A build-time credential is
+> the opposite: it is used only to fetch dependencies during the build and
+> never ships inside the application, which makes the repository the only
+> place it can leak from — and why it is the one thing here that must not come
+> to rest there.
 
 ### 2.3 What the consumer generates
 
@@ -168,23 +176,330 @@ Two rules govern scaffolding:
 
 ### 2.4 Obligations on the consumer's bootstrap
 
-*To be ported from the first attempt (§2.3): the Android activity must be an
-`androidx.activity.ComponentActivity`, and the iOS app delegate must not swallow
-URL callbacks.*
+Before it reads any sidecar, a consumer's bootstrap must provide two properties
+that declared material depends on and no producer can check.
+
+**Android.** The bootstrap **MUST** make the Android activity it generates an
+`androidx.activity.ComponentActivity`, or a subclass of one.
+
+> **Note:** Current Android SDKs return their results through the
+> activity-result contract, `registerForActivityResult`, which is declared on
+> `ComponentActivity` and not on the platform's own `Activity`. The
+> `onActivityResult` path it replaced is deprecated. An SDK that opens a screen
+> of its own — a payment sheet, an identity check — then has nowhere to hand its
+> result back to. The application sees a compile error inside generated glue, or
+> a cast failure at first use, with nothing tying either to the distribution
+> that declared the dependency.
+>
+> Naming a class dates this obligation. That is accepted deliberately: every
+> other spelling describes the same type in more words, and a minor revision
+> revisits it when Android's mainstream moves.
+
+**iOS.** The bootstrap **MUST NOT** consume a URL callback delivered to
+`application(_:open:options:)` without providing a documented way for
+application code to observe it.
+
+> **Note:** [§5.3](#53-actions) lets a producer ask the application to register
+> a URL scheme and forward the resulting callback to an SDK's handler. In this
+> ecosystem the application author writes Python and the app delegate belongs to
+> the bootstrap, so a bootstrap that swallows the callback leaves a requirement
+> nobody can satisfy. An application that acknowledged forwarding it would then
+> be wrong through no fault of its own.
+
+Neither clause gives a producer a way to run code at startup or to join a
+lifecycle callback. Both are properties of a bootstrap the consumer already
+writes, not a seam for producer code to enter.
 
 ---
 
 ## 3. Discovery
 
-*To be ported from the first attempt (§3): the entry point, resolution against
-the dependency closure, iteration rather than lookup, multiple entries, and the
-distribution as the only carrier.*
+### 3.1 The entry point
+
+A producer **MUST** declare exactly one entry point in the group
+`native_integration.v1`:
+
+```toml
+[project.entry-points."native_integration.v1"]
+native = "mypkg._native"
+```
+
+- The entry-point name **SHOULD** be `native`. It carries no meaning, and
+  consumers ignore it — see [§3.3](#33-iterate-do-not-look-up-by-name).
+- The value **MUST** be an importable module reference: a dotted path of valid
+  Python identifiers, with no `:attr` suffix, naming the directory that contains
+  the sidecar.
+
+Nothing is ever imported. The value is spelled as a module reference so the
+metadata stays truthful to the entry-points specification, which defines a value
+as pointing to an importable object. This convention reads the named directory's
+*files* instead.
+
+> **Caution:** There are two ways to misspell the group, and both are silent.
+> The underscore is required —
+> [entry-point group names](https://packaging.python.org/en/latest/specifications/entry-points/)
+> cannot contain hyphens, so `native-integration.v1` is not this group despite
+> matching the project name. The quotes are required TOML syntax: in an unquoted
+> header a dot nests, so `[project.entry-points.native_integration.v1]` declares
+> a group named `native_integration` containing a table `v1`. Either mistake
+> produces a wheel that installs cleanly and a build that never finds the
+> sidecar.
+
+### 3.2 Resolution
+
+A consumer **MUST** resolve declarations as follows:
+
+1. Determine the candidate set: the resolved **dependency closure** of the
+   application for the target platform. A consumer operating in an isolated
+   environment that contains exactly that closure **MAY** treat all installed
+   distributions as candidates.
+2. For each candidate, read entry points in the group `native_integration.v1`
+   through `importlib.metadata`.
+3. Interpret the value's dotted path as a directory within the distribution —
+   `mypkg._native` becomes `mypkg/_native/` — and read `native.toml` inside it.
+
+A consumer **MUST NOT** accept contributions from distributions outside the
+closure, whatever else is installed alongside it.
+
+> **Note:** `importlib.metadata` has no concept of "the application's
+> dependencies"; it enumerates entry points across whatever is installed.
+> Resolving the closure into a clean environment is what makes step 1's shortcut
+> sound — only there does *installed* coincide with *in the closure*. Outside
+> such an environment the two sets diverge, and the consumer must compute the
+> closure and filter against it rather than trust what it finds.
+
+A consumer **MUST** access the sidecar and every resource it references through
+the distribution's metadata and file-resource interface —
+`importlib.metadata.Distribution.locate_file()`, `Distribution.files`, or
+equivalent. A consumer **MUST NOT** assume a distribution is represented by a
+conventional `site-packages` directory. When a distribution's resources cannot
+be materialized or read, the consumer **MUST** fail, naming the distribution,
+rather than skipping it.
+
+**Nothing is imported, ever.** A consumer **MUST NOT** import the producing
+package or any module of it, at any point, including the module the entry point
+names. Metadata reads and file reads only.
+
+> **Note:** A consumer runs on a desktop build host. A distribution targeting
+> Android or iOS may raise on import there, or may not be importable at all.
+
+**Provenance.** For each producer, a consumer **MUST** be able to state how it
+entered the dependency closure. Where several dependency paths exist, the
+consumer **MUST** report at least the producer's immediate dependents, and any
+path it reports **MUST** be deterministic across runs.
+
+### 3.3 Iterate; do not look up by name
+
+A consumer **MUST** iterate every entry in the group and ignore the entry-point
+name. A consumer **MUST NOT** look the entry up by name.
+
+> **Note:** The name carries no information — the platform lives inside the
+> file — so a name-keyed lookup silently skips any distribution that labelled it
+> differently. The package installs, the build succeeds, and the declaration
+> never lands.
+
+### 3.4 One entry per distribution
+
+A distribution that declares more than one entry in the group is invalid. A
+consumer **MUST** fail, naming the distribution. It **MUST NOT** select one or
+merge them.
+
+### 3.5 The distribution is the only carrier
+
+A declaration reaches a consumer only by riding on an installed Python
+distribution in the application's dependency closure. There is no other channel:
+no path, no registry, and no configuration key by which a consumer can be
+pointed at a sidecar the closure does not contain.
+
+A project whose material is entirely native — a Swift package, a Maven
+artifact — **MUST** therefore publish a Python distribution to participate,
+however thin. A distribution carrying nothing but a sidecar and the package data
+it references is a legitimate and expected shape.
+
+> **Note:** This is a real obligation, not a formality. It asks projects with no
+> other reason to build a wheel to build one. It is worth the cost because the
+> dependency closure is what bounds the set of things allowed to configure the
+> application: a declaration that could arrive from outside the closure would be
+> a declaration nobody chose to depend on.
+
+The closure is resolved for a target platform **and a Python version**. A
+sidecar **MUST NOT** restate an interpreter requirement. `Requires-Python`
+already carries it enforceably, and a closure correctly resolved for one
+interpreter cannot contain a distribution built for another.
+
+Platform support is not symmetric with this, which is why
+[§4.5](#45-platform-support) exists. No enforceable standard metadata carries
+*this distribution does not function on Android* for a distribution whose own
+content is pure Python: wheel platform tags require platform-specific content,
+and `Classifier: Operating System :: Android` is informational only.
 
 ## 4. The sidecar file
 
-*To be ported from the first attempt (§4): location and name, one file for all
-platforms, the contract version and its under-declaration rule, unknown keys
-failing closed, and `platforms`.*
+### 4.1 Location and name
+
+The sidecar **MUST** be named `native.toml`, **MUST** reside in the directory
+the entry-point value identifies, and **MUST** ship as ordinary package data.
+
+```
+mypkg/
+  __init__.py
+  _native/
+    __init__.py          ← required: keeps the entry-point value importable
+    native.toml          ← fixed name; the entry point does not spell it
+    java/…               ← optional, per §6
+    swift/…              ← optional, per §7
+```
+
+The sidecar directory **MUST** contain an `__init__.py`, typically empty.
+
+> **Note:** Without it the directory is only a namespace package
+> ([PEP 420](https://peps.python.org/pep-0420/)), and implicit
+> namespace-package resolution is not guaranteed to behave identically across
+> import systems — so the entry point's dotted path would not be reliably
+> portable. A regular package makes it one unambiguous thing.
+
+**Referenced resources.** Every path a sidecar declares is interpreted relative
+to `native.toml` and **MUST NOT** escape its directory, checked *after* path
+normalization and symlink resolution. Symlinked resources are not permitted in
+version 1; a consumer **MUST** reject one, naming the distribution. Contributed
+source files **MUST** be UTF-8 encoded.
+
+**The sidecar directory is build input, not application payload.** A consumer
+**MUST** exclude it — `native.toml` and every resource under it — from any
+Python payload it assembles for the device.
+
+> **Note:** Its contents have already been consumed at build time, and
+> contributed source is compiled by the application's own toolchain. A second
+> copy inside the application is at best dead weight. At worst it is a
+> regression: source that compilation had turned into something less directly
+> readable ships again as plain text, undoing whatever protection the build step
+> gave a producer's glue code.
+
+### 4.2 One file for all platforms
+
+A distribution **MUST** ship exactly one sidecar covering every platform it
+supports. Platforms are tables within it, not separate files.
+
+> **Note:** The contract version is then declared once and validated in a single
+> read, before anything is trusted. Per-platform files would let those versions
+> disagree.
+
+### 4.3 Contract version
+
+The sidecar **MUST** declare a top-level `contract` key: a string holding the
+major version of this specification, optionally with a minor.
+
+```toml
+contract = "1"        # equivalent to "1.0"
+```
+
+```toml
+contract = "1.1"      # uses a capability added in revision 1.1
+```
+
+Declare the smallest contract whose capabilities you use.
+
+A consumer implementing contract *X.Y* **MUST** reject a sidecar that declares a
+different major, or a minor greater than *Y*, with a message naming the
+distribution and the contract the sidecar needs. It **MUST NOT** parse such a
+sidecar partially.
+
+A consumer **MUST** also reject a sidecar that **under-declares**: one using a
+key or table introduced in a revision later than the contract it names, even
+when the consumer implements both.
+
+> **Note:** Without the under-declaration rule the gate protects only older
+> consumers. A producer that mis-declares its contract is then caught by nobody
+> until an older consumer meets it — at which point the diagnostic blames the
+> consumer's age rather than the producer's declaration.
+
+The declaration reference in Appendix D is the registry that makes the
+under-declaration rule checkable. Every key it lists is contract 1.0 unless it
+carries a *Since* note, and a minor revision that adds a key **MUST** record the
+minor there. Without one normative source for *which revision introduced this
+key*, two conforming consumers would reach different verdicts on the same
+sidecar.
+
+A consumer **MUST** be able to state the contract it implements, and **SHOULD**
+report it where a person can see it — a version string, a doctor check. That is
+what lets a package author decide whether adopting a minor strands their users.
+
+### 4.4 Unknown declarations fail closed
+
+Within a platform table the consumer is **building for**, an unrecognized key
+**MUST** be rejected, naming the distribution and the key. A consumer **MUST
+NOT** ignore a declaration it does not understand in order to proceed.
+
+**Values fail closed on the same terms.** Some contribution keys take a value
+from a vocabulary the *platform* owns and this document does not enumerate — an
+Android `<data>` attribute, a foreground service type. Where a key is defined
+that way, a consumer **MUST** reject a value it does not implement, naming the
+distribution and the value, and **MUST NOT** substitute a default it does
+understand. A consumer **SHOULD** say which values it does implement, so a
+producer can tell an unsupported declaration from a misspelled one.
+
+An unrecognized **top-level key that is not a table MUST be rejected**, naming
+the distribution and the key.
+
+A consumer **MAY** ignore a platform table for a platform it is not building —
+an `[ios]` table during an Android build is outside its concern. A consumer
+**SHOULD** warn about a top-level *table* it does not recognize at all, since it
+cannot distinguish a future platform from a misspelled one.
+
+> **Caution:** That tolerance is for tables only. A future platform arrives as a
+> table, so nothing legitimate has the other shape, and the key likeliest to be
+> misspelled is `platforms`. A `platfroms = ["ios"]` that only warned would
+> discard the one claim [§4.5](#45-platform-support) exists to carry — silently,
+> which is the failure that section was added to prevent.
+
+> **Note:** Silently ignoring an unknown *contribution* is the dangerous case. A
+> 1.0 consumer skipping a 1.1 table builds an application that breaks at
+> runtime, far from the cause. Failing closed also catches typos: a misspelled
+> `permisions` key is an error, not a no-op. Additive evolution is preserved by
+> [§4.3](#43-contract-version)'s minor, which turns *silently ignored* into
+> *visibly rejected, with the version that would work*.
+
+**There is no fail-open exception for requirements**, and a reader who knows the
+first attempt should not go looking for one. An action ([§5.3](#53-actions))
+carries no vocabulary: `summary`, `reason`, `instructions` and `acceptance` are
+prose, `slot` is opaque and compared only for equality, and `uses` names values
+in the same sidecar. Value kinds ([§5.5](#55-value-kinds)) are a **closed** set
+and fail closed like any other, because a consumer is being asked to write
+something. Nothing in [§5](#5-requirements-on-the-application) needs an
+exception, which is why this section has none.
+
+### 4.5 Platform support
+
+```toml
+platforms = ["ios"]
+```
+
+Optional. Names the platforms on which the distribution **functions at all**. A
+consumer building for a platform not listed **MUST** fail, naming the
+distribution and how it entered the dependency closure.
+
+- Values **MUST** be platform names this document defines: `android`, `ios`. An
+  empty list is invalid.
+- Declaring a platform table for a platform the key omits is a contradiction. A
+  consumer **MUST** reject it, naming the distribution.
+- Omitting the key makes no claim, and is the default.
+
+**A missing platform table and a missing platform name are different claims.**
+No `[ios]` table means *I contribute no native material on iOS*; the package may
+still work there and simply need nothing. Omitting `android` from
+`platforms = ["ios"]` means something stronger: *I do not function on Android at
+all*.
+
+> **Note:** A platform-specific framework's Python wrapper installs fine on the
+> wrong platform, because its own content is pure Python and nothing in the
+> wheel objects. The build succeeds. The failure appears later, at `import`, or
+> never: a facade whose unimplemented branch is `pass` runs and does nothing.
+> [§4.4](#44-unknown-declarations-fail-closed) cannot catch this — there is no
+> key to reject, only a distribution that does not work here.
+>
+> This key makes a claim about the **distribution**, not about native material.
+> That reaches beyond this document's usual scope, and no other mechanism
+> carries the claim today.
 
 ## 5. Requirements on the application
 
@@ -201,9 +516,10 @@ deterministically.** If the consumer can take a string and write it to a known
 key, it is a value. If the application must create something, configure
 something, or make a claim the consumer cannot inspect, it is an action.
 
-Apply the test to the thing itself, not to how much you want it automated. A
-notification icon is a drawable someone must draw: the consumer has nowhere to
-put a string, so it is an action, however convenient a value would be.
+Classify by what the requirement is, not by which shape would be easier to
+satisfy. A notification icon is a drawable image someone must draw: there is
+no string for the consumer to write, so it is an action — however convenient
+declaring it as a value would be.
 
 ### 5.1 Build floors
 
