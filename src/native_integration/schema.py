@@ -532,10 +532,22 @@ def validate_document(
             _walk(PLATFORMS[key], value, key, ctx)
         elif key in PLATFORMS:
             continue  # another platform's table: legitimately not our concern
-        else:
+        elif isinstance(value, dict):
             bag.add(
                 rules.UNKNOWN_TOP_LEVEL,
                 f"`{key}` is not a table this specification defines — a future platform "
                 "and a misspelling are indistinguishable from here",
+                distribution,
+            )
+        else:
+            # §4.4 — the warning above exists because a future platform is
+            # indistinguishable from a typo. A future platform is a *table*, so
+            # a scalar cannot be one, and the key likeliest to be misspelled is
+            # `platforms`, whose whole point is a claim that otherwise fails
+            # silently (§4.5).
+            bag.add(
+                rules.UNKNOWN_KEY,
+                f"`{key}` is not a top-level key this specification defines, and is not "
+                "a table, so it cannot be a platform a later revision adds",
                 distribution,
             )

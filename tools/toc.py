@@ -33,6 +33,17 @@ START, END = "<!-- toc -->", "<!-- /toc -->"
 SKIP = {"Contents"}
 
 
+def uncoded(text: str) -> str:
+    """Blank fenced blocks, keeping line structure.
+
+    A ``# producer's native.toml`` comment inside an example is not a heading,
+    and the ordinal below must not count it as one.
+    """
+    return re.sub(
+        r"```.*?```", lambda m: re.sub(r"[^\n]", " ", m.group(0)), text, flags=re.S
+    )
+
+
 def anchor(heading: str) -> str:
     return re.sub(r"[^a-z0-9 -]", "", heading.lower()).replace(" ", "-")
 
@@ -57,13 +68,20 @@ def build(text: str) -> str:
     """
     out: list[str] = []
     ancestors: list[int] = []
-    for hashes, heading in re.findall(r"^(#{2,4}) (.+)$", text, re.M):
-        if heading in SKIP:
-            continue
+    seen: dict[str, int] = {}
+    # Every level is walked, because GitHub numbers a repeated heading in
+    # document order over the whole file; only levels 2 to 4 are listed.
+    for hashes, heading in re.findall(r"^(#{1,6}) (.+)$", uncoded(text), re.M):
+        base = anchor(heading)
+        nth = seen.get(base, 0)
+        seen[base] = nth + 1
+        target = base if nth == 0 else f"{base}-{nth}"
         level = len(hashes)
+        if heading in SKIP or not 2 <= level <= 4:
+            continue
         while ancestors and ancestors[-1] >= level:
             ancestors.pop()
-        out.append(f"{'  ' * len(ancestors)}- [{label(heading)}](#{anchor(heading)})")
+        out.append(f"{'  ' * len(ancestors)}- [{label(heading)}](#{target})")
         ancestors.append(level)
     return "\n".join(out)
 

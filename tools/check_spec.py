@@ -168,6 +168,27 @@ for line, body in quotes:
 check("rationale blocks state no requirement", problems)
 
 # --- 6. relative links resolve ----------------------------------------------
+def heading_anchors(text: str) -> set[str]:
+    """The anchors GitHub would generate, its -1/-2 disambiguation included.
+
+    Two sections here call a subsection "Common rules"; the second one's anchor
+    is `common-rules-1`, and a contents entry linking to the bare form points
+    silently at the first. Fenced blocks are blanked first, since a
+    `# producer's native.toml` comment is not a heading.
+    """
+    body = re.sub(
+        r"```.*?```", lambda m: re.sub(r"[^\n]", " ", m.group(0)), text, flags=re.S
+    )
+    seen: dict[str, int] = {}
+    found: set[str] = set()
+    for heading in re.findall(r"^#{1,6} (.+)$", body, re.M):
+        base = re.sub(r"[^a-z0-9 -]", "", heading.lower()).replace(" ", "-")
+        nth = seen.get(base, 0)
+        seen[base] = nth + 1
+        found.add(base if nth == 0 else f"{base}-{nth}")
+    return found
+
+
 problems = []
 for label, text, base in (
     ("README.md", README, ROOT),
@@ -183,10 +204,7 @@ for label, text, base in (
     for target in sorted(set(re.findall(r"\]\((?!https?:)([^)#]+)\)", text))):
         if not (base / target).exists():
             problems.append(f"{label} links to {target}, which does not exist")
-    headings = {
-        re.sub(r"[^a-z0-9 -]", "", h.lower()).replace(" ", "-")
-        for h in re.findall(r"^#{1,6} (.+)$", text, re.M)
-    }
+    headings = heading_anchors(text)
     for anchor in sorted(set(re.findall(r"\]\(#([a-z0-9-]+)\)", text))):
         if anchor not in headings:
             problems.append(f"{label} links to #{anchor}, which matches no heading")

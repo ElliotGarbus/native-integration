@@ -80,8 +80,8 @@ checklist, and §§3–7 are what it refers to.
   - [7.1 Symbol prefixes](#71-symbol-prefixes-ios)
   - [7.2 Build requirements](#72-build-requirements-iosrequires)
   - [7.3 Application prerequisites](#73-application-prerequisites-iosrequires)
-    - [Common rules](#common-rules)
-    - [What counts as satisfied](#what-counts-as-satisfied)
+    - [Common rules](#common-rules-1)
+    - [What counts as satisfied](#what-counts-as-satisfied-1)
     - [Conditional prerequisites](#conditional-prerequisites)
     - [The seven tables](#the-seven-tables)
   - [7.4 Swift packages](#74-swift-packages-ioscontributesswiftpackages)
@@ -724,6 +724,14 @@ be ignored. A consumer **SHOULD** warn about a top-level table it does not
 recognize at all, since it cannot distinguish a future platform from a
 misspelled one.
 
+**An unrecognized top-level key that is not a table MUST be rejected**, naming
+the distribution and the key. The tolerance above is for a platform this
+revision does not define, and a platform arrives as a *table*; nothing
+legitimate has the other shape. The key likeliest to be misspelled is
+`platforms`, and a `platfroms = ["ios"]` that only warned would discard the one
+claim §4.5 exists to carry — silently, which is the failure §4.5 was added to
+prevent.
+
 > Rationale: silently ignoring an unknown *contribution* is the dangerous case —
 > a 1.0 consumer skipping a 1.1 `content_providers` table builds an application
 > that is broken at runtime, far from the cause. Failing closed also catches
@@ -831,9 +839,9 @@ keep_classes = ["org.example.analytics.**"]
 
 # -------------------------------------------------------------------- iOS ---
 
-# Namespaces the Swift symbols this sidecar generates (§7.5).
-[ios]
-swift_symbol_prefixes = ["ExampleAnalytics"]
+# No `swift_symbol_prefixes` (§7.1): this package ships its Swift as a package
+# below, which compiles as its own module, so there are no loose symbols in the
+# application's target for a prefix to keep apart.
 
 # SDK floor the application must build against.
 [ios.requires]
@@ -1122,22 +1130,18 @@ supplied a value, the consumer emits nothing and fails the build, naming the
 distribution and the `reason`. A *requires* is checked, never auto-satisfied
 (§2.1).
 
-> **Why this table is Android-only, and why it stays that way.** No iOS case has
-> needed a build-embedded value: the iOS SDKs examined either take their
-> configuration through a runtime call or read a whole file (§7.3's
-> `application_files`). Sentry needs its DSN on both platforms but reaches it on
-> iOS through `SentrySDK.start`, which is a runtime call and not this table's
-> business.
->
-> When one does appear, the shape is a **parallel `[[ios.requires.application_values]]`
-> table** with its own delivery field — not this table promoted to the top level
-> with one delivery field per platform. That promotion looks tidier and cannot
-> work, because **the value itself is frequently per-platform**. An AdMob
-> application ID differs between Android and iOS, since the console registers a
-> separate app for each. Firebase encodes the platform *inside* the identifier —
-> `1:1234:android:…` against `1:1234:ios:…` — which is why `google-services.json`
-> and `GoogleService-Info.plist` carry different values rather than one value in
-> two formats.
+> **Why this table is Android-only rather than platform-neutral.** iOS has its
+> own — §7.3's `application_values`, which landed once five vendors needed one,
+> having been predicted here while no iOS case had yet asked for a value the
+> build must embed. The two are **parallel tables**, each with its own delivery
+> field, and not this one promoted to the top level with one delivery field per
+> platform. That promotion looks tidier and cannot work, because **the value
+> itself is frequently per-platform**. An AdMob application ID differs between
+> Android and iOS, since the console registers a separate app for each. Firebase
+> encodes the platform *inside* the identifier — `1:1234:android:…` against
+> `1:1234:ios:…` — which is why `google-services.json` and
+> `GoogleService-Info.plist` carry different values rather than one value in two
+> formats.
 >
 > A single entry answered once cannot express that. Producers would be forced to
 > invent `admob_app_id_android` and `admob_app_id_ios`, pushing the platform into
@@ -1544,7 +1548,7 @@ own merged manifest, and a **shared** provider such as AndroidX Startup's
 `InitializationProvider` is a contended singleton that must be merged rather
 than registered a second time. A future minor **MAY** introduce providers with
 a producer-declared authority *suffix* the consumer prefixes with the
-application ID — the form §4.3's rationale already imagines as a 1.1
+application ID — the form §4.4's rationale already imagines as a 1.1
 `content_providers` table — once a producer needs one.
 
 **Provenance.** A component's class comes from one of two places, and the entry
@@ -3014,8 +3018,9 @@ the durable disclosure that was the point.
 A conforming consumer **MUST**:
 
 1. Enforce the contract version gate, including the minor (§4.3), and fail
-   closed in platform tables it builds — on an unrecognized key, and on a value
-   from an open vocabulary it does not implement (§4.4).
+   closed on what it does not recognize: an unrecognized key in a platform table
+   it builds, a value from an open vocabulary it does not implement, and an
+   unrecognized top-level key that is not a table (§4.4).
 2. Restrict candidate producers to the application's dependency closure (§3.2).
 3. Discover by iterating the group, ignoring the entry-point name (§3.3), and
    never import the producing package or execute declared content (§2.1, §3.2).
@@ -3792,7 +3797,7 @@ key is 1.0, which is why nothing below carries a mark yet.
 | `requirement` | Exactly one of `{ exact }`, `{ from }`, `{ revision }`. `branch` is invalid |
 | **`[ios.contributes.src]`** §7.5 — no merge rule: §7.1 has nothing to enforce; **free** | |
 | `swift` | Directories of `.swift` staged into the application target. For small shims only |
-| `[[…accessed_api_types]]` — `type`, `reasons` | *union*; **disclosed**. Required-reason APIs the contributed Swift touches, merged into the application's `PrivacyInfo.xcprivacy`. Valid only alongside contributed Swift, since a §7.4 package carries its own manifest |
+| `[[ios.contributes.accessed_api_types]]` — `type`, `reasons` | *union*; **disclosed**. Required-reason APIs the contributed Swift touches, merged into the application's `PrivacyInfo.xcprivacy`. Valid only alongside contributed Swift, since a §7.4 package carries its own manifest |
 | **`[ios.contributes.info_plist]`** §7.6 — `values` is a *unique key with a value*, `append` and `skadnetwork_identifiers` are *union*; **free**, less the keys §7.6 rejects as **application-only** | |
 | `values` | Scalar keys set verbatim. Collisions fail; `*UsageDescription` keys are rejected |
 | `append` | Array keys merged with the application's and other producers', de-duplicated |

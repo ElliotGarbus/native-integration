@@ -89,6 +89,17 @@ def test_an_unrecognized_top_level_table_only_warns(parse):
     assert sidecar is not None and bag.ok
 
 
+def test_a_misspelled_top_level_key_is_rejected(parse):
+    """§4.4 — the warning above is for a future platform, which is a table.
+
+    `platfroms` is a scalar, so it cannot be one, and letting it warn would
+    discard §4.5's claim in the one case where nothing else carries it.
+    """
+    _, codes, bag = parse('contract = "1"\nplatfroms = ["ios"]\n')
+    assert codes == ["unknown-key"] and not bag.ok
+    assert "platfroms" in bag.items[0].message
+
+
 def test_a_wrong_type_names_the_key(parse):
     _, codes, bag = parse('contract = "1"\n[android.requires]\nmin_sdk = "24"\n')
     assert codes == ["type-invalid"]
