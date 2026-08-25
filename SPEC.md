@@ -44,7 +44,7 @@ checklist, and §§3–7 are what it refers to.
     - [What a consumer must be able to ask](#what-a-consumer-must-be-able-to-ask)
     - [The join key is not the consumer's to choose](#the-join-key-is-not-the-consumers-to-choose)
     - [Three answers, end to end](#three-answers-end-to-end)
-  - [2.3 The host the consumer generates](#23-the-host-the-consumer-generates)
+  - [2.3 Obligations on the consumer's bootstrap](#23-obligations-on-the-consumers-bootstrap)
   - [2.4 The patterns behind the tables](#24-the-patterns-behind-the-tables)
 - [3. Discovery](#3-discovery)
   - [3.1 The entry point](#31-the-entry-point)
@@ -360,19 +360,13 @@ by distribution first or by `id` first — is yours to design. What is fixed is
 only the leaf: the literal join key from the declaration, scoped by the
 declaring distribution wherever the table above requires it.
 
-### 2.3 The host the consumer generates
+### 2.3 Obligations on the consumer's bootstrap
 
-*For the two properties of the generated native entry point — an Android
-activity, an iOS app delegate — that material declared under this convention
-depends on, and that no producer can check. §2.2 covers what the application
-answers; this covers what the consumer provides before any sidecar is read.*
+*The consumer's bootstrap must provide two properties before any sidecar is
+read: an Android activity and an iOS app delegate that meet the rules below.*
 
-Both obligations are **scoped to a consumer that generates the host**. A
-consumer whose application author writes their own activity or app delegate has
-nothing here to make conform, and neither clause applies to it.
-
-**Android.** A consumer that generates the application's Android activity
-**MUST** make it an `androidx.activity.ComponentActivity`, or a subclass of one.
+**Android.** The consumer's bootstrap **MUST** make the Android activity it
+generates an `androidx.activity.ComponentActivity`, or a subclass of one.
 
 > Rationale. Current Android SDKs return their results through the
 > activity-result contract — `registerForActivityResult` — which is declared on
@@ -387,23 +381,23 @@ nothing here to make conform, and neither clause applies to it.
 > deliberately: the alternative spellings all describe the same type in more
 > words. A minor revision revisits it when Android's mainstream moves.
 
-**iOS.** A consumer that generates the application's app delegate **MUST NOT**
-consume a URL callback delivered to `application(_:open:options:)` without
-providing a documented means for application code to observe it.
+**iOS.** The consumer's bootstrap **MUST NOT** consume a URL callback delivered
+to `application(_:open:options:)` without providing a documented means for
+application code to observe it.
 
 > Rationale. §7.3's `url_schemes` asks the application for two things: register
 > a scheme, and forward the resulting callback to the SDK's handler. In this
 > ecosystem the application author writes Python and the app delegate belongs to
-> the consumer, so a generated delegate that swallows the callback — dispatching
-> it as something else, or dropping it — leaves a prerequisite nobody can
-> satisfy. An application acknowledging that it forwarded the callback would
-> then be wrong through no fault of its own, which turns §7.3's disclosure into
-> the opposite of disclosure.
+> the consumer's bootstrap, so one that swallows the callback — dispatching it
+> as something else, or dropping it — leaves a prerequisite nobody can satisfy.
+> An application acknowledging that it forwarded the callback would then be
+> wrong through no fault of its own, which turns §7.3's disclosure into the
+> opposite of disclosure.
 
 Neither clause gives a producer a way to run code at startup or to participate
 in a lifecycle callback. §11's exclusion of runtime lifecycle composition is
-untouched: what is required here is a property of a host the consumer already
-writes, not a seam for producer code to enter.
+untouched: what is required here is a property of the bootstrap the consumer
+already writes, not a seam for producer code to enter.
 
 ### 2.4 The patterns behind the tables
 
@@ -2996,7 +2990,7 @@ gives the thematic reading:
 | Recording, disclosure, attribution | 9, 15, 19, 25, 33, 37 |
 | Platform applicability | 18 |
 | The application's side of the contract | 7, 26 |
-| The host the consumer generates | 28, 29 |
+| Obligations on the consumer's bootstrap | 28, 29 |
 | Composition between distributions | 16, 30, 32, 35 |
 
 **Three outcomes, and no others.** What a consumer finds falls into exactly
@@ -3099,11 +3093,11 @@ A conforming consumer **MUST**:
     under one `id`, which the application could not answer separately (§7.3).
 27. Compile contributed `.java` sources with UTF-8 forced, never the platform
     default (§6.4).
-28. When it generates the application's Android activity, make it an
-    `androidx.activity.ComponentActivity` or a subclass (§2.3).
-29. When it generates the application's iOS app delegate, provide a documented
-    means for application code to observe a URL callback delivered to
-    `application(_:open:options:)`, rather than consuming it (§2.3).
+28. Make the bootstrap's Android activity an `androidx.activity.ComponentActivity`
+    or a subclass (§2.3).
+29. Provide a documented means for application code to observe a URL callback
+    delivered to the bootstrap's `application(_:open:options:)`, rather than
+    consuming it (§2.3).
 30. Detect packaging collisions between the resolved artifacts of different
     distributions; resolve only packaging metadata on its own authority, fail on
     a colliding native library the application has not chosen between, and

@@ -302,12 +302,12 @@ Particularly wanted, most useful first:
    been written and every one by the same hand, which is the gap no further
    example of mine can close. Pick a package you know and try to declare its
    native half; where you get stuck is the finding.
-2. **If you maintain a build tool: could you generate the host §2.3 asks for?**
-   That clause requires a tool that generates the application's Android
-   activity to make it an `androidx.activity.ComponentActivity`, and one that
-   generates the iOS app delegate not to swallow URL callbacks. It is the only
-   place this convention makes a demand on a tool's own architecture, and the
-   cost of it is knowable only by whoever would pay it.
+2. **If you maintain a build tool: could your bootstrap meet §2.3?** That
+   clause requires the bootstrap's Android activity to be an
+   `androidx.activity.ComponentActivity`, and its iOS app delegate not to
+   swallow URL callbacks. It is the only place this convention makes a demand
+   on a tool's own architecture, and the cost of it is knowable only by
+   whoever would pay it.
 3. **Does the app-keeps-authority split land in the right place?** Where the
    application owns the artifact, a package states the need rather than writing
    it. Most of the design follows from that line, so it is the most valuable
