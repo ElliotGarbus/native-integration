@@ -34,7 +34,7 @@ to do.
 
 That leaves two prerequisite tables where the first attempt has thirteen:
 
-```toml
+```text
 [[<platform>.requires.application_value]]
 id          # the join key, scoped by (distribution, id, platform)
 kind        # where the consumer delivers it: manifest_meta_data,
@@ -55,6 +55,11 @@ reason      # why it is needed, and what breaks without it
 instructions # OPTIONAL path to prose in the wheel
 conditional
 ```
+
+> That sketch is the schema **as tested**, and two parts of it did not survive
+> the first review: `kind` left the action along with the verification idea it
+> served, and `instructions` is an inline string rather than a path. The
+> current shape is in [outline.md](outline.md) §6.3.
 
 The contributions half of the first attempt — `owns`, source, Gradle dependencies and
 repositories, Swift packages, permissions, features, components, `meta_data`,
@@ -118,6 +123,12 @@ action carries an optional `kind` (V2).
 
 ### V1 — actions must fail *open*, where the first attempt fails closed
 
+> **Withdrawn** by [review-01](review-01.md) §11. The rule below was invented to
+> protect an open `kind` on the action; with verification removed from v1 there
+> is no open vocabulary in the requires section, and §4.4 carries unchanged. The
+> maintenance win is real and its cause is simpler than this: **an action is
+> prose and carries no vocabulary at all.** Original reasoning follows.
+
 The load-bearing decision. §4.4 makes a consumer reject any value it does not
 implement, and that rule is precisely why each new platform construct needs a
 new table: an unknown `kind` is a build failure, so the specification has to
@@ -136,6 +147,13 @@ Google ships something new, and it is the whole reason the model is cheaper to
 maintain. It should be argued for explicitly rather than left as a default.
 
 ### V2 — an opaque action blinds five checks; `kind` is the cheap fix
+
+> **Diagnosis kept, remedy withdrawn** by [review-01](review-01.md) §3. Five
+> checks are indeed lost, of which four were sound. The `kind` hint below does
+> not recover them safely: a check that cannot satisfy an action buys only a
+> better message, and one that can reports *done* for a requirement that is not
+> met. v1 accepts the loss and revisits it on support evidence. Original
+> reasoning follows.
 
 An entitlement key's presence, a capability key's value, a bundle file being
 wired in — a consumer that generates the project can check all three today. A

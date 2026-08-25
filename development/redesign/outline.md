@@ -59,18 +59,15 @@ entry-point group stays `native_integration.v1`.
 §§4.1, 4.2, 4.3, 4.5 verbatim: location, one file for all platforms, the
 contract version and its under-declaration rule, `platforms`.
 
-§4.4 is where the redesign's load-bearing rule lands. Today it says everything
-fails closed. It must now say **two things**:
+§4.4 **carries unchanged**, which is the outline's most surprising line. The
+probe expected to carve a fail-open exception into it for actions; removing
+`verify` ([review-01](review-01.md) §11) leaves the requires section with no
+open vocabulary to except. Everything still fails closed, and the maintenance
+property comes from an action table that has nothing to enumerate rather than
+from an exception to the rule.
 
-- a contribution, a key, or a value in a *closed* vocabulary still fails
-  closed — unchanged, and for the reason the first attempt gives;
-- **an action whose `kind` a consumer does not implement degrades to a manual
-  instruction, and does not fail the build** (V1). Safe here and nowhere else,
-  because an action is a `requires` and grants the producer nothing; the worst
-  case is a person reading a sentence.
-
-That asymmetry is the whole maintenance argument and needs to be argued in
-place, not assumed.
+Worth one paragraph of rationale saying so, because a reader who knows the
+first attempt will expect the exception and should be told why there is none.
 
 ### 5. Structure — **rewritten**
 
@@ -93,21 +90,24 @@ The centre of the change. Replaces §6.2, §6.3, §6.11, §7.2 and §7.3.
   identity being `(distribution, id)` scoped by platform, which the
   mediated-ads trio proved.
 - **6.3 Actions the application performs** — one table. `id`, `summary`,
-  `reason`, and the optional `instructions`, `acceptance`, `uses`, `verify`,
-  `slot`, `conditional`. `verify` is a separate inline block so that an
-  unrecognized check degrades without the requirement degrading with it;
-  `acceptance` states the end state for whoever does the work; `uses` names the
-  values the action consumes. `template`, `reference` and `destination_hint`
-  are deferred. Carries §7.3's `conditional` semantics unchanged.
-- **6.4 What counts as satisfied** — the three tiers (V7): a value is satisfied
-  when its placeholder is gone, an action with a known `kind` by that kind's
-  check, an opaque action by acknowledgement. This is where §2.4's one durable
-  idea lands.
-- **6.5 Kinds and slots** — the per-platform `verify.kind` vocabulary,
-  explicitly **non-normative and open**; and `slot` as an opaque contention key
-  taken from the platform's own identifiers, which the specification never
-  enumerates. A consumer implements what it can, degrades on the rest, and
-  compares slots only for equality.
+  `reason`, and the optional `instructions`, `acceptance`, `uses`, `slot`,
+  `conditional`. `acceptance` states the end state for whoever does the work;
+  `uses` names the values the action consumes; `slot` reports contention over a
+  platform singleton. **No verification mechanism** ([review-01](review-01.md)
+  §3): a check that cannot satisfy buys only a better message, and one that can
+  reports *done* for a requirement that is not met. `template`, `reference` and
+  `destination_hint` are deferred. Carries §7.3's `conditional` semantics
+  unchanged.
+- **6.4 What counts as satisfied** — two tiers: a value when its placeholder is
+  gone, an action when the application acknowledges it by `(distribution, id)`.
+  Plus the sentence that keeps the second from reading as a prohibition: a
+  consumer **MAY** report what it inherently knows, since it is the party
+  assembling the bundle. This is where §2.4's one durable idea lands.
+- **6.5 Kinds and slots** — the **closed** `application_value.kind` set, which
+  fails closed because the consumer is being asked to write something; and
+  `slot` as an opaque contention key taken from the platform's own identifiers,
+  which the specification never enumerates and a consumer only ever compares
+  for equality.
 - **6.6 Instructions** — the new channel and its rule: data shown to a human, a
   consumer never acts on it, and the file is a declared resource so §10's
   per-file hashing surfaces a change between versions.
@@ -208,13 +208,11 @@ them.
    outline.
 2. ~~Whether a value can live inside an action.~~ **Answered** in
    [review-01](review-01.md): the action states the outcome, the value is
-   declared separately, and `uses` ties them. What stays open is whether
-   `verify` and `acceptance` may reference each other.
-3. **Whether `verify.kind` values need a registry.** Open-and-degrading is what
-   makes the model cheap and also means two consumers check different things. A
-   non-normative list extended without a version bump is probably right, and it
-   is the seam where this design could regrow what it replaced — the most
-   likely way the redesign fails.
+   declared separately, and `uses` ties them.
+3. ~~Whether `verify.kind` values need a registry.~~ **Answered by deletion.**
+   There is no verification vocabulary, so there is nothing to register and
+   nothing to diverge over. This was the seam where the design could have
+   regrown what it replaced.
 4. **Whether `[[android.contributes.r8.keep]]` earns its cost.** Its
    `from_dependency` check needs an archive-listing port — one of the four
    obligations that need something only a build tool has — to verify a keep

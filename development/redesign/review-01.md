@@ -117,7 +117,45 @@ already implemented.
 > If it appears, `delivery = { …, mode = "append_unique" }` is the shape, and
 > two modes are enough.
 
-## 3. `verify` as a separate optional block — adopt
+## 3. `verify` — **removed from v1**
+
+> **Decision.** `verify` does not go into version 1, in any form. The analysis
+> below stands and reaches the wrong conclusion; what it missed is that
+> separating `verify` from the action does not resolve the dilemma underneath
+> it, it only makes the dilemma legible.
+>
+> **Either a check can satisfy an action, or it cannot.** If it cannot, the
+> action blocks on acknowledgement anyway and `verify`'s whole contribution is
+> a better error message. If it can, a partial check reports *satisfied* for a
+> requirement that is not met — which is FT1's false pass, generalised and made
+> systematic, and which the first attempt already forbids in terms: *"A consumer
+> MUST NOT treat that inspectable half as sufficient on its own, since it would
+> only prove half of what was asked for."*
+>
+> Of the first attempt's checks, exactly two are complete — a packaged file's
+> presence, and a plist key holding a stated value. Four normative concepts to
+> keep two checks, one of which the consumer can perform anyway because it is
+> the party assembling the bundle.
+>
+> **What is given up**, stated plainly: four sound checks
+> (`plist_capabilities`, `application_files` on both platforms, `resources`).
+> The mistake they would have caught is *acknowledged but not done* — a false
+> claim rather than an omission, since a forgotten action still blocks. It
+> surfaces between a `codesign` error at archive and a white notification icon
+> in production, which is the range the first attempt already accepts for the
+> four tables it made acknowledgement-only.
+>
+> **What is gained**: a consumer that never tells anyone they are finished when
+> they are not. A missed check fails the author who made the false claim, and
+> §9's record proves the claim. A false pass fails someone who did everything
+> they were asked.
+>
+> **Revisit when** support traffic shows the pattern — applications
+> acknowledging a packaged-file requirement and failing on it — rather than on
+> argument. That is the falsifiable form, and it needs a consumer with users
+> before it can produce evidence.
+>
+> Original reasoning follows.
 
 The probe put `kind`, `key` and `value` on the action itself. That conflates two
 questions, and the review is right to split them.
@@ -190,7 +228,6 @@ existed. It cannot produce a false collision, only a missed one.
 | `instructions` | **yes**, inline string | HC2's XML is fifteen lines and fits; a file path adds resource rules for nothing yet |
 | `acceptance` | **yes** | see §6 — the idea that makes *manual* mean something |
 | `uses` | **yes** | without it §1's split requirements are incoherent |
-| `verify` | **yes** | §3 |
 | `slot` | **yes** | §4 |
 | `conditional` | **yes** | carries from the first attempt, where it earned its place twice |
 | `template` | **defer** | see below |
@@ -269,12 +306,10 @@ suppression, export approval, and repository scope bounding.
 
 Asked for honestly, and there are four places.
 
-1. **The taxonomy moves into `verify.kind`.** If consumers compete on how many
-   kinds they implement, the ecosystem regrows the taxonomy informally, outside
-   the document where nobody can audit it. This is the most likely way the
-   redesign fails. Mitigations: a non-normative list of known kinds in the
-   specification, and a report that shows which actions were verified and which
-   were acknowledged, so a consumer's coverage is visible rather than claimed.
+1. ~~The taxonomy moves into `verify.kind`.~~ **Retired by §3's decision.**
+   This was the most likely way the redesign fails — consumers competing on how
+   many kinds they implement, regrowing the taxonomy informally outside the
+   document where nobody can audit it. Removing `verify` removes it.
 2. **Prose quality replaces schema coverage.** A bad `instructions` block is
    worse than a missing table, because it looks complete. The first attempt
    could be wrong in ways a checker caught; this cannot.
@@ -328,6 +363,49 @@ That is a substantial success, and it is a different claim from "the
 specification is simpler to implement". The new document should make it in those
 words.
 
+## 11. What removing `verify` does to the rest of the model
+
+Larger than the field it deletes, and it corrects the probe's headline finding.
+
+**V1 claimed that failing open on an unknown `kind` was the load-bearing
+maintenance property.** It is not. What delivers the maintenance win is that
+**an action is prose and carries no vocabulary at all** — a new Apple or Android
+construct needs no specification change because the action describes it in
+words. The fail-open rule was invented to protect an open `kind` that the probe
+had put on the action, and once `verify` is gone there is no open vocabulary in
+the requires section for it to protect:
+
+| Field | Kind of thing | Rule |
+| --- | --- | --- |
+| `application_value.kind` | delivery semantics — the consumer writes something | **closed**, fails closed (the review's own division) |
+| `slot` | opaque contention key | compared for equality, never interpreted |
+| `summary`, `reason`, `instructions`, `acceptance` | prose | not a vocabulary |
+
+So **§4.4 needs no new rule.** The first attempt's *everything fails closed*
+stands unchanged, and the redesign's maintenance property comes from a table
+that has nothing to enumerate rather than from an exception carved into the
+rule. One fewer normative concept, and the concept removed is the one that
+would have been hardest to defend.
+
+> **V21 — the redesign needs no change to §4.4, and V1 is withdrawn.** A rule
+> proposed to protect a field, deleted along with the field. Worth recording
+> because the probe presented that rule as the centre of the design, and the
+> centre turns out to be something simpler that was true all along.
+
+## Satisfaction, reduced to two tiers
+
+V7 described three. With `verify` gone there are two:
+
+| Form | Satisfied when | Strength |
+| --- | --- | --- |
+| value | the placeholder is gone | strong, and machine-checked |
+| action | the application acknowledges by `(distribution, id)` | a claim, recorded and attributable |
+
+A consumer **MAY** still report what it inherently knows — it is the party
+assembling the bundle, so it knows whether a named file is in it — and the new
+document should say so where it defines actions. Removing the mechanism is not
+a prohibition on diligence, and leaving that unsaid would read like one.
+
 ## Revisions to earlier findings
 
 | Finding | Change |
@@ -335,16 +413,18 @@ words.
 | **V3** (`slot`) | superseded by **V19**: slots are platform-derived and carry no vocabulary. The probe's `ios:extension:notification_service` spelling is withdrawn. |
 | **V4** (delivery site) | restated semantically as §1's boundary; the schema rule survives as its test. |
 | **V8** (Airship's two paths) | *"the model should have no way to say either/or"* is too strong. Corrected: **v1 omits alternatives deliberately**, the producer chooses, and the case for revisiting is a vendor whose two paths are genuinely equivalent and both common. |
+| **V1** (fail open) | **withdrawn** — see §11. The maintenance win is that actions carry no vocabulary; there is nothing left to fail open on. |
+| **V7** (three tiers) | reduced to two: placeholder for values, acknowledgement for actions. |
+| **V18** (`verify` as a block) | **withdrawn** with `verify` itself. |
 | **V12** (entitlement values) | the diagnosis stands — the first attempt's key-only check is a false pass. The remedy was wrong: it is an action carrying a value by `uses`, not a value alone. |
 | **FT1, FT3** | the fragments in [forward-test.md](forward-test.md) are superseded by §1's shape. |
 
 ## Still open
 
-- **Whether `verify` and `acceptance` should be allowed to reference each
-  other** — a criterion that happens to be machine-checkable is exactly what
-  `verify` describes, and saying so twice invites them to disagree.
-- **Whether the non-normative `kind` list lives in the specification or beside
-  it.** In it, and it accretes; outside it, and two consumers diverge with
-  nothing to point at.
+- ~~Whether `verify` and `acceptance` may reference each other.~~ Moot: there
+  is no `verify`, and `acceptance` is the only structured statement of done.
+- ~~Where the non-normative `kind` list lives.~~ Moot for actions. Value kinds
+  remain a **closed** set that fails closed, because a consumer must know how
+  to place a value.
 - **`[[r8.keep]]`'s archive-listing port**, still the one automated-core item
   that has not been re-tested against an adoption-first target.
