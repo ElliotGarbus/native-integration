@@ -3191,7 +3191,8 @@ acquires *all* of its inherited native surface at once.
 #### The report
 
 A report **MUST** carry three things — the distribution, **how it entered the
-dependency closure**, and the delta:
+dependency closure**, and the delta. It covers **one platform's build**, since
+that is what a consumer computes (§2.2); the example below is an Android one:
 
 ```
 analytics-shim 2.1.0  (via some-ui-lib)
@@ -3204,8 +3205,8 @@ map-sdk 4.1.0  (direct dependency)
   + dependency  com.example.maps:android:4.1.0
   + from com.example.maps:android:4.1.0 (resolved artifact manifest):
       + permission  com.example.permission.MAPS_ID
-  ! requires    NSLocationWhenInUseUsageDescription  ✗ not supplied by application
-  ~ requires    NSLocationAlwaysAndWhenInUseUsageDescription  (conditional, unresolved)
+  ! requires    application_files  maps-config.json   ✗ not supplied by application
+  ~ requires    app_links  map_deep_links   (conditional, unresolved)
 ```
 
 The middle element matters most for the case that motivates the requirement — a
@@ -3216,9 +3217,15 @@ elsewhere in this specification: a repository contribution is set apart rather
 than folded into a list (§6.6); contributions arriving from a **resolved
 artifact's own manifest** are attributed to that artifact rather than to the
 distribution that declared the coordinate (below); and an unmet prerequisite is
-distinguished from an unresolved **conditional** one (§7.3), because the first
-blocks the build and the second is guidance. No format is mandated — only that a
-report which collapses these distinctions has not reported them.
+distinguished from an unresolved **conditional** one (§6.11, §7.3), because the
+first blocks the build and the second is guidance. No format is mandated — only
+that a report which collapses these distinctions has not reported them.
+
+A prerequisite belonging to the platform **not** being built belongs in neither
+the report nor the record: an `[ios]` table is outside an Android build's
+concern (§4.4), and a consumer that reported an unsatisfied iOS purpose string
+against an Android build would be failing it (§7.3 rule 4) for something that
+build never had to satisfy.
 
 #### Hashing the integration inputs
 
@@ -3798,31 +3805,48 @@ live inside its own lock file is conforming without resembling this at all.
 
 ```json
 {
-  "record": 1,
-  "platform": "android",
   "contract": "1",
   "distributions": [
     {
-      "name": "pystripe",
-      "version": "2.1.0",
-      "origin": "via some-ui-lib",
+      "artifacts": { "com.example.maps:android:4.1.0": "sha256:0d3e…" },
       "contract": "1",
-      "inputs": {
-        "java/org/pystripe/PaymentReturnActivity.java": "sha256:9f2c…",
-        "native.toml": "sha256:cde8…"
-      },
       "entries": [
-        "permission android.permission.INTERNET  (\"Stripe API calls\")",
+        "source java/com/example/maps/MapBridge.java",
+        "dependency com.example.maps:android:4.1.0",
+        "REPOSITORY https://maven.example.com/releases → com.example.maps  authenticated — credentials configured",
+        "requires app_links map_deep_links (conditional, unresolved)",
+        "from com.example.maps:android:4.1.0 (resolved artifact manifest): permission com.example.permission.MAPS_ID"
+      ],
+      "inputs": {
+        "java/com/example/maps/MapBridge.java": "sha256:9f2c…",
+        "native.toml": "sha256:71ff…"
+      },
+      "name": "map-sdk",
+      "origin": "direct dependency",
+      "swift": {},
+      "swift_binaries": {},
+      "version": "4.1.0"
+    },
+    {
+      "artifacts": { "com.stripe:stripe-android:21.6.0": "sha256:4b1a…" },
+      "contract": "1",
+      "entries": [
+        "permission android.permission.INTERNET  (\"Stripe API calls and 3D Secure authentication\")",
         "component activity org.pystripe.PaymentReturnActivity (exported)",
         "  view_link org.pystripe.PaymentReturnActivity: scheme trailmap-pay, host stripe-redirect",
         "dependency com.stripe:stripe-android  requested [21.0.0, 22.0.0) → resolved 21.6.0",
-        "requires url_schemes stripe_3ds_callback (conditional, unresolved)"
+        "keep org.pystripe.**"
       ],
-      "artifacts": { "com.stripe:stripe-android:21.6.0": "sha256:4b1a…" },
+      "inputs": { "native.toml": "sha256:cde8…" },
+      "name": "pystripe",
+      "origin": "via some-ui-lib",
       "swift": {},
-      "swift_binaries": {}
+      "swift_binaries": {},
+      "version": "2.1.0"
     }
-  ]
+  ],
+  "platform": "android",
+  "record": 1
 }
 ```
 
@@ -3832,8 +3856,9 @@ rather than merely present:
 - **One line per contributed thing.** A set difference over `entries` *is* the
   delta a reviewer reads, so the report of §9 needs no separate computation and
   a `git diff` is already legible.
-- **Sorted keys, UTF-8, one contribution per line.** The record is normally
-  committed; anything that reorders between runs turns review into noise.
+- **Sorted keys, distributions in normalized-name order, UTF-8, one
+  contribution per line.** The record is normally committed; anything that
+  reorders between runs turns review into noise.
 - **No credential, ever.** An authenticated repository appears as
   `REPOSITORY … authenticated — credentials configured`. That the repository
   needs a credential is a fact about the integration; the credential is not
