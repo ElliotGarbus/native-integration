@@ -2976,17 +2976,17 @@ gives the thematic reading:
 
 | Theme | Requirements |
 | --- | --- |
-| Discovery and the sidecar | 1, 2, 3, 4, 14 |
+| Discovery and the sidecar | 1, 2, 3, 4, 14, 38, 40 |
 | Exclusive claims and namespaces | 5, 17 |
-| **Never satisfy a prerequisite** | 6, 8, 21, 22, 23, 25 |
+| **Never satisfy a prerequisite** | 6, 8, 21, 22, 23, 25, 31 |
 | The application's authority | 7 |
 | Native dependency resolution | 10, 12, 16 |
-| Generated manifest and project material | 11, 13, 20, 24, 27 |
-| Recording, disclosure, attribution | 9, 15, 19, 25 |
+| Generated manifest and project material | 11, 13, 20, 24, 27, 32, 33, 34, 35, 36, 37, 39 |
+| Recording, disclosure, attribution | 9, 15, 19, 25, 33, 37 |
 | Platform applicability | 18 |
 | The application's side of the contract | 7, 26 |
 | The host the consumer generates | 28, 29 |
-| Composition between distributions | 16, 30 |
+| Composition between distributions | 16, 30, 32, 35 |
 
 **Three outcomes, and no others.** What a consumer finds falls into exactly
 three kinds, named here so that two implementations classify the same condition
@@ -3007,7 +3007,8 @@ the durable disclosure that was the point.
 A conforming consumer **MUST**:
 
 1. Enforce the contract version gate, including the minor (§4.3), and fail
-   closed on unrecognized keys in platform tables it builds (§4.4).
+   closed in platform tables it builds — on an unrecognized key, and on a value
+   from an open vocabulary it does not implement (§4.4).
 2. Restrict candidate producers to the application's dependency closure (§3.2).
 3. Discover by iterating the group, ignoring the entry-point name (§3.3), and
    never import the producing package or execute declared content (§2.1, §3.2).
@@ -3095,6 +3096,43 @@ A conforming consumer **MUST**:
     distributions; resolve only packaging metadata on its own authority, fail on
     a colliding native library the application has not chosen between, and
     record every collision against the distributions responsible (§9.1).
+31. Report every §6.11 prerequisite, naming the distribution; fail when an
+    unconditional one is unsatisfied — judged by that section's satisfaction
+    table — and record an unsatisfied conditional one without failing; never
+    create the file, generate the resource, or synthesize the class that would
+    satisfy one (§6.11).
+32. Merge contributed `meta_data` and §6.3's delivered values as **one**
+    manifest key space: coalesce equal values keeping both provenance records,
+    fail on differing ones naming both distributions, and keep and report the
+    application's own entry where it sets the key. Reject a resource reference
+    as a `meta_data` value unless it names a `resources` entry the same sidecar
+    declares (§6.10, §6.11).
+33. Reject a `queries` entry declaring both or neither of `package` and
+    `provider_authority`, merge entries as a union, and report each with the
+    distribution that asked for it (§6.12).
+34. Reject `foreground_service_type` on a component that is not a service
+    (§6.8).
+35. Enforce §7.6's TOML-to-plist mapping, rejecting any other type and any
+    array that is not homogeneous; fail on two distributions setting one
+    `values` key differently, and on a key the consumer manages itself; keep
+    and report the application's value where it sets one; render
+    `SKAdNetworkItems` only from `skadnetwork_identifiers`, rejecting that key
+    offered through `values` or `append` and rejecting an identifier that is
+    not lowercase and `.skadnetwork`-suffixed (§7.6, §7.3).
+36. Reject `accessed_api_types` from a sidecar that contributes no Swift
+    source, and merge what it declares into the application's
+    `PrivacyInfo.xcprivacy` in the order §7.5 fixes (§7.5).
+37. Link the application target so that Objective-C categories in statically
+    linked libraries are loaded when any distribution declares
+    `objc_categories`, and record it naming the distributions that asked
+    (§7.8).
+38. Be able to state the contract version it implements, so a package author
+    can tell whether adopting a minor strands their users (§4.3).
+39. Reject a component attributed through `from_dependency` to a dependency the
+    same sidecar does not declare (§6.8).
+40. Reject a sidecar that reuses a local identifier the application would have
+    to answer under: two `application_values` sharing an `id` (§6.3), or two
+    Swift packages sharing a `name` (§7.4).
 
 > Rationale for 16. Every other rule here assumes native resolution *succeeds*.
 > It need not: two distributions in one closure can declare native dependencies

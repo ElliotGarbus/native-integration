@@ -65,11 +65,11 @@ COMPONENT_OUTSIDE_NAMESPACE = _rule("component-outside-namespace", "§6.1", ERRO
 FLOOR_UNMET = _rule("floor-unmet", "§6.2", ERROR, 8)
 
 # --- application values (§6.3) ---------------------------------------------
-APPLICATION_VALUE_DUPLICATE = _rule("application-value-duplicate", "§6.3", ERROR, 1)
+APPLICATION_VALUE_DUPLICATE = _rule("application-value-duplicate", "§6.3", ERROR, 40)
 APPLICATION_VALUE_UNRESOLVED_REF = _rule("application-value-unresolved-ref", "§6.3", ERROR, 8)
 APPLICATION_VALUE_UNSUPPLIED = _rule("application-value-unsupplied", "§6.3", ERROR, 8, 26)
-META_DATA_CONFLICT = _rule("meta-data-conflict", "§6.3", ERROR, 8)
-META_DATA_APPLICATION_OVERRIDE = _rule("meta-data-application-override", "§6.3", NOTE, 8)
+META_DATA_CONFLICT = _rule("meta-data-conflict", "§6.3, §6.10", ERROR, 32)
+META_DATA_APPLICATION_OVERRIDE = _rule("meta-data-application-override", "§6.3, §6.10", NOTE, 32)
 
 # --- source (§6.4, §7.5) ----------------------------------------------------
 SOURCE_ROOT_MISSING = _rule("source-root-missing", "§6.4", ERROR, 4)
@@ -82,7 +82,7 @@ DEPENDENCY_CONFIGURATION = _rule("dependency-configuration", "§6.5", ERROR, 12)
 DEPENDENCY_VERSION_SUBSTITUTED = _rule("dependency-version-substituted", "§6.5", NOTE, 12)
 DEPENDENCY_CHECKSUM_MISMATCH = _rule("dependency-checksum-mismatch", "§6.5", ERROR, 12)
 RESOLUTION_FAILED = _rule("resolution-failed", "§6.5", ERROR, 16)
-SWIFT_PACKAGE_DUPLICATE_NAME = _rule("swift-package-duplicate-name", "§7.4", ERROR, 1)
+SWIFT_PACKAGE_DUPLICATE_NAME = _rule("swift-package-duplicate-name", "§7.4", ERROR, 40)
 SWIFT_BRANCH_REQUIREMENT = _rule("swift-branch-requirement", "§7.4", ERROR, 12)
 SWIFT_GRAPH_UNPINNABLE = _rule("swift-graph-unpinnable", "§7.4", ERROR, 12)
 SWIFT_BINARY_CHECKSUM_MISMATCH = _rule("swift-binary-checksum-mismatch", "§7.4", ERROR, 12)
@@ -104,7 +104,7 @@ PERMISSION_SUPPRESSED = _rule("permission-suppressed", "§6.7", NOTE, 7)
 COMPONENT_DUPLICATE = _rule("component-duplicate", "§6.8", ERROR, 8)
 COMPONENT_EXPORT_UNAPPROVED = _rule("component-export-unapproved", "§6.8", ERROR, 8)
 COMPONENT_EXPORT_FORBIDDEN_KEY = _rule("component-export-forbidden-key", "§6.8", ERROR, 6)
-COMPONENT_DEPENDENCY_UNDECLARED = _rule("component-dependency-undeclared", "§6.8", ERROR, 1)
+COMPONENT_DEPENDENCY_UNDECLARED = _rule("component-dependency-undeclared", "§6.8", ERROR, 39)
 COMPONENT_CLASS_ABSENT = _rule("component-class-absent", "§6.8", WARN, 1)
 VIEW_LINKS_INVALID = _rule("view-links-invalid", "§6.8", ERROR, 13)
 INTENT_FILTER_INVALID = _rule("intent-filter-invalid", "§6.8", ERROR, 24)
@@ -114,9 +114,9 @@ KEEP_OUTSIDE_NAMESPACE = _rule("keep-outside-namespace", "§6.9", ERROR, 11, 17)
 KEEP_DEPENDENCY_UNDECLARED = _rule("keep-dependency-undeclared", "§6.9", ERROR, 11)
 KEEP_MATCHES_FOREIGN_CLASS = _rule("keep-matches-foreign-class", "§6.9", ERROR, 11)
 
-# --- iOS prerequisites (§7.3) ----------------------------------------------
-PREREQUISITE_UNSATISFIED = _rule("prerequisite-unsatisfied", "§7.3", ERROR, 8, 21, 23)
-PREREQUISITE_CONDITIONAL = _rule("prerequisite-conditional", "§7.3", NOTE, 22)
+# --- prerequisites (§6.11, §7.3) --------------------------------------------
+PREREQUISITE_UNSATISFIED = _rule("prerequisite-unsatisfied", "§6.11, §7.3", ERROR, 8, 21, 23, 31)
+PREREQUISITE_CONDITIONAL = _rule("prerequisite-conditional", "§6.11, §7.3", NOTE, 22, 31)
 PREREQUISITE_CONDITION_UNSTATED = _rule("prerequisite-condition-unstated", "§7.3", WARN, 1)
 PREREQUISITE_ID_DUPLICATE = _rule("prerequisite-id-duplicate", "§7.3", ERROR, 26)
 EXTENSION_KIND_UNIMPLEMENTED = _rule("extension-kind-unimplemented", "§7.3", ERROR, 1)
@@ -124,17 +124,21 @@ EXTENSION_KIND_UNIMPLEMENTED = _rule("extension-kind-unimplemented", "§7.3", ER
 # --- Info.plist (§7.6) ------------------------------------------------------
 PLIST_USAGE_DESCRIPTION = _rule("plist-usage-description", "§7.6", ERROR, 6)
 PLIST_CAPABILITY_KEY = _rule("plist-capability-key", "§7.6", ERROR, 6)
-SKADNETWORK_IDENTIFIER_INVALID = _rule("skadnetwork-identifier-invalid", "§7.6", ERROR, 1)
-SKADNETWORK_ITEMS_KEY = _rule("skadnetwork-items-key", "§7.6", ERROR, 1)
-META_DATA_RESOURCE_REFERENCE = _rule("meta-data-resource-reference", "§6.10", ERROR, 1)
-QUERY_FORM = _rule("query-form", "§6.12", ERROR, 1)
-ACCESSED_API_WITHOUT_SOURCE = _rule("accessed-api-without-source", "§7.5", ERROR, 1)
-FOREGROUND_TYPE_ON_NON_SERVICE = _rule("foreground-type-on-non-service", "§6.8", ERROR, 1)
+SKADNETWORK_IDENTIFIER_INVALID = _rule("skadnetwork-identifier-invalid", "§7.6", ERROR, 35)
+SKADNETWORK_ITEMS_KEY = _rule("skadnetwork-items-key", "§7.6", ERROR, 35)
+PLIST_VALUE_CONFLICT = _rule("plist-value-conflict", "§7.6", ERROR, 35)
+PLIST_CONSUMER_MANAGED = _rule("plist-consumer-managed", "§7.6", ERROR, 35)
+
+# --- manifest meta-data, queries (§6.10, §6.12) -----------------------------
+META_DATA_RESOURCE_REFERENCE = _rule("meta-data-resource-reference", "§6.10", ERROR, 32)
+QUERY_FORM = _rule("query-form", "§6.12", ERROR, 33)
+
+# --- contributed Swift, foreground services (§7.5, §6.8) --------------------
+ACCESSED_API_WITHOUT_SOURCE = _rule("accessed-api-without-source", "§7.5", ERROR, 36)
+FOREGROUND_TYPE_ON_NON_SERVICE = _rule("foreground-type-on-non-service", "§6.8", ERROR, 34)
 FOREGROUND_TYPE_WITHOUT_PERMISSION = _rule(
-    "foreground-type-without-permission", "§6.8", WARN, 1
+    "foreground-type-without-permission", "§6.8", WARN, 34
 )
-PLIST_VALUE_CONFLICT = _rule("plist-value-conflict", "§7.6", ERROR, 1)
-PLIST_CONSUMER_MANAGED = _rule("plist-consumer-managed", "§7.6", ERROR, 1)
 
 # --- Python modules (§7.7) --------------------------------------------------
 PYTHON_MODULE_NAME_INVALID = _rule("python-module-name-invalid", "§7.7", ERROR, 20)
@@ -170,6 +174,12 @@ STRUCTURAL: dict[int, str] = {
     19: "ports.ArtifactInspector.manifest_of() drives the §9 artifact rules",
     20: "EffectiveSet.python_payload_exclusions() drops <name>.py and <name>.pyi",
     26: "answers.AnswerSource — every requires is answered under (distribution, key)",
+    37: (
+        "EffectiveSet.objc_categories, recorded as `objc-categories loaded at link "
+        "time` against each distribution that asked — the link setting itself is "
+        "the consumer's own build step"
+    ),
+    38: "context.ConsumerProfile.contract — the contract this reader implements",
 }
 
 

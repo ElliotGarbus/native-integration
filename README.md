@@ -451,7 +451,7 @@ So, in order:
 1. **Review from people who did not write this.** Eighteen sidecars, one hand.
    The specific asks are in [Getting involved](#getting-involved).
 2. **A real consumer.** [KivyForge](https://github.com/ElliotGarbus/kivyforge) is
-   the intended first one. §8's thirty requirements and
+   the intended first one. §8's forty requirements and
    [`docs/REQUIREMENTS.md`](docs/REQUIREMENTS.md) are what an implementer works
    from; the reference reader shows one way to discharge them and is not the
    only way.
