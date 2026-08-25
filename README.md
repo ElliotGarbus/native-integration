@@ -240,9 +240,9 @@ interoperability specification rather than a PEP.
 
 ## Tested against real packages
 
-Before asking anyone to implement a consumer, **fourteen integration cases** were
+Before asking anyone to implement a consumer, **eighteen integration cases** were
 expressed against this spec as `native.toml` sidecars — four existing Python
-packages, and ten clean-sheet sidecars written from vendor documentation.
+packages, and fourteen clean-sheet sidecars written from vendor documentation.
 
 | Case | Pressure on the spec | Outcome |
 | --- | --- | --- |
@@ -258,6 +258,8 @@ packages, and ten clean-sheet sidecars written from vendor documentation.
 | **Airship** | Android configuration, two paths | iOS clean; Android **blocked** on both paths to one app key |
 | **Agora** | real-time media, screen capture | calls clean; screen share **blocked** on both platforms |
 | **Health Connect** | an application-owned class | **blocked** — package visibility, and a Play-required rationale activity |
+| **Mediated ads** ×3 | three packages composed, plus the application's half | **clean** — two predicted stresses were structurally impossible; the application file corrected §2.2's join |
+| **TensorFlow Lite** | a native library collision with Agora | **§9.1's first evidence** — and a packaging *option* no rule reaches; iOS out of reach |
 
 **PyGMA was the one that fit without a workaround.** The other three round-one
 packages each needed either a change to the package or a capability that did not
@@ -279,33 +281,45 @@ six could not, and two results are worth pulling out:
 
 **Round five went wider before going deeper.** A survey of the next forty SDKs
 ([development/SURVEY.md](development/SURVEY.md)) asked only what each vendor's
-integration guide requires and whether this convention can say it. Fifteen of
-its twenty-one findings are missing vocabulary that the existing shapes already
-accommodate, which is the most useful thing it established — the four that are
-not are collected as proposals. Meta, Airship, Agora and Health Connect were
-then written as sidecars against the costliest findings, and three of the four
-amended the finding they were testing.
+integration guide requires and whether this convention can say it. Its
+twenty-one findings were almost all missing *vocabulary* rather than a missing
+shape — where something was inexpressible it was a missing table, never a
+missing way for the application to answer, which is the most useful thing it
+established. Meta, Airship, Agora and Health Connect were then written as
+sidecars against the costliest findings, and three of the four amended the
+finding they were testing.
+
+**Round six composed rather than added.** Every sidecar before it is one
+producer read alone, which left the rules whose whole justification is
+cross-distribution evidenced only by unit tests. Mediated ads is three packages
+at once because a real ads integration holds three to six; it came out clean,
+and two of the three stresses it was chosen for turned out to be structurally
+impossible — arguments *for* the rules as written, arrived at by trying rather
+than by asserting. TensorFlow Lite was written to be composed with Agora: both
+bundle a C++ runtime, which is the collision §9.1 was landed for and which
+nothing had yet reached.
 
 [**examples/**](examples/) carries one integration in full — the package's
 declaration and the application's reply side by side — if you would rather see
 the authority split than read about it.
 
-The other nine, and the design history behind every decision including what was
-cut back, deferred or withdrawn, are under
+The other seventeen, and the design history behind every decision including
+what was cut back, deferred or withdrawn, are under
 [**development/**](development/): [the sidecars](development/examples/) with
 their findings, and [PROPOSALS.md](development/PROPOSALS.md).
 
 ## What the survey changed
 
 The forty-SDK survey ([development/SURVEY.md](development/SURVEY.md)) produced
-twenty-one findings. Fifteen landed, three closed without a change, and three
-are deferred with a stated trigger. What a package can say grew in these places:
+twenty-one findings. Sixteen landed, four closed — the proposed shape declined
+and a different change made instead — and one is deferred with a stated
+trigger. What a package can say grew in these places:
 
 | Added | For |
 | --- | --- |
 | iOS application values | An account identifier the SDK reads from `Info.plist` at launch — Meta's app ID, Branch's key, a Google client ID. §6.3's iOS counterpart, and the table §6.3 predicted |
 | Manifest `meta-data` a package knows the value of | Firebase's notification defaults, ML Kit's model list, a vendor's initialization flags. One key space with the values an app supplies, so a collision between the two halves fails |
-| An Android prerequisite family | A config file in `assets`, a resource the app must supply, a class the vendor fixes the path of. iOS had six such tables; Android had none |
+| An Android prerequisite family | A config file in `assets`, a resource the app must supply, a class the vendor fixes the path of. iOS had a family of them; Android had none |
 | Package visibility (`<queries>`) | Android 11 made it opt-in, and without it `PackageManager` answers "not installed" — silently — for everything a package's own code looks for |
 | Verified App Links | A prerequisite rather than a manifest attribute: verification is a fact about a domain, and `assetlinks.json` is the application's to host |
 | SKAdNetwork identifiers, permission attributes, manifest placeholders, core-library desugaring, Objective-C category loading | Five smaller gaps, each with more than one vendor behind it |
@@ -316,8 +330,9 @@ activity a modern one and must not swallow iOS URL callbacks, and a consumer
 must detect packaging collisions between two packages' artifacts and refuse to
 pick between two native libraries on its own.
 
-Three vocabularies **opened**: where the platform owns the names — Apple's
-extension points, Android's `<data>` attributes — a package may use any of them
+Four vocabularies **opened**: where the platform owns the names — Apple's
+extension points, Android's `<data>` attributes, its resource types, its
+foreground-service types — a package may use any of them
 and a tool rejects what it does not implement, rather than waiting for this
 document to enumerate one more. The Gradle configurations stayed closed, because
 some of those values would make the build run code.
@@ -402,7 +417,7 @@ publish it.
 ## Checks
 
 `python3 tools/check_spec.py` validates the specification against itself and
-against the fourteen worked examples: that every `§` reference and link resolves, the
+against the eighteen worked examples: that every `§` reference and link resolves, the
 consumer requirements are sequentially numbered and fully indexed, every TOML
 block parses, every documented sidecar obeys the rules the specification states,
 every key appears in the reference table, and no RFC 2119 keyword is left
@@ -419,7 +434,7 @@ section is worse than none.
 
 `python3 -m pytest` runs the reference reader's own suite, which asks a
 different question of the same files: not whether the documents agree with each
-other, but whether all fourteen sidecars survive an implementation of the rules the
+other, but whether all eighteen sidecars survive an implementation of the rules the
 specification states. Both run in CI on every push and pull request.
 
 ## What happens before a freeze
@@ -458,7 +473,7 @@ call:
   means something. One implementation cannot demonstrate it.
 - **A sidecar authored outside this repository**, by someone who read the spec
   rather than wrote it.
-- **One integration on a device.** Nothing here has ever been run: twenty
+- **One integration on a device.** Nothing here has ever been run: eighteen
   sidecars, two hundred tests, zero installed applications.
 - **A round that finds no new table.** Each round so far has added
   capability; the signal to stop is a round that produces only corrections.

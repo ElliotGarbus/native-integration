@@ -12,14 +12,15 @@ tool discovers, validates, and stages that material.
 > this line is removed, and this revision makes some — the draft is amended in
 > place rather than by contract minor.
 >
-> This revision incorporates the corrections found by expressing **ten packages**
-> against the text as ten **integration cases** — four existing Python packages,
-> and six clean-sheet sidecars
-> for Firebase, Sentry, Stripe and Mapbox, whose vendors have never heard of this
-> convention. See [`examples/`](examples/) for a worked integration with both
-> halves, [`development/examples/`](development/examples/) for the nine that
-> shaped the text, and [`development/PROPOSALS.md`](development/PROPOSALS.md)
-> for the decisions they produced, including the ones deliberately not adopted.
+> This revision incorporates the corrections found by expressing **eighteen
+> integration cases** against the text as sidecars — four existing Python
+> packages, and fourteen clean-sheet ones for Firebase, Sentry, Stripe, Mapbox,
+> Meta, Airship, Agora, Health Connect, TensorFlow Lite and a three-package
+> mediated-ads set, whose vendors have never heard of this convention. See
+> [`examples/`](examples/) for a worked integration with both halves,
+> [`development/examples/`](development/examples/) for the seventeen that shaped
+> the text, and [`development/PROPOSALS.md`](development/PROPOSALS.md) for the
+> decisions they produced, including the ones deliberately not adopted.
 
 ---
 
@@ -2177,8 +2178,9 @@ A floor, with the same semantics as §6.2.
 
 *For everything on iOS a producer needs and must not write: entitlements,
 purpose strings, bundle files, extension targets, URL registrations, capability
-keys. The producer states the need and the application answers, because each of
-these fails far from its cause — a codesign error, a trap on first API call.*
+keys, account identifiers. The producer states the need and the application
+answers, because each of these fails far from its cause — a codesign error, a
+trap on first API call.*
 
 ```toml
 [[ios.requires.entitlements]]
@@ -2250,7 +2252,7 @@ Per table, stated because two conforming readers would otherwise diverge:
 **Why `app_extensions` and `url_schemes` use an `id` instead of a platform
 key.** Neither has a single string iOS defines the way an entitlement or an
 `Info.plist` key does, so there is nothing else to join on. And unlike the
-other four tables, satisfying either one is an **acknowledgement**, not
+other five tables, satisfying either one is an **acknowledgement**, not
 something the consumer can verify on its own — the next two paragraphs
 explain why, for each.
 

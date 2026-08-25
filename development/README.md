@@ -11,9 +11,9 @@ integration; everything here is the evidence behind the decisions, not a
 tutorial.
 
 Four are existing packages from
-[PyPlatformPackages](https://github.com/PyPlatformPackages). The other six are
-clean-sheet, written against the documentation of vendors who have never heard
-of this convention.
+[PyPlatformPackages](https://github.com/PyPlatformPackages). The other fourteen
+are clean-sheet, written against the documentation of vendors who have never
+heard of this convention.
 
 | Example | Chosen to stress | Outcome |
 | --- | --- | --- |
@@ -33,9 +33,10 @@ of this convention.
 | [TensorFlow Lite](examples/pytflite/) | round six: composition — **a native collision** with Agora | **§9.1's first evidence**; a new gap in packaging *options*; iOS out of reach |
 
 The first four are existing packages from one toolchain lineage. Firebase,
-Sentry, Stripe and Mapbox are **clean-sheet**: sidecars written against each
-vendor's own documentation, for vendors that have never heard of this
-convention, and run after the corrections and decisions below had landed.
+Sentry, Stripe and Mapbox — the second round — are **clean-sheet**: sidecars
+written against each vendor's own documentation, for vendors that have never
+heard of this convention, and run after the corrections and decisions below had
+landed.
 
 They were also chosen differently. Firebase asked the open question — can this
 express an SDK nobody here designed around? The last three test **specific
@@ -79,9 +80,9 @@ at all, because they only surface when you try to write the entry.
 
 ### What round five closed, and what it did not
 
-The survey's twenty-one findings resolved as fifteen landed, three closed
-without a change, and three deferred with a stated trigger. Against the four
-sidecars specifically:
+The survey's twenty-one findings resolved as sixteen landed, four closed — the
+proposed shape declined and a different change made instead — and one deferred
+with a stated trigger. Against the four sidecars specifically:
 
 | Finding | Now |
 | --- | --- |
@@ -93,8 +94,8 @@ sidecars specifically:
 | HC2 — an application-owned class | **closed in part**: §6.11's `application_classes`; the activity-alias and its `android:permission` are not |
 | AG3 — `libc++_shared.so` twice | **closed**: §9.1, as a consumer obligation |
 | FB6 — `-ObjC` | **closed**: §7.8, §11's one bounded exception |
+| AG1 — the capture service's `foregroundServiceType` | **closed**: §6.8's `foreground_service_type`, with 8.S4 on the permission half |
 | FB5 — tracking domains | **deferred**, with a trigger |
-| AG1 — `foregroundServiceType` | **open**: N5's remaining half, component attributes |
 | FB3 — `from_dependency` cannot name a transitive module | **open** |
 | FB4 — an application value cannot be derived from another | **open**, recorded as a wart with a workaround |
 

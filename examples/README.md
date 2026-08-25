@@ -37,9 +37,10 @@ application.
 
 ---
 
-**Nine further integrations** — PyOneSignal, PyCoreLocation, PyWebViews, PyGMA,
-Firebase, Sentry and Mapbox — were expressed against the specification while it
-was being written, and are what shaped it. They live in
-[`development/examples/`](../development/examples/) with the findings beside
+**Seventeen further integrations** — PyOneSignal, PyCoreLocation, PyWebViews,
+PyGMA, Firebase, Sentry, Mapbox, Meta, Airship, Agora, Health Connect,
+TensorFlow Lite and a three-package mediated-ads set — were expressed against
+the specification while it was being written, and are what shaped it. They live
+in [`development/examples/`](../development/examples/) with the findings beside
 each, and the decisions they produced are in
 [`development/PROPOSALS.md`](../development/PROPOSALS.md).
