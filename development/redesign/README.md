@@ -78,6 +78,11 @@ Five sidecars, chosen as the hardest cases in the existing set:
 Airship is the only one written out in full, as [`pyairship/native.toml`](pyairship/native.toml);
 it is the case the other four could not ask.
 
+A second pass, [`forward-test.md`](forward-test.md), asks the opposite
+question: four requirements the first attempt **cannot state at all**, to test
+whether the redesign absorbs them without inventing vocabulary. It carries
+findings V11–V15.
+
 ## What the thirteen tables become
 
 | First attempt | Redesign | Loss |
