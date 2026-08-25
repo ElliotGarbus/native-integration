@@ -239,6 +239,9 @@ contract = "1"
 [android.owns]
 java_namespaces = ["org.pystripe"]
 
+[android.contributes.src]
+java = ["java"]
+
 [android.requires]
 min_sdk = 21
 compile_sdk = 34
@@ -263,6 +266,11 @@ reason = "Receives the 3D Secure redirect"
 """
 
 
+#: SIDE registers `org.pystripe.PaymentReturnActivity`, which §6.8 requires the
+#: sidecar to contribute, so every source built from it carries the class.
+PAYMENT_ACTIVITY = {"java/org/pystripe/PaymentReturnActivity.java": "package org.pystripe;"}
+
+
 def build(
     tmp_path, body=SIDE, *, name="pystripe", module="pystripe._native", files=None
 ):
@@ -271,7 +279,7 @@ def build(
     root = tmp_path / name / module.replace(".", "/")
     root.mkdir(parents=True, exist_ok=True)
     (root / "native.toml").write_text(body, encoding="utf-8")
-    for relative, content in (files or {}).items():
+    for relative, content in {**PAYMENT_ACTIVITY, **(files or {})}.items():
         target = root / relative
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(content, encoding="utf-8")

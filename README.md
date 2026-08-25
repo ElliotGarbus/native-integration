@@ -242,7 +242,9 @@ interoperability specification rather than a PEP.
 
 Before asking anyone to implement a consumer, **eighteen integration cases** were
 expressed against this spec as `native.toml` sidecars — four existing Python
-packages, and fourteen clean-sheet sidecars written from vendor documentation.
+packages, and fourteen clean-sheet sidecars written from vendor documentation —
+plus a survey of forty further SDKs read against the text without writing
+sidecars for them.
 
 | Case | Pressure on the spec | Outcome |
 | --- | --- | --- |
@@ -261,81 +263,28 @@ packages, and fourteen clean-sheet sidecars written from vendor documentation.
 | **Mediated ads** ×3 | three packages composed, plus the application's half | **clean** — two predicted stresses were structurally impossible; the application file corrected §2.2's join |
 | **TensorFlow Lite** | a native library collision with Agora | **§9.1's first evidence** — and a packaging *option* no rule reaches; iOS out of reach |
 
-**PyGMA was the one that fit without a workaround.** The other three round-one
-packages each needed either a change to the package or a capability that did not
-exist — most consequentially that a Swift package can now *be* the Python
-module, which is how most of that organization's iOS packages are built and
-which nothing could previously make importable.
-
-Round two exists because those four share one toolchain lineage and could
-plausibly have been fitting a spec written with them in view. The clean-sheet
-six could not, and two results are worth pulling out:
-
-- **The hardest failures are correct refusals.** Firebase's Gradle plugin and
-  Crashlytics' symbol upload are unreachable because the spec declines
-  build-time execution — not because something is missing. FCM's service intent
-  filter, by contrast, was a genuine gap and produced `intent_filters`.
-- **Examples caught claims this project had made too strongly** — that
-  build-script SDKs were one uniform category, and that application values had
-  no live use. Both were corrected by a vendor, not by argument.
-
-**Round five went wider before going deeper.** A survey of the next forty SDKs
-([development/SURVEY.md](development/SURVEY.md)) asked only what each vendor's
-integration guide requires and whether this convention can say it. Its
-twenty-one findings were almost all missing *vocabulary* rather than a missing
-shape — where something was inexpressible it was a missing table, never a
-missing way for the application to answer, which is the most useful thing it
-established. Meta, Airship, Agora and Health Connect were then written as
-sidecars against the costliest findings, and three of the four amended the
-finding they were testing.
-
-**Round six composed rather than added.** Every sidecar before it is one
-producer read alone, which left the rules whose whole justification is
-cross-distribution evidenced only by unit tests. Mediated ads is three packages
-at once because a real ads integration holds three to six; it came out clean,
-and two of the three stresses it was chosen for turned out to be structurally
-impossible — arguments *for* the rules as written, arrived at by trying rather
-than by asserting. TensorFlow Lite was written to be composed with Agora: both
-bundle a C++ runtime, which is the collision §9.1 was landed for and which
-nothing had yet reached.
+**The findings were almost always missing vocabulary, not a missing shape.**
+Across all eighteen sidecars and the forty-SDK survey, an inexpressible
+requirement was nearly always a missing *table* — an application value, a
+config file, a package-visibility declaration — never a missing way for the
+application to answer. The clearest refusals held up too: Firebase's Gradle
+plugin and Crashlytics' symbol upload stay unreachable because the spec
+declines build-time execution, not because something is missing. What did land
+from that pressure: iOS application values, package-visibility (`<queries>`),
+an Android prerequisite family mirroring iOS's, verified App Links, and several
+smaller vocabulary additions (SKAdNetwork identifiers, permission attributes,
+manifest placeholders, core-library desugaring, Objective-C category loading) —
+plus two obligations on **build tools** themselves: generating a modern Android
+host activity and not swallowing iOS URL callbacks, and detecting packaging
+collisions between two packages' artifacts rather than picking one silently.
 
 [**examples/**](examples/) carries one integration in full — the package's
 declaration and the application's reply side by side — if you would rather see
-the authority split than read about it.
-
-The other seventeen, and the design history behind every decision including
-what was cut back, deferred or withdrawn, are under
-[**development/**](development/): [the sidecars](development/examples/) with
-their findings, and [PROPOSALS.md](development/PROPOSALS.md).
-
-## What the survey changed
-
-The forty-SDK survey ([development/SURVEY.md](development/SURVEY.md)) produced
-twenty-one findings. Sixteen landed, four closed — the proposed shape declined
-and a different change made instead — and one is deferred with a stated
-trigger. What a package can say grew in these places:
-
-| Added | For |
-| --- | --- |
-| iOS application values | An account identifier the SDK reads from `Info.plist` at launch — Meta's app ID, Branch's key, a Google client ID. §6.3's iOS counterpart, and the table §6.3 predicted |
-| Manifest `meta-data` a package knows the value of | Firebase's notification defaults, ML Kit's model list, a vendor's initialization flags. One key space with the values an app supplies, so a collision between the two halves fails |
-| An Android prerequisite family | A config file in `assets`, a resource the app must supply, a class the vendor fixes the path of. iOS had a family of them; Android had none |
-| Package visibility (`<queries>`) | Android 11 made it opt-in, and without it `PackageManager` answers "not installed" — silently — for everything a package's own code looks for |
-| Verified App Links | A prerequisite rather than a manifest attribute: verification is a fact about a domain, and `assetlinks.json` is the application's to host |
-| SKAdNetwork identifiers, permission attributes, manifest placeholders, core-library desugaring, Objective-C category loading | Five smaller gaps, each with more than one vendor behind it |
-
-Two things landed that are **obligations on build tools** rather than new
-declarations: a consumer that generates the app's host must make its Android
-activity a modern one and must not swallow iOS URL callbacks, and a consumer
-must detect packaging collisions between two packages' artifacts and refuse to
-pick between two native libraries on its own.
-
-Four vocabularies **opened**: where the platform owns the names — Apple's
-extension points, Android's `<data>` attributes, its resource types, its
-foreground-service types — a package may use any of them
-and a tool rejects what it does not implement, rather than waiting for this
-document to enumerate one more. The Gradle configurations stayed closed, because
-some of those values would make the build run code.
+the authority split than read about it. The full round-by-round account, every
+sidecar, and the design history behind each decision — including what was cut
+back, deferred or withdrawn — are under [**development/**](development/):
+[the sidecars](development/examples/) with their findings,
+[SURVEY.md](development/SURVEY.md), and [PROPOSALS.md](development/PROPOSALS.md).
 
 ## Getting involved
 
@@ -451,7 +400,7 @@ So, in order:
 1. **Review from people who did not write this.** Eighteen sidecars, one hand.
    The specific asks are in [Getting involved](#getting-involved).
 2. **A real consumer.** [KivyForge](https://github.com/ElliotGarbus/kivyforge) is
-   the intended first one. §8's forty requirements and
+   the intended first one. §8's forty-one requirements and
    [`docs/REQUIREMENTS.md`](docs/REQUIREMENTS.md) are what an implementer works
    from; the reference reader shows one way to discharge them and is not the
    only way.

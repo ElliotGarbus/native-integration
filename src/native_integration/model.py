@@ -213,7 +213,7 @@ class AndroidSection:
     permissions: tuple[Permission, ...] = ()
     features: tuple[Feature, ...] = ()
     meta_data: tuple[ContributedMetaData, ...] = ()
-    #: §6.11 — application_files, resources and application_classes.
+    #: §6.11 — application_files, resources, application_classes and app_links.
     prerequisites: tuple[Prerequisite, ...] = ()
     #: §6.12 — package visibility for the producer's own code.
     queries: tuple[Query, ...] = ()

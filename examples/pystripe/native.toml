@@ -19,6 +19,12 @@ contract = "1"
 [android.owns]
 java_namespaces = ["org.pystripe"]
 
+# The redirect activity below is this package's own class, so §6.8 needs the
+# source that holds it. Illustrative like the rest of the example set: a real
+# wheel ships the tree, this repository ships the declaration.
+[android.contributes.src]
+java = ["java"]
+
 [android.requires]
 min_sdk = 21
 compile_sdk = 34

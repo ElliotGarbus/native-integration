@@ -10,6 +10,14 @@ ANDROID_MINIMAL = """
 contract = "1"
 """
 
+#: §6.8 — a producer-source component names a class the sidecar contributes,
+#: so a fixture registering one ships the source that class is in.
+REDIRECT_JAVA = {"java/org/example/Redirect.java": "package org.example;\n"}
+CAPTURE_JAVA = {
+    "java/org/pyagora/ScreenCaptureService.java": "package org.pyagora;\n"
+}
+RECEIVER_JAVA = {"java/org/pyagora/Receiver.java": "package org.pyagora;\n"}
+
 
 # --- §4.3 the contract gate -------------------------------------------------
 
@@ -210,6 +218,8 @@ def test_an_inline_reference_must_resolve_to_a_declared_id(parse):
 contract = "1"
 [android.owns]
 java_namespaces = ["org.example"]
+[android.contributes.src]
+java = ["java"]
 
 [[android.contributes.components]]
 kind = "activity"
@@ -219,7 +229,7 @@ reason = "OAuth redirect"
   [[android.contributes.components.view_links]]
   scheme = { application_value = "undeclared" }
 """
-    _, codes, bag = parse(text)
+    _, codes, bag = parse(text, files=REDIRECT_JAVA)
     assert codes == ["application-value-unresolved-ref"]
     assert "would have no `reason`" in bag.items[0].message
 
@@ -517,6 +527,8 @@ def test_a_foreground_service_declares_its_type(parse):
 contract = "1"
 [android.owns]
 java_namespaces = ["org.pyagora"]
+[android.contributes.src]
+java = ["java"]
 
 [[android.contributes.components]]
 kind = "service"
@@ -527,7 +539,7 @@ foreground_service_type = "mediaProjection"
 name = "android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION"
 reason = "Screen capture runs in a foreground service"
 """
-    sidecar, codes, _ = parse(text)
+    sidecar, codes, _ = parse(text, files=CAPTURE_JAVA)
     assert codes == []
     (component,) = sidecar.android.components
     assert component.foreground_service_type == "mediaProjection"
@@ -539,13 +551,15 @@ def test_a_foreground_type_without_its_permission_is_advisory(parse):
 contract = "1"
 [android.owns]
 java_namespaces = ["org.pyagora"]
+[android.contributes.src]
+java = ["java"]
 
 [[android.contributes.components]]
 kind = "service"
 name = "org.pyagora.ScreenCaptureService"
 foreground_service_type = "mediaProjection"
 """
-    _, codes, bag = parse(text)
+    _, codes, bag = parse(text, files=CAPTURE_JAVA)
     assert codes == ["foreground-type-without-permission"]
     assert all(d.rule.severity.name == "WARNING" for d in bag)  # advisory, not blocking
 
@@ -555,13 +569,15 @@ def test_only_a_service_runs_in_the_foreground(parse):
 contract = "1"
 [android.owns]
 java_namespaces = ["org.pyagora"]
+[android.contributes.src]
+java = ["java"]
 
 [[android.contributes.components]]
 kind = "receiver"
 name = "org.pyagora.Receiver"
 foreground_service_type = "mediaProjection"
 """
-    _, codes, _ = parse(text)
+    _, codes, _ = parse(text, files=RECEIVER_JAVA)
     assert codes == ["foreground-type-on-non-service"]
 
 
@@ -731,6 +747,49 @@ name = "com.vendor.sdk.Receiver"
 from_dependency = "com.vendor:sdk"
 """
     _, codes, _ = parse(text)
+    assert codes == []
+
+
+def test_a_producer_source_component_needs_contributed_source(parse):
+    """§6.8 — no `from_dependency` means the class is the producer's to ship.
+
+    The sidecar contributes nothing, so there is nowhere for the class to be:
+    the manifest would name one that exists in no artifact, and the failure
+    lands at first use rather than at build time.
+    """
+    text = """
+contract = "1"
+[android.owns]
+java_namespaces = ["org.example"]
+
+[[android.contributes.components]]
+kind = "service"
+name = "org.example.PushService"
+"""
+    _, codes, bag = parse(text)
+    assert codes == ["component-source-undeclared"]
+    assert "org.example.PushService" in bag.items[0].message
+
+
+def test_the_class_is_not_matched_to_a_file(parse):
+    """Declaring source is the whole of the check (§6.8).
+
+    Kotlin does not tie a file's name to the classes inside it, so a consumer
+    that insisted on `org/example/PushService.java` would reject sidecars that
+    are correct.
+    """
+    text = """
+contract = "1"
+[android.owns]
+java_namespaces = ["org.example"]
+[android.contributes.src]
+kotlin = ["kotlin"]
+
+[[android.contributes.components]]
+kind = "service"
+name = "org.example.PushService"
+"""
+    _, codes, _ = parse(text, files={"kotlin/org/example/services.kt": "package org.example"})
     assert codes == []
 
 

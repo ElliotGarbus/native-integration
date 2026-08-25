@@ -497,6 +497,18 @@ def _check_components(sidecar: Sidecar, android: AndroidSection, *, bag: Diagnos
                     "declared dependency needs `from_dependency`",
                     name,
                 )
+            # §6.8 — the class is the producer's to contribute, so a sidecar
+            # that contributes no source has nowhere for it to be. Matching the
+            # class to a *file* is not attempted: Kotlin does not tie a file's
+            # name to the classes inside it.
+            if not android.src_java and not android.src_kotlin:
+                bag.add(
+                    rules.COMPONENT_SOURCE_UNDECLARED,
+                    f"component `{component.name}` names no `from_dependency`, so the "
+                    "class is this distribution's to contribute — but the sidecar "
+                    "declares no `[android.contributes.src]` for it to be in",
+                    name,
+                )
         elif component.from_dependency not in declared_modules:
             bag.add(
                 rules.COMPONENT_DEPENDENCY_UNDECLARED,

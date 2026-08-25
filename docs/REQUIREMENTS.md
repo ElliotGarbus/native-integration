@@ -73,6 +73,7 @@ returning a clean result.
 | 8.38 | Be able to state the contract version it implements, so a package author can tell whether adopting a minor strands their users (§4.3). | *structural* — context.ConsumerProfile.contract — the contract this reader implements |
 | 8.39 | Reject a component attributed through `from_dependency` to a dependency the same sidecar does not declare (§6.8). | `component-dependency-undeclared` |
 | 8.40 | Reject a sidecar that reuses a local identifier the application would have to answer under: two `application_values` sharing an `id` (§6.3), or two Swift packages sharing a `name` (§7.4). | `application-value-duplicate`, `swift-package-duplicate-name` |
+| 8.41 | Reject a producer-source component — one declaring no `from_dependency` — in a sidecar that contributes no Java or Kotlin source (§6.8). | `component-source-undeclared` |
 
 ## Advisory obligations (§8's SHOULD list)
 

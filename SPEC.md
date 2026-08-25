@@ -193,7 +193,8 @@ integration record**, every time, for every dependency a producer contributes
 ### 2.2 How the application answers, at build time
 
 The **application** answers every `requires` in this specification, through
-the **consumer's own configuration**. This specification mandates the
+the **consumer's own configuration** (typically a `[tool.*]` table in the
+application's `pyproject.toml`). This specification mandates the
 capability a consumer must offer, never its spelling: two conforming
 consumers can ask for the same value in different words, and that is expected.
 
@@ -1551,7 +1552,13 @@ states which:
 
 - **Producer source** (no `from_dependency`): `name` **MUST** refer to a class
   the distribution contributes (§6.4) and **MUST** fall under an owned namespace
-  (§6.1 rule 2).
+  (§6.1 rule 2). A consumer **MUST** reject a producer-source component in a
+  sidecar that contributes no source at all, since the class can then be in
+  nothing — and is asked for no more than that. Matching a class to a *file*
+  would reject legitimate sidecars: Kotlin does not tie a file's name to the
+  classes inside it, and Java ties only its public ones. The dependency form
+  below can be verified because a resolved artifact lists what it contains; a
+  directory of source does not.
 - **A declared dependency** (`from_dependency = "group:artifact"`): the value
   **MUST** match the group and artifact of a dependency the same sidecar
   declares (§6.5), in either the `coordinate` or the `module` form. 
@@ -2981,7 +2988,7 @@ gives the thematic reading:
 | **Never satisfy a prerequisite** | 6, 8, 21, 22, 23, 25, 31 |
 | The application's authority | 7 |
 | Native dependency resolution | 10, 12, 16 |
-| Generated manifest and project material | 11, 13, 20, 24, 27, 32, 33, 34, 35, 36, 37, 39 |
+| Generated manifest and project material | 11, 13, 20, 24, 27, 32, 33, 34, 35, 36, 37, 39, 41 |
 | Recording, disclosure, attribution | 9, 15, 19, 25, 33, 37 |
 | Platform applicability | 18 |
 | The application's side of the contract | 7, 26 |
@@ -3133,6 +3140,8 @@ A conforming consumer **MUST**:
 40. Reject a sidecar that reuses a local identifier the application would have
     to answer under: two `application_values` sharing an `id` (§6.3), or two
     Swift packages sharing a `name` (§7.4).
+41. Reject a producer-source component — one declaring no `from_dependency` —
+    in a sidecar that contributes no Java or Kotlin source (§6.8).
 
 > Rationale for 16. Every other rule here assumes native resolution *succeeds*.
 > It need not: two distributions in one closure can declare native dependencies
@@ -3811,16 +3820,12 @@ live inside its own lock file is conforming without resembling this at all.
       "artifacts": { "com.example.maps:android:4.1.0": "sha256:0d3e…" },
       "contract": "1",
       "entries": [
-        "source java/com/example/maps/MapBridge.java",
         "dependency com.example.maps:android:4.1.0",
         "REPOSITORY https://maven.example.com/releases → com.example.maps  authenticated — credentials configured",
         "requires app_links map_deep_links (conditional, unresolved)",
         "from com.example.maps:android:4.1.0 (resolved artifact manifest): permission com.example.permission.MAPS_ID"
       ],
-      "inputs": {
-        "java/com/example/maps/MapBridge.java": "sha256:9f2c…",
-        "native.toml": "sha256:71ff…"
-      },
+      "inputs": { "native.toml": "sha256:71ff…" },
       "name": "map-sdk",
       "origin": "direct dependency",
       "swift": {},
@@ -3835,9 +3840,13 @@ live inside its own lock file is conforming without resembling this at all.
         "component activity org.pystripe.PaymentReturnActivity (exported)",
         "  view_link org.pystripe.PaymentReturnActivity: scheme trailmap-pay, host stripe-redirect",
         "dependency com.stripe:stripe-android  requested [21.0.0, 22.0.0) → resolved 21.6.0",
-        "keep org.pystripe.**"
+        "keep org.pystripe.**",
+        "source java/org/pystripe/PaymentReturnActivity.java"
       ],
-      "inputs": { "native.toml": "sha256:cde8…" },
+      "inputs": {
+        "java/org/pystripe/PaymentReturnActivity.java": "sha256:9f2c…",
+        "native.toml": "sha256:cde8…"
+      },
       "name": "pystripe",
       "origin": "via some-ui-lib",
       "swift": {},
