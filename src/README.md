@@ -1,6 +1,6 @@
 # The reference reader
 
-`native_integration` is a reader for [the specification](../SPEC.md): discovery,
+`native_integration` is a reader for [the specification](../development/first-attempt.md): discovery,
 parsing, validation, and rule enforcement, so that a build tool gets the
 consumer obligations of §8 as code paths rather than as prose it has to
 remember to implement.
@@ -57,7 +57,7 @@ both.
 
 [`docs/REQUIREMENTS.md`](../docs/REQUIREMENTS.md) maps every §8 requirement to
 the code path that discharges it. It is generated from `rules.py` and from
-SPEC.md itself, and CI fails if it drifts.
+first-attempt.md itself, and CI fails if it drifts.
 
 | Module | What it holds |
 | --- | --- |

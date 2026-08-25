@@ -19,6 +19,17 @@
 > **The contract is deliberately unfrozen.** Nothing here has been built into a
 > build tool or run on a device yet, and freezing before that would freeze in
 > guesses — see [What happens before a freeze](#what-happens-before-a-freeze).
+>
+> **Being restructured, right now.** What eighteen examples kept adding was
+> *tables* — thirteen of them for application prerequisites alone — and that
+> growth is unbounded while Apple and Google keep shipping constructs. The
+> specification is being rewritten around a smaller automated core plus a
+> generic way to tell an application author what remains to be done by hand.
+> The first attempt is [`development/first-attempt.md`](development/first-attempt.md),
+> kept whole for its reasoning and its evidence; the redesign, and the five
+> hardest sidecars re-expressed against it, are in
+> [`development/redesign/`](development/redesign/). Sections below still
+> describe the first attempt's machinery.
 
 ## The problem
 
@@ -139,10 +150,11 @@ version, SDK-licence acceptance and an AndroidX flag; this convention models
 neither those nor anything else that belongs to the build tool rather than to a
 package.
 
-Read the full [specification](SPEC.md). Every key a sidecar may contain is
-listed with a one-line description in
-[Appendix D](SPEC.md#appendix-d-declaration-reference), which is the faster way
-in if you are writing one or reviewing one.
+Read the full [first attempt](development/first-attempt.md) — superseded, but
+the most complete statement of the model so far. Every key a sidecar may
+contain is listed with a one-line description in its
+[Appendix D](development/first-attempt.md#appendix-d-declaration-reference),
+which is the faster way in if you are writing one or reviewing one.
 
 ## What makes this different from "put the Java in a wheel"
 
@@ -333,7 +345,7 @@ order, and what would make it ready.
 
 [**`src/native_integration/`**](src/README.md) is a reader for this
 specification — discovery, parsing, validation, and rule enforcement — so that
-the consumer obligations of [§8](SPEC.md#8-consuming-tool-requirements) are code
+the consumer obligations of [§8](development/first-attempt.md#8-consuming-tool-requirements) are code
 paths a build tool gets by *using* it, rather than prose it has to remember to
 implement. It is not a build tool: it never writes a Gradle or Xcode project,
 never resolves a Maven coordinate, and never runs anything.
@@ -345,7 +357,7 @@ integration.raise_for_errors()
 ```
 
 [`docs/REQUIREMENTS.md`](docs/REQUIREMENTS.md) maps every §8 requirement to the
-code path that discharges it, generated from the rule registry and from SPEC.md
+code path that discharges it, generated from the rule registry and from first-attempt.md
 so it cannot drift.
 
 Two things it does deliberately, because they are the obligations most easily

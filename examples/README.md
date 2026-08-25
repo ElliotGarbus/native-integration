@@ -21,7 +21,7 @@ SDK most people recognise:
 
 Each answer is filed under the **declaring distribution plus the key the
 declaration named**. The spelling of the application's file is illustrative —
-[§2.2](../SPEC.md) defines the capability a build tool must offer and
+[§2.2](../development/first-attempt.md) defines the capability a build tool must offer and
 deliberately not the syntax — but that join is not.
 
 The most useful thing in the pair may be what is *absent*: the Stripe

@@ -122,7 +122,7 @@ def test_the_pystripe_pair_blocks_when_the_application_answers_nothing():
 
 def test_the_specs_own_complete_example_is_valid(tmp_path):
     """§5.1 shows a whole sidecar. The reader is what proves it is a real one."""
-    spec = (ROOT / "SPEC.md").read_text(encoding="utf-8")
+    spec = (ROOT / "development" / "first-attempt.md").read_text(encoding="utf-8")
     block = next(
         b for b in spec.split("```toml")[1:] if "examplytics" in b
     ).split("```")[0]

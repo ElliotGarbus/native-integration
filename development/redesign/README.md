@@ -1,18 +1,18 @@
-# Round seven: a probe against a successor model
+# Round seven: a probe against the redesign
 
-**Status: a design probe, not a specification, and not part of the version 1
-example set.** Nothing here is normative and nothing here has been decided. The
-five sidecars below were re-expressed *on paper* against a proposed successor
-model, before any specification text was written, because that is the order
+**Status: a design probe, not a specification, and not part of the first
+attempt's example set.** Nothing here is normative and nothing here has been decided. The
+five sidecars below were re-expressed *on paper* against the proposed redesign,
+before any specification text was written, because that is the order
 that has changed this design every round: the examples first, the prose after.
 
 The question being tested is whether a much smaller model can carry what
-version 1 carries. The concerns behind it are adoption (a specification too
+the first attempt carries. The concerns behind it are adoption (a specification too
 complicated to implement is not implemented), coverage (a missing capability
 that only surfaces after a producer needs it), and **maintenance** — every one
 of `app_extensions`, `app_links`, `plist_capabilities` and
 `application_classes` exists because a platform vendor shipped a construct and
-[SPEC.md](../../SPEC.md) needed a table for it. That is an unbounded obligation
+[the first attempt](../first-attempt.md) needed a table for it. That is an unbounded obligation
 against two vendors who ship annually.
 
 Gap identifiers are `V1`–`V10`, continuing the per-round scheme of
@@ -20,8 +20,9 @@ Gap identifiers are `V1`–`V10`, continuing the per-round scheme of
 
 ## The model under test
 
-The target changes. Version 1's is *the sidecar contains everything necessary
-for a consumer to correctly integrate the package*. The successor's is **the
+The target changes. The first attempt's is *the sidecar contains everything
+necessary for a consumer to correctly integrate the package*. The redesign's is
+**the
 sidecar automates the portable, repeatable parts of integration and tells the
 application author exactly what remains** — with *manual* as a first-class
 outcome rather than a gap in the specification.
@@ -31,7 +32,7 @@ the consumer can do it deterministically, and little or no application-specific
 policy is involved. Everything else becomes something the application is told
 to do.
 
-That leaves two prerequisite tables where version 1 has thirteen:
+That leaves two prerequisite tables where the first attempt has thirteen:
 
 ```toml
 [[<platform>.requires.application_value]]
@@ -55,7 +56,7 @@ instructions # OPTIONAL path to prose in the wheel
 conditional
 ```
 
-The contributions half of version 1 — `owns`, source, Gradle dependencies and
+The contributions half of the first attempt — `owns`, source, Gradle dependencies and
 repositories, Swift packages, permissions, features, components, `meta_data`,
 `queries`, `r8`, `info_plist`, `python_modules`, `objc_categories`, the SDK
 floors — is **unchanged**. So is discovery (§3), the sidecar and contract
@@ -70,8 +71,8 @@ Five sidecars, chosen as the hardest cases in the existing set:
 | --- | --- | --- |
 | [Meta](../examples/pyfacebook/) | three account values, a derived value, a browser return | **clean** — one table collapses for free |
 | [OneSignal](../examples/pyonesignal/) | an extension target, two entitlements, a capability key | **clean, with V2 and V3 applied** |
-| [Health Connect](../examples/pyhealthconnect/) | an application-owned class Play policy requires | **better than version 1** |
-| [Mediated ads](../examples/mediated-ads/) ×3 | composition: three packages in one application | **clean** — and it exposed a version 1 misuse |
+| [Health Connect](../examples/pyhealthconnect/) | an application-owned class Play policy requires | **better than the first attempt** |
+| [Mediated ads](../examples/mediated-ads/) ×3 | composition: three packages in one application | **clean** — and it exposed a misuse |
 | [Airship](pyairship/) | the vendor offers **two paths to one fact** | **clean** — and the model chooses between them |
 
 Airship is the only one written out in full, as [`pyairship/native.toml`](pyairship/native.toml);
@@ -79,7 +80,7 @@ it is the case the other four could not ask.
 
 ## What the thirteen tables become
 
-| Version 1 | Successor | Loss |
+| First attempt | Redesign | Loss |
 | --- | --- | --- |
 | `ios.url_schemes` | action | **none** — already acknowledgement-only |
 | `android.application_classes` | action | **none** — already acknowledgement-only |
@@ -101,7 +102,7 @@ action carries an optional `kind` (V2).
 
 ## Findings
 
-### V1 — actions must fail *open*, where version 1 fails closed
+### V1 — actions must fail *open*, where the first attempt fails closed
 
 The load-bearing decision. §4.4 makes a consumer reject any value it does not
 implement, and that rule is precisely why each new platform construct needs a
@@ -126,8 +127,8 @@ An entitlement key's presence, a capability key's value, a bundle file being
 wired in — a consumer that generates the project can check all three today. A
 missing `aps-environment` currently **fails the build** instead of producing a
 `codesign` error with no path back to the package that needed it. Collapsing
-those to a tick-box is the one place the successor is genuinely worse than
-version 1.
+those to a tick-box is the one place the redesign is genuinely worse than the
+first attempt.
 
 An optional `kind` recovers all of it and costs nothing, because V1 already
 established that an unknown one degrades:
@@ -170,7 +171,7 @@ platform — is in the automated core and survives untouched.
 Make it a schema rule, and the value/action line becomes crisp: **if there is
 nowhere for the consumer to write it, it is not a value.**
 
-Version 1 cannot state that, because its delivery field is optional — and the
+The first attempt cannot state that, because its delivery field is optional — and the
 trio shows the cost. `pyadmob-mintegral` declares two application values with
 no `manifest_meta_data` and no inline reference:
 
@@ -183,7 +184,7 @@ reason = "Your Mintegral application ID, from the Mintegral dashboard"
 The application supplies those and they reach **nothing** — Mintegral takes
 them at runtime. §6.3 has a SHOULD against exactly this (*"a producer SHOULD
 NOT route one through build configuration merely because it can"*) and no way
-to enforce it. Under the successor it is a schema error, and the honest form is
+to enforce it. Under the redesign it is a schema error, and the honest form is
 an action: *obtain your Mintegral keys and pass them to `init()`*.
 
 One consequence: §6.10's `resources` pairing needs the resource declaration to
@@ -197,26 +198,26 @@ activity-alias guarded by `START_VIEW_PERMISSION_USAGE` with an intent filter
 carrying both an action and a category. Google Play requires the whole thing of
 a health application.
 
-Version 1 expresses **half**: `application_classes` covers the class, and the
+The first attempt expresses **half**: `application_classes` covers the class, and the
 alias, the attribute and the two-part filter are recorded as inexpressible. The
-successor expresses all of it — one action, with an `instructions` file
+redesign expresses all of it — one action, with an `instructions` file
 carrying the exact XML to paste.
 
 §2.1 already argues this is the better outcome: *"A contribution that writes
 half of a two-part requirement is worse than a prerequisite naming both,
-because it looks finished."* Version 1 landed on the wrong side of its own
+because it looks finished."* The first attempt landed on the wrong side of its own
 principle here, because a table was the only instrument it had.
 
 ### V6 — three tables collapse with nothing lost at all
 
 `url_schemes`, `application_classes` and `app_links` are already
-acknowledgement-only in version 1: the consumer cannot inspect what was asked
+acknowledgement-only in the first attempt: the consumer cannot inspect what was asked
 for, so it asks the application to state that it did the work. That is exactly
 what a generic action does. Three tables, three sets of satisfaction rules, and
 three §8 requirements, for nothing.
 
-Meta's iOS half is the demonstration — everything version 1 says, the successor
-says, and `url_schemes` disappears.
+Meta's iOS half is the demonstration — everything the first attempt says, the
+redesign says, and `url_schemes` disappears.
 
 ### V7 — placeholders verify values; actions have three tiers
 
@@ -260,7 +261,7 @@ would be a mistake — it would hand the application author two TODOs for one
 fact and no way to know that doing either is enough. The producer decides; the
 sidecar states one path.
 
-Version 1 has the same property and never had to face it, because when Airship
+The first attempt has the same property and never had to face it, because when Airship
 was first written both paths were blocked (AS1, AS2). Both are expressible
 today, so the choice is now real.
 
@@ -312,7 +313,9 @@ will feel misled.
   export approval, and repository scope bounding. The three-part test decides
   what to automate; it does not make the automated things policy-free, and the
   new text should say so rather than imply otherwise.
-- **Whether this is `native_integration.v2` or version 1 amended.** §10 requires
-  a new major and a new group name for a change that alters meaning, binding
-  from the moment the draft marker comes off — which it has not. Amending in
-  place is legitimate; a new group is clearer, and costs one string.
+- **Decided since: this is version 1, not a version 2.** §10 binds the
+  new-major rule *"from the moment the draft marker at the top of this document
+  is removed, and not before"*, and the marker never came off. Nothing was
+  released, no consumer implements the first attempt, and the entry-point group
+  `native_integration.v1` has no users to strand — so the redesign takes the
+  version the first attempt never spent, and the group name is unchanged.

@@ -2,12 +2,12 @@
 
 **Status: proposals, not specification.** Nothing here is normative. This file
 records design work driven by the worked examples under `examples/`, so it
-survives while more examples are run. It moves into SPEC.md only after the
+survives while more examples are run. It moves into first-attempt.md only after the
 example set stops changing it.
 
 > **Landed.** The corrections group — **P5, P6, P7, P9, P10, P13, P14, P15,
 > P16, P17, P18, P19**, plus the §6.3 satisfaction correction recorded under
-> P2 — is now in SPEC.md. Those sections below are kept as the reasoning
+> P2 — is now in first-attempt.md. Those sections below are kept as the reasoning
 > behind the change, not as outstanding work.
 >
 > **P11 and P20 have since been decided and landed**, both with amended
@@ -1751,7 +1751,7 @@ P28–P33 came from writing a consumer. P34–P36 come from
 are the only three of its twenty-one findings that are about the **model**
 rather than about missing vocabulary.
 
-> **Landed from this round.** The corrections batch is in SPEC.md: `provider`
+> **Landed from this round.** The corrections batch is in first-attempt.md: `provider`
 > removed from §6.8's vocabulary, §7.6's missing application-wins rule, §11's
 > third build-time outcome, §11's two new exclusion rows, §7.6's
 > `SKAdNetworkItems` counter-case, and **P36 in full**. None adds producer
@@ -1818,7 +1818,7 @@ fifteen. The next one produces more.
 **The proposal is a factoring pass, not a redesign**: state the small number of
 mechanisms the fifteen tables are instances of, so that adding the sixteenth is
 a classified row rather than a section. What follows is that pass, run against
-every table in SPEC.md.
+every table in first-attempt.md.
 
 ### The pass, part one: how a prerequisite is satisfied
 
@@ -1845,7 +1845,7 @@ and it belongs to the second half of the pass. §2.2's five-row answer table
 already separates them; it simply never said that is what it was doing.
 
 **The modes are predictive, which is the test.** Two rules fall out that
-SPEC.md currently states twice each, per table, as if they were local:
+first-attempt.md currently states twice each, per table, as if they were local:
 
 - *When a consumer cannot inspect the whole of what was asked, the mode is
   **acknowledgement**, never partial presence.* §7.3 argues this at length for

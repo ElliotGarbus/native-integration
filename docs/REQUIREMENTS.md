@@ -1,10 +1,10 @@
 # Where each consumer obligation lives
 
-Every requirement in [§8 of the specification](../SPEC.md#8-consuming-tool-requirements),
+Every requirement in [§8 of the specification](../development/first-attempt.md#8-consuming-tool-requirements),
 against the code path in [`native_integration`](../src/native_integration/) that
 discharges it.
 
-**Generated** by `python3 tools/requirements_table.py` from SPEC.md and
+**Generated** by `python3 tools/requirements_table.py` from first-attempt.md and
 `native_integration.rules`; CI fails if it drifts. A requirement that appears in
 neither column fails `tests/test_integration.py::test_every_requirement_is_discharged_somewhere`.
 

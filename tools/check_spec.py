@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Consistency checks for SPEC.md, README.md and the worked examples.
+"""Consistency checks for first-attempt.md, README.md and the worked examples.
 
 These catch the failure mode this repository keeps hitting: a change that is
 locally correct invalidates its immediate neighbour, and the neighbour is the
@@ -22,7 +22,7 @@ import tomllib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-SPEC = (ROOT / "SPEC.md").read_text(encoding="utf-8")
+SPEC = (ROOT / "development" / "first-attempt.md").read_text(encoding="utf-8")
 README = (ROOT / "README.md").read_text(encoding="utf-8")
 EXAMPLES = sorted(
     [*ROOT.glob("examples/**/native.toml"), *ROOT.glob("development/examples/**/native.toml")]
@@ -98,7 +98,7 @@ check("§8 requirements sequential and fully indexed", problems)
 
 # --- 3. every TOML block parses ---------------------------------------------
 problems = []
-for label, text in (("SPEC.md", SPEC), ("README.md", README)):
+for label, text in (("first-attempt.md", SPEC), ("README.md", README)):
     for line, body in toml_blocks(text):
         try:
             tomllib.loads(body)
@@ -112,12 +112,12 @@ problems = []
 for path in EXAMPLES:
     for key in keys_of(tomllib.loads(path.read_text(encoding="utf-8"))):
         if key not in SPEC:
-            problems.append(f"{path.relative_to(ROOT)} uses `{key}`, absent from SPEC.md")
+            problems.append(f"{path.relative_to(ROOT)} uses `{key}`, absent from first-attempt.md")
 for line, body in toml_blocks(README):
     for key in keys_of(tomllib.loads(body)):
         # pyproject.toml fragments legitimately name the producer's own package
         if key not in SPEC and not key.startswith(("project", "tool")) and key != "kivmob":
-            problems.append(f"README.md:{line} uses `{key}`, absent from SPEC.md")
+            problems.append(f"README.md:{line} uses `{key}`, absent from first-attempt.md")
 check("keys used in examples and README exist in SPEC", problems)
 
 # --- 5. RFC 2119 keywords are marked ----------------------------------------
@@ -145,7 +145,7 @@ for m in re.finditer(rf"(?<!\*\*)\b({RFC2119})\b(?!\*\*)", prose):
         continue  # prose *about* the keyword
     line = SPEC[: m.start()].count("\n") + 1
     context = " ".join(SPEC[max(0, m.start() - 60) : m.end() + 30].split())
-    problems.append(f"SPEC.md:{line} unmarked `{m.group(1)}`: …{context}…")
+    problems.append(f"first-attempt.md:{line} unmarked `{m.group(1)}`: …{context}…")
 check("RFC 2119 keywords are emphasised", problems)
 
 # --- 5b. rationale states no requirement ------------------------------------
@@ -164,7 +164,7 @@ for i, line in enumerate(SPEC.splitlines(), 1):
         cur = []
 for line, body in quotes:
     for kw in re.findall(rf"\*\*({RFC2119})\*\*", re.sub(r"`[^`]*`", " ", body)):
-        problems.append(f"SPEC.md:{line} rationale block states a normative `{kw}`")
+        problems.append(f"first-attempt.md:{line} rationale block states a normative `{kw}`")
 check("rationale blocks state no requirement", problems)
 
 # --- 6. relative links resolve ----------------------------------------------
@@ -192,7 +192,7 @@ def heading_anchors(text: str) -> set[str]:
 problems = []
 for label, text, base in (
     ("README.md", README, ROOT),
-    ("SPEC.md", SPEC, ROOT),
+    ("development/first-attempt.md", SPEC, ROOT / "development"),
     ("examples/README.md", (ROOT / "examples/README.md").read_text(encoding="utf-8"), ROOT / "examples"),
     ("development/README.md", (ROOT / "development/README.md").read_text(encoding="utf-8"), ROOT / "development"),
     ("development/PROPOSALS.md", (ROOT / "development/PROPOSALS.md").read_text(encoding="utf-8"), ROOT / "development"),
@@ -212,7 +212,7 @@ check("relative links and anchors resolve", problems)
 
 # --- 7. sidecars obey the rules the spec states ------------------------------
 # Applied to the worked examples *and* to every complete sidecar documented in
-# SPEC.md or README.md, because a documented example that drifts from the schema
+# first-attempt.md or README.md, because a documented example that drifts from the schema
 # is the same defect as an example file that does — and has shipped once.
 problems = []
 CREDENTIAL_SHAPED = re.compile(r"(password\s*=\s*\"|secret\s*=\s*\"|token\s*=\s*\"|sk\.[A-Za-z0-9]{8})", re.I)
@@ -251,7 +251,7 @@ def sidecar_sources():
     for path in EXAMPLES:
         raw = path.read_text(encoding="utf-8")
         yield str(path.relative_to(ROOT)), raw, tomllib.loads(raw)
-    for label, text in (("SPEC.md", SPEC), ("README.md", README)):
+    for label, text in (("first-attempt.md", SPEC), ("README.md", README)):
         for line, body in toml_blocks(text):
             doc = tomllib.loads(body)
             # Only whole sidecars. §4.3 requires `contract`, so its presence is

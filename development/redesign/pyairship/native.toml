@@ -1,15 +1,16 @@
-# pyairship, expressed against the **proposed successor model** (contract "2").
+# pyairship, expressed against the **proposed redesign**.
 #
-# NOT part of the version 1 example set. The schema below is a probe, not a
-# specification: two prerequisite tables — `application_value` and
-# `application_action` — in place of version 1's thirteen. See ../README.md.
+# NOT part of the first attempt's example set. The schema below is a probe, not
+# a specification: two prerequisite tables — `application_value` and
+# `application_action` — in place of the first attempt's thirteen. The contract
+# stays "1", which the first attempt never released. See ../README.md.
 #
 # Airship was chosen for one question the other four could not ask: the vendor
 # offers **two paths to the same fact**, and the model has to say something
 # about which one a producer takes. It does, and the answer is not "express
 # both". See finding V8.
 
-contract = "2"
+contract = "1"
 platforms = ["android", "ios"]
 
 # ---------------------------------------------------------------- Android ---
@@ -153,7 +154,7 @@ handler; App Store review asks what the application does with it."""
 
 # --- the two extensions, and the singleton each one claims -------------------
 #
-# `slot` is what survives of version 1's `app_extensions.kind`: iOS permits one
+# `slot` is what survives of the first attempt's `app_extensions.kind`: iOS permits one
 # target per extension point, so two packages asking for the same one is a
 # collision the consumer must report rather than a duplicate it may merge.
 

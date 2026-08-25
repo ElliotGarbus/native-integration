@@ -2,7 +2,7 @@
 
 **Status: survey findings, not proposals.** This file records what forty
 further SDKs — the tier below the ten worked in [`examples/`](examples/) — ask
-of a native build, and which of those asks SPEC.md cannot express. Nothing here
+of a native build, and which of those asks first-attempt.md cannot express. Nothing here
 is normative and nothing here has been decided. Remedies belong in
 [PROPOSALS.md](PROPOSALS.md); this is the evidence that would justify one.
 
@@ -16,7 +16,7 @@ single integration.
 The ten worked examples were chosen for *pressure* — each was picked to break
 something. This survey is the opposite: it takes the SDKs an application is
 statistically likely to acquire, reads each vendor's own integration
-instructions, and asks only whether SPEC.md can say what the vendor asks for.
+instructions, and asks only whether first-attempt.md can say what the vendor asks for.
 No sidecars were written for the survey itself. A finding here is a claim about
 **expressiveness**, not about whether a wrapper would be worth shipping — and
 four of them have since been put to a sidecar, which changed three of the four
@@ -288,7 +288,7 @@ P3 recorded this with one motivating example, which PROPOSALS.md's own rule
 calls a hypothesis. Six makes it a finding.
 
 **The interlock with §11's lifecycle deferral is the interesting part.**
-SPEC.md argues for waiting on startup hooks partly because *"some vendors reach
+first-attempt.md argues for waiting on startup hooks partly because *"some vendors reach
 the same result declaratively"*, citing Sentry's `ContentProvider`. Airship's
 Autopilot is a second instance of exactly that — a `meta-data` key naming a
 producer-owned class, so `takeOff` runs before any component receives an intent
@@ -520,7 +520,7 @@ must provide a class at this path, doing this.* Without it the only honest
 option is a README — which is the transcription problem this specification
 exists to end.
 
-## Tier D — a claim SPEC.md makes that the survey contradicts
+## Tier D — a claim first-attempt.md makes that the survey contradicts
 
 ### N21 — build-time execution is three categories, not two
 
@@ -571,7 +571,7 @@ Findings are more legible against what did not move.
 
 ## Since this survey
 
-**Six corrections have landed in SPEC.md** — the batch that fixes something
+**Six corrections have landed in first-attempt.md** — the batch that fixes something
 wrong rather than adding capability: `provider` left §6.8's vocabulary (it
 cannot carry a device-unique authority a producer could know), §7.6 gained the
 application-wins rule §6.3 always had, §11 gained a third build-time outcome
@@ -632,4 +632,4 @@ outstanding.
 
 Six of these are single-field or documentation-only changes with multi-vendor
 evidence behind them — N8, N18, N12, N2, N21, N16 — and three of those correct
-something SPEC.md currently gets wrong rather than adding capability.
+something first-attempt.md currently gets wrong rather than adding capability.

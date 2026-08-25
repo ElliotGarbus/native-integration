@@ -71,7 +71,7 @@ cannot say. Depth found the refusals above; breadth found the missing tables.
 
 **Round five is where the two meet.** The four sidecars above were written to
 put depth behind the survey's most consequential findings before any of them was
-allowed to change SPEC.md — and three of the four changed the finding they were
+allowed to change first-attempt.md — and three of the four changed the finding they were
 testing. FB2 narrowed N6 (an `.aar` merges its own `<queries>`), AG1 removed
 the hedge from N5 (a capture service is the producer's to declare, so the gap is
 not narrow), and HC2 showed §6.8's single-action stereotype does not generalize
@@ -129,7 +129,7 @@ asserting. What it did not reach — packaging collisions, the permission
 attribute merge, namespace exclusivity — is recorded at the end of its NOTES so
 the next composition is chosen against the gap.
 
-> **Reading these after the fact.** Each `NOTES.md` describes SPEC.md **as it
+> **Reading these after the fact.** Each `NOTES.md` describes first-attempt.md **as it
 > stood when that example was run**. For the four PyPlatformPackages examples
 > that is the text before the corrections group landed, so several findings
 > recorded there as defects — §7.6's usage-description example, §6.5's range

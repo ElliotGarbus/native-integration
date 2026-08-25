@@ -1924,14 +1924,14 @@ def test_two_shims_touching_one_api_category_both_tell_the_truth(tmp_path):
 def test_every_requirement_is_discharged_somewhere():
     """Every §8 requirement is discharged, structural, or named as beyond a reader.
 
-    The count comes from SPEC.md rather than a literal, because a hardcoded
+    The count comes from first-attempt.md rather than a literal, because a hardcoded
     bound does not fail when the specification grows — it quietly covers less,
     which is how requirements 27 to 29 went unchecked.
     """
     import re
     from pathlib import Path as _Path
 
-    spec = (_Path(__file__).resolve().parent.parent / "SPEC.md").read_text(encoding="utf-8")
+    spec = (_Path(__file__).resolve().parent.parent / "development" / "first-attempt.md").read_text(encoding="utf-8")
     block = spec.split("A conforming consumer **MUST**:")[1].split(
         "A conforming consumer **SHOULD**:"
     )[0]
@@ -1966,7 +1966,7 @@ def test_every_advisory_obligation_is_accounted_for():
 
     from native_integration.rules import ADVISORY
 
-    spec = (_Path(__file__).resolve().parent.parent / "SPEC.md").read_text(encoding="utf-8")
+    spec = (_Path(__file__).resolve().parent.parent / "development" / "first-attempt.md").read_text(encoding="utf-8")
     block = spec.split("A conforming consumer **SHOULD**")[1].split("\n## ")[0]
     declared = set(re.findall(r"^- \*\*(S\d+)\.\*\*", block, re.M))
     assert declared, "no identified SHOULD items found in §8"

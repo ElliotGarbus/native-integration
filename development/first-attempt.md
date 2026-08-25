@@ -1,26 +1,41 @@
-# The native-integration specification
+# The native-integration specification — the first attempt
 
-**Version:** `1` (draft)
-**Entry-point group:** `native_integration.v1`
+**Superseded, and kept.** This is the first attempt at the specification. It was
+never released: no build tool implemented it, no distribution ever shipped a
+sidecar against it, and the entry-point group it names has no users. The
+specification that replaces it lives at `SPEC.md` in the repository root and
+takes the version number this document never spent, which is why nothing here
+is a version 1 anyone has to support.
 
 A convention by which a Python distribution declares the native material an
 Android or iOS application build must provide on its behalf, and by which a build
 tool discovers, validates, and stages that material.
 
-> **Status: draft.** No build tool implements this yet; a reference reader in
-> this repository does, and tracks the text. Breaking changes are expected until
-> this line is removed, and this revision makes some — the draft is amended in
-> place rather than by contract minor.
+> **Why it is here.** It was tested harder than anything that replaces it will be
+> for some time: **eighteen integration cases** expressed against the text as
+> sidecars — four existing Python packages, and fourteen clean-sheet ones for
+> Firebase, Sentry, Stripe, Mapbox, Meta, Airship, Agora, Health Connect,
+> TensorFlow Lite and a three-package mediated-ads set, whose vendors have never
+> heard of this convention — plus a survey of forty further SDKs. See
+> [`examples/`](../examples/) for a worked integration with both halves,
+> [`examples/`](examples/) beside this file for the seventeen that shaped the
+> text, and [`PROPOSALS.md`](PROPOSALS.md) for the decisions they produced,
+> including the ones deliberately not adopted.
 >
-> This revision incorporates the corrections found by expressing **eighteen
-> integration cases** against the text as sidecars — four existing Python
-> packages, and fourteen clean-sheet ones for Firebase, Sentry, Stripe, Mapbox,
-> Meta, Airship, Agora, Health Connect, TensorFlow Lite and a three-package
-> mediated-ads set, whose vendors have never heard of this convention. See
-> [`examples/`](examples/) for a worked integration with both halves,
-> [`development/examples/`](development/examples/) for the seventeen that shaped
-> the text, and [`development/PROPOSALS.md`](development/PROPOSALS.md) for the
-> decisions they produced, including the ones deliberately not adopted.
+> **What carried forward.** Most of it. Discovery, the sidecar and its contract
+> version, ownership, locked native dependency resolution, the integration record
+> and its review gate, and the out-of-scope boundaries are the parts eighteen
+> examples validated, and they move across roughly unchanged.
+>
+> **Why it was restructured rather than amended.** Each round of examples closed
+> a gap by adding a table, and the count of them became the problem: thirteen
+> prerequisite tables, a §2.4 whose job is to classify the other sections, and an
+> open-ended obligation to add another table whenever Apple or Google ships a
+> construct. The successor keeps the automated core and replaces the taxonomy
+> with two tables and a rule that unknown things degrade to a manual instruction
+> instead of failing the build. The reasoning is in
+> [`redesign/`](redesign/), and it was tested against the five hardest cases
+> here before any of it was written.
 
 ---
 
@@ -869,7 +884,7 @@ purpose string the application must provide. Everything else it **contributes**:
 source, a Maven coordinate, a permission, a service the SDK dispatches to, a
 shrinker rule, a Swift package, one `Info.plist` array entry.
 
-[`examples/pystripe/`](examples/pystripe/) carries both halves of one
+[`examples/pystripe/`](../examples/pystripe/) carries both halves of one
 integration, sidecar and application reply side by side.
 
 ### 5.2 Every table at a glance

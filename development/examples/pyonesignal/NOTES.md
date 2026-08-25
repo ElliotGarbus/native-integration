@@ -192,7 +192,7 @@ targets (B1), and producer-contributed manifest/resource entries (A3, A4) are al
 the same missing idea in different clothes — a producer attaching itself to a
 point in the generated project that the consumer owns.
 
-Before changing SPEC.md, the other three cases are worth running:
+Before changing first-attempt.md, the other three cases are worth running:
 
 - **PyCoreLocation** should stress §7.6 `values` and the permission/purpose-string
   path — likely a clean fit, and a useful control.

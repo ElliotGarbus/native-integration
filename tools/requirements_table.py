@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate docs/REQUIREMENTS.md from SPEC.md §8 and the library's rule registry.
+"""Generate docs/REQUIREMENTS.md from first-attempt.md §8 and the library's rule registry.
 
 The point of the reference reader is that a consumer's obligations are code
 paths rather than prose it has to remember. That claim is only worth something
@@ -31,11 +31,11 @@ OUTPUT = ROOT / "docs" / "REQUIREMENTS.md"
 
 HEADER = """# Where each consumer obligation lives
 
-Every requirement in [§8 of the specification](../SPEC.md#8-consuming-tool-requirements),
+Every requirement in [§8 of the specification](../development/first-attempt.md#8-consuming-tool-requirements),
 against the code path in [`native_integration`](../src/native_integration/) that
 discharges it.
 
-**Generated** by `python3 tools/requirements_table.py` from SPEC.md and
+**Generated** by `python3 tools/requirements_table.py` from first-attempt.md and
 `native_integration.rules`; CI fails if it drifts. A requirement that appears in
 neither column fails `tests/test_integration.py::test_every_requirement_is_discharged_somewhere`.
 
@@ -67,7 +67,7 @@ returning a clean result.
 
 
 def requirement_text() -> dict[int, str]:
-    spec = (ROOT / "SPEC.md").read_text(encoding="utf-8")
+    spec = (ROOT / "development" / "first-attempt.md").read_text(encoding="utf-8")
     block = spec.split("A conforming consumer **MUST**:")[1].split(
         "A conforming consumer **SHOULD**:"
     )[0]
@@ -84,7 +84,7 @@ def requirement_text() -> dict[int, str]:
 
 def advisory_text() -> dict[str, str]:
     """§8's SHOULD items, by the identifier the specification gives them."""
-    spec = (ROOT / "SPEC.md").read_text(encoding="utf-8")
+    spec = (ROOT / "development" / "first-attempt.md").read_text(encoding="utf-8")
     block = spec.split("A conforming consumer **SHOULD**")[1].split("\n## ")[0]
     found: dict[str, str] = {}
     for match in re.finditer(r"^- \*\*(S\d+)\.\*\*\s(.*?)(?=^- \*\*S|\Z)", block, re.M | re.S):
