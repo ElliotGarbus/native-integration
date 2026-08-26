@@ -93,10 +93,28 @@ backend, or a new artifact type.
 hooks, or build-system arguments. A producer describes; it never instructs. A
 consumer **MUST NOT** execute any content of a sidecar.
 
-**Automate what is deterministic; state the rest.** Use the three-part test
-under [Goals](#goals). When a requirement fails the test, it is stated as an
-action rather than forced into a shape the consumer cannot honor. A partial
-automation that looks complete is worse than a clear task.
+**All native integration material falls into one of three categories.** They are
+the sidecar's top-level shape, and each carries a different part of the security
+model.
+
+| Category | Meaning | Enforcement |
+| --- | --- | --- |
+| **`owns`** | An exclusive claim, held across every distribution in the closure | collision-checked; a second claimant fails |
+| **`requires`** | A condition the application or its build must satisfy | reported and never auto-satisfied; the consumer invents nothing |
+| **`contributes`** | Material the consumer stages into the generated project on the producer's behalf | staged, attributed, and disclosed in the record |
+
+A Java namespace is owned. An SDK floor, a value the application supplies, and
+an action it performs are required — [§5](#5-requirements-on-the-application)
+covers those three shapes. Source files, dependency coordinates, permissions and
+manifest components are contributed — [§6](#6-android-contributions) and
+[§7](#7-ios-contributions) cover those per platform.
+
+**Automate what is deterministic; state the rest.** The three-part test under
+[Goals](#goals) is what decides between the last two categories: material that
+passes all three is a contribution, and material that fails any of them is a
+requirement. When it fails, state it as an action rather than forcing it into a
+shape the consumer cannot honor. A partial automation that looks complete is
+worse than a clear task.
 
 **Never originate what belongs to the application.** Where the application owns
 the artifact — an entitlement, its `Info.plist`, its bundle, a build target — a
