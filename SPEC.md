@@ -154,8 +154,11 @@ into a file the consumer tells the application to commit.
 
 ### 2.3 What the consumer generates
 
-A consumer **MUST** report every unmet requirement, naming the distribution that
-declared it, the `reason`, and — for an action — the `summary`.
+A consumer **MUST** report every unmet requirement, naming the distribution
+that declared it, the `reason`, and — for an action — the `summary`,
+`instructions`, and `acceptance`. Omitting the latter two would report that
+something is owed without carrying what a person or agent needs to do the work
+and confirm it.
 
 A consumer **SHOULD** scaffold declared placeholders into the application's own
 configuration, so that what remains is visible where the author already works:
@@ -166,13 +169,47 @@ configuration, so that what remains is visible where the author already works:
 sentry_dsn = "<TODO: your Sentry DSN, from Settings → Projects → Client Keys>"
 ```
 
-Two rules govern scaffolding:
+An action has no placeholder — nothing satisfies it but the application
+author's own acknowledgement — so a consumer **SHOULD** instead scaffold it
+**commented out**, carrying `summary`, `reason`, `instructions`, and
+`acceptance` as commentary the author uncomments once done. `instructions` and
+`acceptance` are what let a coding agent act on this directly rather than stop
+and wait for a human to translate a one-line summary
+([§5.6](#56-instructions-and-acceptance-criteria)):
+
+```toml
+# Added by examplebuild. Required by mywechatpkg.
+# Add a WXEntryActivity under your own application ID.
+# WeChat resolves this class by name under your application ID; without it,
+# login and share callbacks never reach the SDK.
+#
+# Create WXEntryActivity in the package <applicationId>.wxapi. It must extend
+# Activity, implement IWXAPIEventHandler, and forward both callbacks to
+# IWXAPI.handleIntent. Declare it in your manifest as exported, with
+# android:launchMode="singleTask".
+#
+# Acceptance:
+#   - WXEntryActivity exists in the package <applicationId>.wxapi
+#   - The activity implements IWXAPIEventHandler
+#   - The activity is declared in the manifest, exported, with launchMode singleTask
+#   - Both callbacks are forwarded to IWXAPI.handleIntent
+#
+# Uncomment once done:
+# [tool.examplebuild.native.mywechatpkg.android]
+# acknowledged_actions = ["wechat_entry"]
+```
+
+Three rules govern scaffolding:
 
 - A consumer **MUST NOT** modify a file the application owns unless the
   application asked it to. Scaffolding is a command the author runs, not a side
   effect of a build.
 - A consumer **MUST NOT** treat a placeholder as a supplied value. See
   [§5.4](#54-how-a-requirement-is-satisfied).
+- A consumer **MUST NOT** scaffold an action's acknowledgement anywhere but
+  commented out. An acknowledgement the consumer wrote itself is
+  indistinguishable from one the application author wrote after doing the
+  work, and only the author can make that claim true.
 
 ### 2.4 Obligations on the consumer's bootstrap
 
@@ -210,6 +247,17 @@ Neither clause gives a producer a way to run code at startup or to join a
 lifecycle callback. Both are properties of a bootstrap the consumer already
 writes, not a seam for producer code to enter.
 
+> **Note:** Some SDKs need this and already solve it themselves. Where a
+> vendor's own SDK provides a declarative load hook — a manifest entry naming a
+> class its own bundled loader reads before any component runs, as Android's
+> Airship `Autopilot` and Sentry's `ContentProvider` trick do — a producer
+> states that entirely through an ordinary value ([§5.2](#52-values)) and a
+> contributed class ([§6](#6-android-contributions)), and no manual step
+> remains. Where no such hook exists — iOS has none today — the requirement
+> stays an action ([§5.3](#53-actions)): the application author calls the SDK
+> from their own code at startup. This document grants no other path for
+> producer code to run early, on either platform.
+
 ---
 
 ## 3. Discovery
@@ -217,9 +265,10 @@ writes, not a seam for producer code to enter.
 ### 3.1 The entry point
 
 A producer **MUST** declare exactly one entry point in the group
-`native_integration.v1`:
+`native_integration.v1`, in the producer's own `pyproject.toml`:
 
 ```toml
+# the producer's own pyproject.toml
 [project.entry-points."native_integration.v1"]
 native = "mypkg._native"
 ```
@@ -281,7 +330,8 @@ package or any module of it, at any point, including the module the entry point
 names. Metadata reads and file reads only.
 
 > **Note:** A consumer runs on a desktop build host. A distribution targeting
-> Android or iOS may raise on import there, or may not be importable at all.
+> Android or iOS may raise on import on that host, or may not be importable on
+> it at all.
 
 **Provenance.** For each producer, a consumer **MUST** be able to state how it
 entered the dependency closure. Where several dependency paths exist, the
@@ -290,8 +340,11 @@ path it reports **MUST** be deterministic across runs.
 
 ### 3.3 Iterate; do not look up by name
 
-A consumer **MUST** iterate every entry in the group and ignore the entry-point
-name. A consumer **MUST NOT** look the entry up by name.
+One distribution contributes at most one entry ([§3.4](#34-one-entry-per-distribution)),
+but the closure holds one candidate per distribution, so the group can hold
+many — one from each distribution that ships a sidecar. A consumer **MUST**
+iterate every entry in the group `native_integration.v1` across the closure and
+ignore each entry's own name. A consumer **MUST NOT** look an entry up by name.
 
 > **Note:** The name carries no information — the platform lives inside the
 > file — so a name-keyed lookup silently skips any distribution that labelled it
@@ -304,9 +357,9 @@ A distribution that declares more than one entry in the group is invalid. A
 consumer **MUST** fail, naming the distribution. It **MUST NOT** select one or
 merge them.
 
-### 3.5 The distribution is the only carrier
+### 3.5 The distribution is the only carrier of the sidecar
 
-A declaration reaches a consumer only by riding on an installed Python
+A sidecar reaches a consumer only by riding on an installed Python
 distribution in the application's dependency closure. There is no other channel:
 no path, no registry, and no configuration key by which a consumer can be
 pointed at a sidecar the closure does not contain.
@@ -326,12 +379,6 @@ The closure is resolved for a target platform **and a Python version**. A
 sidecar **MUST NOT** restate an interpreter requirement. `Requires-Python`
 already carries it enforceably, and a closure correctly resolved for one
 interpreter cannot contain a distribution built for another.
-
-Platform support is not symmetric with this, which is why
-[§4.5](#45-platform-support) exists. No enforceable standard metadata carries
-*this distribution does not function on Android* for a distribution whose own
-content is pure Python: wheel platform tags require platform-specific content,
-and `Classifier: Operating System :: Android` is informational only.
 
 ## 4. The sidecar file
 
@@ -459,15 +506,6 @@ cannot distinguish a future platform from a misspelled one.
 > [§4.3](#43-contract-version)'s minor, which turns *silently ignored* into
 > *visibly rejected, with the version that would work*.
 
-**There is no fail-open exception for requirements**, and a reader who knows the
-first attempt should not go looking for one. An action ([§5.3](#53-actions))
-carries no vocabulary: `summary`, `reason`, `instructions` and `acceptance` are
-prose, `slot` is opaque and compared only for equality, and `uses` names values
-in the same sidecar. Value kinds ([§5.5](#55-value-kinds)) are a **closed** set
-and fail closed like any other, because a consumer is being asked to write
-something. Nothing in [§5](#5-requirements-on-the-application) needs an
-exception, which is why this section has none.
-
 ### 4.5 Platform support
 
 ```toml
@@ -497,9 +535,9 @@ all*.
 > [§4.4](#44-unknown-declarations-fail-closed) cannot catch this — there is no
 > key to reject, only a distribution that does not work here.
 >
-> This key makes a claim about the **distribution**, not about native material.
-> That reaches beyond this document's usual scope, and no other mechanism
-> carries the claim today.
+> `platforms` makes a claim about the **distribution**, not about native
+> material. That reaches beyond this document's usual scope, and no other
+> mechanism carries the claim today.
 
 ## 5. Requirements on the application
 
@@ -541,13 +579,13 @@ configured value is lower, or when a declared boolean floor is not enabled. A
 consumer **MUST NOT** raise the application's configuration to satisfy a floor.
 
 > **Caution:** `target_sdk` changes behavior across the whole application, in
-> code that has nothing to do with your package. Declare it only when a specific
-> behavior depends on it, and say which one.
+> code that has nothing to do with the producer's package. Declare it only when
+> a specific behavior depends on it, and say which one.
 
 ### 5.2 Values
 
-Declare a value when the application has a string that the build must embed, and
-you know the platform key it goes to.
+A producer declares a value when the application has a string that the build
+must embed, and the producer knows the platform key it goes to.
 
 ```toml
 [[android.requires.application_value]]
@@ -578,7 +616,35 @@ Rules:
 - A key the **application** sets itself is the application's. The consumer keeps
   the application's value and reports the override.
 - A producer **MUST NOT** declare a value for something an SDK accepts at
-  runtime. Pass that from your Python code instead.
+  runtime. Pass that from the producer's own Python code instead.
+
+Three pieces make up the whole exchange: the sidecar above declares the
+requirement, the consumer scaffolds it, and the application author fills it
+in.
+
+The consumer reads `id`, `reason`, and `placeholder` from the sidecar and
+writes this into the application's own `pyproject.toml`
+([§2.3](#23-what-the-consumer-generates)) — the application has supplied
+nothing yet:
+
+```toml
+# Added by examplebuild. Required by pysentry. Fill in the value below.
+[tool.examplebuild.native.pysentry.android.application_values]
+sentry_dsn = "<TODO: your Sentry DSN, from Settings → Projects → Client Keys>"
+```
+
+The application author replaces the placeholder with the real string, under
+the same `(distribution, id)` — scoped to the same platform, `android` here —
+the consumer scaffolded:
+
+```toml
+[tool.examplebuild.native.pysentry.android.application_values]
+sentry_dsn = "https://examplePublicKey@o0.ingest.sentry.io/0"
+```
+
+Only once that placeholder is gone does the consumer write the string to
+`io.sentry.dsn`, because `key` said so — the application never spells the
+platform key, and the producer never sees the DSN.
 
 > **Why values are scalar:** every delivery site in [§5.5](#55-value-kinds)
 > takes one string. Array-valued platform keys are either producer-known, in
@@ -589,8 +655,8 @@ Rules:
 
 ### 5.3 Actions
 
-Declare an action when the application must achieve an outcome you cannot hand
-the consumer as a string.
+A producer declares an action when the application must achieve an outcome the
+producer cannot hand the consumer as a string.
 
 ```toml
 [[android.requires.application_action]]
@@ -635,11 +701,76 @@ Rules:
 - There is no verification mechanism in version 1. A consumer reports an action
   and the application acknowledges it.
 
-> **Note:** `uses` exists because some requirements have both halves. An app
-> group identifier is a value the application supplies; enabling App Groups on
-> two targets and getting the entitlement into a provisioning profile is an
-> action. Declaring both and linking them says so without pretending either half
-> is the whole.
+An action has no placeholder, so the consumer scaffolds it commented out,
+carrying every field above as commentary
+([§2.3](#23-what-the-consumer-generates)), built entirely from the sidecar
+above:
+
+```toml
+# Added by examplebuild. Required by mywechatpkg.
+# Add a WXEntryActivity under your own application ID.
+# WeChat resolves this class by name under your application ID; without it,
+# login and share callbacks never reach the SDK.
+#
+# Create WXEntryActivity in the package <applicationId>.wxapi. It must extend
+# Activity, implement IWXAPIEventHandler, and forward both callbacks to
+# IWXAPI.handleIntent. Declare it in your manifest as exported, with
+# android:launchMode="singleTask".
+#
+# Acceptance:
+#   - WXEntryActivity exists in the package <applicationId>.wxapi
+#   - The activity implements IWXAPIEventHandler
+#   - The activity is declared in the manifest, exported, with launchMode singleTask
+#   - Both callbacks are forwarded to IWXAPI.handleIntent
+#
+# Uncomment once done:
+# [tool.examplebuild.native.mywechatpkg.android]
+# acknowledged_actions = ["wechat_entry"]
+```
+
+The third piece is the application author doing that work, then uncommenting
+the acknowledgement themselves — the consumer never uncomments it on their
+behalf, because only the author can make that claim true:
+
+```toml
+[tool.examplebuild.native.mywechatpkg.android]
+acknowledged_actions = ["wechat_entry"]
+```
+
+Acknowledging is a claim, not a proof: nothing here checks that
+`WXEntryActivity` exists. The application author is asserting that
+`instructions` was followed, and a consumer **MUST** take that assertion as
+satisfying the requirement — see [§5.4](#54-how-a-requirement-is-satisfied).
+
+> **Note:** `uses` links an action to a value it depends on, when a
+> requirement has both halves. An app group identifier is a string the
+> application supplies — a value ([§5.2](#52-values)) — but enabling App
+> Groups on two targets and getting the entitlement into a provisioning
+> profile is work only the application author can do — an action. Declare
+> both, and put the value's `id` in the action's `uses`:
+>
+> ```toml
+> [[ios.requires.application_values]]
+> id = "app_group_id"
+> kind = "info_plist"
+> key = "com.example.app-group"
+> reason = "The App Group identifier this SDK shares data through"
+>
+> [[ios.requires.application_action]]
+> id = "app_group_entitlement"
+> summary = "Enable App Groups and add the identifier above to the entitlement"
+> uses = ["app_group_id"]
+> ```
+>
+> Without `uses`, these would read as two unrelated line items, and nothing
+> would stop an application author from acknowledging the action while the
+> value it depends on is still an unfilled placeholder. `uses` makes that
+> dependency checkable ([§5.3](#53-actions) rejects a `uses` that does not
+> resolve) and lets a report show the action beside the value it needs,
+> instead of asking the reader to notice the connection on their own. It does
+> not collapse the two into one requirement — the value is still something a
+> consumer can place automatically, and the action is still something only
+> the application author can complete.
 
 ### 5.4 How a requirement is satisfied
 
@@ -651,10 +782,10 @@ Rules:
 
 A consumer **MUST**:
 
-- fail the build when an **unconditional** requirement is unsatisfied, naming
-  the distribution and the `reason`;
-- record an unsatisfied **conditional** requirement in the integration record
-  and **MUST NOT** fail the build for it.
+- fail the build when an **unconditional** (`conditional == false`)
+  requirement is unsatisfied, naming the distribution and the `reason`;
+- record an unsatisfied **conditional** (`conditional == true`) requirement in
+  the integration record and **MUST NOT** fail the build for it.
 
 Declare `conditional = true` when you cannot tell whether the requirement
 applies and the application can. State the triggering condition in `reason`.
@@ -694,10 +825,30 @@ does not implement, naming the distribution and the value.
 `usage_description`, which exists so that a report can tell an author they are
 being asked for user-facing text that App Store review reads.
 
+**Nothing in this section has an open vocabulary.** Some contribution keys
+elsewhere in this document stay open deliberately, because the *platform* owns
+the names — an Android `<data>` attribute, a foreground service type. A
+requirement never does. An action ([§5.3](#53-actions)) carries no vocabulary
+at all: `summary`, `reason`, `instructions` and `acceptance` are prose, `slot`
+is opaque and compared only for equality, and `uses` names values in the same
+sidecar. `kind`, above, is a **closed**, enumerated set for the same reason
+every other closed set is: a consumer is being asked to write something. There
+is nothing left in [§5](#5-requirements-on-the-application) that a platform's
+own vocabulary could extend.
+
 ### 5.6 Instructions and acceptance criteria
 
 `instructions` and `acceptance` are addressed to a person or to a coding agent
 working on that person's behalf. They are not addressed to the consumer.
+
+**Write for a reader with no other context.** A coding agent acting on a
+scaffolded action ([§2.3](#23-what-the-consumer-generates)) has this text and
+nothing else — not the producer's README, not its issue tracker, not a human
+across a desk to ask a follow-up of. Name the exact class, package, method,
+and manifest attribute; an instruction that leans on context a human would
+infer ("wire it up the usual way") gives an agent nothing to act on and
+produces a plausible-looking implementation that satisfies none of the
+`acceptance` items below.
 
 **Acceptance criteria state an end state, never an operation.**
 
@@ -707,9 +858,17 @@ working on that person's behalf. They are not addressed to the consumer.
 | "The extension target shares an app group with the application" | "Add the app group key to Extension.entitlements" |
 
 Criteria written as end states stay true when a toolchain lays its project out
-differently, and can be evaluated by whoever did the work. Criteria written as
+differently, and can be evaluated by whoever did the work — including an agent
+checking its own output against a list before declaring the action done, the
+same way it would check any other task's exit criteria. Criteria written as
 operations are a build-mutation language, which this convention does not have
 and does not want.
+
+**Each item in `acceptance` is checked independently.** A producer **SHOULD**
+split it into several short statements — one end state per item — rather than
+folding everything into a single long entry, so a reader, human or agent, can
+work through the list item by item instead of re-deriving what "done" means
+from a wall of prose.
 
 **Security boundary.** A producer's `instructions` and `acceptance` are
 **untrusted content**, and this document distinguishes three parties:
@@ -727,8 +886,27 @@ bounds the channel.
 
 ### 5.7 Slots
 
-A `slot` names an application-owned surface that only one thing can occupy —
-one notification service extension per iOS application, for instance.
+**The problem `slot` solves:** iOS allows exactly one notification service
+extension per application. A push SDK that needs to decrypt or rewrite a
+notification before it displays asks the application to create one and call
+into its handler — an ordinary action. A second, unrelated push SDK, added
+later, asks for the same thing. Nothing about either action alone reveals the
+conflict: each reads as a reasonable, self-contained request, and an
+application author acting on them one at a time creates two extension
+targets — which iOS does not run side by side — or overwrites one vendor's
+handler with the other's, and finds out only when that vendor's feature
+silently stops working.
+
+Nothing about this is specific to notifications. An iOS broadcast upload
+extension (screen recording), a file provider extension, and a watch
+extension are each capped at one per application the same way, and a `slot`
+covers all of them identically — it is the shape, "the platform allows
+exactly one," not the particular surface, that makes something worth naming
+this way.
+
+A `slot` names the contended surface so a consumer can catch this before the
+application author starts, by recognizing that two actions claim the same
+one-only surface:
 
 ```toml
 slot = "com.apple.usernotifications.service"
