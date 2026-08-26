@@ -979,6 +979,12 @@ toolchains — `org.kivy.android`, `org.libsdl.app`, `org.jnius`,
 `org.renpy.android`, `com.chaquo.python`, `org.beeware.android` — plus any
 namespace the consumer's own bootstrap occupies.
 
+> **Note:** Rule 4 stops a distribution shipping
+> `org/kivy/android/PythonActivity.java` from silently replacing the
+> application's entry point. The list is consumer-independent so that one
+> toolchain's runtime cannot be clobbered because a different toolchain built
+> the application.
+
 **Containment is computed on dot-separated segments, never on raw strings**, in
 rule 4 as in rule 5. A namespace *A* contains *B* when *B* equals *A*, or when
 *B* begins with *A* followed by a `.`. So `org.kivy.android` contains
@@ -990,16 +996,11 @@ single-label one: it is ownable and collision-checked like any other, but it
 claims a top-level name for one distribution, which makes accidental overlap
 with a sibling project far likelier.
 
-> **Note:** Rule 4 stops a distribution shipping
-> `org/kivy/android/PythonActivity.java` from silently replacing the
-> application's entry point. The list is consumer-independent so that one
-> toolchain's runtime cannot be clobbered because a different toolchain built
-> the application.
 
 ### 6.2 Source
 
-Glue classes your binding needs on the device, compiled by the application's own
-toolchain rather than shipped as a binary.
+Source code for "glue classes" your binding needs on the device, compiled by the application's own
+toolchain.
 
 ```toml
 [android.contributes.src]
@@ -1062,7 +1063,7 @@ Adding a coordinate to `annotationProcessor`, `kapt` or `ksp` makes the build
 configuration, and a consumer **MUST** reject one, naming the distribution. The
 four names above add a dependency and execute nothing.
 
-**A declared version is a requirement, not a pin.** Gradle may select a higher
+**A declared version is a minimum, not a pin.** Gradle may select a higher
 version when something else in the graph requires it. A consumer **MUST NOT**
 silently convert a declaration into a `strictly` constraint — that would make
 two producers naming different versions of one library unresolvable, and
@@ -1809,9 +1810,245 @@ objc_categories = true
 
 ## 9. Recording and review
 
-*To be ported from the first attempt (§9): the lifecycle, the report, hashed
-inputs, what resolved artifacts bring with them, the secrets rule, what a record
-must contain, and packaging collisions.*
+The integration record serves two purposes: **review** of the native surface an
+application is acquiring, and **integrity** of the inputs and resolved artifacts
+that produced it. Per-file hashes, per-artifact checksums, and failing on drift
+are what make the second more than a claim.
+
+### 9.1 The lifecycle
+
+1. **Compute** the integration resolution — the effective set from the
+   application's dependency closure, including locked native dependency graphs.
+2. **Compare** it against the last accepted integration record.
+3. **Report the delta**, naming each distribution and how it entered the closure.
+4. **Fail, or require explicit acceptance** — a re-lock, a flag, a committed
+   record; the consumer's workflow decides the form.
+5. **Update the record** only on acceptance.
+
+**The first build is step 4, not an exemption.** When no accepted record exists,
+every contribution is new, and a consumer **MUST** require the same explicit
+acceptance it would require for a change — reporting the whole effective set
+rather than silently writing a record and proceeding. A single bootstrap action
+covering the initial set satisfies this; treating "no record yet" as implicit
+approval does not, because the first build is the one where an application
+acquires *all* of its inherited native surface at once.
+
+### 9.2 The report
+
+A report **MUST** carry three things: the distribution, **how it entered the
+dependency closure**, and the delta. It covers **one platform's build**, since
+that is what a consumer computes ([§2.2](#22-how-the-application-answers)).
+
+```
+android build — 12 contributions staged, 1 value and 2 actions outstanding
+
+analytics-shim 2.1.0  (via some-ui-lib)
+  + permission   android.permission.ACCESS_FINE_LOCATION  ("optional BLE discovery")
+  + feature      android.hardware.location.gps  (required=false)
+
+map-sdk 4.1.0  (direct dependency)
+  ! REPOSITORY  https://maven.example.com/releases  → groups: com.example.maps
+                authenticated — no credentials configured        ✗ BLOCKING
+  + dependency  com.example.maps:android:4.1.0
+  + from com.example.maps:android:4.1.0 (resolved artifact manifest):
+      + permission  com.example.permission.MAPS_ID
+  ! value       maps_api_key → meta-data com.example.maps.API_KEY
+                placeholder not replaced                          ✗ BLOCKING
+  ! action      maps_config   "Add maps-config.json to your assets"
+                not acknowledged                                  ✗ BLOCKING
+  ~ action      map_deep_links  "Register your link domain as a verified App Link"
+                conditional, unresolved
+```
+
+The middle element matters most for the case that motivates the requirement: a
+transitive dependency the application author has never heard of.
+
+The shape of that second entry is normative in four respects:
+
+| Requirement | Why |
+| --- | --- |
+| A repository contribution is set apart, never folded into a list | [§6.4](#64-maven-repositories) |
+| Contributions arriving from a **resolved artifact's own manifest** are attributed to that artifact, not to the distribution that declared the coordinate | [§9.4](#94-what-resolved-artifacts-bring-with-them) |
+| An unmet requirement is distinguished from an unresolved **conditional** one | [§5.4](#54-how-a-requirement-is-satisfied) — the first blocks the build, the second is guidance |
+| **What was staged is distinguished from what remains** | the whole point of this convention: the application author needs to see the boundary between work that was done for them and work that is theirs |
+
+No format is mandated. A report that collapses these distinctions has not
+reported them.
+
+A requirement belonging to the platform **not** being built belongs in neither
+the report nor the record. An `[ios]` table is outside an Android build's
+concern ([§4.4](#44-unknown-declarations-fail-closed)), and a consumer that
+failed an Android build over an unmet iOS requirement would be failing it for
+something that build never had to satisfy.
+
+### 9.3 Hashed inputs
+
+Inputs are hashed for **every** producer, not only path and editable installs.
+The record **MUST** include a SHA-256 per file, keyed by normalized relative path
+(forward slashes, relative to the sidecar directory), covering `native.toml` and
+every resource it references.
+
+The wheel's own hash pins the distribution, but the useful identity for this
+protocol is the material the integration was computed from: per-file hashes let
+a diagnostic say `java/Bridge.java changed`, not merely "the producer's hash
+changed."
+
+> **Note:** This is also what bounds the `instructions` and `acceptance` channel
+> ([§5.6](#56-instructions-and-acceptance-criteria)). Both are inline in
+> `native.toml`, so hashing that file covers them: text a human or an agent may
+> act on cannot change between versions without appearing as a delta the
+> application reviews.
+
+### 9.4 What resolved artifacts bring with them
+
+A resolved dependency carries native effects of its own. A Maven coordinate can
+resolve to an `.aar` whose manifest AGP merges into the application's; a Swift
+package can vend binary targets.
+
+**For Android**, a consumer **MUST** include in the record and report every
+`<uses-permission>`, `<uses-feature>`, and manifest component declared by the
+**manifests of the resolved artifacts themselves**, beyond those declared by
+sidecars and the application, attributed to the artifact that declares each one.
+The resolved graph is already required by [§6.3](#63-gradle-dependencies), and
+this obligation is bounded by it: read each resolved `.aar`'s own
+`AndroidManifest.xml`.
+
+A consumer **SHOULD** additionally report the fully merged manifest's delta.
+That is a larger claim — it depends on merge semantics rather than on what each
+artifact declares — and where a consumer stops at the artifact manifests, its
+documentation **MUST** say that the record's coverage is per-artifact
+declarations rather than the merged result.
+
+**For iOS**, reporting the native effects of a Swift package's binary targets
+remains a **SHOULD**: there is no equivalent merge step, and no comparable
+manifest to read.
+
+**Native dependencies are a trust boundary, and two rules cross it.** The
+restrictions in §§5–7 constrain effects *authored by the sidecar*. An `.aar` may
+carry a manifest, resources, JNI libraries and consumer ProGuard rules; a Swift
+package may vend binary targets. Those artifacts remain subject to their own
+ecosystem's authority model, and this convention provides **attribution and
+review** for their native effects, not restriction. Policing arbitrary library
+code is not attempted and would not succeed.
+
+Two exceptions exist, because otherwise moving material out of the sidecar and
+into an `.aar` would launder past a rule this document treats as
+security-sensitive:
+
+- A resolved artifact declaring `<uses-feature required="true">` **MUST NOT** be
+  allowed to silently make hardware mandatory. The consumer **MUST** report it,
+  and **MUST** override it to `required="false"` unless the **application
+  itself** independently declares that feature required. Silently shrinking an
+  application's device reach is the same harm whoever authors it.
+- A resolved artifact declaring an **exported component** **MUST** be reported
+  with the same prominence as a contributed one
+  ([§6.6](#66-manifest-components)), so the application sees every externally
+  reachable surface it is acquiring, whatever declared it.
+
+Consumer ProGuard rules embedded in a resolved `.aar` **SHOULD** likewise be
+reported: they are appended to the application's shrinker configuration without
+passing through [§6.7](#67-shrinker-keep-patterns)'s scoping.
+
+> **Note:** The Android half is a **MUST** because it is the case this section
+> exists for — a permission arriving through a transitive Python dependency the
+> author has never heard of, carrying obligations beyond the build.
+> `com.google.android.gms.permission.AD_ID` comes from an ads AAR and pulls the
+> application into a Play Console data-safety declaration. [§11](#11-out-of-scope)
+> also rests on it: an `.aar` embedded in a wheel is excluded there because its
+> manifest merges with no attribution, while one reached through a declared
+> coordinate is permitted because this section surfaces it — a justification
+> that cannot stand on an optional feature.
+
+### 9.5 Secrets are never recorded
+
+A consumer **MUST NOT** write an application-supplied credential — or any value
+the application supplies as a secret — into the integration record, into a
+report, or into a diagnostic. Where a record must refer to one, it refers to the
+*requirement* (that a repository is authenticated,
+[§6.4](#64-maven-repositories)) and never to the value.
+
+> **Caution:** This is the one place where the rest of this section works
+> against itself. The record is durable, diffable, hashes every input, and is
+> normally committed — so the machinery that makes contributions auditable is
+> exactly the machinery that would publish a credential to version control.
+
+### 9.6 What a record must contain
+
+Two concepts are worth distinguishing by name, though this document mandates
+neither a file nor a format:
+
+- **integration resolution** — computing the effective set (step 1);
+- **integration record** — the durable, diffable artifact of the last accepted
+  resolution (step 5).
+
+A lockfile entry, a checksum file beside the generated project, or any other
+durable artifact satisfies the record. The normative property is that a change
+in what distributions contribute **MUST NOT** pass silently.
+
+For every distribution in the effective set, a record **MUST** make these
+recoverable:
+
+| | |
+| --- | --- |
+| the distribution | its name and version, and the contract it declared |
+| its provenance | how it entered the dependency closure ([§3.2](#32-resolution)) |
+| its inputs | a SHA-256 per file, keyed by normalized relative path ([§9.3](#93-hashed-inputs)) |
+| its contributions | each one, in a form two records can be compared by |
+| its requirements | every value and every action, **with its state** — supplied, acknowledged, or unresolved-and-conditional |
+| the native graph | every resolved artifact with its checksum ([§6.3](#63-gradle-dependencies)), and every resolved package with its version **and** revision, plus a checksum per binary target ([§7.2](#72-swift-packages)) |
+
+A record that cannot answer one of those rows has not recorded the integration,
+whatever else it contains.
+
+> **Note:** The requirements row does more work here than its counterpart did in
+> the first attempt, which recorded only unsatisfied conditional prerequisites.
+> Version 1 has no verification mechanism ([§5.4](#54-how-a-requirement-is-satisfied)):
+> an action is satisfied by the application's claim that it was done. Recording
+> every action and its acknowledgement — with the version and the date the claim
+> was made — is what makes that claim attributable afterwards. It is the
+> mechanism that lets the model take a claim at face value without the claim
+> vanishing.
+
+**What acceptance does and does not guarantee.** The build *does* stop: an
+unaccepted change fails. What acceptance cannot guarantee is that anyone read
+what they accepted — a reviewer can approve a delta unexamined, and no mechanism
+in a build tool prevents that. So this is a review gate whose *blocking* is
+enforced and whose *scrutiny* is not, which is a deliberate trade: a blocking
+prompt inside a build loop earns click-through quickly and then provides
+nothing, whereas a recorded delta stays attributable before the fact in review
+and after the fact in history.
+
+### 9.7 Packaging collisions
+
+Two independently-authored packages composing is what this convention is for,
+and Android packaging is where that composition breaks first. The producers
+cannot see the collision; the consumer is the only party that can.
+
+Two resolved artifacts from **different distributions** may carry a file at the
+same path — `lib/arm64-v8a/libc++_shared.so` from two SDKs that each bundle a
+C++ runtime, or `META-INF/LICENSE` from almost any pair of libraries. A consumer
+**MUST** detect such a collision across the artifacts of the effective set, and
+**MUST** treat two cases differently:
+
+| Case | Rule |
+| --- | --- |
+| **Packaging metadata** — files under `META-INF/` that are not code, such as licence texts and build fingerprints | A consumer **MAY** resolve these itself, by a rule that does not depend on resolution order, and **MUST** record what it did |
+| **Anything else, and every native library** | A consumer **MUST NOT** choose silently. It **MUST** fail, naming the path and **both declaring distributions**, unless the application has chosen which artifact supplies the file; where the application has chosen, the consumer **MUST** record the choice |
+
+A consumer **MUST** record every collision it detected and how it was resolved,
+attributed to the distributions whose declarations pulled the artifacts in.
+
+> **Note:** `pickFirst` is what an application writes by hand today, and for a
+> licence file it is right. For two copies of a C++ runtime it is a coin toss
+> between two ABIs, decided by declaration order, and the symptom is a crash in
+> native code with no path back to either package.
+>
+> This is a consumer obligation rather than a declaration because a collision is
+> not a property of any producer: it exists only in a combination, and no
+> producer can know what it will be composed with. What the consumer adds that
+> the build system cannot is which *Python distributions* asked for the
+> colliding artifacts — Gradle already fails on a duplicate path, in a message
+> naming two artifacts and nothing else.
 
 ## 10. Versioning
 
