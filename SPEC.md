@@ -750,7 +750,7 @@ satisfying the requirement — see [§5.4](#54-how-a-requirement-is-satisfied).
 > both, and put the value's `id` in the action's `uses`:
 >
 > ```toml
-> [[ios.requires.application_values]]
+> [[ios.requires.application_value]]
 > id = "app_group_id"
 > kind = "info_plist"
 > key = "com.example.app-group"
@@ -928,15 +928,862 @@ is work no consumer can do and no producer can anticipate.
 
 ## 6. Android contributions
 
-*To be ported from the first attempt (§6): ownership, source, Gradle
-dependencies and repositories, permissions and features, manifest components,
-shrinker keep patterns, manifest meta-data, package visibility.*
+Material the consumer stages into the generated Gradle project on your behalf.
+
+### 6.1 Ownership
+
+Claim the Java namespaces your distribution writes into, so no other
+distribution can collide with them or replace a toolchain's entry point through
+a transitive dependency.
+
+```toml
+[android.owns]
+java_namespaces = ["org.example.mypkg"]
+```
+
+`java_namespaces` is **REQUIRED** when the distribution contributes Java or
+Kotlin source, producer-sourced manifest components, or shrinker keep patterns
+under its own namespace.
+
+A consumer **MUST** enforce every rule below and fail the build when one is
+violated, naming the distribution or distributions responsible:
+
+| # | Rule |
+| --- | --- |
+| 1 | Every contributed source file's path **and** its declared `package` falls under an owned namespace. |
+| 2 | Every producer-sourced component name ([§6.6](#66-manifest-components)) falls under an owned namespace. A component attributed to a declared dependency is exempt; the class is not the producer's. |
+| 3 | Every `keep_classes` pattern falls within an owned namespace. Dependency keeps are checked differently ([§6.7](#67-shrinker-keep-patterns)). |
+| 4 | An owned namespace under a reserved prefix is rejected. |
+| 5 | Two distributions claiming overlapping namespaces fail, naming both. |
+
+Reserved prefixes are the bootstrap namespaces of the known Python-mobile
+toolchains — `org.kivy.android`, `org.libsdl.app`, `org.jnius`,
+`org.renpy.android`, `com.chaquo.python`, `org.beeware.android` — plus any
+namespace the consumer's own bootstrap occupies.
+
+**Containment is computed on dot-separated segments, never on raw strings**, in
+rule 4 as in rule 5. A namespace *A* contains *B* when *B* equals *A*, or when
+*B* begins with *A* followed by a `.`. So `org.kivy.android` contains
+`org.kivy.android.helpers` and does not contain `org.kivy.androidx`, and `PyGMA`
+does not contain `PyGMAKit`.
+
+An owned namespace **SHOULD** be reverse-DNS. A consumer **SHOULD** warn on a
+single-label one: it is ownable and collision-checked like any other, but it
+claims a top-level name for one distribution, which makes accidental overlap
+with a sibling project far likelier.
+
+> **Note:** Rule 4 stops a distribution shipping
+> `org/kivy/android/PythonActivity.java` from silently replacing the
+> application's entry point. The list is consumer-independent so that one
+> toolchain's runtime cannot be clobbered because a different toolchain built
+> the application.
+
+### 6.2 Source
+
+Glue classes your binding needs on the device, compiled by the application's own
+toolchain rather than shipped as a binary.
+
+```toml
+[android.contributes.src]
+java = ["java"]
+kotlin = []
+```
+
+From each listed directory the consumer stages, recursively, exactly the files
+with the matching extension — `.java` for `java` roots, `.kt` for `kotlin`
+roots — and ignores other files. Contents **MUST** be source text.
+
+A consumer **MUST**:
+
+- compile them with the application's own toolchain;
+- exclude the source files from any Python payload it assembles;
+- compile `.java` sources with UTF-8 forced, never the platform default.
+
+Path rules are [§4.1](#41-location-and-name)'s. Subject to
+[§6.1](#61-ownership) rule 1.
+
+> **Note:** `kotlinc` and the Swift compiler always read source as UTF-8;
+> `javac` does not, and falls back to the platform default charset unless told
+> otherwise. Without forcing it, §4.1's UTF-8 requirement on the producer's side
+> guarantees nothing.
+
+### 6.3 Gradle dependencies
+
+A vendor SDK, declared as a Maven coordinate and resolved by Gradle, rather than
+transcribed into the application's build file by hand.
+
+```toml
+[[android.contributes.gradle_dependencies]]
+coordinate = "com.google.android.gms:play-services-ads:25.2.0"
+configuration = "implementation"    # optional
+```
+
+A dependency **MUST** be spelled in exactly one of two forms. The exact form
+above is **RECOMMENDED**. The second is a bounded range:
+
+```toml
+[[android.contributes.gradle_dependencies]]
+module = "com.onesignal:OneSignal"
+version = { at_least = "5.6.1", below = "6.0.0" }
+```
+
+| Field | Rule |
+| --- | --- |
+| `coordinate` | `group:artifact:version`. The version **MUST** be exact. |
+| `module` | `group:artifact`. `version` is **REQUIRED**, and **both** `at_least` (inclusive) and `below` (exclusive) are **REQUIRED** within it. A range open at either end is invalid. |
+| `configuration` | Optional. `implementation` (default), `api`, `compileOnly`, `runtimeOnly`. A **closed** set. |
+
+A consumer **MUST** reject an entry declaring both `coordinate` and `module`, or
+neither. Changing versions (`-SNAPSHOT`), unbounded dynamic versions (`+`,
+`latest.release`), and ranges spelled inside `coordinate` are invalid in either
+form.
+
+**The configuration set is closed, and deliberately not the platform's own.**
+Adding a coordinate to `annotationProcessor`, `kapt` or `ksp` makes the build
+*run code from that artifact*. A producer **MUST NOT** declare a processor
+configuration, and a consumer **MUST** reject one, naming the distribution. The
+four names above add a dependency and execute nothing.
+
+**A declared version is a requirement, not a pin.** Gradle may select a higher
+version when something else in the graph requires it. A consumer **MUST NOT**
+silently convert a declaration into a `strictly` constraint — that would make
+two producers naming different versions of one library unresolvable, and
+composing independently-authored packages is the point. Where the selected
+version differs from the declared one, the record and report **MUST** show both:
+
+```
+  + dependency  com.example:widget   requested 1.2.3 → resolved 1.4.0
+```
+
+**Resolution is locked, not merely versioned.** A consumer **MUST**:
+
+- record the fully resolved dependency graph — every artifact and version,
+  transitives included — in the integration record;
+- resolve from that record on subsequent builds until a new resolution is
+  accepted;
+- record a checksum per resolved artifact, verify each one on subsequent builds,
+  and fail on a mismatch, naming the artifact and the distribution that declared
+  it.
+
+> **Note:** A version is a coordinate, not a content hash. A repository can
+> serve different bytes under one version, and a moved tag resolves elsewhere.
+> The checksum is what makes reproducibility literally true, and it is cheap,
+> because the consumer has already downloaded every artifact it is hashing.
+
+**Cross-artifact alignment is not expressible.** Every rule here governs one
+dependency at a time. A vendor BOM — Gradle's `platform(…)` — is a constraint
+over a set, and neither form can state it. A family split across several
+distributions pins its artifacts independently, and nothing makes those choices
+agree. Producers publishing such a family **SHOULD** pin compatible versions
+deliberately and release together.
+
+### 6.4 Maven repositories
+
+For an SDK its vendor does not publish to Maven Central.
+
+> **Caution:** This is the most powerful thing a sidecar can contribute. An
+> unconstrained repository can reach the application through any transitive
+> dependency, which is a dependency-confusion vector, so the rules here are the
+> strictest in this document.
+
+```toml
+[[android.contributes.gradle_repositories]]
+url = "https://maven.pkg.github.com/example/repo"
+reason = "Hosts org.example:shim, which is not on Maven Central"
+groups = ["org.example"]
+```
+
+`reason` is **REQUIRED**. At least one of `groups` (Maven group IDs) or
+`modules` (`group:artifact` pairs) is **REQUIRED**.
+
+**The normative requirement is bounded participation.** The contributed
+repository **MUST NOT** participate in resolution for anything outside the
+declared groups or modules. A consumer implements that with its build system's
+native mechanism; Gradle's repository content filtering expresses exactly this.
+
+**Overlapping scopes are rejected.** Two contributed repositories whose scopes
+intersect **MUST** fail, naming both distributions and the contested
+coordinates — unless they declare the same `url`, which is not a conflict.
+
+> **Caution:** Do not substitute Gradle's `exclusiveContent` for content
+> filtering. It is a different and stronger policy: it additionally makes the
+> declared modules resolvable *only* from that repository, which can change
+> first-time resolution results. A consumer **MUST NOT** substitute it, because
+> the same sidecar would then resolve differently depending on which mechanism
+> the consumer picked.
+
+A consumer **MUST** report repository contributions with distinct prominence in
+the record and report, never folded into a generic list, and **SHOULD** surface
+them in any standing diagnostic. A consumer **MAY**, as its own policy, require
+explicit application approval before adding one to resolution.
+
+**Authenticated repositories.** Set `credentials_required = true` to declare
+that the repository is authenticated.
+
+```toml
+[[android.contributes.gradle_repositories]]
+url = "https://api.mapbox.com/downloads/v2/releases/maven"
+reason = """Mapbox does not publish to Maven Central. Access needs a Mapbox token scoped DOWNLOADS:READ, used as the password with username "mapbox"."""
+groups = ["com.mapbox"]
+credentials_required = true
+```
+
+- A producer **MUST NOT** put a credential in a sidecar, in any field, under any
+  spelling. A sidecar is package data inside a wheel, readable by everyone who
+  installs the distribution.
+- A consumer **MUST** reject a credential where one is syntactically
+  identifiable — at minimum, URL user-info (`https://user:pass@host/…`) in
+  `url` — and **SHOULD** warn on obvious embedded-secret forms elsewhere.
+- The application supplies credentials through the consumer's configuration,
+  which **MUST** accept them by indirection ([§2.2](#22-how-the-application-answers)).
+  `reason` **MUST** say what credential is needed and where to obtain it.
+- A consumer **MUST** report an authenticated repository as a requirement and
+  **MUST** fail when no credentials are configured, naming the distribution,
+  rather than attempting resolution and surfacing a bare `401`.
+- A consumer **MUST NOT** write supplied credentials into the generated project
+  in any persisted form, into the integration record, or into any diagnostic.
+
+### 6.5 Permissions and features
+
+The permissions and hardware features your code needs at runtime — visible to
+the application instead of arriving silently through a dependency's AAR, and
+refusable, because the application is accountable for what the installed app can
+do.
+
+```toml
+[[android.contributes.permissions]]
+name = "android.permission.INTERNET"
+reason = "Ad delivery"
+
+[[android.contributes.features]]
+name = "android.hardware.bluetooth_le"
+```
+
+| Field | Applies to | Description |
+| --- | --- | --- |
+| `name` | both | The canonical manifest string — `android.permission.INTERNET`, never a shorthand. No prefix expansion is defined, which accommodates custom and vendor permissions with no extra rule. |
+| `reason` | permission | **RECOMMENDED**. Consumers **SHOULD** carry it into the record and report. |
+| `max_sdk_version` | permission | Optional integer. Becomes `android:maxSdkVersion`. |
+| `never_for_location` | permission | Optional boolean. Becomes `android:usesPermissionFlags="neverForLocation"`. |
+
+**Attributes merge least-restrictively, and the merge is reported.** A consumer
+**MUST** register a permission with the widest need any distribution stated: an
+entry with no `max_sdk_version` defeats one that has it, a lower
+`max_sdk_version` gives way to a higher, and `never_for_location` holds only
+when **every** declaration of that permission asserts it. The result **MUST**
+appear in the record and report with the distributions that produced it.
+
+**Features are never required.** A producer **MUST NOT** set `required` on a
+feature. A consumer **MUST** treat every producer-declared feature as
+`required = false` and **MUST NOT** promote one on a producer's declaration
+alone.
+
+> **Note:** Whether an application *requires* Bluetooth or merely uses it when
+> present is a property of the application. A producer promoting a feature to
+> required would silently remove the application from devices lacking that
+> hardware.
+
+**Application-side suppression.** A consumer **MUST** provide a way for the
+application to suppress any contributed permission. A suppressed permission
+**MUST** be absent from the **effective merged manifest**, together with any
+feature it alone implied, and the suppression **MUST** appear in the record and
+report.
+
+Omitting a suppressed permission from the generated manifest is not sufficient.
+A resolved `.aar` carries its own manifest, which AGP merges, so a permission
+the consumer never wrote can still arrive from a dependency — and the permission
+a producer declares here is very often the same one its AAR declares. A consumer
+**MUST** emit an explicit manifest-merger removal (`tools:node="remove"`) so the
+permission is absent from the merged result, and **MUST** report it as
+suppressed rather than silently losing the suppression.
+
+Suppression is at the application's own risk: the producer's code may fail or
+degrade when a permission it declared is withheld. A consumer **SHOULD** make an
+active suppression visible in its standing diagnostics, so the failure stays
+traceable to the application's choice.
+
+### 6.6 Manifest components
+
+Register the services, receivers and activities your integration needs, whether
+the class is yours or a declared dependency's. Components are unexported by
+default and exported only when the application explicitly approves.
+
+```toml
+[[android.contributes.components]]
+kind = "service"        # service | activity | receiver
+name = "org.example.mypkg.PushService"
+
+[[android.contributes.components]]
+kind = "receiver"
+name = "com.vendor.sdk.InstallReferrerReceiver"
+from_dependency = "com.vendor:sdk"
+```
+
+> **Note:** `provider` is deliberately absent. A `<provider>` is invalid without
+> `android:authorities`, and an authority must be unique across every
+> application on the device, so it is conventionally derived from the
+> application ID — which a producer does not know. A `kind` this document could
+> not register validly would be worse than one it does not offer, because a
+> consumer would have to invent the authority to make the manifest parse.
+
+**Provenance.** A component's class comes from one of two places, and the entry
+states which:
+
+- **Producer source** (no `from_dependency`): `name` **MUST** refer to a class
+  the distribution contributes and **MUST** fall under an owned namespace.
+- **A declared dependency** (`from_dependency = "group:artifact"`): the value
+  **MUST** match the group and artifact of a dependency the same sidecar
+  declares, in either form. The owned-namespace rule does not apply. A consumer
+  **SHOULD** verify the class exists in the resolved artifact.
+
+Two distributions registering the same component class **MUST** fail, naming
+both.
+
+**Foreground services.** Since Android 14 a foreground service must declare what
+it is for, and one that starts without a type is refused by the platform.
+
+```toml
+[[android.contributes.components]]
+kind = "service"
+name = "org.example.mypkg.ScreenCaptureService"
+foreground_service_type = "mediaProjection"
+```
+
+`foreground_service_type` is valid **only** on `kind = "service"`; a consumer
+**MUST** reject it elsewhere, naming the distribution. The value is Android's
+own, written exactly as the platform defines it, and the vocabulary is open per
+[§4.4](#44-unknown-declarations-fail-closed). Android also requires the matching
+`FOREGROUND_SERVICE_*` permission, which is an ordinary
+[§6.5](#65-permissions-and-features) contribution.
+
+**Export.** Components are registered `android:exported="false"` by default. A
+producer **MUST NOT** declare `exported = true` directly. A producer **MAY**
+declare `exported_required = true` with a `reason` (**REQUIRED** when present).
+
+A consumer **MUST** treat that as an application requirement: it **MUST NOT**
+register the component as exported without explicit application approval, and
+**MUST** report the pending requirement, naming the distribution and the
+`reason`.
+
+Where approval is absent the consumer **MUST** fail. It **MUST NOT** fall back
+to registering the component unexported: the producer has said the component is
+useless unless reachable, so a non-exported registration builds an application
+that does not work.
+
+**Link targets.** An activity reachable from a browser or another app — an OAuth
+redirect receiver, a deep-link target — needs an intent filter. Version 1 models
+one stereotyped filter, not the intent-filter grammar.
+
+```toml
+  [[android.contributes.components.view_links]]
+  scheme = { application_value = "oauth_redirect_scheme" }
+  host = "oauth2redirect"
+  path_prefix = "/callback"
+```
+
+- Valid only on `kind = "activity"` entries that declare
+  `exported_required = true`. A consumer **MUST** reject the inconsistent
+  combination — a link target that is not exported is unreachable.
+- The fields are Android's own `<data>` attribute names in snake case, and the
+  set is **open** per [§4.4](#44-unknown-declarations-fail-closed): `port`,
+  `mime_type`, `path`, `path_pattern` and `path_suffix` are as declarable as the
+  three shown. Only `scheme` is **REQUIRED**.
+- Every attribute may take a literal or an inline application value
+  ([§5.5](#55-value-kinds)).
+- The consumer **generates** the filter: `android.intent.action.VIEW`, the
+  `DEFAULT` and `BROWSABLE` categories, and one `<data>` element. Actions and
+  categories are not spellable; they are implied by the type.
+- The record and report **MUST** show the link data alongside the export.
+
+Verified App Links are **not contributable**. `android:autoVerify` requires an
+`assetlinks.json` file on the application's own domain, which is application
+infrastructure. State the need as an action ([§5.3](#53-actions)).
+
+**Vendor actions.** Some components receive a vendor-defined event — not a link
+a browser opens, but an intent the SDK's own backend or the system delivers
+under an action string the vendor defines.
+
+```toml
+[[android.contributes.components]]
+kind = "service"
+name = "org.example.mypkg.MessagingService"
+
+  [[android.contributes.components.intent_filters]]
+  action = "com.google.firebase.MESSAGING_EVENT"
+```
+
+- Exactly one `action` per filter. No categories and no data element; those
+  belong to `view_links`, which models the browser-reachable case.
+- Valid **only** on a component that is not exported. A consumer **MUST** reject
+  `intent_filters` on an entry that declares `exported_required`, or that also
+  declares `view_links`.
+- The record and report **MUST** show the action alongside the component.
+
+### 6.7 Shrinker keep patterns
+
+Keep classes R8 would otherwise strip or rename — your own reflectively-reached
+classes, or a declared dependency's — without letting any distribution disable
+shrinking for the application as a whole.
+
+```toml
+[android.contributes.r8]
+keep_classes = ["org.example.mypkg.**"]
+
+[[android.contributes.r8.keep]]
+pattern = "okhttp3.**"
+from_dependency = "com.squareup.okhttp3:okhttp"
+```
+
+These are class patterns, **not** raw ProGuard or R8 directives; the consumer
+generates the corresponding `-keep class <pattern> { *; }` rules itself. Two
+forms, distinguished by whose classes are kept:
+
+- **`keep_classes`** — patterns that **MUST** fall within an owned namespace
+  ([§6.1](#61-ownership) rule 3). Containment is computed on dot-separated
+  segments.
+- **`[[…r8.keep]]`** — a pattern belonging to a declared dependency.
+  `from_dependency` **MUST** match a dependency the same sidecar declares. A
+  consumer **MUST** evaluate the pattern against the **effective compilation
+  classpath** and reject the entry when any class it matches originates outside
+  that dependency's resolved artifacts — a listing of archive contents, not a
+  parser — naming the distribution, the pattern, and the artifact the stray
+  class came from.
+
+A consumer **MUST** apply these only when the application has enabled shrinking.
+
+> **Note:** A pattern's namespace need not match its dependency's Maven group:
+> `com.squareup.okhttp3:okhttp` ships classes under `okhttp3.*`. Checking the
+> group would reject that legitimate pattern, so the consumer checks the
+> resolved artifact instead. The check covers the whole classpath because the
+> generated rule applies everywhere in the program, not only inside the named
+> dependency.
+
+### 6.8 Manifest meta-data
+
+A `<meta-data>` entry whose value **you** know — a vendor flag, a model list, a
+class name the SDK loads reflectively.
+
+```toml
+[[android.contributes.meta_data]]
+key = "com.google.mlkit.vision.DEPENDENCIES"
+value = "barcode,face"
+reason = "Bundles the barcode and face models rather than downloading them on first use"
+```
+
+- `key` is the manifest entry's name, written exactly as the vendor code reads
+  it. It is **not** scoped by the declaring distribution.
+- `reason` is **REQUIRED**. The key is global, its effect is invisible in
+  Python, and the report is where an application sees what a transitive
+  dependency turned on.
+- `value` is a string, integer or boolean, mapped to `android:value` as the
+  text verbatim, the digits, or `true`/`false`.
+- Entries are written into the `<application>` element. Version 1 does not model
+  `<meta-data>` on a component.
+
+**This shares one key space with [§5.2](#52-values)'s `manifest_meta_data`
+delivery.** A key set here and a value delivered there are the same manifest
+entry, so both merge together: equal values coalesce with every provenance
+record kept, differing values **MUST** fail naming both distributions, and a key
+the **application** sets itself is the application's — the consumer keeps that
+value and reports the override.
+
+> **Note:** A `<meta-data>` key is global, and nothing stops a producer writing
+> one that belongs to another vendor's SDK — turning analytics collection on,
+> say, in an application that turned it off. The application's own entry
+> winning, plus every entry appearing in the report against the distribution
+> that asked for it, is the answer: the producer states a need, the application
+> sees it, and setting the key itself is how the application refuses.
+
+**Resource references.** A `value` **MAY** be a resource reference — anything
+beginning `@` or `?` — only when the same sidecar declares an action
+([§5.3](#53-actions)) asking the application to supply that resource. A producer
+that references a resource it has not asked for **MUST NOT** do so.
+
+> **Caution:** A consumer cannot check this pairing, because an action is prose.
+> This is a producer obligation, and the failure when it is broken is an AAPT
+> error naming a missing resource. What makes that tolerable is that the
+> `<meta-data>` entry appears in the record attributed to the distribution, so
+> the error has a trail back to the package that caused it.
+
+### 6.9 Package visibility
+
+The `<queries>` entries your own code needs in order to see that another
+application exists at all. Android 11 made package visibility opt-in, and
+without a declaration `PackageManager` answers "not installed" — silently — for
+everything your code looks for.
+
+```toml
+[[android.contributes.queries]]
+package = "com.google.android.apps.healthdata"
+reason = "Health Connect availability check; the client reports it absent without this"
+```
+
+- Exactly one of `package` (an application ID) or `provider_authority` (a
+  content provider authority) is **REQUIRED**. A consumer **MUST** reject an
+  entry declaring both or neither.
+- `reason` is **REQUIRED**. This is a producer asking what else is installed on
+  the user's device, and the report is where an application sees that a
+  transitive dependency does so.
+- Entries merge as a **union**. Two distributions naming one package are asking
+  for the same visibility.
+
+The `<intent>` form, which matches by action and data rather than by name, is
+not expressible in version 1. It is an intent-filter grammar, and the reasons
+for modelling stereotypes instead apply unchanged.
+
+> **Note:** There is no veto here, where [§6.5](#65-permissions-and-features)
+> has one. A permission is user-visible, policy-relevant, and refusing it leaves
+> the application working with less. A `<queries>` entry is none of those:
+> removing it does not reduce what the application may do, it makes the
+> producer's code quietly get a wrong answer.
 
 ## 7. iOS contributions
 
-*To be ported from the first attempt (§7): symbol prefixes, Swift packages,
-source and required-reason APIs, `Info.plist`, Python modules, Objective-C
-categories.*
+Material the consumer stages into the generated Xcode project on your behalf.
+
+### 7.1 Symbol prefixes
+
+Contributed Swift compiles straight into the application's single target, with
+no per-package namespace like Android's to keep declarations apart.
+
+```toml
+[ios]
+swift_symbol_prefixes = ["MyPkg"]
+```
+
+A producer that contributes Swift source ([§7.3](#73-source)) **SHOULD** do two
+things: name its contributed types — and in particular its `@objc` runtime
+names — with a consistent prefix, and declare that same prefix here.
+
+A consumer **SHOULD** use declared prefixes to attribute a redeclaration or
+duplicate-name error to the contributing distribution.
+
+**What this does not reach.** Prefixing covers type names and `@objc` runtime
+names only — not file-scope functions, global constants, or extension members. A
+contributed file declaring `let ui_scale`, `func invertedHeight(_:)`, or
+`extension Double { var retinaScaled }` puts all three into the application
+target's scope under exactly the names it wrote, and a consumer has no way to
+check for it.
+
+> **Note:** This guidance deliberately does not live in an `owns` table. One
+> shared module and globally-scoped `@objc` names leave a consumer nothing to
+> enforce, where [§6.1](#61-ownership) has a namespace it can hold exclusively.
+> A producer that ships its Swift as a package ([§7.2](#72-swift-packages))
+> avoids the problem entirely: a package compiles as its own module, so its
+> symbols are already isolated. `@objc` names are the exception either way —
+> they register in the Objective-C runtime's single flat namespace whatever
+> module declared them.
+
+### 7.2 Swift packages
+
+A vendor's Swift package, or your own: resolved by SwiftPM, locked by the
+integration record, and compiled as its own module rather than into the
+application's.
+
+```toml
+[[ios.contributes.swift_packages]]
+name = "Shim"
+url = "https://github.com/example/shim"
+requirement = { exact = "1.2.3" }
+products = ["Shim"]
+```
+
+`name` is a local handle, **unique within the sidecar**. [§7.5](#75-python-modules)
+refers to packages by it, so two entries sharing a `name` are invalid even when
+their URLs differ; a consumer **MUST** reject that, naming the distribution.
+
+`requirement` **MUST** be exactly one of:
+
+| Form | Meaning |
+| --- | --- |
+| `{ exact = "1.2.3" }` | That version only |
+| `{ from = "1.2.0" }` | SwiftPM's up-to-next-major range |
+| `{ revision = "<commit>" }` | A specific commit |
+
+A `branch` requirement **MUST NOT** appear in a distribution published to a
+package index; a consumer **MUST** reject it, naming the distribution.
+
+**The whole graph is locked, not only what the sidecar names.** A consumer
+**MUST** record the fully resolved Swift package graph, transitives included, in
+the integration record, and **MUST** resolve from that record on subsequent
+builds until a new resolution is accepted.
+
+**Record the resolved revision, not only the resolved version.** A version is a
+tag, and a tag can be moved; the commit identifies the source that was built.
+`Package.resolved` records both, and the integration record **MUST** preserve
+both for every package in the graph — for `exact` and `revision` requirements as
+much as for `from`.
+
+> **Note:** This is why [§7.2](#72-swift-packages) needs no per-artifact
+> checksum where [§6.3](#63-gradle-dependencies) does. A recorded revision *is*
+> content identity: a commit names the tree it contains. A Maven version names
+> no content, which is why the Android side must add a hash to get the same
+> guarantee. The asymmetry is in the ecosystems.
+
+**Binary targets are where that reasoning stops.** A Swift package may vend a
+prebuilt binary target, whose bytes are fetched from a URL the package names and
+which the package's own revision does not cover. SwiftPM models this already: a
+remote `binaryTarget` carries a `checksum`. A consumer **MUST** record that
+checksum for every binary target in the resolved graph, **MUST** verify it on
+subsequent builds, and **MUST** fail on a mismatch, naming the package and the
+declaring distribution. A consumer **SHOULD** warn when a remote binary target
+carries no checksum, since the record then pins nothing.
+
+**The declaration rules bind the sidecar; the resolved graph is where they are
+enforced.** A declared package's own `Package.swift` may name anything — a
+branch, a local filesystem path, an arbitrary URL — and nothing in the
+declaration reveals it. A consumer **MUST** therefore reject a resolved graph
+containing a **branch** requirement or a **path** dependency, naming the
+declaring distribution and the offending package.
+
+**You may declare your own repository here.** A distribution whose native half
+lives in a Swift package it also publishes is an expected shape. Two
+consequences:
+
+- The declared package **MUST** be resolvable in the form declared. A repository
+  with no tags cannot use `exact` or `from`, leaving `revision` as the only
+  valid option.
+- Your distribution's version does **not** pin the native half, and the record's
+  per-file hashing does not reach it. A consumer's record **MUST** make that
+  distinction visible rather than implying the distribution's version covers
+  both.
+
+Swift Package Manager is the **RECOMMENDED** channel for anything larger than a
+few glue files.
+
+### 7.3 Source
+
+Contributed Swift lands in the application's own compilation scope under exactly
+the names it was written with, which is why this is for shims and
+[§7.2](#72-swift-packages) is for everything else.
+
+```toml
+[ios.contributes.src]
+swift = ["swift"]
+```
+
+The consumer stages `.swift` files recursively and ignores other files. Path
+rules are [§4.1](#41-location-and-name)'s. This is intended for small `@objc`
+shims whose value is versioning atomically with the Python half; it **SHOULD
+NOT** be used for a library.
+
+**The scope restriction is narrow and load-bearing.** Every declaration a
+contributed file makes at file scope is exposed to the application's own code —
+free functions, global constants, protocols, and extension members on types the
+producer does not own — and [§7.1](#71-symbol-prefixes)'s guidance reaches none
+of them. A producer whose Swift declares anything at file scope beyond prefixed
+types **SHOULD** ship a Swift package instead, where those declarations are
+confined to its own module.
+
+**Required-reason APIs.** Contributed Swift compiles into the application's
+target, so by Apple's rule it *is* application code: an SDK's own privacy
+manifest reports the SDK's usage, and nothing reports code that has no target of
+its own. Declare what your contributed source touches, and the consumer merges
+it into the application's `PrivacyInfo.xcprivacy`.
+
+```toml
+[[ios.contributes.accessed_api_types]]
+type = "NSPrivacyAccessedAPICategoryUserDefaults"
+reasons = ["CA92.1"]
+reason = "Caches the last selected region so the shim can restore it"
+```
+
+- This table is valid **only** where the same sidecar contributes Swift under
+  `[ios.contributes.src]`. A consumer **MUST** reject it otherwise, naming the
+  distribution and directing the producer to [§7.2](#72-swift-packages) — a
+  Swift package carries its own `PrivacyInfo.xcprivacy` in its resources, which
+  is both the better answer and the one Apple documents.
+- `type` and `reasons` are **Apple's canonical strings**, written exactly as
+  Apple defines them. No expansion or shorthand is defined.
+- `reason` is **RECOMMENDED** prose. Apple's codes are opaque by design, and the
+  record is where an application reads what its dependencies claim.
+- Entries merge as a **union**: the application's own entries first, then each
+  distribution's in normalized distribution-name order, with the `reasons` for
+  one `type` unioned and de-duplicated.
+
+> **Caution:** A consumer cannot verify this declaration. Nothing checks that
+> the declared categories match what the contributed Swift actually calls, and
+> nothing could without implementing Apple's static analysis. An omission is
+> invisible at build time and surfaces as an App Store rejection of the
+> application, weeks later, naming an API rather than a package. Recording the
+> claim is what makes the omission attributable after the fact.
+
+### 7.4 Info.plist
+
+The `Info.plist` keys an SDK genuinely needs set — and deliberately not the ones
+that grant the application a capability or restrict who may install it.
+
+```toml
+[ios.contributes.info_plist.values]
+CADisableMinimumFrameDurationOnPhone = true
+
+[ios.contributes.info_plist.append]
+LSApplicationQueriesSchemes = ["examplescheme"]
+```
+
+Two contribution modes, by shape:
+
+- **`values`** — scalar keys, set verbatim. A consumer **MUST** fail on a key
+  that collides with one it manages itself, and on two distributions setting the
+  same key to different values, naming the distributions. Two distributions
+  setting the same key to the **same** value coalesce, preserving both
+  provenance records. A key the **application** also sets is the application's:
+  the consumer **MUST** keep the application's value and report the override.
+- **`append`** — array-valued keys. Contributions from all distributions and the
+  application are concatenated and de-duplicated in a deterministic order: the
+  application's entries first, then each distribution's in normalized
+  distribution-name order.
+
+**TOML-to-plist mapping.** "Set verbatim" is not enough for two implementations
+to agree, so the correspondence is fixed:
+
+| TOML type | plist type |
+| --- | --- |
+| string | `<string>` |
+| integer | `<integer>` |
+| float | `<real>` |
+| boolean | `<true/>` / `<false/>` |
+| array of the above, homogeneous | `<array>` |
+
+A consumer **MUST** reject any other TOML type — offset and local date-times,
+and inline or nested tables — naming the distribution and the key. An array
+**MUST** be homogeneous: a mixed-type array has no unambiguous plist form.
+
+**Usage descriptions are not contributable.** A consumer **MUST** reject any
+`values` key whose name ends in `UsageDescription`, or which is otherwise a
+purpose string, naming the distribution and directing the producer to
+[§5.2](#52-values)'s `usage_description` kind. That text is user-facing,
+localized, and read by App Store review; it is a claim about what *the
+application* does with the data, and a `values` entry is the one place a
+producer could write it by accident.
+
+**Capability keys are not contributable either.** A consumer **MUST** reject
+these keys in `values` and in `append` alike, naming the distribution and
+directing the producer to state an action ([§5.3](#53-actions)):
+
+| Key | What a producer's entry would do |
+| --- | --- |
+| `UIBackgroundModes` | grant the application background execution |
+| `UIRequiredDeviceCapabilities` | **restrict installation** — silently remove the application from devices lacking that hardware |
+
+The list is closed, and a minor revision may extend it. What puts a key on it is
+that a producer's entry **changes what the application may do, or who may
+install it** — not that the key is array-valued. `LSApplicationQueriesSchemes`
+grants nothing and stays an ordinary contribution.
+
+**A key delivered as a value is consumer-managed.** A producer contributing the
+same `Info.plist` key through `values` that another declares through
+[§5.2](#52-values)'s `info_plist` kind **MUST** fail, on the collision rule
+above.
+
+**Dictionary-valued keys are excluded by design, not deferred.** The structured
+cases examined are better served by a narrower primitive: `NSExtension` is
+generated from a declared extension target, and `NSAppTransportSecurity` depends
+on what the application loads and is not the producer's to declare at all. A
+general form would hand producers the ability to write arbitrary structured
+application configuration.
+
+**`skadnetwork_identifiers` is the one narrower primitive that case needed.**
+`SKAdNetworkItems` is an array of single-entry dictionaries, one per ad network,
+which every advertising and mediation SDK requires and which runs to around a
+hundred entries for a mediated integration.
+
+```toml
+[ios.contributes.info_plist]
+skadnetwork_identifiers = ["su67r6k2v3.skadnetwork", "4fzdc2evr5.skadnetwork"]
+```
+
+- Each entry is an ad network identifier: lowercase, and ending in
+  `.skadnetwork`, which is the form Apple defines. A consumer **MUST** reject an
+  entry that is not, naming the distribution and the entry.
+- The consumer renders `SKAdNetworkItems`, one `SKAdNetworkIdentifier`
+  dictionary per identifier. A producer never writes the dictionary itself.
+- Merging follows `append` exactly.
+- A consumer **MUST** reject `SKAdNetworkItems` offered through `values` or
+  `append`, naming the distribution and directing the producer here.
+
+> **Note:** A mistyped identifier does not fail. It sits in the plist, matches
+> no network, and silently loses attribution for that network's installs — a
+> quiet wrong answer of exactly the kind this convention exists to turn into a
+> build-time diagnostic. That is what the two validation conditions buy.
+
+### 7.5 Python modules
+
+When a Swift package **is** the Python extension module, compiled into the
+application target. Without this registration the build succeeds and the
+`import` fails.
+
+```toml
+[[ios.contributes.python_modules]]
+name = "web_views"
+swift_package = "PyWebViews"
+init = "PyInit_WebViews"      # optional; defaults to PyInit_<name>
+```
+
+The package is compiled into the application target rather than loaded from a
+shared object, so the ordinary import machinery never sees it. This table
+registers it with the interpreter — a name and a symbol, nothing executed at
+build time.
+
+- `swift_package` **MUST** name a package the same sidecar declares. A module
+  cannot be registered without the code that implements it.
+- `name` is the name Python imports, and **MUST** be a single ASCII Python
+  identifier: `[A-Za-z_][A-Za-z0-9_]*`. **Dotted names are not permitted** —
+  registering a submodule means creating the parent package too, which is
+  package semantics this table does not model.
+- `init` names the module's initialization function and defaults to
+  `PyInit_<name>`. When supplied it **MUST** be a valid C identifier. It exists
+  because the three names need not agree: a package `PyWebViews` may implement a
+  module whose Swift type is `WebViews` and whose Python name is `web_views`.
+- Two distributions registering the same `name` **MUST** fail, naming both.
+- A consumer **MUST** make the module importable from first use — in practice,
+  registering it before interpreter initialization.
+
+A consumer **MUST** exclude both `<name>.py` and `<name>.pyi` from the Python
+payload it assembles for the device, for every module this table registers.
+
+> **Note:** Producers ship stubs of the same name for type checking off device.
+> A `.py` stub would otherwise sit on `sys.path` as a silent fallback: a
+> registration that failed or was skipped would surface not as `ImportError` but
+> as an application that imports successfully and does nothing. The `.pyi` is
+> excluded with it because it is inert on device and its presence invites the
+> `.py` back.
+
+### 7.6 Objective-C categories
+
+The one link-time setting a producer cannot work around and the application
+cannot guess: a static library whose Objective-C **categories** are dropped by
+the linker unless the application target asks for them.
+
+```toml
+[ios.contributes]
+objc_categories = true
+```
+
+- A consumer **MUST** link the application target so that Objective-C categories
+  in statically linked libraries are loaded. In Apple's toolchain that is the
+  `-ObjC` flag; this key names the **effect**, not the flag, so a consumer whose
+  toolchain spells it differently is still conforming.
+- Entries merge as a **union**: one producer asking is enough.
+- A consumer **MUST** report it in the record, naming the distributions that
+  asked. It changes how the whole application links, and the application is
+  entitled to see which dependency caused that.
+- There is **no veto**, for [§6.9](#69-package-visibility)'s reason: withholding
+  it does not reduce what the application may do, it makes the producer's code
+  fail at runtime with a message pointing nowhere.
+
+> **Note:** Categories in a static library are not referenced by any symbol the
+> linker can see, so it discards them. The application builds, links, ships, and
+> then dies on `unrecognized selector sent to instance` the first time the SDK
+> calls its own method, with nothing in the message naming the library — let
+> alone the Python distribution that brought it in.
+>
+> A producer cannot solve this in its own package. SwiftPM rejects raw linker
+> flags in a package consumed by version, so a vendor's own package cannot set
+> it, and the setting belongs to the application target regardless. The cost is
+> that loading every category also loads the classes carrying them, so the
+> binary grows by whatever the static libraries contain — which is why this is
+> declared by the producers that need it rather than switched on for everyone.
 
 ## 8. Consuming tool requirements
 
