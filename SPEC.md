@@ -1416,8 +1416,17 @@ A consumer **MUST** apply these only when the application has enabled shrinking.
 
 ### 6.8 Manifest meta-data
 
-A `<meta-data>` entry whose value **you** know — a vendor flag, a model list, a
-class name the SDK loads reflectively.
+A `<meta-data>` entry whose value the producer already knows — a vendor flag,
+a model list, a class name the SDK loads reflectively.
+
+> **Why this exists:** `<meta-data>` is the one channel Android gives a
+> library to read a build-time constant with no application code at all —
+> the manifest is already merged from every dependency, so a vendor gets a
+> working config channel for the cost of one line, instead of inventing and
+> documenting a loader of its own. Firebase Messaging's notification
+> defaults, ML Kit's model list, Branch's test-mode flag, and Google Mobile
+> Ads' initialization flags are each a fixed constant the producer already
+> knows, with zero application-specific judgment involved.
 
 ```toml
 [[android.contributes.meta_data]]
@@ -1433,8 +1442,12 @@ reason = "Bundles the barcode and face models rather than downloading them on fi
   dependency turned on.
 - `value` is a string, integer or boolean, mapped to `android:value` as the
   text verbatim, the digits, or `true`/`false`.
-- Entries are written into the `<application>` element. Version 1 does not model
-  `<meta-data>` on a component.
+- `<meta-data>` can be nested under `<application>`, where it is global, or
+  under a specific component (`<activity>`, `<service>`, `<receiver>`,
+  `<provider>`), where the platform hands it only to that component. This
+  section writes only the first form. A producer needing the second declares
+  an action ([§5.3](#53-actions)) instead, naming the exact `<meta-data>` entry
+  and the component it belongs on.
 
 **This shares one key space with [§5.2](#52-values)'s `manifest_meta_data`
 delivery.** A key set here and a value delivered there are the same manifest
@@ -1443,23 +1456,38 @@ record kept, differing values **MUST** fail naming both distributions, and a key
 the **application** sets itself is the application's — the consumer keeps that
 value and reports the override.
 
-> **Note:** A `<meta-data>` key is global, and nothing stops a producer writing
-> one that belongs to another vendor's SDK — turning analytics collection on,
-> say, in an application that turned it off. The application's own entry
-> winning, plus every entry appearing in the report against the distribution
-> that asked for it, is the answer: the producer states a need, the application
-> sees it, and setting the key itself is how the application refuses.
+> **Note:** Because an application-scoped `key` is not scoped by distribution
+> either, `pyfoo` could name a key belonging to an SDK it doesn't even depend
+> on. That isn't a hole: the application's own value for that key always
+> wins, no matter who else declares it.
 
 **Resource references.** A `value` **MAY** be a resource reference — anything
-beginning `@` or `?` — only when the same sidecar declares an action
-([§5.3](#53-actions)) asking the application to supply that resource. A producer
-that references a resource it has not asked for **MUST NOT** do so.
+beginning `@` or `?`. A producer **MUST NOT** reference one unless the same
+sidecar declares an action ([§5.3](#53-actions)) asking the application to
+supply it:
 
-> **Caution:** A consumer cannot check this pairing, because an action is prose.
-> This is a producer obligation, and the failure when it is broken is an AAPT
-> error naming a missing resource. What makes that tolerable is that the
-> `<meta-data>` entry appears in the record attributed to the distribution, so
-> the error has a trail back to the package that caused it.
+```toml
+[[android.contributes.meta_data]]
+key = "android.accessibilityservice"
+value = "@xml/accessibility_config"
+reason = "Declares the service's capabilities to the platform"
+
+[[android.requires.application_action]]
+id = "accessibility_config_resource"
+summary = "Add res/xml/accessibility_config.xml"
+instructions = "Create res/xml/accessibility_config.xml with the capabilities MySDK declares..."
+acceptance = ["res/xml/accessibility_config.xml exists with the described content"]
+```
+
+> **Caution:** Nothing links these two entries structurally. `meta_data` has
+> no `id`, and the action's `uses` ([§5.3](#53-actions)) resolves only against
+> declared values, not against a contribution like this one — so there is no
+> field for either entry to name the other. A consumer cannot check this
+> pairing, because an action is prose. This is a producer obligation, and the
+> failure when it is broken is an AAPT error naming a missing resource. What
+> makes that tolerable is that the `<meta-data>` entry appears in the record
+> attributed to the distribution, so the error has a trail back to the
+> package that caused it.
 
 ### 6.9 Package visibility
 
