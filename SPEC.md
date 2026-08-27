@@ -1185,6 +1185,14 @@ name = "android.hardware.bluetooth_le"
 | `max_sdk_version` | permission | Optional integer. Becomes `android:maxSdkVersion`. |
 | `never_for_location` | permission | Optional boolean. Becomes `android:usesPermissionFlags="neverForLocation"`. |
 
+> **Note:** `never_for_location` is unscoped for the same reason `name` takes
+> no prefix expansion: a consumer passes it through without interpreting
+> which permissions it is meaningful on. Android recognizes it only on
+> `BLUETOOTH_SCAN` today, but hard-coding that here would model Android's own
+> vocabulary rather than this document's — exactly what the
+> [Non-goals](#non-goals) rule out. A producer that sets it elsewhere is
+> caught by AGP or Play policy, not by this document.
+
 **Attributes merge least-restrictively, and the merge is reported.** A consumer
 **MUST** register a permission with the widest need any distribution stated: an
 entry with no `max_sdk_version` defeats one that has it, a lower
@@ -1208,6 +1216,32 @@ application to suppress any contributed permission. A suppressed permission
 feature it alone implied, and the suppression **MUST** appear in the record and
 report.
 
+The application triggers this in its own `pyproject.toml`
+([§2.2](#22-how-the-application-answers)), joined by the permission's `name` —
+not `(distribution, id)`, because a suppression addresses the merged manifest,
+and two distributions can contribute the same permission name:
+
+```toml
+[tool.examplebuild.android]
+suppressed_permissions = ["android.permission.INTERNET"]
+```
+
+The record and report entry that follows is the *disclosure* of that choice,
+not the mechanism for making it — a consumer **MUST** show the suppression
+happened; it does not originate one on its own.
+
+> **Note:** Permissions and features are **opt-out**, not opt-in — staged the
+> moment a producer declares them, with the report as the default channel and
+> `pyproject.toml` touched only to override that default. An exported
+> component ([§6.6](#66-manifest-components)) is the opposite: staged **only**
+> with explicit approval in `pyproject.toml`, and the build fails without it.
+> The asymmetry tracks risk, not category. Lacking a declared permission
+> breaks a feature at runtime; an unwanted exported component is a standing
+> attack surface reachable by any other app on the device. Requiring an
+> accept step for every ordinary permission would make each dependency's
+> routine manifest needs manual toil for the application author, which is
+> exactly what [Goals](#goals)' automation test exists to avoid.
+
 Omitting a suppressed permission from the generated manifest is not sufficient.
 A resolved `.aar` carries its own manifest, which AGP merges, so a permission
 the consumer never wrote can still arrive from a dependency — and the permission
@@ -1223,9 +1257,8 @@ traceable to the application's choice.
 
 ### 6.6 Manifest components
 
-Register the services, receivers and activities your integration needs, whether
-the class is yours or a declared dependency's. Components are unexported by
-default and exported only when the application explicitly approves.
+A producer registers a service, receiver, or activity — its own class, or one
+belonging to a declared dependency.
 
 ```toml
 [[android.contributes.components]]
@@ -1241,9 +1274,11 @@ from_dependency = "com.vendor:sdk"
 > **Note:** `provider` is deliberately absent. A `<provider>` is invalid without
 > `android:authorities`, and an authority must be unique across every
 > application on the device, so it is conventionally derived from the
-> application ID — which a producer does not know. A `kind` this document could
-> not register validly would be worse than one it does not offer, because a
-> consumer would have to invent the authority to make the manifest parse.
+> application ID — which a producer does not know. A producer that needs one
+> declares an action ([§5.3](#53-actions)) instead: the application author
+> writes the class and its manifest entry directly, where
+> `${applicationId}` is available to them the same way it is in any
+> hand-written manifest.
 
 **Provenance.** A component's class comes from one of two places, and the entry
 states which:
@@ -1340,9 +1375,11 @@ name = "org.example.mypkg.MessagingService"
 
 ### 6.7 Shrinker keep patterns
 
-Keep classes R8 would otherwise strip or rename — your own reflectively-reached
-classes, or a declared dependency's — without letting any distribution disable
-shrinking for the application as a whole.
+Keep classes R8 — Android's default shrinker, and the ProGuard-compatible
+successor to the ProGuard tool it replaced — would otherwise strip or rename:
+a producer's own reflectively-reached classes, or a declared dependency's,
+without letting any distribution disable shrinking for the application as a
+whole.
 
 ```toml
 [android.contributes.r8]
