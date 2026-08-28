@@ -953,7 +953,7 @@ producer's behalf.
 | --- | --- | --- | --- |
 | [6.1](#61-ownership) | `android.owns.java_namespaces` | A claim on a Java/Kotlin namespace | Overlapping claims **fail** the build |
 | [6.2](#62-source) | `android.contributes.src` | Java/Kotlin source under an owned namespace | N/A — one producer owns the namespace |
-| [6.3](#63-gradle-dependencies) | `android.contributes.gradle_dependencies` | A Gradle dependency coordinate | Versions resolve to a **floor** ([§5.1](#51-versions)); conflicting configurations fail |
+| [6.3](#63-gradle-dependencies) | `android.contributes.gradle_dependencies` | A Gradle dependency coordinate | Versions resolve to a **floor** ([§5.1](#51-build-floors)); conflicting configurations fail |
 | [6.4](#64-maven-repositories) | `android.contributes.gradle_repositories` | A Maven repository URL | Union; a consumer **MAY** refuse an untrusted host |
 | [6.5](#65-permissions-and-features) | `android.contributes.permissions`, `.features` | A `<uses-permission>` or `<uses-feature>` entry | Union; the application **MAY** suppress one |
 | [6.6](#66-manifest-components) | `android.contributes.components` | An `<activity>`, `<service>`, `<receiver>`, or `<activity-alias>` entry | Two producers naming the same class **fail** the build |
@@ -2204,13 +2204,257 @@ attributed to the distributions whose declarations pulled the artifacts in.
 
 ## 10. Versioning
 
-*To be ported from the first attempt (§10).*
+The entry-point group carries the major version (`native_integration.v1`). A
+consumer implementing version *N* **MUST** ignore groups for other major
+versions entirely, rather than attempting to read them.
+
+Within a major, the `contract` minor ([§4.3](#43-contract-version)) negotiates
+capabilities: minor revisions add optional keys and tables, producers declare
+the smallest contract they use, and an older consumer rejects a newer
+declaration visibly instead of mis-building it.
+
+Any change that would alter the meaning of an existing key, or make a previously
+valid sidecar invalid, requires a new major version and a new group name.
+
+**That rule binds from the moment the draft marker at the top of this document
+is removed, and not before.** While this document is a draft it is amended in
+place. It is the second attempt at this convention; the first is kept at
+[`development/first-attempt.md`](development/first-attempt.md), was never
+released, and is not a version anyone has to support — which is why the
+restructure took version 1 rather than renumbering around it.
+
+**What a minor revision has to cover is smaller than it looks.** A minor is
+required for a new key, a new table, or a new value in a **closed** vocabulary —
+[§5.5](#55-value-kinds)'s value kinds, [§6.3](#63-gradle-dependencies)'s Gradle
+configurations, [§7.4](#74-infoplist)'s capability-key list. It is **not**
+required for:
+
+| | Why not |
+| --- | --- |
+| A new kind of application requirement | An action is prose. A platform construct this document has never heard of is stated in `summary`, `reason` and `acceptance` without the document changing. |
+| A new `slot` | Slots are opaque and compared only for equality ([§5.7](#57-slots)). |
+| A new value in an **open** vocabulary | `foreground_service_type`, `<data>` attributes, and Apple's required-reason strings are the platform's to extend; a consumer rejects what it does not implement. |
+
+That is the point of the split between contributions and actions. Contribution
+vocabulary is closed and versioned because a consumer is being asked to modify
+the build; requirement vocabulary barely exists, because a consumer is being
+asked to report a sentence.
+
+Anticipated minor-revision work, deliberately excluded from version 1: further
+intent-filter forms beyond `view_links`; conditional contributions (a `when` key
+with a **closed vocabulary** of conditions such as ABI or simulator/device — not
+an expression language); further Gradle configurations; and further
+namespace-scoped shrinker rule forms.
+
+**Version 1 has no way to say "either A or B".** Where a vendor offers two paths
+to the same outcome — a configuration file *or* an initialization class — the
+producer picks one and declares it. That is a deliberate limitation rather than
+a judgment that alternatives could never be useful: expressing them would mean
+handing the application author two tasks for one fact, with nothing saying that
+doing either is enough. Revisit if a vendor appears whose two paths are
+genuinely equivalent and both common.
 
 ## 11. Out of scope
 
-*To be ported from the first attempt (§11).*
+| Not covered | Reason |
+| --- | --- |
+| Prebuilt `.aar` **embedded in the wheel** | Carries an `AndroidManifest.xml` that merges into the application's, defeating [§6.5](#65-permissions-and-features) and [§6.6](#66-manifest-components) with no attribution |
+| Prebuilt iOS binaries **carried by the wheel** | Forces a platform tag onto an otherwise pure-Python wheel, and is opaque to this convention's source-level inspection model |
+| Native `.so`, extension modules | Solved by `android_<api>_<abi>`-tagged wheels ([PEP 738](https://peps.python.org/pep-0738/)) |
+| iOS frameworks in wheels | Solved by `ios_*`-tagged wheels ([PEP 730](https://peps.python.org/pep-0730/)) |
+| Android resources (`res/`) | Resource names are a flat global namespace per type, so no ownership rule can be built for them — [§6.1](#61-ownership) needs dots to compute containment. A producer shipping `values/strings.xml` with `app_name` renames the application. Resources reach an application through an `.aar` from a declared coordinate, where AGP merges them; a producer that needs one asks for it as an action |
+| Scripts, hooks, build plugins | Excluded on principle ([§2.1](#21-design-principles)), not as a deferral |
+| **Arbitrary manifest, `Info.plist` or build-file fragments** | The declarative form of the same capability, excluded on the same principle. A fragment cannot be collision-checked, refused per-permission, gated per-component, or diffed in a record. Permanent; see below |
+| **Build-file, manifest and project mutation instructions** | A producer describes an outcome, never an edit. See below |
+| **CocoaPods-only iOS SDKs** | [§7.2](#72-swift-packages) declares Swift packages, and this document defines no CocoaPods channel. A vendor that publishes only a podspec is out of reach; see below |
+| **Native runtime lifecycle composition** | No way for a producer to run code at application start, or to participate in an app-delegate callback. Deliberate in version 1, and not on principle — see below |
+| Xcode build settings, compiler and linker flags | Arbitrary build mutation. The exclusion stands for flags in general; [§7.6](#76-objective-c-categories)'s `objc_categories` is the one bounded exception, and it names a behavior rather than passing a flag |
+| Application configuration — *writing* it | The application's own build settings are its own. **Declaring a requirement on it is in scope**, and is what [§5](#5-requirements-on-the-application) is for |
+
+**What "in the wheel" excludes, and what it does not.** The qualifier on the
+first four rows is deliberate. A declared Maven coordinate may resolve to an
+`.aar`, a declared Swift package may vend binary targets, and a Swift package
+may implement a Python extension module from source
+([§7.5](#75-python-modules)). All three are in scope: they arrive through the
+platform's own dependency channel, locked by [§6.3](#63-gradle-dependencies) and
+[§7.2](#72-swift-packages) and surfaced by [§9](#9-recording-and-review). What
+is excluded is native material smuggled inside the Python artifact, where no
+resolver, lock, or manifest tooling ever sees it.
+
+That distinction is only as good as the surfacing, which is why
+[§9.4](#94-what-resolved-artifacts-bring-with-them) makes the Android half of
+that reporting a **MUST**. An embedded `.aar` and a coordinate-resolved `.aar`
+merge identical manifests into the application; what separates them is that one
+is locked, attributable, and reported.
+
+**Why arbitrary fragments stay excluded, and what it costs.** The obvious answer
+to every gap in this section is to let a producer contribute a block of manifest
+XML, a subtree of `Info.plist`, or a snippet of build script. It would make
+almost everything expressible, and it would remove the reason to trust any of
+it: authority here is carried by knowing, per key, whether a producer may set it
+freely, only with the application's approval, or not at all. A fragment answers
+that question nowhere. [§6.7](#67-shrinker-keep-patterns) already refuses raw
+shrinker directives for this reason and takes structured class patterns instead;
+this row is that argument generalized.
+
+**Mutation instructions are excluded for the same reason, and it is worth
+separating from fragments.** A producer does not describe an edit to make — a
+file to open, an element to insert, a setting to change. It describes the
+**outcome the application must reach**, and
+[§5.6](#56-instructions-and-acceptance-criteria) requires acceptance criteria to
+be end states rather than operations. An edit language would put this document
+in the business of tracking Gradle, AGP and Xcode project formats forever, which
+is the maintenance burden the whole design is arranged to avoid.
+
+> **Note:** The cost of both exclusions is real and is paid deliberately: a
+> mechanism this document has no vocabulary for is unreachable until a minor
+> adds one. What makes that cost survivable now is [§5.3](#53-actions). A
+> requirement the document cannot automate is still *stateable*, so the choice
+> is no longer between modelling a construct and being silent about it.
+
+**Build-time uploads are an excluded category, not one product.** Any SDK whose
+value depends on uploading build artifacts — symbol files, mapping files, source
+maps — requires build-time execution by construction. Firebase Crashlytics is
+the canonical case: its Gradle plugin uploads the R8 mapping file, and a
+run-script phase uploads dSYMs. Sentry, Bugsnag, Instabug and Datadog share the
+shape. Such an SDK can be *linked* through [§6.3](#63-gradle-dependencies) or
+[§7.2](#72-swift-packages) and the result will build; the build-time step must
+be configured in the application's own build. **This is permanent, not a
+deferral.**
+
+**Uploading is not the only shape.** A second class of plugin **transforms the
+code being built** — instrumenting bytecode, or running as a compiler plugin —
+and for those the sentence above is false: linking the SDK produces a build that
+succeeds and an SDK that does nothing, or code that does not compile at all.
+
+Work out which of three cases your package is in:
+
+| Case | Example | Ship a wrapper? |
+| --- | --- | --- |
+| **The SDK degrades.** The build-time step adds symbolication to something that already captures and delivers events | Sentry — its Gradle plugin is optional, and its configuration is declarations this document can express | Yes, with a known deficiency |
+| **The SDK fails.** The build-time step is load-bearing for the SDK's core value | Crashlytics — without it every report is unsymbolicated | No |
+| **The SDK cannot be integrated at all.** The build-time step *is* the integration | Embrace's `embrace-swazzler` and New Relic's Gradle plugin instrument bytecode to insert the hooks the SDK reads; Realm's Kotlin compiler plugin generates members its model classes are unusable without | No — and say so, rather than publishing a wrapper whose failure looks like a bug in this convention |
+
+**A CocoaPods-only vendor is out of reach, and a producer has two options.**
+Nothing here resolves podspecs, and adding a second dependency channel is a
+larger commitment than any single vendor justifies. Where a vendor publishes
+only to CocoaPods — Google's ML Kit for Apple platforms is the standing
+example — a producer can wait for the vendor's own Swift package, or publish a
+package of its own that vends the vendor's binaries and declare that under
+[§7.2](#72-swift-packages), taking on the maintenance that implies.
+
+**Lifecycle composition is a deferral, not a principle**, and is the most
+consequential thing version 1 cannot automate. Firebase calls
+`FirebaseApp.configure()` from `application(_:didFinishLaunchingWithOptions:)`,
+OneSignal's Android integration is an `Application` subclass, and Stripe needs a
+URL callback forwarded from the app delegate.
+
+Two things argue for waiting. Some vendors reach the same result declaratively —
+Sentry initializes before any application code through a `ContentProvider` in
+its own library plus manifest meta-data, and Airship loads a class named in one
+`<meta-data>` entry — so a hook is not the only shape the problem takes. And it
+would be the largest runtime capability here: unlike a `service` or `receiver`,
+which run when the platform routes an event to them, a startup hook runs
+unconditionally and first, in every application that acquires the package
+transitively.
+
+If it is added, the shape is a closed vocabulary of events plus a
+producer-owned typed handler, with the consumer generating a static dispatcher —
+never a source snippet, which would breach [§2.1](#21-design-principles). The
+singleton slots such a design needs — `<application android:name>`, the
+generated entry point — are the consumer's, and a producer **MUST NOT** be able
+to claim one meanwhile.
+
+> **Note:** Unlike the other deferrals here, this one already has a form. *Call
+> `pyfoo.init()` early in your application* is an action
+> ([§5.3](#53-actions)): stated, reported, acknowledged, and attributed in the
+> record. What version 1 lacks is the automation, not the ability to say the
+> thing — which is the difference between a deferral and a silence.
 
 ## 12. Guidance for package authors
 
-*To be ported from the first attempt (§12), plus one rule: do not reach for an
-action where a contribution or a value already expresses the requirement.*
+**Declare only what you unconditionally require.** A producer **SHOULD**
+declare only what every application that imports the package needs. Anything
+needed only when a particular feature is used does not belong in your sidecar.
+
+**Do not reach for an action where a contribution or a value already expresses
+the requirement.** A producer **SHOULD NOT** state as an action anything the
+automated core can carry. An action is the cheapest thing for you to write and
+the most expensive thing for every application that installs your package to act
+on. Run the three-part test under [Goals](#goals) honestly before deciding that
+something cannot be automated.
+
+**Split feature-conditional surface into optional distributions.**
+Feature-conditional native surface **SHOULD** ship as separate distributions
+rather than in one package's sidecar. The union problem matters most for **facade packages** — libraries exposing many optional
+platform features behind one API, the [Plyer](https://github.com/kivy/plyer)
+shape. A facade declaring every permission any feature *might* use hands every
+application its worst-case manifest, and no amount of disclosure repairs that:
+per-permission suppression ([§6.5](#65-permissions-and-features)) becomes each
+application's cleanup chore rather than a rare override.
+
+Ship the conditional surface as optional distributions instead, each carrying
+its own sidecar, with extras as the opt-in mechanism:
+
+```toml
+# the facade's pyproject.toml
+[project.optional-dependencies]
+gps = ["plyer-gps"]
+camera = ["plyer-camera"]
+```
+
+`pip install plyer[gps]` then installs `plyer-gps`, whose sidecar contributes
+exactly `android.permission.ACCESS_FINE_LOCATION` and nothing else. An extra
+cannot vary the facade's *own* sidecar — extras select dependencies; they do not
+change a distribution's contents — but it can select a distribution that carries
+one, which is all that is needed.
+
+This is why there is no conditional **contribution** syntax: **the dependency
+graph is the conditionality mechanism.** Sidecars are per-distribution,
+applications opt in by depending on the piece they use, and the record
+attributes each contribution to the smallest meaningful unit.
+
+**Requirements are the exception, and they do carry a `conditional` flag.** The
+asymmetry is deliberate. A contribution *imposes* — an application that acquires
+the distribution gets the permission whether or not it wanted it — so making one
+conditional needs a mechanism that can actually withhold it, and the dependency
+graph is that mechanism. A requirement imposes nothing; it asks. Marking one
+conditional changes only whether an unmet ask blocks the build, so a flag
+suffices where a contribution would need a whole opt-in channel.
+
+The honest cost falls on you: splitting a facade into optional distributions is
+real packaging work — separate releases, and an import layout that tolerates
+missing pieces. The guidance is **SHOULD**, not MUST, for exactly that reason,
+and [§6.5](#65-permissions-and-features)'s suppression exists in part as the
+application's recourse when a producer declares more than its applications want.
+
+### 12.1 Framework bindings, where this guidance does not apply
+
+The advice above assumes a **facade**: independent features behind one
+dispatcher, with a seam to split along. A **1:1 binding of a platform
+framework** has no such seam. Its API surface is the platform vendor's, it is
+typically one native module and one Python module, and its requirements vary per
+method rather than per feature:
+
+| A `CLLocationManager` binding | pulls in |
+| --- | --- |
+| `requestWhenInUseAuthorization` | `NSLocationWhenInUseUsageDescription` |
+| `requestAlwaysAuthorization` | `NSLocationAlwaysAndWhenInUseUsageDescription` |
+| `allowsBackgroundLocationUpdates` | `UIBackgroundModes = ["location"]` |
+| `startMonitoringLocationPushes` | a location push extension and an Apple-approved entitlement |
+
+Splitting that into optional distributions would mean splitting the class, which
+is not packaging work but a worse API. So a binding cannot follow the guidance
+above, and it faces the union problem that guidance exists to prevent: declare
+everything and every application carries the worst case, or declare the minimum
+and callers of everything else fail at runtime.
+
+**Conditional requirements are the answer for this shape.** Declare your
+unconditional needs normally, and mark the rest `conditional = true` with the
+triggering condition in `reason`. Nothing is imposed on applications that do not
+use the feature, and nothing is silent for applications that do.
+
+> **Caution:** Producers **SHOULD NOT** reach for `conditional` to avoid
+> stating an unconditional requirement. It converts a build failure that names
+> the problem into a line in a report, and the application discovers the
+> requirement at runtime instead.
