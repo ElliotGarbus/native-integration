@@ -598,6 +598,29 @@ problems = [
 ]
 check("Appendix B covers every key SPEC.md declares", problems)
 
+# --- 15. the converted sidecars validate against the current specification --
+# An example nothing checks is a claim about the specification that nobody is
+# testing — which is how the probe's own Airship sidecar carried fields that had
+# been removed from the model weeks earlier.
+problems = []
+for path in sorted((ROOT / "development" / "redesign" / "examples").rglob("*.toml")):
+    rel = path.relative_to(ROOT)
+    try:
+        doc = tomllib.loads(path.read_text(encoding="utf-8"))
+    except tomllib.TOMLDecodeError as exc:
+        problems.append(f"{rel} does not parse: {exc}")
+        continue
+    if doc.keys() & {"tool", "project"}:
+        continue  # an application's own configuration, not a sidecar
+    if doc.get("contract") != "1":
+        problems.append(f"{rel} declares contract {doc.get('contract')!r}, not \"1\"")
+    for key in sorted(keys_of(doc)):
+        if key in {"contract", "platforms"} or not key.islower() or "." in key:
+            continue
+        if key not in appendix_b:
+            problems.append(f"{rel} uses `{key}`, which Appendix B does not list")
+check("the converted sidecars obey the current specification", problems)
+
 
 print()
 if failures:

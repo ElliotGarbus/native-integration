@@ -1,0 +1,101 @@
+# pystripe — HYPOTHETICAL, clean-sheet. Stripe payments.
+#
+# Converted from the first attempt's version of this sidecar
+# (../../examples/pystripe/), which is kept frozen there. Read this beside
+# app-pyproject.toml: this file is what the *package* declares, that one is what
+# the *application* writes in reply.
+#
+# Two things changed in conversion beyond the schema, and both are recorded in
+# ../CONVERSION.md: the iOS URL-scheme prerequisite became an action with
+# acceptance criteria, and the missing `contributes.src` was added — the first
+# attempt declared a component whose class the sidecar never shipped.
+
+contract = "1"
+
+# ---------------------------------------------------------------- Android ---
+
+[android.owns]
+java_namespaces = ["org.pystripe"]
+
+[android.requires]
+min_sdk = 21
+compile_sdk = 34
+
+# Referenced inline by view_links below. The scheme is registered per
+# application in the Stripe dashboard, so the producer cannot know it.
+[[android.requires.application_value]]
+id = "stripe_return_scheme"
+kind = "inline"
+reason = """\
+The URL scheme you registered with Stripe for 3D Secure returns; it must match \
+the return_url your server sends when confirming a PaymentIntent."""
+placeholder = "<TODO: your Stripe 3DS return scheme>"
+
+[[android.contributes.gradle_dependencies]]
+module = "com.stripe:stripe-android"
+version = { at_least = "21.0.0", below = "22.0.0" }
+
+[[android.contributes.permissions]]
+name = "android.permission.INTERNET"
+reason = "Stripe API calls and 3D Secure authentication"
+
+# The activity registered below is this package's own class, so the package
+# ships it. The first attempt's sidecar registered the class and contributed no
+# source, which §6.6 forbids and nothing checked.
+[android.contributes.src]
+java = ["java"]
+
+# The 3DS challenge hands control to the issuing bank in a browser; the return
+# lands here.
+[[android.contributes.components]]
+kind = "activity"
+name = "org.pystripe.PaymentReturnActivity"
+exported_required = true
+reason = "Receives the 3D Secure redirect back from the issuing bank's browser flow"
+
+  [[android.contributes.components.view_links]]
+  scheme = { application_value = "stripe_return_scheme" }
+  host = "stripe-redirect"
+
+[android.contributes.r8]
+keep_classes = ["org.pystripe.**"]
+
+[[android.contributes.r8.keep]]
+pattern = "com.stripe.**"
+from_dependency = "com.stripe:stripe-android"
+
+# -------------------------------------------------------------------- iOS ---
+
+[ios.requires]
+deployment_target = "15.0"
+
+# The counterpart of the Android view_links above, and an action rather than a
+# contribution: iOS binds URL registration to the bundle rather than to a class,
+# and the application must forward the callback in its own code either way.
+#
+# Conditional because the native 3DS flow needs no scheme; only the webview
+# fallback does. This is the shape §12.1 describes — one SDK's fallback path,
+# with no seam to split into an optional distribution.
+[[ios.requires.application_action]]
+id = "stripe_3ds_callback"
+conditional = true
+summary = "Register a URL scheme and forward its callback to Stripe"
+reason = """\
+Required only if the 3D Secure webview fallback is reached. Without it the \
+payment flow leaves the application and never returns."""
+instructions = """\
+Add a custom URL scheme to CFBundleURLTypes — any scheme you own, matching the
+return_url your server sends. Then, in application(_:open:options:), pass the
+URL to StripeAPI.handleURLCallback(with:) and return true when it handles it.
+"""
+acceptance = [
+  "CFBundleURLTypes contains the scheme registered with Stripe",
+  "application(_:open:options:) forwards the URL to StripeAPI.handleURLCallback(with:)",
+  "A 3D Secure payment using the webview fallback returns to the application",
+]
+
+[[ios.contributes.swift_packages]]
+name = "StripeIOS"
+url = "https://github.com/stripe/stripe-ios"
+requirement = { from = "23.0.0" }
+products = ["StripePaymentSheet"]

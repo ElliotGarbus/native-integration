@@ -1,0 +1,117 @@
+# PyOneSignal — converted from the first attempt's sidecar
+# (../../examples/pyonesignal/), kept frozen there.
+#
+# The case with the most actions in the set: four of the first attempt's iOS
+# prerequisite tables appear here, and all four become actions. Two claim a
+# platform singleton, which is what `slot` is for.
+
+contract = "1"
+
+# ---------------------------------------------------------------- Android ---
+
+[android.requires]
+# OneSignal Android SDK 5.x floor.
+min_sdk = 23
+# POST_NOTIFICATIONS is an API 33 constant; the AAR itself compiles against 34.
+compile_sdk = 34
+
+[[android.contributes.gradle_dependencies]]
+module = "com.onesignal:OneSignal"
+version = { at_least = "5.6.1", below = "6.0.0" }
+
+[[android.contributes.permissions]]
+name = "android.permission.INTERNET"
+reason = "OneSignal REST API and FCM delivery"
+
+[[android.contributes.permissions]]
+name = "android.permission.POST_NOTIFICATIONS"
+reason = "Displaying push notifications on Android 13+"
+
+[android.contributes.r8]
+# The Python half reaches com.onesignal.* entirely through pyjnius — autoclass()
+# and PythonJavaClass listeners — none of which the shrinker can see.
+[[android.contributes.r8.keep]]
+pattern = "com.onesignal.**"
+from_dependency = "com.onesignal:OneSignal"
+
+# -------------------------------------------------------------------- iOS ---
+
+[ios.requires]
+deployment_target = "12.0"
+
+# The app group identifier is a value the application supplies; enabling App
+# Groups on two targets and getting the entitlement into a provisioning profile
+# is an outcome only the application can reach. Declared as both, tied by
+# `uses` — the split review-01 §1 arrived at.
+[[ios.requires.application_value]]
+id = "onesignal_app_group"
+kind = "inline"
+reason = """\
+The App Group identifier OneSignal shares delivery state through. OneSignal \
+expects group.<your-bundle-id>.onesignal."""
+placeholder = "group.<TODO: your bundle id>.onesignal"
+
+[[ios.requires.application_action]]
+id = "aps_environment"
+summary = "Enable the Push Notifications capability"
+reason = """\
+APNs delivery. Without the entitlement the archive fails at codesign, with a \
+message naming the entitlement and not this package."""
+acceptance = [
+  "The Push Notifications capability is enabled on the App ID",
+  "The provisioning profile used for release builds carries aps-environment",
+]
+
+[[ios.requires.application_action]]
+id = "onesignal_app_group_entitlement"
+summary = "Enable App Groups on the application and on the extension target"
+reason = """\
+Confirmed delivery, badge counts and image attachments need the application and \
+the notification service extension to share a container."""
+uses = ["onesignal_app_group"]
+acceptance = [
+  "The App Groups capability is enabled on the App ID",
+  "The application target declares the group identifier above",
+  "The notification service extension target declares the same identifier",
+]
+
+# One notification service extension per application, whatever asks for it —
+# so a second push SDK asking for the same slot is a collision the consumer
+# reports and the application resolves by merging both vendors' code.
+[[ios.requires.application_action]]
+id = "onesignal_nse"
+slot = "com.apple.usernotifications.service"
+summary = "Add a Notification Service Extension linking OneSignalExtension"
+reason = """\
+Without it, confirmed delivery, badge counts and image attachments are \
+unavailable. Notifications still arrive; they arrive plain."""
+instructions = """\
+Add a Notification Service Extension target. Link OneSignalExtension into it,
+give it the same app group as the application, and call
+OneSignalExtension.didReceiveNotificationExtensionRequest(_:with:withContentHandler:)
+from didReceive(_:withContentHandler:).
+"""
+acceptance = [
+  "An extension target of point com.apple.usernotifications.service exists",
+  "It links OneSignalExtension and shares the application's app group",
+  "didReceive forwards to OneSignalExtension's handler",
+  "A notification sent with an image attachment displays the image",
+]
+
+[[ios.requires.application_action]]
+id = "onesignal_background_push"
+summary = "Enable Background Modes → Remote notifications"
+reason = """\
+Silent pushes wake the application to fetch notification content. Without it \
+OneSignal cannot deliver background data messages, and confirmed-delivery \
+receipts stop working."""
+acceptance = [
+  "UIBackgroundModes in Info.plist contains remote-notification",
+  "The application implements the background fetch handler",
+]
+
+[[ios.contributes.swift_packages]]
+name = "OneSignal"
+url = "https://github.com/OneSignal/OneSignal-XCFramework"
+requirement = { from = "5.4.1" }
+products = ["OneSignalFramework"]

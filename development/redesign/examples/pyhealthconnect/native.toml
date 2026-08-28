@@ -1,0 +1,87 @@
+# pyhealthconnect — converted from the first attempt's sidecar
+# (../../examples/pyhealthconnect/), kept frozen there.
+#
+# The case that decided the redesign. HC2 needs a rationale activity the
+# application owns, an activity-alias guarded by a permission, and an intent
+# filter carrying both an action and a category. The first attempt could express
+# the class and called the other three inexpressible; here it is one action, and
+# the parts it could not name live in `instructions`.
+
+contract = "1"
+platforms = ["android"]
+
+[android.owns]
+java_namespaces = ["org.pyhealthconnect"]
+
+[android.requires]
+# connect-client supports API 26; the Health Connect application itself needs
+# API 28, so a lower-API device sees the SDK report Health Connect unavailable.
+min_sdk = 26
+compile_sdk = 35
+
+[[android.contributes.gradle_dependencies]]
+coordinate = "androidx.health.connect:connect-client:1.1.0"
+
+# Health Connect permissions are ordinary manifest strings under a vendor
+# prefix. §6.5 defines no prefix expansion, which is what lets these be declared
+# with no additional rule.
+[[android.contributes.permissions]]
+name = "android.permission.health.READ_STEPS"
+reason = "Reading step counts written by other applications"
+
+[[android.contributes.permissions]]
+name = "android.permission.health.WRITE_STEPS"
+reason = "Writing step counts recorded by this application"
+
+[[android.contributes.permissions]]
+name = "android.permission.health.READ_HEART_RATE"
+reason = "Reading heart-rate samples written by other applications"
+
+# HC1, closed. Android 11 made package visibility opt-in, and without this the
+# client reports Health Connect absent on every device — silently.
+[[android.contributes.queries]]
+package = "com.google.android.apps.healthdata"
+reason = "Health Connect availability check; the client reports it absent without this"
+
+[android.contributes.r8]
+keep_classes = ["org.pyhealthconnect.**"]
+
+# HC2. Google Play requires a health application to show why it wants health
+# permissions, through a screen the application owns. Three things the first
+# attempt could not say are here as one outcome: the class is the application's,
+# the alias carries a platform permission, and the filter pairs an action with a
+# category.
+[[android.requires.application_action]]
+id = "permissions_rationale"
+summary = "Add a permissions-rationale screen and the alias Play requires"
+reason = """\
+Google Play rejects a health application that cannot show why it requests \
+health permissions. Health Connect opens this screen from its own settings UI, \
+so it must exist under your application ID and be reachable by the platform."""
+instructions = """\
+Add an Activity of your own that explains why your application reads and writes
+health data — the content is yours; Play reviews it.
+
+Declare it in your manifest, then add an activity-alias pointing at it so the
+platform can open it:
+
+    <activity-alias
+        android:name=".ViewPermissionUsageActivity"
+        android:exported="true"
+        android:targetActivity=".RationaleActivity"
+        android:permission="android.permission.START_VIEW_PERMISSION_USAGE">
+      <intent-filter>
+        <action android:name="android.intent.action.VIEW_PERMISSION_USAGE" />
+        <category android:name="android.intent.category.HEALTH_PERMISSIONS" />
+      </intent-filter>
+    </activity-alias>
+
+The `android:permission` attribute is what stops any application on the device
+from opening the screen; only the platform holds that permission.
+"""
+acceptance = [
+  "An activity explaining the application's use of health data exists and is declared",
+  "An activity-alias targets it, exported, guarded by START_VIEW_PERMISSION_USAGE",
+  "The alias filters on VIEW_PERMISSION_USAGE with category HEALTH_PERMISSIONS",
+  "Opening Health Connect settings and choosing this application shows the screen",
+]

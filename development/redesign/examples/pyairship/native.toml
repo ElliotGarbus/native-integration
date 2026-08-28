@@ -1,14 +1,11 @@
-# pyairship, expressed against the **proposed redesign**.
+# pyairship — the case the other conversions could not ask: the vendor offers
+# **two paths to the same fact**, and the model has to say something about which
+# one a producer takes. It does, and the answer is not "express both".
 #
-# NOT part of the first attempt's example set. The schema below is a probe, not
-# a specification: two prerequisite tables — `application_value` and
-# `application_action` — in place of the first attempt's thirteen. The contract
-# stays "1", which the first attempt never released. See ../README.md.
-#
-# Airship was chosen for one question the other four could not ask: the vendor
-# offers **two paths to the same fact**, and the model has to say something
-# about which one a producer takes. It does, and the answer is not "express
-# both". See finding V8.
+# First written against the probe's schema (../../pyairship/, now superseded)
+# and updated here: actions no longer carry `kind`, `key` or `value`, since
+# version 1 has no verification mechanism, and a slot is the platform's own
+# identifier rather than a spelling this document invents.
 
 contract = "1"
 platforms = ["android", "ios"]
@@ -34,16 +31,16 @@ target_sdk = 33
 #   (B) an Autopilot subclass supplying AirshipConfigOptions, loaded by Airship
 #       from one <meta-data> line naming the class.
 #
-# (A) is an application_action: manual, and the consumer can check only that a
-# file of that name is present. (B) is two application_values and a contributed
-# class: the consumer writes both values into the manifest, the producer's own
-# code reads them at takeOff, and **no manual step remains**. The producer
-# writes the Autopilot subclass once so that no application author transcribes
-# anything, which is the whole trade this convention exists to make.
+# (A) is an action: manual, and the consumer can only report it. (B) is two
+# values and a contributed class — the consumer writes both into the manifest,
+# this package's own code reads them at takeOff, and **no manual step remains**.
+# The producer writes the Autopilot subclass once so that no application author
+# transcribes anything, which is the trade this convention exists to make.
 #
 # So this sidecar takes (B) and does not mention (A). Offering both would hand
-# the application author two TODOs for one fact and no way to know that doing
-# either is enough.
+# the application author two tasks for one fact and no way to know that doing
+# either is enough. Version 1 has no way to say "either A or B" (§10), and that
+# is a deliberate limitation rather than an oversight.
 
 [[android.requires.application_value]]
 id = "airship_app_key"
@@ -61,22 +58,24 @@ key = "org.pyairship.APP_SECRET"
 reason = "Your Airship app secret, issued beside the app key"
 placeholder = "<TODO: Airship app secret>"
 
-# --- the notification icon ---------------------------------------------------
-#
-# Airship draws a white square when the status-bar icon is missing, on the
+# Airship draws a white square where the status-bar icon is missing, on the
 # application's branding, at runtime, in production. The producer cannot ship a
-# drawable (resources are one flat namespace, and out of scope), so it fixes
-# the *name* and asks for it: its Autopilot subclass resolves that name at
-# takeOff.
-
+# drawable — a drawable is authored, not placed — so it fixes the name and asks.
 [[android.requires.application_action]]
 id = "notification_icon"
-kind = "resource"
-key = "drawable/ic_airship_notification"
-summary = "Add a monochrome status-bar notification icon named ic_airship_notification"
+summary = "Add a monochrome status-bar icon named ic_airship_notification"
 reason = """\
 Android draws a white square where this icon is missing — on your \
 application's branding, and only once a notification arrives."""
+instructions = """\
+Add a white-on-transparent drawable at res/drawable/ic_airship_notification.xml
+(or the .png densities). Android renders it as a silhouette, so colour and
+detail are discarded; a simple mark reads best at status-bar size.
+"""
+acceptance = [
+  "res/drawable/ic_airship_notification exists",
+  "A delivered notification shows the icon rather than a white square",
+]
 
 [[android.contributes.gradle_dependencies]]
 module = "com.urbanairship.android:urbanairship-fcm"
@@ -107,87 +106,104 @@ from_dependency = "com.urbanairship.android:urbanairship-fcm"
 
 # -------------------------------------------------------------------- iOS ---
 
-[ios]
-swift_symbol_prefixes = ["PyAirship"]
-
 [ios.requires]
 deployment_target = "15.0"
 
 # --- the app key, where no automatable path exists ---------------------------
 #
-# The Android half above automates configuration because Airship provides a
-# vendor hook — one manifest line naming a producer class that runs early.
-# iOS has no counterpart: `Airship.takeOff` is a runtime call that comes too
-# late for a push received at launch, and nothing lets a producer register code
-# to run before the interpreter starts (the deferred lifecycle question).
+# The Android half automates configuration because Airship provides a vendor
+# load hook — one manifest line naming a producer class that runs early. iOS has
+# no counterpart: Airship.takeOff is a runtime call that comes too late for a
+# push received at launch, and nothing lets a producer register code to run
+# before the interpreter starts (§11's deferred lifecycle question).
 #
-# So on iOS the same fact stays a manual action. The asymmetry is the
-# platform's, and it is worth recording that it lands exactly where the
-# lifecycle gap is.
+# So the same fact stays a manual action on iOS. The asymmetry is the
+# platform's, and it lands exactly on the gap §11 defers.
 
 [[ios.requires.application_action]]
 id = "airship_config"
-kind = "bundle_file"
-key = "AirshipConfig.plist"
 summary = "Add AirshipConfig.plist to the application bundle"
 reason = """\
 App key and app secret from the Airship dashboard. Airship.takeOff reads the \
 file from the bundle; the programmatic alternative runs too late for a push \
 received at launch."""
+acceptance = [
+  "AirshipConfig.plist is present in the built application bundle",
+  "It carries the production and development app keys and secrets",
+]
 
 [[ios.requires.application_action]]
 id = "aps_environment"
-kind = "entitlement"
-key = "aps-environment"
 summary = "Enable the Push Notifications capability"
 reason = "APNs delivery. Without the entitlement the build fails at codesign."
+acceptance = [
+  "The Push Notifications capability is enabled on the App ID",
+  "The provisioning profile used for release builds carries aps-environment",
+]
 
 [[ios.requires.application_action]]
-id = "background_push"
-kind = "plist_capability"
-key = "UIBackgroundModes"
-value = "remote-notification"
+id = "airship_background_push"
 summary = "Enable Background Modes → Remote notifications"
 reason = """\
 Background delivery of silent pushes. You must also implement the background \
 handler; App Store review asks what the application does with it."""
+acceptance = [
+  "UIBackgroundModes in Info.plist contains remote-notification",
+  "The application implements the background fetch handler",
+]
 
 # --- the two extensions, and the singleton each one claims -------------------
 #
-# `slot` is what survives of the first attempt's `app_extensions.kind`: iOS permits one
-# target per extension point, so two packages asking for the same one is a
-# collision the consumer must report rather than a duplicate it may merge.
+# iOS permits one target per extension point, so two packages asking for the
+# same one is a collision the consumer reports rather than a duplicate it may
+# merge. The slot is Apple's own extension point identifier — what a built
+# target carries in its own Info.plist — not a spelling invented here.
 
 [[ios.requires.application_action]]
 id = "airship_nse"
-kind = "app_extension"
-slot = "ios:extension:notification_service"
+slot = "com.apple.usernotifications.service"
 conditional = true
 summary = "Add a Notification Service Extension carrying AirshipServiceExtension"
 reason = """\
 Required only if you send notifications with images, or need delivery \
-confirmation. Share an app group with the application."""
-instructions = "setup/notification-service-extension.md"
+confirmation."""
+acceptance = [
+  "An extension target of point com.apple.usernotifications.service exists",
+  "It links AirshipServiceExtension and shares an app group with the application",
+  "A notification sent with an image attachment displays the image",
+]
 
 [[ios.requires.application_action]]
 id = "airship_nce"
-kind = "app_extension"
-slot = "ios:extension:notification_content"
+slot = "com.apple.usernotifications.content-extension"
 conditional = true
 summary = "Add a Notification Content Extension for rich push UI"
 reason = "Required only if you send notifications with custom in-notification UI."
-instructions = "setup/notification-content-extension.md"
+acceptance = [
+  "An extension target of point com.apple.usernotifications.content-extension exists",
+  "Its UNNotificationExtensionCategory matches the categories Airship sends",
+]
+
+[[ios.requires.application_value]]
+id = "airship_app_group"
+kind = "inline"
+conditional = true
+reason = """\
+Required only if you add either extension above. The same identifier must be \
+configured on the application and on each extension target, or Airship cannot \
+share delivery state between them."""
+placeholder = "group.<TODO: your bundle id>.airship"
 
 [[ios.requires.application_action]]
-id = "airship_app_group"
-kind = "entitlement"
-key = "com.apple.security.application-groups"
+id = "airship_app_group_entitlement"
 conditional = true
 summary = "Enable App Groups on the application and on each extension target"
-reason = """\
-Required only if you add either extension above. The group must be configured \
-identically on both targets, so Airship can share delivery state between \
-them."""
+reason = "Required only if you add either extension above."
+uses = ["airship_app_group"]
+acceptance = [
+  "The App Groups capability is enabled on the App ID",
+  "The application and every Airship extension target declare the identifier above",
+]
 
 [[ios.contributes.swift_packages]]
 name = "Airship"

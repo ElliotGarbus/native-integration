@@ -1,0 +1,78 @@
+# pyadmob-mintegral — converted from the first attempt's sidecar
+# (../../../examples/mediated-ads/), kept frozen there.
+#
+# The adapter that does not publish to Maven Central, which is what puts §6.4
+# into a composition. It is also where the conversion caught a defect the first
+# attempt could not: two values that reached nowhere. See ../../CONVERSION.md.
+
+contract = "1"
+platforms = ["android", "ios"]
+
+# ---------------------------------------------------------------- Android ---
+
+[android.requires]
+min_sdk = 23
+compile_sdk = 35
+
+# The first attempt declared `mintegral_app_id` and `mintegral_app_key` as
+# application values with no delivery field, so the application supplied two
+# strings that reached nothing. §6.3's own SHOULD said not to and could not
+# enforce it; §5.2 now requires a delivery site, which makes it a schema error.
+#
+# Mintegral takes both at runtime, so the honest form is an action.
+[[android.requires.application_action]]
+id = "mintegral_credentials"
+summary = "Pass your Mintegral app ID and key to the adapter at startup"
+reason = """\
+Mintegral is initialized programmatically, not from the manifest, so these \
+values reach the SDK through your own code rather than through the build."""
+instructions = """\
+Obtain the application ID and application key from the Mintegral dashboard,
+then pass them where you initialize ads, before requesting the first ad:
+
+    pyadmob_mintegral.init(app_id="…", app_key="…")
+
+Keep them out of source control the way you would any other account
+identifier you would rather not publish; they are readable in the shipped
+application either way.
+"""
+acceptance = [
+  "The Mintegral app ID and key are passed to the adapter before the first ad request",
+  "A mediated Mintegral ad fills in a test build",
+]
+
+[[android.contributes.gradle_repositories]]
+url = "https://dl-maven-android.mintegral.com/repository/mbridge_android_sdk_oversea"
+reason = """\
+Mintegral does not publish its Android SDK to Maven Central; the adapter's \
+transitive dependency resolves only from this repository. No credential is \
+needed."""
+groups = ["com.mbridge.msdk.oversea"]
+
+[[android.contributes.gradle_dependencies]]
+module = "com.google.ads.mediation:mintegral"
+version = { at_least = "16.9.0", below = "17.0.0" }
+
+[[android.contributes.permissions]]
+name = "android.permission.INTERNET"
+reason = "Ad requests to the Mintegral network"
+
+# -------------------------------------------------------------------- iOS ---
+
+[ios.requires]
+deployment_target = "15.0"
+
+[[ios.contributes.swift_packages]]
+name = "MintegralAdapter"
+url = "https://github.com/googleads/googleads-mobile-ios-mediation-mintegral"
+requirement = { from = "7.7.0" }
+products = ["MintegralAdapter"]
+
+[ios.contributes]
+objc_categories = true
+
+[ios.contributes.info_plist]
+skadnetwork_identifiers = [
+  "kbd757ywx3.skadnetwork",
+  "cstr6suwn9.skadnetwork",
+]

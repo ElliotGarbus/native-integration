@@ -92,6 +92,11 @@ it is the case the other four could not ask.
 > placements made here. **V8** is softened: v1 omits alternatives deliberately
 > rather than permanently.
 
+The sidecars themselves have since been **converted in full** against the
+finished specification — [`CONVERSION.md`](CONVERSION.md) and
+[`examples/`](examples/), carrying findings V22–V25. Read those for the current
+shape; the fragments below are the probe as it was run.
+
 A second pass, [`forward-test.md`](forward-test.md), asks the opposite
 question: four requirements the first attempt **cannot state at all**, to test
 whether the redesign absorbs them without inventing vocabulary. It carries

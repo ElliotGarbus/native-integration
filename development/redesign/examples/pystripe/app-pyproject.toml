@@ -1,0 +1,73 @@
+# The APPLICATION's pyproject.toml — the other half of native.toml beside it.
+#
+# ILLUSTRATIVE SPELLING. §2.2 defines the capability a consuming tool must
+# provide and deliberately not the syntax; `examplebuild` is a placeholder.
+#
+# WHAT IS NOT ILLUSTRATIVE is the join: each answer is filed under the
+# **declaring distribution** plus the key the declaration named, scoped by
+# platform. An answer that said only `stripe_return_scheme` would not say whose
+# requirement it met, and one filed under `android` would not answer an iOS
+# requirement that happened to share the id.
+
+[project]
+name = "trailmap"
+dependencies = ["pystripe"]
+
+# --- floors (§5.1) ----------------------------------------------------------
+# Not answers, but checks: pystripe requires min_sdk 21 and compile_sdk 34, and
+# the build fails if these are lower. The consumer never raises them for you.
+
+[tool.examplebuild.android]
+min_sdk = 24
+compile_sdk = 35
+
+# --- a value (§5.2) ---------------------------------------------------------
+# pystripe declares `id = "stripe_return_scheme"` with `kind = "inline"`, so
+# nothing writes it to a platform key directly: it is substituted wherever
+# view_links referenced it, into the generated intent filter.
+#
+# Until this line exists the consumer scaffolds pystripe's placeholder here and
+# the build does not proceed — a placeholder is not a supplied value (§5.4).
+
+[tool.examplebuild.native.pystripe.android.application_values]
+stripe_return_scheme = "trailmap-pay"
+
+# --- approving an exported component (§6.6) ---------------------------------
+# `exported_required = true` is a *request*. Without this line the build fails
+# naming pystripe — it does not quietly register the activity unexported, which
+# would produce an app that builds and then cannot complete a 3DS payment.
+
+[tool.examplebuild.native.pystripe.android]
+allow_exported = ["org.pystripe.PaymentReturnActivity"]
+
+# --- acknowledging an action (§5.3) -----------------------------------------
+# Answered by acknowledging `(pystripe, stripe_3ds_callback)`. The acknowledgement
+# asserts that every acceptance criterion in the sidecar is met — the scheme is
+# in CFBundleURLTypes, the delegate forwards the callback, and a fallback
+# payment returns to the app. No consumer can verify any of that, which is why
+# satisfaction is a claim the record attributes to this build (§9.6).
+#
+# It is `conditional = true`, so leaving this out does not fail the build. The
+# requirement is then *unresolved*: recorded, and reported on every build until
+# it is either acknowledged here or dismissed as not applicable.
+
+[tool.examplebuild.native.pystripe.ios]
+acknowledged_actions = ["stripe_3ds_callback"]
+
+# To say instead that the webview fallback is never reached in this application:
+#
+#     dismissed_actions = ["stripe_3ds_callback"]
+#
+# which is recorded as a decision rather than left as an open question.
+
+# --- what does NOT belong here ----------------------------------------------
+#
+# The Stripe publishable key. It is per-application, so the instinct is to put
+# it beside the scheme above — but the SDK takes it at runtime through
+# StripeAPI.defaultPublishableKey, and §5.2 is only for values the *build* must
+# embed. It goes in the application's Python:
+#
+#     stripe.set_publishable_key("pk_live_…")
+#
+# The scheme above is different in kind: it is baked into a manifest intent
+# filter at build time, and no runtime call can supply it after the fact.
