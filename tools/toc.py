@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate first-attempt.md's table of contents, between its `<!-- toc -->` markers.
+"""Generate the current specification's table of contents, between its `<!-- toc -->` markers.
 
 A hand-maintained contents list for a 2,500-line document drifts the first time
 someone adds a section, and a table of contents that silently omits a section is
@@ -25,7 +25,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-SPEC = ROOT / "development" / "first-attempt.md"
+SPEC = ROOT / "SPEC.md"
 
 START, END = "<!-- toc -->", "<!-- /toc -->"
 
@@ -90,7 +90,7 @@ def rewrite(text: str) -> str:
     contents = build(text)
     pattern = re.compile(re.escape(START) + r".*?" + re.escape(END), re.S)
     if not pattern.search(text):
-        raise SystemExit(f"first-attempt.md has no {START} … {END} block to fill")
+        raise SystemExit(f"SPEC.md has no {START} … {END} block to fill")
     return pattern.sub(f"{START}\n\n{contents}\n\n{END}", text)
 
 
@@ -99,13 +99,13 @@ def main() -> int:
     updated = rewrite(text)
     if "--check" in sys.argv:
         if text != updated:
-            print("FAIL  first-attempt.md's table of contents is out of date")
+            print("FAIL  SPEC.md's table of contents is out of date")
             print("      run: python3 tools/toc.py")
             return 1
-        print("ok    first-attempt.md's table of contents is current")
+        print("ok    SPEC.md's table of contents is current")
         return 0
     SPEC.write_text(updated, encoding="utf-8")
-    print(f"wrote {len(build(text).splitlines())} entries into first-attempt.md")
+    print(f"wrote {len(build(text).splitlines())} entries into SPEC.md")
     return 0
 
 

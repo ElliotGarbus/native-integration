@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Consistency checks for first-attempt.md, README.md and the worked examples.
+"""Consistency checks for SPEC.md, its predecessor, README.md and the examples.
 
 These catch the failure mode this repository keeps hitting: a change that is
 locally correct invalidates its immediate neighbour, and the neighbour is the
@@ -16,14 +16,21 @@ Exits non-zero on the first failing category, listing every failure in it.
 
 from __future__ import annotations
 
+import json
 import re
 import sys
 import tomllib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+NEW = (ROOT / "SPEC.md").read_text(encoding="utf-8")
 SPEC = (ROOT / "development" / "first-attempt.md").read_text(encoding="utf-8")
 README = (ROOT / "README.md").read_text(encoding="utf-8")
+
+#: Both specifications, for the checks that apply to any document of this shape.
+#: The first attempt is frozen, so nothing there should drift — but its links
+#: still break if a file moves, and the checks cost nothing to keep running.
+DOCS = (("SPEC.md", NEW), ("development/first-attempt.md", SPEC))
 EXAMPLES = sorted(
     [*ROOT.glob("examples/**/native.toml"), *ROOT.glob("development/examples/**/native.toml")]
 )
@@ -39,12 +46,23 @@ def check(name: str, problems: list[str]) -> None:
     failures.extend(problems)
 
 
+def fenced(text: str, lang: str) -> list[tuple[int, str]]:
+    """Fenced blocks of one language, with the 1-based line each starts on.
+
+    A fence inside a blockquote carries the quote marker on every line; strip it
+    before parsing, or a legitimate example in a Note reads as a syntax error.
+    """
+    out = []
+    for m in re.finditer(rf"(?:^|\n)((?:> )?)```{lang}\n(.*?)\n\1?```", text, re.S):
+        quoted, body = m.group(1), m.group(2)
+        if quoted:
+            body = "\n".join(re.sub(r"^> ?", "", line) for line in body.split("\n"))
+        out.append((text[: m.start()].count("\n") + 2, body))
+    return out
+
+
 def toml_blocks(text: str) -> list[tuple[int, str]]:
-    """Fenced ```toml blocks, with the 1-based line each starts on."""
-    return [
-        (text[: m.start()].count("\n") + 1, m.group(1))
-        for m in re.finditer(r"```toml\n(.*?)```", text, re.S)
-    ]
+    return fenced(text, "toml")
 
 
 def keys_of(obj: dict) -> set[str]:
@@ -61,13 +79,14 @@ def keys_of(obj: dict) -> set[str]:
 
 
 # --- 1. every § reference resolves ------------------------------------------
-sections = {
-    m.group(1) for m in re.finditer(r"^#{2,3}\s+(\d+(?:\.\d+)?)[.\s]", SPEC, re.M)
-}
-check(
-    "§ references resolve",
-    [f"§{r} referenced but no such section" for r in sorted(set(re.findall(r"§(\d+(?:\.\d+)?)", SPEC)) - sections)],
-)
+problems = []
+for label, text in DOCS:
+    sections = {
+        m.group(1) for m in re.finditer(r"^#{2,3}\s+(\d+(?:\.\d+)?)[.\s]", text, re.M)
+    }
+    for r in sorted(set(re.findall(r"§(\d+(?:\.\d+)?)", text)) - sections):
+        problems.append(f"{label}: §{r} referenced but no such section")
+check("§ references resolve", problems)
 
 # --- 2. consumer requirements are sequential, and the index matches ----------
 problems = []
@@ -98,13 +117,18 @@ check("§8 requirements sequential and fully indexed", problems)
 
 # --- 3. every TOML block parses ---------------------------------------------
 problems = []
-for label, text in (("first-attempt.md", SPEC), ("README.md", README)):
+for label, text in (*DOCS, ("README.md", README)):
     for line, body in toml_blocks(text):
         try:
             tomllib.loads(body)
         except tomllib.TOMLDecodeError as exc:
             problems.append(f"{label}:{line} does not parse: {exc}")
-check("TOML blocks parse", problems)
+    for line, body in fenced(text, "json"):
+        try:
+            json.loads(body)
+        except json.JSONDecodeError as exc:
+            problems.append(f"{label}:{line} is not valid JSON: {exc}")
+check("TOML and JSON blocks parse", problems)
 
 # --- 4. documented keys exist in the spec -----------------------------------
 # Catches an example or a README block drifting after a schema change.
@@ -135,17 +159,18 @@ def mask_code(text: str) -> str:
     return "".join(out)
 
 
-prose = mask_code(SPEC)
-bold_spans = [(m.start(), m.end()) for m in re.finditer(r"\*\*.+?\*\*", prose, re.S)]
 problems = []
-for m in re.finditer(rf"(?<!\*\*)\b({RFC2119})\b(?!\*\*)", prose):
-    if any(a <= m.start() < b for a, b in bold_spans):
-        continue  # inside a bolded sentence
-    if re.search(r"\b(a|an|the|is|not|its)\s+(\w+\s+)?$", prose[max(0, m.start() - 40) : m.start()]):
-        continue  # prose *about* the keyword
-    line = SPEC[: m.start()].count("\n") + 1
-    context = " ".join(SPEC[max(0, m.start() - 60) : m.end() + 30].split())
-    problems.append(f"first-attempt.md:{line} unmarked `{m.group(1)}`: …{context}…")
+for label, text in DOCS:
+    prose = mask_code(text)
+    bold_spans = [(m.start(), m.end()) for m in re.finditer(r"\*\*.+?\*\*", prose, re.S)]
+    for m in re.finditer(rf"(?<!\*\*)\b({RFC2119})\b(?!\*\*)", prose):
+        if any(a <= m.start() < b for a, b in bold_spans):
+            continue  # inside a bolded sentence
+        if re.search(r"\b(a|an|the|is|not|its)\s+(\w+\s+)?$", prose[max(0, m.start() - 40) : m.start()]):
+            continue  # prose *about* the keyword
+        line = text[: m.start()].count("\n") + 1
+        context = " ".join(text[max(0, m.start() - 60) : m.end() + 30].split())
+        problems.append(f"{label}:{line} unmarked `{m.group(1)}`: …{context}…")
 check("RFC 2119 keywords are emphasised", problems)
 
 # --- 5b. rationale states no requirement ------------------------------------
@@ -153,18 +178,19 @@ check("RFC 2119 keywords are emphasised", problems)
 # skipping them loses nothing binding. That is only safe if it is true: a
 # normative keyword inside one is a requirement a reader was invited to skip.
 problems = []
-quotes, cur, start = [], [], 0
-for i, line in enumerate(SPEC.splitlines(), 1):
-    if line.startswith(">"):
-        if not cur:
-            start = i
-        cur.append(line[1:])
-    elif cur:
-        quotes.append((start, " ".join(cur)))
-        cur = []
-for line, body in quotes:
-    for kw in re.findall(rf"\*\*({RFC2119})\*\*", re.sub(r"`[^`]*`", " ", body)):
-        problems.append(f"first-attempt.md:{line} rationale block states a normative `{kw}`")
+for label, text in DOCS:
+    quotes, cur, start = [], [], 0
+    for i, line in enumerate(text.splitlines(), 1):
+        if line.startswith(">"):
+            if not cur:
+                start = i
+            cur.append(line[1:])
+        elif cur:
+            quotes.append((start, " ".join(cur)))
+            cur = []
+    for line, body in quotes:
+        for kw in re.findall(rf"\*\*({RFC2119})\*\*", re.sub(r"`[^`]*`", " ", body)):
+            problems.append(f"{label}:{line} rationale block states a normative `{kw}`")
 check("rationale blocks state no requirement", problems)
 
 # --- 6. relative links resolve ----------------------------------------------
@@ -191,6 +217,7 @@ def heading_anchors(text: str) -> set[str]:
 
 problems = []
 for label, text, base in (
+    ("SPEC.md", NEW, ROOT),
     ("README.md", README, ROOT),
     ("development/first-attempt.md", SPEC, ROOT / "development"),
     ("examples/README.md", (ROOT / "examples/README.md").read_text(encoding="utf-8"), ROOT / "examples"),
@@ -477,6 +504,78 @@ if app_path.exists():
 else:
     problems.append("examples/pystripe/app-pyproject.toml is missing")
 check("the paired application example answers its sidecar", problems)
+
+
+# --- 11. SPEC.md is finished ------------------------------------------------
+# A stub that survives into a release is a section a reader trusts and finds
+# empty. This is the cheapest possible guard against that.
+check(
+    "SPEC.md has no unwritten sections",
+    [f"SPEC.md still says {m.group(0)!r}" for m in re.finditer(r"\*To be (?:ported|written)[^*]*\*", NEW)],
+)
+
+# --- 12. SPEC.md's §8 is numbered 1..N and wholly indexed -------------------
+# The thematic index exists so an implementer can find the requirements for one
+# concern. A requirement in no theme is one nobody arrives at on purpose.
+problems = []
+try:
+    body = NEW.split("A conforming consumer **MUST**:")[1].split("### 8.4")[0]
+    nums = [int(n) for n in re.findall(r"^(\d+)\.\s", body, re.M)]
+    if nums != list(range(1, len(nums) + 1)):
+        problems.append(f"§8.3 numbering is not 1..N: {nums}")
+    index = NEW.split("### 8.2 Thematic index")[1].split("### 8.3")[0]
+    listed: set[int] = set()
+    for lo, hi in re.findall(r"\b(\d+)(?:[–-](\d+))?\b", index):
+        listed |= set(range(int(lo), int(hi or lo) + 1))
+    for missing in sorted(set(nums) - listed):
+        problems.append(f"requirement {missing} is in no index theme")
+    for phantom in sorted(listed - set(nums)):
+        problems.append(f"the index names requirement {phantom}, which does not exist")
+    advisory = [int(n) for n in re.findall(r"\*\*S(\d+)\*\*", NEW.split("### 8.4")[1])]
+    if advisory != list(range(1, len(advisory) + 1)):
+        problems.append(f"advisory numbering is not S1..SN: {advisory}")
+except IndexError:
+    problems.append("could not locate §8's requirement list, index, or advisory table")
+check("SPEC.md §8 is sequential and fully indexed", problems)
+
+# --- 13. §8 cites every section that binds a consumer -----------------------
+# §8 claims to restate §§2-7 and §9. A section carrying a consumer obligation
+# that §8 never cites is one an implementer working from the checklist misses.
+cited = set(re.findall(r"§(\d+(?:\.\d+)?)", NEW[NEW.index("## 8. Consuming") : NEW.index("## 9. Recording")]))
+problems = []
+parts = re.split(r"^(#{2,3} (\d+(?:\.\d+)?)\.? .+)$", mask_code(NEW), flags=re.M)
+for i in range(1, len(parts), 3):
+    num, section = parts[i + 1], " ".join(parts[i + 2].split())
+    if num.startswith("8") or num in cited:
+        continue
+    # "a consumer MUST …" binds one; "the slots are the consumer's, and a
+    # producer MUST NOT …" does not. Require the keyword to follow the subject.
+    if re.search(rf"consumer\s+(?:\w+\s+){{0,2}}\*\*({RFC2119})\*\*", section):
+        problems.append(f"§{num} binds a consumer and §8 never cites it")
+check("§8 cites every section that binds a consumer", problems)
+
+# --- 14. the declaration reference covers SPEC.md's own examples ------------
+# Appendix B is the contract-minor registry §4.3 rests on: a key missing from it
+# has no recorded revision, so the under-declaration rule cannot be applied.
+appendix_b = NEW[NEW.index("## Appendix B") : NEW.index("## Appendix C")]
+declared: set[str] = set()
+for _, block in toml_blocks(NEW):
+    try:
+        doc = tomllib.loads(block)
+    except tomllib.TOMLDecodeError:
+        continue
+    # An application's own configuration and a producer's pyproject.toml are
+    # illustrations of the consumer's spelling, not sidecar keys: their leaves
+    # are distribution names and value ids, which no registry could list.
+    if doc.keys() & {"tool", "project"}:
+        continue
+    declared |= keys_of(doc)
+problems = [
+    f"`{k}` appears in a SPEC.md sidecar example but not in Appendix B"
+    for k in sorted(declared)
+    if k not in appendix_b and k.islower() and "." not in k
+]
+check("Appendix B covers every key SPEC.md declares", problems)
 
 
 print()

@@ -16,6 +16,93 @@ to do.
 
 ---
 
+## Contents
+
+Writing a sidecar? [Appendix A](#appendix-a-a-complete-sidecar) shows one whole,
+and [Appendix B](#appendix-b-declaration-reference) lists every key it may
+contain. Building a tool that reads them?
+[§8](#8-consuming-tool-requirements) is the checklist, and §§2–7 and
+[§9](#9-recording-and-review) are what it refers to.
+
+> Callouts like this one are **rationale**: why a rule is the way it is, and
+> what goes wrong without it. They state no requirement, and a reader who skips
+> every one of them has missed nothing binding.
+
+<!-- toc -->
+
+- [Goals](#goals)
+- [Non-goals](#non-goals)
+- [1. Terminology](#1-terminology)
+- [2. Overview](#2-overview)
+  - [2.1 Design principles](#21-design-principles)
+  - [2.2 How the application answers](#22-how-the-application-answers)
+  - [2.3 What the consumer generates](#23-what-the-consumer-generates)
+  - [2.4 Obligations on the consumer's bootstrap](#24-obligations-on-the-consumers-bootstrap)
+- [3. Discovery](#3-discovery)
+  - [3.1 The entry point](#31-the-entry-point)
+  - [3.2 Resolution](#32-resolution)
+  - [3.3 Iterate; do not look up by name](#33-iterate-do-not-look-up-by-name)
+  - [3.4 One entry per distribution](#34-one-entry-per-distribution)
+  - [3.5 The distribution is the only carrier of the sidecar](#35-the-distribution-is-the-only-carrier-of-the-sidecar)
+- [4. The sidecar file](#4-the-sidecar-file)
+  - [4.1 Location and name](#41-location-and-name)
+  - [4.2 One file for all platforms](#42-one-file-for-all-platforms)
+  - [4.3 Contract version](#43-contract-version)
+  - [4.4 Unknown declarations fail closed](#44-unknown-declarations-fail-closed)
+  - [4.5 Platform support](#45-platform-support)
+- [5. Requirements on the application](#5-requirements-on-the-application)
+  - [5.1 Build floors](#51-build-floors)
+  - [5.2 Values](#52-values)
+  - [5.3 Actions](#53-actions)
+  - [5.4 How a requirement is satisfied](#54-how-a-requirement-is-satisfied)
+  - [5.5 Value kinds](#55-value-kinds)
+  - [5.6 Instructions and acceptance criteria](#56-instructions-and-acceptance-criteria)
+  - [5.7 Slots](#57-slots)
+- [6. Android contributions](#6-android-contributions)
+  - [6.1 Ownership](#61-ownership)
+  - [6.2 Source](#62-source)
+  - [6.3 Gradle dependencies](#63-gradle-dependencies)
+  - [6.4 Maven repositories](#64-maven-repositories)
+  - [6.5 Permissions and features](#65-permissions-and-features)
+  - [6.6 Manifest components](#66-manifest-components)
+  - [6.7 Shrinker keep patterns](#67-shrinker-keep-patterns)
+  - [6.8 Manifest meta-data](#68-manifest-meta-data)
+  - [6.9 Package visibility](#69-package-visibility)
+- [7. iOS contributions](#7-ios-contributions)
+  - [7.1 Symbol prefixes](#71-symbol-prefixes)
+  - [7.2 Swift packages](#72-swift-packages)
+  - [7.3 Source](#73-source)
+  - [7.4 Info.plist](#74-infoplist)
+  - [7.5 Python modules](#75-python-modules)
+  - [7.6 Objective-C categories](#76-objective-c-categories)
+- [8. Consuming tool requirements](#8-consuming-tool-requirements)
+  - [8.1 Three outcomes, and no others](#81-three-outcomes-and-no-others)
+  - [8.2 Thematic index](#82-thematic-index)
+  - [8.3 Requirements](#83-requirements)
+  - [8.4 Advisory obligations](#84-advisory-obligations)
+- [9. Recording and review](#9-recording-and-review)
+  - [9.1 The lifecycle](#91-the-lifecycle)
+  - [9.2 The report](#92-the-report)
+  - [9.3 Hashed inputs](#93-hashed-inputs)
+  - [9.4 What resolved artifacts bring with them](#94-what-resolved-artifacts-bring-with-them)
+  - [9.5 Secrets are never recorded](#95-secrets-are-never-recorded)
+  - [9.6 What a record must contain](#96-what-a-record-must-contain)
+  - [9.7 Packaging collisions](#97-packaging-collisions)
+- [10. Versioning](#10-versioning)
+- [11. Out of scope](#11-out-of-scope)
+- [12. Guidance for package authors](#12-guidance-for-package-authors)
+  - [12.1 Framework bindings, where this guidance does not apply](#121-framework-bindings-where-this-guidance-does-not-apply)
+- [Appendix A: a complete sidecar](#appendix-a-a-complete-sidecar)
+- [Appendix B: declaration reference](#appendix-b-declaration-reference)
+- [Appendix C: a record that satisfies §9](#appendix-c-a-record-that-satisfies-9)
+- [Appendix D: why contributions stay per-distribution](#appendix-d-why-contributions-stay-per-distribution)
+- [Appendix E: why not a build backend](#appendix-e-why-not-a-build-backend)
+- [Appendix F: prior art](#appendix-f-prior-art)
+
+<!-- /toc -->
+
+---
+
 ## Goals
 
 This convention automates the parts of native integration that are portable and
@@ -963,8 +1050,8 @@ producer's behalf.
 | [6.1](#61-ownership) | `android.owns.java_namespaces` | A claim on a Java/Kotlin namespace | Overlapping claims **fail** the build |
 | [6.2](#62-source) | `android.contributes.src` | Java/Kotlin source under an owned namespace | N/A — one producer owns the namespace |
 | [6.3](#63-gradle-dependencies) | `android.contributes.gradle_dependencies` | A Gradle dependency coordinate | Versions resolve to a **floor** ([§5.1](#51-build-floors)); conflicting configurations fail |
-| [6.4](#64-maven-repositories) | `android.contributes.gradle_repositories` | A Maven repository URL | Union; a consumer **MAY** refuse an untrusted host |
-| [6.5](#65-permissions-and-features) | `android.contributes.permissions`, `.features` | A `<uses-permission>` or `<uses-feature>` entry | Union; the application **MAY** suppress one |
+| [6.4](#64-maven-repositories) | `android.contributes.gradle_repositories` | A Maven repository URL | Bounded to declared groups; overlapping scopes fail |
+| [6.5](#65-permissions-and-features) | `android.contributes.permissions`, `.features` | A `<uses-permission>` or `<uses-feature>` entry | Union; the application may suppress a permission |
 | [6.6](#66-manifest-components) | `android.contributes.components` | An `<activity>`, `<service>`, `<receiver>`, or `<activity-alias>` entry | Two producers naming the same class **fail** the build |
 | [6.7](#67-shrinker-keep-patterns) | `android.contributes.r8.keep` | An R8 keep pattern | Union |
 | [6.8](#68-manifest-meta-data) | `android.contributes.meta_data` | An application-scoped `<meta-data>` entry | Equal values coalesce, differing values **fail**, the application's own value always wins |
@@ -1146,11 +1233,13 @@ native mechanism; Gradle's repository content filtering expresses exactly this.
 intersect **MUST** fail, naming both distributions and the contested
 coordinates — unless they declare the same `url`, which is not a conflict.
 
-> **Caution:** Do not substitute Gradle's `exclusiveContent` for content
-> filtering. It is a different and stronger policy: it additionally makes the
-> declared modules resolvable *only* from that repository, which can change
-> first-time resolution results. A consumer **MUST NOT** substitute it, because
-> the same sidecar would then resolve differently depending on which mechanism
+A consumer **MUST NOT** substitute Gradle's `exclusiveContent` for content
+filtering.
+
+> **Caution:** `exclusiveContent` is a different and stronger policy: it
+> additionally makes the declared modules resolvable *only* from that
+> repository, which can change first-time resolution results. Substituting it
+> would make the same sidecar resolve differently depending on which mechanism
 > the consumer picked.
 
 A consumer **MUST** report repository contributions with distinct prominence in
@@ -2057,15 +2146,16 @@ point.
 | Theme | Requirements |
 | --- | --- |
 | Discovery and the sidecar | 1–9 |
-| Answering, reporting, and scaffolding | 10, 11, 20, 21 |
-| Never satisfy a requirement on the producer's authority | 12, 13, 14, 15, 16 |
-| Composition between distributions | 17, 22, 26, 30, 33 |
-| Generated project material | 23, 24, 25, 27, 28, 29, 31, 32, 34, 35 |
-| Recording, disclosure, attribution | 36, 37, 38, 39, 40, 41, 42 |
-| The bootstrap | 43, 44 |
-| Everywhere | 18, 19, 45, 46 |
+| Answering, reporting, and scaffolding | 10–11 |
+| Never satisfy a requirement on the producer's authority | 12–16 |
+| Composition between distributions | 17–22 |
+| Generated project material | 23–37 |
+| Recording, disclosure, attribution | 38–44 |
+| The bootstrap | 45–46 |
 
-### 8.3 A conforming consumer MUST
+### 8.3 Requirements
+
+A conforming consumer **MUST**:
 
 **Discovery and the sidecar**
 
@@ -2270,10 +2360,10 @@ A conforming consumer **SHOULD**:
 | **S12** | Report the fully merged Android manifest's delta, beyond the per-artifact declarations requirement 41 requires | [§9.4](#94-what-resolved-artifacts-bring-with-them) |
 | **S13** | Report consumer ProGuard rules embedded in a resolved `.aar` | [§9.4](#94-what-resolved-artifacts-bring-with-them) |
 
-> **Note:** A consumer that stops at per-artifact declarations rather than
-> implementing S12 **MUST** say so in its own documentation
-> ([§9.4](#94-what-resolved-artifacts-bring-with-them)). An advisory obligation
-> quietly skipped is how a conformance claim overstates itself.
+> **Note:** [§9.4](#94-what-resolved-artifacts-bring-with-them) requires a
+> consumer that stops at per-artifact declarations, rather than implementing
+> S12, to say so in its own documentation. An advisory obligation quietly
+> skipped is how a conformance claim overstates itself.
 
 ## 9. Recording and review
 
@@ -2416,8 +2506,8 @@ Consumer ProGuard rules embedded in a resolved `.aar` **SHOULD** likewise be
 reported: they are appended to the application's shrinker configuration without
 passing through [§6.7](#67-shrinker-keep-patterns)'s scoping.
 
-> **Note:** The Android half is a **MUST** because it is the case this section
-> exists for — a permission arriving through a transitive Python dependency the
+> **Note:** The Android half is required rather than advisory because it is the
+> case this section exists for — a permission arriving through a transitive Python dependency the
 > author has never heard of, carrying obligations beyond the build.
 > `com.google.android.gms.permission.AD_ID` comes from an ads AAR and pulls the
 > application into a Play Console data-safety declaration. [§11](#11-out-of-scope)
@@ -2769,10 +2859,12 @@ unconditional needs normally, and mark the rest `conditional = true` with the
 triggering condition in `reason`. Nothing is imposed on applications that do not
 use the feature, and nothing is silent for applications that do.
 
-> **Caution:** Producers **SHOULD NOT** reach for `conditional` to avoid
-> stating an unconditional requirement. It converts a build failure that names
-> the problem into a line in a report, and the application discovers the
-> requirement at runtime instead.
+Producers **SHOULD NOT** reach for `conditional` to avoid stating an
+unconditional requirement.
+
+> **Caution:** Marking an unconditional requirement conditional converts a build
+> failure that names the problem into a line in a report, and the application
+> discovers the requirement at runtime instead.
 
 
 ---

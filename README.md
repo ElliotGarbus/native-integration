@@ -377,12 +377,14 @@ publish it.
 
 ## Checks
 
-`python3 tools/check_spec.py` validates the specification against itself and
-against the eighteen worked examples: that every `§` reference and link resolves, the
-consumer requirements are sequentially numbered and fully indexed, every TOML
-block parses, every documented sidecar obeys the rules the specification states,
-every key appears in the reference table, and no RFC 2119 keyword is left
-unmarked. It runs in CI on every push and pull request.
+`python3 tools/check_spec.py` validates both specifications against themselves
+and against the eighteen worked examples: that every `§` reference and link
+resolves, the consumer requirements are sequentially numbered and wholly
+indexed, every TOML and JSON block parses, no section binding a consumer goes
+uncited by the checklist, every documented sidecar obeys the rules the
+specification states, every key appears in the declaration reference, no
+rationale callout hides a requirement, and no RFC 2119 keyword is left unmarked.
+It runs in CI on every push and pull request.
 
 Each check exists because the corresponding mistake shipped at least once. They
 cover mechanical drift only — a section that contradicts itself still needs a
