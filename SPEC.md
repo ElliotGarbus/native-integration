@@ -2023,8 +2023,9 @@ point.
    under-declares, and be able to state the contract it implements
    ([§4.3](#43-contract-version)).
 8. Fail closed on an unrecognized key in a platform table it is building, and on
-   a value from a closed vocabulary it does not implement, substituting no
-   default ([§4.4](#44-unknown-declarations-fail-closed)).
+   a value from a closed vocabulary it does not implement — a value `kind`, a
+   Gradle configuration, a capability key — substituting no default
+   ([§4.4](#44-unknown-declarations-fail-closed), [§5.5](#55-value-kinds)).
 9. Fail when building for a platform a sidecar's `platforms` key omits, naming
    the distribution and how it entered the closure
    ([§4.5](#45-platform-support)).
