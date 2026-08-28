@@ -843,6 +843,15 @@ does not implement, naming the distribution and the value.
 `usage_description`, which exists so that a report can tell an author they are
 being asked for user-facing text that App Store review reads.
 
+> **Note:** `manifest_placeholder` exists for a value that a **declared
+> dependency's own manifest** reads, which `manifest_meta_data` cannot reach.
+> Auth0's and AppAuth's Android libraries ship the redirect intent filter
+> pre-written with `${auth0Domain}` and `${auth0Scheme}` holes in it, and the
+> application fills them through AGP's `manifestPlaceholders`. Without this
+> kind, the application is back to transcribing a value into its own build
+> file, which is the problem this convention exists to remove — and the
+> dependency's filter cannot be reached any other way.
+
 **Nothing in this section has an open vocabulary.** Some contribution keys
 elsewhere in this document stay open deliberately, because the *platform* owns
 the names — an Android `<data>` attribute, a foreground service type. A
@@ -1365,6 +1374,62 @@ one stereotyped filter, not the intent-filter grammar.
 Verified App Links are **not contributable**. `android:autoVerify` requires an
 `assetlinks.json` file on the application's own domain, which is application
 infrastructure. State the need as an action ([§5.3](#53-actions)).
+
+**Putting the pieces together.** A browser-return activity is three
+declarations in one sidecar — the component, the value its filter splices in,
+and the link itself — satisfied by two answers from the application.
+
+```toml
+# the producer's sidecar
+[[android.contributes.components]]
+kind = "activity"
+name = "org.example.mypkg.RedirectActivity"
+exported_required = true
+reason = "Receives the OAuth redirect from the browser"
+
+  [[android.contributes.components.view_links]]
+  scheme = { application_value = "oauth_redirect_scheme" }
+  host = "oauth2redirect"
+  path_prefix = "/callback"
+
+[[android.requires.application_value]]
+id = "oauth_redirect_scheme"
+kind = "inline"
+reason = "The redirect URI scheme registered with your OAuth provider"
+placeholder = "<TODO: your registered redirect scheme>"
+```
+
+```toml
+# the application's configuration — two separate answers
+[tool.examplebuild.android.exported_components]
+"org.example.mypkg.RedirectActivity" = true
+
+[tool.examplebuild.native.some-oauth-sdk.android.values]
+oauth_redirect_scheme = "myapp-oauth"
+```
+
+The consumer combines both into the generated manifest — the export approval
+and the spliced-in scheme:
+
+```xml
+<activity android:name="org.example.mypkg.RedirectActivity" android:exported="true">
+  <intent-filter>
+    <action android:name="android.intent.action.VIEW" />
+    <category android:name="android.intent.category.DEFAULT" />
+    <category android:name="android.intent.category.BROWSABLE" />
+    <data android:scheme="myapp-oauth"
+          android:host="oauth2redirect"
+          android:pathPrefix="/callback" />
+  </intent-filter>
+</activity>
+```
+
+> **Note:** Neither a plain Gradle project nor a sidecar-based one asks anyone
+> to hand-write that XML. Gradle solves it the same way: AppAuth-Android ships
+> the intent filter pre-written, with a placeholder for the one value the
+> application supplies. `view_links` reproduces that split — the producer
+> supplies the filter's shape, the application supplies one value, and the
+> consumer does the substitution.
 
 **Vendor actions.** Some components receive a vendor-defined event — not a link
 a browser opens, but an intent the SDK's own backend or the system delivers
