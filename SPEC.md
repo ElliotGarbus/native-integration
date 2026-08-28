@@ -58,7 +58,7 @@ contain. Building a tool that reads them?
   - [5.5 Value kinds](#55-value-kinds)
   - [5.6 Instructions and acceptance criteria](#56-instructions-and-acceptance-criteria)
   - [5.7 Slots](#57-slots)
-- [6. Android contributions](#6-android-contributions)
+- [6. Android declarations](#6-android-declarations)
   - [6.1 Ownership](#61-ownership)
   - [6.2 Source](#62-source)
   - [6.3 Gradle dependencies](#63-gradle-dependencies)
@@ -68,7 +68,7 @@ contain. Building a tool that reads them?
   - [6.7 Shrinker keep patterns](#67-shrinker-keep-patterns)
   - [6.8 Manifest meta-data](#68-manifest-meta-data)
   - [6.9 Package visibility](#69-package-visibility)
-- [7. iOS contributions](#7-ios-contributions)
+- [7. iOS declarations](#7-ios-declarations)
   - [7.1 Symbol prefixes](#71-symbol-prefixes)
   - [7.2 Swift packages](#72-swift-packages)
   - [7.3 Source](#73-source)
@@ -159,6 +159,8 @@ are to be interpreted as described in
 | **Contribution** | Native material the consumer stages on the producer's behalf. |
 | **Value** | A string the application supplies and the consumer writes to a platform key. |
 | **Action** | An outcome the application must achieve, which the consumer states and does not perform. |
+| **Integration record** | The durable, diffable artifact of the last accepted resolution ([§9](#9-recording-and-review)). |
+| **Report** | What a consumer shows for one build: each distribution, how it entered the closure, and the delta since the last accepted record. |
 | **Placeholder** | Text a consumer scaffolds in place of a value it does not have. The build does not proceed while a placeholder stands. |
 | **Fail closed** | On anything unrecognized, invalid, or unverifiable, reject and stop the build — never proceed as though it were absent. The opposite, **fail open**, is never conforming behavior under this document. |
 
@@ -193,8 +195,8 @@ model.
 A Java namespace is owned. An SDK floor, a value the application supplies, and
 an action it performs are required — [§5](#5-requirements-on-the-application)
 covers those three shapes. Source files, dependency coordinates, permissions and
-manifest components are contributed — [§6](#6-android-contributions) and
-[§7](#7-ios-contributions) cover those per platform.
+manifest components are contributed — [§6](#6-android-declarations) and
+[§7](#7-ios-declarations) cover those per platform.
 
 **Automate what is deterministic; state the rest.** The three-part test under
 [Goals](#goals) is what decides between the last two categories: material that
@@ -352,12 +354,23 @@ Neither clause gives a producer a way to run code at startup or to join a
 lifecycle callback. Both are properties of a bootstrap the consumer already
 writes, not a seam for producer code to enter.
 
+**Why these bind every consumer, rather than being declarable.** A producer
+could in principle state "I need a `ComponentActivity`" as a requirement, and
+this document deliberately does not let it. The property is a **baseline every
+package may assume**, not a per-package need: a binding author knows they wrap
+Stripe, not that Stripe's Android SDK calls a method declared only on the
+AndroidX class, and discovering that is not reasonably their job. Making it
+declarable would also mean every producer that forgot to declare it ships a
+package that fails on some consumers and not others, with nothing naming the
+cause. Two clauses fixed here cost each consumer once; the alternative costs
+every producer forever, and silently.
+
 > **Note:** Some SDKs need this and already solve it themselves. Where a
 > vendor's own SDK provides a declarative load hook — a manifest entry naming a
 > class its own bundled loader reads before any component runs, as Android's
 > Airship `Autopilot` and Sentry's `ContentProvider` trick do — a producer
 > states that entirely through an ordinary value ([§5.2](#52-values)) and a
-> contributed class ([§6](#6-android-contributions)), and no manual step
+> contributed class ([§6](#6-android-declarations)), and no manual step
 > remains. Where no such hook exists — iOS has none today — the requirement
 > stays an action ([§5.3](#53-actions)): the application author calls the SDK
 > from their own code at startup. This document grants no other path for
@@ -654,6 +667,13 @@ A producer states a requirement in one of three shapes.
 | **Value** | The application has a string, and the consumer knows where to write it | [§5.2](#52-values) |
 | **Action** | The application must achieve an outcome the consumer cannot produce | [§5.3](#53-actions) |
 
+**An `id` is unique within one platform table, across values and actions
+alike.** A value and an action **MUST NOT** share an `id` on one platform: the
+application answers both by `(distribution, id)`, so a shared name has no
+unambiguous answer. The same `id` on the two platforms is a different
+requirement and is expected — an account identifier usually differs per
+platform.
+
 **The boundary between a value and an action is what the consumer can place
 deterministically.** If the consumer can take a string and write it to a known
 key, it is a value. If the application must create something, configure
@@ -703,7 +723,7 @@ placeholder = "<TODO: your Sentry DSN>"
 
 | Field | Required | Description |
 | --- | --- | --- |
-| `id` | **yes** | A logical name, unique within the sidecar. Identity is `(distribution, id)`, scoped by platform. |
+| `id` | **yes** | A logical name, unique among the requirements in this platform table. Identity is `(distribution, platform, id)`. |
 | `kind` | **yes** | Where the consumer writes the value. A closed set — see [§5.5](#55-value-kinds). |
 | `key` | depends on `kind` | The platform key the value is written to. |
 | `reason` | **yes** | What the value is and where to obtain it. |
@@ -786,7 +806,7 @@ acceptance = [
 
 | Field | Required | Description |
 | --- | --- | --- |
-| `id` | **yes** | A logical name, unique within the sidecar. Identity is `(distribution, id)`, scoped by platform. |
+| `id` | **yes** | A logical name, unique among the requirements in this platform table. Identity is `(distribution, platform, id)`. |
 | `summary` | **yes** | One line, in the imperative. This is what a report shows. |
 | `reason` | **yes** | Why it is needed, and what breaks without it. |
 | `instructions` | no | Prose telling a reader how to do it. |
@@ -894,6 +914,27 @@ A consumer **MUST**:
 
 Declare `conditional = true` when you cannot tell whether the requirement
 applies and the application can. State the triggering condition in `reason`.
+
+A conditional requirement has **three** states, not two:
+
+| State | How it is reached | Outcome |
+| --- | --- | --- |
+| satisfied | the application supplied the value or acknowledged the action | met, and recorded |
+| dismissed | the application states that it does not apply | recorded, and no longer reported |
+| unresolved | the application has answered neither | recorded, **and reported on every build** |
+
+A consumer **MUST** provide a way for the application to dismiss a conditional
+requirement, joined by `(distribution, id)`, and **MUST** record a dismissal
+like any other answer. A consumer **MUST** report an unresolved conditional in
+every build's report, not only in the record.
+
+> **Note:** Unresolved is deliberately not blocking. A framework binding
+> ([§12.1](#121-framework-bindings-where-this-guidance-does-not-apply)) may
+> carry several conditional requirements, and forcing an answer to each would
+> reimpose the worst case that `conditional` exists to avoid. What the three
+> states buy is that *unanswered* stays visible: it does not decay into silence
+> after the first build, and dismissing something is a decision the record
+> attributes rather than an absence.
 
 > **Caution:** Do not mark an unconditional requirement conditional to avoid a
 > build failure. It converts a failure that names the problem into a line in a
@@ -1040,19 +1081,20 @@ is work no consumer can do and no producer can anticipate.
 
 ---
 
-## 6. Android contributions
+## 6. Android declarations
 
-Material the consumer stages into the generated Gradle project on the
-producer's behalf.
+What a producer owns and contributes on Android. Requirements on the
+application are [§5](#5-requirements-on-the-application)'s, whichever platform
+they name.
 
-| § | Key | Contributes | How conflicts resolve |
+| § | Key | Declares | How conflicts resolve |
 | --- | --- | --- | --- |
 | [6.1](#61-ownership) | `android.owns.java_namespaces` | A claim on a Java/Kotlin namespace | Overlapping claims **fail** the build |
 | [6.2](#62-source) | `android.contributes.src` | Java/Kotlin source under an owned namespace | N/A — one producer owns the namespace |
-| [6.3](#63-gradle-dependencies) | `android.contributes.gradle_dependencies` | A Gradle dependency coordinate | Versions resolve to a **floor** ([§5.1](#51-build-floors)); conflicting configurations fail |
+| [6.3](#63-gradle-dependencies) | `android.contributes.gradle_dependencies` | A Gradle dependency coordinate | Versions are requests Gradle resolves; two declarations differing in `configuration` fail |
 | [6.4](#64-maven-repositories) | `android.contributes.gradle_repositories` | A Maven repository URL | Bounded to declared groups; overlapping scopes fail |
 | [6.5](#65-permissions-and-features) | `android.contributes.permissions`, `.features` | A `<uses-permission>` or `<uses-feature>` entry | Union; the application may suppress a permission |
-| [6.6](#66-manifest-components) | `android.contributes.components` | An `<activity>`, `<service>`, `<receiver>`, or `<activity-alias>` entry | Two producers naming the same class **fail** the build |
+| [6.6](#66-manifest-components) | `android.contributes.components` | An `<activity>`, `<service>` or `<receiver>` entry | Two producers naming the same class **fail** the build |
 | [6.7](#67-shrinker-keep-patterns) | `android.contributes.r8.keep` | An R8 keep pattern | Union |
 | [6.8](#68-manifest-meta-data) | `android.contributes.meta_data` | An application-scoped `<meta-data>` entry | Equal values coalesce, differing values **fail**, the application's own value always wins |
 | [6.9](#69-package-visibility) | `android.contributes.queries` | A `<queries>` entry (`package` or `provider_authority`) | Union |
@@ -1157,7 +1199,7 @@ version = { at_least = "5.6.1", below = "6.0.0" }
 
 | Field | Rule |
 | --- | --- |
-| `coordinate` | `group:artifact:version`. The version **MUST** be exact. |
+| `coordinate` | `group:artifact:version`. A **single-version request**: one version, named exactly, which Gradle may still resolve higher |
 | `module` | `group:artifact`. `version` is **REQUIRED**, and **both** `at_least` (inclusive) and `below` (exclusive) are **REQUIRED** within it. A range open at either end is invalid. |
 | `configuration` | Optional. `implementation` (default), `api`, `compileOnly`, `runtimeOnly`. A **closed** set. |
 
@@ -1171,6 +1213,18 @@ Adding a coordinate to `annotationProcessor`, `kapt` or `ksp` makes the build
 *run code from that artifact*. A producer **MUST NOT** declare a processor
 configuration, and a consumer **MUST** reject one, naming the distribution. The
 four names above add a dependency and execute nothing.
+
+**Two declarations of one module must agree on `configuration`.** Where two
+distributions declare the same `group:artifact` with different `configuration`
+values, a consumer **MUST** fail, naming both distributions and the module.
+Equal values coalesce.
+
+> **Note:** The conservative rule, deliberately. `api` and `implementation`
+> differ only in what they expose downstream, so a widest-wins merge would be
+> defensible — but it would silently put a dependency on the application's
+> compile classpath because some transitive producer asked for `api`. Failing
+> tells two producers to agree, which is cheap, and can be relaxed if a real
+> composition needs it.
 
 **A declared version is a minimum, not a pin.** Gradle may select a higher
 version when something else in the graph requires it. A consumer **MUST NOT**
@@ -1382,14 +1436,16 @@ name = "com.vendor.sdk.InstallReferrerReceiver"
 from_dependency = "com.vendor:sdk"
 ```
 
-> **Note:** `provider` is deliberately absent. A `<provider>` is invalid without
-> `android:authorities`, and an authority must be unique across every
-> application on the device, so it is conventionally derived from the
-> application ID — which a producer does not know. A producer that needs one
-> declares an action ([§5.3](#53-actions)) instead: the application author
-> writes the class and its manifest entry directly, where
-> `${applicationId}` is available to them the same way it is in any
-> hand-written manifest.
+> **Note:** `provider` is deliberately absent, and **not** because a producer
+> cannot name an authority. AGP's `${applicationId}` placeholder makes
+> `${applicationId}.mypkg.provider` perfectly deterministic, and AndroidX
+> Startup's own manifest uses exactly that form. The reason is what a
+> `<provider>` *does*: Android instantiates it before `Application.onCreate`,
+> ahead of any application code. Registering one is therefore the startup
+> execution seam [§11](#11-out-of-scope) defers, reached through a manifest
+> attribute rather than through a hook — which is how Sentry initializes today.
+> Admitting it here would grant that capability without deciding to. A producer
+> that needs a provider declares an action ([§5.3](#53-actions)) meanwhile.
 
 **Provenance.** A component's class comes from one of two places, and the entry
 states which:
@@ -1696,13 +1752,14 @@ with the same action/data pattern a hand-written `<queries>` entry would use.
 > removing it does not reduce what the application may do, it makes the
 > producer's code quietly get a wrong answer.
 
-## 7. iOS contributions
+## 7. iOS declarations
 
-Material the consumer stages into the generated Xcode project.
+What a producer contributes on iOS. Requirements on the application are
+[§5](#5-requirements-on-the-application)'s, whichever platform they name.
 
-| § | Key | Contributes | How conflicts resolve |
+| § | Key | Declares | How conflicts resolve |
 | --- | --- | --- | --- |
-| [7.1](#71-symbol-prefixes) | `ios.swift_symbol_prefixes` | A declared prefix for contributed Swift type names | N/A — a diagnostic aid, not an enforced claim |
+| [7.1](#71-symbol-prefixes) | `ios.contributes.src.symbol_prefixes` | A declared prefix for contributed Swift type names | N/A — a diagnostic aid, not an enforced claim |
 | [7.2](#72-swift-packages) | `ios.contributes.swift_packages` | A SwiftPM package dependency | Locked to the resolved graph; a branch or path dependency **fails** |
 | [7.3](#73-source) | `ios.contributes.src` | Raw Swift source, compiled into the application target | N/A — no ownership or collision check |
 | [7.3](#73-source) | `ios.contributes.accessed_api_types` | A required-reason API disclosure for contributed source | Union; `reasons` de-duplicated per `type` |
@@ -1717,14 +1774,20 @@ Contributed Swift compiles straight into the application's single target. iOS
 lacks Android's per-package namespace to keep declarations apart.
 
 ```toml
-[ios]
-swift_symbol_prefixes = ["MyPkg"]
+[ios.contributes.src]
+swift = ["swift"]
+symbol_prefixes = ["MyPkg"]
 ```
 
 A producer that contributes Swift source ([§7.3](#73-source)) **SHOULD** do two
 things: name every class, struct, enum, and protocol it declares — its
 *types*, and in particular their `@objc` runtime names — with a consistent
 prefix, and declare that same prefix here.
+
+`symbol_prefixes` sits inside `[ios.contributes.src]` because it describes
+contributed source and means nothing without it. A consumer **MUST** reject it
+in a sidecar that contributes no Swift source, naming the distribution — the
+same rule `accessed_api_types` carries, for the same reason.
 
 Xcode's compiler error for this case names the type but not the distribution
 that declared it — `error: invalid redeclaration of 'MyPkgFooBar'`. A consumer
@@ -1775,8 +1838,8 @@ their URLs differ; a consumer **MUST** reject that, naming the distribution.
 | `{ from = "1.2.0" }` | SwiftPM's up-to-next-major range |
 | `{ revision = "<commit>" }` | A specific commit |
 
-A `branch` requirement **MUST NOT** appear in a distribution published to a
-package index; a consumer **MUST** reject it, naming the distribution.
+The grammar is closed: `branch` is not one of the three, so a consumer **MUST**
+reject a sidecar declaring it, naming the distribution.
 
 **The whole graph is locked, not only what the sidecar names.** A consumer
 **MUST** record the fully resolved Swift package graph, transitives included, in
@@ -1801,8 +1864,7 @@ which the package's own revision does not cover. SwiftPM models this already: a
 remote `binaryTarget` carries a `checksum`. A consumer **MUST** record that
 checksum for every binary target in the resolved graph, **MUST** verify it on
 subsequent builds, and **MUST** fail on a mismatch, naming the package and the
-declaring distribution. A consumer **SHOULD** warn when a remote binary target
-carries no checksum, since the record then pins nothing.
+declaring distribution.
 
 **The rules above bind what the sidecar declares; the resolved graph is where
 they are enforced.** The sidecar entry constrains only the package the
@@ -1825,6 +1887,27 @@ producer would have to encounter a vendor package that violates SwiftPM's own
 rules to hit this. This document still names it explicitly, both because
 that guarantee is SwiftPM's to keep, not this specification's, and because it
 gives the record and the report the same vocabulary either way.
+
+**Two distributions may declare the same package.** Their entries are combined
+into one SwiftPM graph and **SwiftPM resolves the constraints**; this document
+defines no second resolver. Package identity is the resolved package's, not the
+sidecar's: `name` is a local handle, so two producers may call one package
+different things without that being a conflict, and neither name reaches
+SwiftPM.
+
+- Compatible requirements resolve — `{ exact = "1.2.3" }` against
+  `{ from = "1.2.0" }` selects 1.2.3.
+- Incompatible ones fail in SwiftPM — `{ exact = "1.2.3" }` against
+  `{ exact = "1.2.4" }` has no solution.
+- `products` are unioned: the application target links every product any
+  distribution asked for.
+
+A consumer **MUST** record every distribution that requested a package, and
+**MUST**, when resolution fails, name every distribution whose declaration
+contributed to the failure — the obligation
+[§6.3](#63-gradle-dependencies) carries on the Gradle side, for the same
+reason: SwiftPM's own message names packages, and only the consumer knows which
+Python distributions asked for them.
 
 **You may declare your own repository here.** A distribution whose native half
 lives in a Swift package it also publishes is an expected shape. Two
@@ -2006,10 +2089,12 @@ skadnetwork_identifiers = ["su67r6k2v3.skadnetwork", "4fzdc2evr5.skadnetwork"]
 - A consumer **MUST** reject `SKAdNetworkItems` offered through `values` or
   `append`, naming the distribution and directing the producer here.
 
-> **Note:** A mistyped identifier does not fail. It sits in the plist, matches
-> no network, and silently loses attribution for that network's installs — a
-> quiet wrong answer of exactly the kind this convention exists to turn into a
-> build-time diagnostic. That is what the two validation conditions buy.
+> **Note:** The two conditions catch a **malformed** identifier — wrong case, a
+> missing suffix — and nothing more. They cannot catch a well-formed identifier
+> that is simply the wrong one: these are values Apple issues, and
+> `su67r6k2v4.skadnetwork` is as valid a string as `su67r6k2v3.skadnetwork`.
+> That failure stays silent, losing attribution for one network's installs, and
+> the record is the only place it is visible at all.
 
 ### 7.5 Python modules
 
@@ -2356,13 +2441,12 @@ A conforming consumer **SHOULD**:
 | **S8** | Make an active permission suppression visible in standing diagnostics | [§6.5](#65-permissions-and-features) |
 | **S9** | Surface contributed repositories in standing diagnostics | [§6.4](#64-maven-repositories) |
 | **S10** | Attribute a duplicate-symbol error to the distribution whose declared prefix matches | [§7.1](#71-symbol-prefixes) |
-| **S11** | Warn when a remote binary target carries no checksum | [§7.2](#72-swift-packages) |
-| **S12** | Report the fully merged Android manifest's delta, beyond the per-artifact declarations requirement 41 requires | [§9.4](#94-what-resolved-artifacts-bring-with-them) |
-| **S13** | Report consumer ProGuard rules embedded in a resolved `.aar` | [§9.4](#94-what-resolved-artifacts-bring-with-them) |
+| **S11** | Report the fully merged Android manifest's delta, beyond the per-artifact declarations requirement 41 requires | [§9.4](#94-what-resolved-artifacts-bring-with-them) |
+| **S12** | Report consumer ProGuard rules embedded in a resolved `.aar` | [§9.4](#94-what-resolved-artifacts-bring-with-them) |
 
 > **Note:** [§9.4](#94-what-resolved-artifacts-bring-with-them) requires a
 > consumer that stops at per-artifact declarations, rather than implementing
-> S12, to say so in its own documentation. An advisory obligation quietly
+> S11, to say so in its own documentation. An advisory obligation quietly
 > skipped is how a conformance claim overstates itself.
 
 ## 9. Recording and review
@@ -2994,7 +3078,7 @@ marks. An unmarked key is 1.0, which is why nothing below carries a mark yet.
 | `core_library_desugaring` | Optional boolean. A floor on a boolean axis: the build fails when the application has not enabled desugaring |
 | `deployment_target` | iOS floor, on the same terms |
 | **`[[<platform>.requires.application_value]]`** [§5.2](#52-values) | A string the application supplies and the consumer places |
-| `id` | **Required.** A logical name, unique within the sidecar; identity is (distribution, `id`), scoped by platform |
+| `id` | **Required.** A logical name, unique among the requirements in one platform table; identity is (distribution, platform, `id`) |
 | `kind` | **Required.** Where the consumer writes it. A **closed** set — [§5.5](#55-value-kinds) |
 | `key` | The platform key the value is written to. Required except where `kind` is `inline` |
 | `reason` | **Required.** What the value is and where to obtain it |
@@ -3029,7 +3113,7 @@ marks. An unmarked key is 1.0, which is why nothing below carries a mark yet.
 | **`[[android.contributes.features]]`** [§6.5](#65-permissions-and-features) | |
 | `name` | Always registered `required="false"`; only the application may promote a feature |
 | **`[[android.contributes.components]]`** [§6.6](#66-manifest-components) | |
-| `kind` | `service`, `activity` or `receiver`. `provider` is deliberately absent: an authority must be unique device-wide, so only the application ID can supply it |
+| `kind` | `service`, `activity` or `receiver`. `provider` is deliberately absent: a provider runs before application code, which is the startup seam §11 defers |
 | `name` | The class. Under an owned namespace unless `from_dependency` says otherwise |
 | `from_dependency` | `group:artifact` of a dependency the same sidecar declares, which owns the class |
 | `foreground_service_type` | Android's own value, on a `service` only. Mandatory on Android 14+ for a foreground service |
@@ -3043,14 +3127,14 @@ marks. An unmarked key is 1.0, which is why nothing below carries a mark yet.
 | `key`, `value`, `reason` | A `<meta-data>` entry the producer knows the value of. `reason` **required**; `value` is a string, integer or boolean; the application's own entry wins |
 | **`[[android.contributes.queries]]`** [§6.9](#69-package-visibility) | |
 | `package`, `provider_authority`, `reason` | Package visibility for the producer's own code. Exactly one of the first two; `reason` **required**. No veto, because removing one breaks the producer silently |
-| **`[ios]`** [§7.1](#71-symbol-prefixes) | |
-| `swift_symbol_prefixes` | Prefixes the producer puts on its Swift type names. Guidance only; it does not cover file-scope functions or extension members |
+
 | **`[[ios.contributes.swift_packages]]`** [§7.2](#72-swift-packages) | |
 | `name` | Local handle, unique within the sidecar; [§7.5](#75-python-modules) refers to packages by it |
 | `url`, `products` | The repository, and which of its products to link |
 | `requirement` | Exactly one of `{ exact }`, `{ from }`, `{ revision }`. `branch` is invalid |
 | **`[ios.contributes.src]`** [§7.3](#73-source) | |
 | `swift` | Directories of `.swift` staged into the application target. For small shims only |
+| `symbol_prefixes` | Prefixes the producer puts on its contributed Swift type names ([§7.1](#71-symbol-prefixes)). Guidance only; it does not cover file-scope functions or extension members, and it is invalid without contributed source |
 | `[[…accessed_api_types]]` — `type`, `reasons`, `reason` | Required-reason APIs the contributed Swift touches, merged into the application's `PrivacyInfo.xcprivacy`. Valid only alongside contributed Swift. Declared as `[[ios.contributes.accessed_api_types]]` |
 | **`[ios.contributes.info_plist]`** [§7.4](#74-infoplist) | |
 | `values` | Scalar keys set verbatim. Collisions fail; `*UsageDescription` and capability keys are rejected |
