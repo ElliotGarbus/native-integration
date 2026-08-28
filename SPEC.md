@@ -946,7 +946,20 @@ is work no consumer can do and no producer can anticipate.
 
 ## 6. Android contributions
 
-Material the consumer stages into the generated Gradle project on your behalf.
+Material the consumer stages into the generated Gradle project on the
+producer's behalf.
+
+| § | Key | Contributes | How conflicts resolve |
+| --- | --- | --- | --- |
+| [6.1](#61-ownership) | `android.owns.java_namespaces` | A claim on a Java/Kotlin namespace | Overlapping claims **fail** the build |
+| [6.2](#62-source) | `android.contributes.src` | Java/Kotlin source under an owned namespace | N/A — one producer owns the namespace |
+| [6.3](#63-gradle-dependencies) | `android.contributes.gradle_dependencies` | A Gradle dependency coordinate | Versions resolve to a **floor** ([§5.1](#51-versions)); conflicting configurations fail |
+| [6.4](#64-maven-repositories) | `android.contributes.gradle_repositories` | A Maven repository URL | Union; a consumer **MAY** refuse an untrusted host |
+| [6.5](#65-permissions-and-features) | `android.contributes.permissions`, `.features` | A `<uses-permission>` or `<uses-feature>` entry | Union; the application **MAY** suppress one |
+| [6.6](#66-manifest-components) | `android.contributes.components` | An `<activity>`, `<service>`, `<receiver>`, or `<activity-alias>` entry | Two producers naming the same class **fail** the build |
+| [6.7](#67-shrinker-keep-patterns) | `android.contributes.r8.keep` | An R8 keep pattern | Union |
+| [6.8](#68-manifest-meta-data) | `android.contributes.meta_data` | An application-scoped `<meta-data>` entry | Equal values coalesce, differing values **fail**, the application's own value always wins |
+| [6.9](#69-package-visibility) | `android.contributes.queries` | A `<queries>` entry (`package` or `provider_authority`) | Union |
 
 ### 6.1 Ownership
 
@@ -1491,10 +1504,16 @@ acceptance = ["res/xml/accessibility_config.xml exists with the described conten
 
 ### 6.9 Package visibility
 
-The `<queries>` entries your own code needs in order to see that another
-application exists at all. Android 11 made package visibility opt-in, and
-without a declaration `PackageManager` answers "not installed" — silently — for
-everything your code looks for.
+Since Android 11, an app cannot see whether another app is installed unless
+it declares that need in advance: without a `<queries>` entry naming the
+target, `PackageManager` answers "not installed" for it — silently, not as an
+error — even when it is actually present. If a producer's bundled code checks
+for another app, it declares that check here, so the consumer can add the
+`<queries>` entry the check depends on.
+
+A `<queries>` element grants this visibility three ways: by exact package
+name, by content-provider authority, or by intent-filter pattern. This
+section models the first two, as one contribution:
 
 ```toml
 [[android.contributes.queries]]
@@ -1511,9 +1530,11 @@ reason = "Health Connect availability check; the client reports it absent withou
 - Entries merge as a **union**. Two distributions naming one package are asking
   for the same visibility.
 
-The `<intent>` form, which matches by action and data rather than by name, is
-not expressible in version 1. It is an intent-filter grammar, and the reasons
-for modelling stereotypes instead apply unchanged.
+The third form, `<intent>`, grants visibility by matching an action and data
+pattern rather than a name. A producer that needs it declares an action
+([§5.3](#53-actions)) instead: the application author adds the
+`<queries><intent>...</intent></queries>` block to the manifest directly,
+with the same action/data pattern a hand-written `<queries>` entry would use.
 
 > **Note:** There is no veto here, where [§6.5](#65-permissions-and-features)
 > has one. A permission is user-visible, policy-relevant, and refusing it leaves
@@ -1523,12 +1544,12 @@ for modelling stereotypes instead apply unchanged.
 
 ## 7. iOS contributions
 
-Material the consumer stages into the generated Xcode project on your behalf.
+Material the consumer stages into the generated Xcode project.
 
 ### 7.1 Symbol prefixes
 
-Contributed Swift compiles straight into the application's single target, with
-no per-package namespace like Android's to keep declarations apart.
+Contributed Swift compiles straight into the application's single target. iOS
+lacks Android's per-package namespace to keep declarations apart.
 
 ```toml
 [ios]
@@ -1536,11 +1557,16 @@ swift_symbol_prefixes = ["MyPkg"]
 ```
 
 A producer that contributes Swift source ([§7.3](#73-source)) **SHOULD** do two
-things: name its contributed types — and in particular its `@objc` runtime
-names — with a consistent prefix, and declare that same prefix here.
+things: name every class, struct, enum, and protocol it declares — its
+*types*, and in particular their `@objc` runtime names — with a consistent
+prefix, and declare that same prefix here.
 
-A consumer **SHOULD** use declared prefixes to attribute a redeclaration or
-duplicate-name error to the contributing distribution.
+Xcode's compiler error for this case names the type but not the distribution
+that declared it — `error: invalid redeclaration of 'MyPkgFooBar'`. A consumer
+**SHOULD** match the named type against each sidecar's declared prefix and
+attribute the error to the distribution whose prefix matches, in the build
+output and the report, rather than leaving the application author to search
+every dependency's source for the name.
 
 **What this does not reach.** Prefixing covers type names and `@objc` runtime
 names only — not file-scope functions, global constants, or extension members. A
@@ -1560,9 +1586,9 @@ check for it.
 
 ### 7.2 Swift packages
 
-A vendor's Swift package, or your own: resolved by SwiftPM, locked by the
-integration record, and compiled as its own module rather than into the
-application's.
+A Swift package — a vendor's, or one the producer authored itself: resolved by
+SwiftPM, locked by the integration record, and compiled as its own module
+rather than into the application's.
 
 ```toml
 [[ios.contributes.swift_packages]]
@@ -1613,12 +1639,27 @@ subsequent builds, and **MUST** fail on a mismatch, naming the package and the
 declaring distribution. A consumer **SHOULD** warn when a remote binary target
 carries no checksum, since the record then pins nothing.
 
-**The declaration rules bind the sidecar; the resolved graph is where they are
-enforced.** A declared package's own `Package.swift` may name anything — a
-branch, a local filesystem path, an arbitrary URL — and nothing in the
-declaration reveals it. A consumer **MUST** therefore reject a resolved graph
-containing a **branch** requirement or a **path** dependency, naming the
-declaring distribution and the offending package.
+**The rules above bind what the sidecar declares; the resolved graph is where
+they are enforced.** The sidecar entry constrains only the package the
+producer names directly — its `exact`, `from`, or `revision`. That package's
+own `Package.swift` can declare its transitive dependencies however it wants,
+and the sidecar entry says nothing about those; resolving the graph is the
+only point where they become visible.
+
+A **path** dependency is the case this actually catches: it points at a
+location on one machine's filesystem, which will not exist on anyone else's,
+and SwiftPM has no rule against declaring one. A consumer **MUST** reject a
+resolved graph containing a path dependency anywhere in it, naming the
+distribution that declared the top-level package and the offending transitive
+package.
+
+A **branch** dependency, by contrast, is close to unreachable in practice:
+SwiftPM itself refuses to resolve a version-pinned package (which is what
+`exact` or `from` produces) against a transitively branch-pinned one, so a
+producer would have to encounter a vendor package that violates SwiftPM's own
+rules to hit this. This document still names it explicitly, both because
+that guarantee is SwiftPM's to keep, not this specification's, and because it
+gives the record and the report the same vocabulary either way.
 
 **You may declare your own repository here.** A distribution whose native half
 lives in a Swift package it also publishes is an expected shape. Two
@@ -1662,8 +1703,13 @@ confined to its own module.
 **Required-reason APIs.** Contributed Swift compiles into the application's
 target, so by Apple's rule it *is* application code: an SDK's own privacy
 manifest reports the SDK's usage, and nothing reports code that has no target of
-its own. Declare what your contributed source touches, and the consumer merges
-it into the application's `PrivacyInfo.xcprivacy`.
+its own. A Swift package ([§7.2](#72-swift-packages)) carries its own
+`PrivacyInfo.xcprivacy` in its resources, which Apple's tooling reads
+automatically; raw source staged here has no such carrier, so this table is
+the sidecar's substitute for the manifest a package would otherwise bring. A
+producer declares what its contributed source touches, and the consumer — the
+only thing that ever writes the real file — merges the declaration into the
+application's `PrivacyInfo.xcprivacy`.
 
 ```toml
 [[ios.contributes.accessed_api_types]]
@@ -1694,8 +1740,14 @@ reason = "Caches the last selected region so the shim can restore it"
 
 ### 7.4 Info.plist
 
-The `Info.plist` keys an SDK genuinely needs set — and deliberately not the ones
-that grant the application a capability or restrict who may install it.
+Most `Info.plist` keys an SDK asks for are ordinary configuration — a feature
+flag, a URL scheme to recognize, a value it reads at runtime — and this
+section covers those. Two kinds are excluded on purpose, and covered later in
+this section instead: a key like `UIBackgroundModes` that would grant the
+application a new capability, and a key like `UIRequiredDeviceCapabilities`
+that would restrict which devices may install it at all. Both change what the
+application *is*, not just how an SDK behaves within it, so a producer states
+those as an action ([§5.3](#53-actions)) instead of setting the key directly.
 
 ```toml
 [ios.contributes.info_plist.values]
@@ -1708,8 +1760,11 @@ LSApplicationQueriesSchemes = ["examplescheme"]
 Two contribution modes, by shape:
 
 - **`values`** — scalar keys, set verbatim. A consumer **MUST** fail on a key
-  that collides with one it manages itself, and on two distributions setting the
-  same key to different values, naming the distributions. Two distributions
+  that collides with one it manages itself — the identity and version keys it
+  derives from the application's own project settings, such as
+  `CFBundleIdentifier`, `CFBundleShortVersionString`, `CFBundleVersion`, and
+  `MinimumOSVersion` — and on two distributions setting the same key to
+  different values, naming the distributions. Two distributions
   setting the same key to the **same** value coalesce, preserving both
   provenance records. A key the **application** also sets is the application's:
   the consumer **MUST** keep the application's value and report the override.
@@ -1760,7 +1815,7 @@ same `Info.plist` key through `values` that another declares through
 [§5.2](#52-values)'s `info_plist` kind **MUST** fail, on the collision rule
 above.
 
-**Dictionary-valued keys are excluded by design, not deferred.** The structured
+**Dictionary-valued keys are excluded by design.** The structured
 cases examined are better served by a narrower primitive: `NSExtension` is
 generated from a declared extension target, and `NSAppTransportSecurity` depends
 on what the application loads and is not the producer's to declare at all. A
@@ -1793,9 +1848,20 @@ skadnetwork_identifiers = ["su67r6k2v3.skadnetwork", "4fzdc2evr5.skadnetwork"]
 
 ### 7.5 Python modules
 
-When a Swift package **is** the Python extension module, compiled into the
-application target. Without this registration the build succeeds and the
-`import` fails.
+Registers a Swift package that **implements** a Python extension module — it
+exposes a `PyInit_*` entry point meant to be reached with `import name` —
+rather than one that is merely Swift code the application happens to use. The
+package is built as its own module ([§7.2](#72-swift-packages)) and linked
+into the application binary, not into a `.so` the ordinary import machinery
+would find on disk, so this registration is what lets `import name` succeed
+at all: without it, the build still succeeds but the `import` fails.
+
+> **Note:** "Swift package" here means a SwiftPM package — a `Package.swift`
+> manifest and a resolved product — not Swift source specifically. SwiftPM
+> targets may be plain C or Objective-C, so a producer whose extension module
+> is generated by Cython, or hand-written in C, can register it the same way
+> by wrapping the generated C in a minimal `Package.swift`. The requirement is
+> "resolved through §7.2," not "written in Swift."
 
 ```toml
 [[ios.contributes.python_modules]]
@@ -1804,7 +1870,7 @@ swift_package = "PyWebViews"
 init = "PyInit_WebViews"      # optional; defaults to PyInit_<name>
 ```
 
-The package is compiled into the application target rather than loaded from a
+The package is linked into the application binary rather than loaded from a
 shared object, so the ordinary import machinery never sees it. This table
 registers it with the interpreter — a name and a symbol, nothing executed at
 build time.
@@ -1812,9 +1878,12 @@ build time.
 - `swift_package` **MUST** name a package the same sidecar declares. A module
   cannot be registered without the code that implements it.
 - `name` is the name Python imports, and **MUST** be a single ASCII Python
-  identifier: `[A-Za-z_][A-Za-z0-9_]*`. **Dotted names are not permitted** —
-  registering a submodule means creating the parent package too, which is
-  package semantics this table does not model.
+  identifier: `[A-Za-z_][A-Za-z0-9_]*`. **Dotted names are not permitted.** A
+  dotted name would require a parent package object with its own `__path__`
+  for the submodule to resolve under, and this table has no mechanism to
+  create one — it registers one flat name against one init function, nothing
+  else. Submodule registration is an unsupported capability, not a
+  deferred one.
 - `init` names the module's initialization function and defaults to
   `PyInit_<name>`. When supplied it **MUST** be a valid C identifier. It exists
   because the three names need not agree: a package `PyWebViews` may implement a
@@ -1835,9 +1904,15 @@ payload it assembles for the device, for every module this table registers.
 
 ### 7.6 Objective-C categories
 
-The one link-time setting a producer cannot work around and the application
-cannot guess: a static library whose Objective-C **categories** are dropped by
-the linker unless the application target asks for them.
+An Objective-C **category** adds methods to an existing class without
+subclassing it — a common way for an SDK to extend a class like `NSString` or
+`UIView`. A category's methods are not referenced by name anywhere the linker
+can see, so when the SDK ships as a static library, the linker silently
+drops them; the application builds and links, then crashes at runtime the
+first time that method is actually called. The fix is a linker setting on the
+*application's own build target* — a producer has no way to set it from
+inside its own package, and the application author has no way to know it is
+needed, since nothing in their own code points at the missing method.
 
 ```toml
 [ios.contributes]
@@ -1856,17 +1931,18 @@ objc_categories = true
   it does not reduce what the application may do, it makes the producer's code
   fail at runtime with a message pointing nowhere.
 
-> **Note:** Categories in a static library are not referenced by any symbol the
-> linker can see, so it discards them. The application builds, links, ships, and
-> then dies on `unrecognized selector sent to instance` the first time the SDK
-> calls its own method, with nothing in the message naming the library — let
-> alone the Python distribution that brought it in.
+> **Note:** In practice this surfaces as `unrecognized selector sent to
+> instance` — Apple's generic message for a missing method — with nothing in
+> it naming the library, let alone the Python distribution that brought it in.
 >
-> A producer cannot solve this in its own package. SwiftPM rejects raw linker
-> flags in a package consumed by version, so a vendor's own package cannot set
-> it, and the setting belongs to the application target regardless. The cost is
-> that loading every category also loads the classes carrying them, so the
-> binary grows by whatever the static libraries contain — which is why this is
+> SwiftPM independently rejects a package setting raw linker flags on itself
+> when consumed by version, which is a second, mechanical reason a producer
+> could not set this even if the setting belonged to its own package rather
+> than the application's.
+>
+> The cost of granting it is that loading every category also loads the
+> classes carrying them, so the binary grows by whatever the static libraries
+> contain — which is why this is
 > declared by the producers that need it rather than switched on for everyone.
 
 ## 8. Consuming tool requirements
