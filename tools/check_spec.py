@@ -519,11 +519,11 @@ check(
 # concern. A requirement in no theme is one nobody arrives at on purpose.
 problems = []
 try:
-    body = NEW.split("A conforming consumer **MUST**:")[1].split("### 8.4")[0]
+    body = NEW.split("A conforming consumer **MUST**:")[1].split("### 8.5")[0]
     nums = [int(n) for n in re.findall(r"^(\d+)\.\s", body, re.M)]
     if nums != list(range(1, len(nums) + 1)):
         problems.append(f"§8.3 numbering is not 1..N: {nums}")
-    index = NEW.split("### 8.2 Thematic index")[1].split("### 8.3")[0]
+    index = NEW.split("### 8.3 Thematic index")[1].split("### 8.4")[0]
     listed: set[int] = set()
     for lo, hi in re.findall(r"\b(\d+)(?:[–-](\d+))?\b", index):
         listed |= set(range(int(lo), int(hi or lo) + 1))
@@ -531,12 +531,33 @@ try:
         problems.append(f"requirement {missing} is in no index theme")
     for phantom in sorted(listed - set(nums)):
         problems.append(f"the index names requirement {phantom}, which does not exist")
-    advisory = [int(n) for n in re.findall(r"\*\*S(\d+)\*\*", NEW.split("### 8.4")[1])]
+    advisory = [int(n) for n in re.findall(r"\*\*S(\d+)\*\*", NEW.split("### 8.5")[1])]
     if advisory != list(range(1, len(advisory) + 1)):
         problems.append(f"advisory numbering is not S1..SN: {advisory}")
 except IndexError:
     problems.append("could not locate §8's requirement list, index, or advisory table")
 check("SPEC.md §8 is sequential and fully indexed", problems)
+
+# --- 12b. the conformance profiles cover every requirement, once ------------
+# A requirement in no profile binds nobody; one in two profiles is ambiguous
+# unless it is deliberately shared, which only the core row is.
+problems = []
+try:
+    profiles = NEW.split("### 8.1 Conformance is per platform")[1].split("### 8.2")[0]
+    rows = dict(re.findall(r"\| \*\*(?:Core|Android|iOS)\*\*([^|]*)\|([^|]*)\|", profiles))
+    seen: dict[int, int] = {}
+    for _, cell in re.findall(r"\| (\*\*(?:Core|Android|iOS)\*\*[^|]*)\|([^|]*)\|", profiles):
+        for lo, hi in re.findall(r"\b(\d+)(?:[–-](\d+))?\b", cell):
+            for n in range(int(lo), int(hi or lo) + 1):
+                seen[n] = seen.get(n, 0) + 1
+    nums = set(int(n) for n in re.findall(r"^(\d+)\.\s", body, re.M))
+    for missing in sorted(nums - set(seen)):
+        problems.append(f"requirement {missing} is in no conformance profile")
+    for phantom in sorted(set(seen) - nums):
+        problems.append(f"a profile names requirement {phantom}, which does not exist")
+except IndexError:
+    problems.append("could not locate the conformance profile table")
+check("SPEC.md §8's profiles cover every requirement", problems)
 
 # --- 13. §8 cites every section that binds a consumer -----------------------
 # §8 claims to restate §§2-7 and §9. A section carrying a consumer obligation

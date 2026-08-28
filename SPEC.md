@@ -76,10 +76,11 @@ contain. Building a tool that reads them?
   - [7.5 Python modules](#75-python-modules)
   - [7.6 Objective-C categories](#76-objective-c-categories)
 - [8. Consuming tool requirements](#8-consuming-tool-requirements)
-  - [8.1 Three outcomes, and no others](#81-three-outcomes-and-no-others)
-  - [8.2 Thematic index](#82-thematic-index)
-  - [8.3 Requirements](#83-requirements)
-  - [8.4 Advisory obligations](#84-advisory-obligations)
+  - [8.1 Conformance is per platform](#81-conformance-is-per-platform)
+  - [8.2 Dispositions, and what recording is not](#82-dispositions-and-what-recording-is-not)
+  - [8.3 Thematic index](#83-thematic-index)
+  - [8.4 Requirements](#84-requirements)
+  - [8.5 Advisory obligations](#85-advisory-obligations)
 - [9. Recording and review](#9-recording-and-review)
   - [9.1 The lifecycle](#91-the-lifecycle)
   - [9.2 The report](#92-the-report)
@@ -220,6 +221,20 @@ contributing distribution in every diagnostic it emits about declared material.
 **Native dependency resolution is reproducible.** Every contributed dependency
 **MUST** resolve identically from the same integration record.
 
+**Native surface changes are review-gated.** A consumer **MUST** record what it
+resolved, report the delta against the last accepted record, and **MUST NOT**
+build through a change the application has not accepted
+([§9](#9-recording-and-review)).
+
+> **Note:** This is the largest obligation in the document that is not about
+> reading a sidecar, and it is deliberately part of the contract rather than
+> left to each tool's policy. Without it the record is a lockfile and nothing
+> more: a transitive dependency's new permission lands in the shipped
+> application with a line in a report nobody had to read. What is mandated is
+> narrow — *an unaccepted change does not pass silently* — and the form is the
+> consumer's: a re-lock, a flag, a committed file. What is not optional is that
+> some deliberate act stands between a new native surface and a build.
+
 ### 2.2 How the application answers
 
 The application answers every requirement through the **consumer's own
@@ -232,10 +247,12 @@ A consumer **MUST** provide a way for the application to:
 | Answer | Joined by |
 | --- | --- |
 | Supply a value | `(distribution, id)` |
-| Acknowledge an action | `(distribution, id)` |
+| Acknowledge an action, or dismiss a conditional one | `(distribution, id)` |
 | Suppress a contributed permission | permission `name` |
 | Approve an exported component | component `name` |
 | Supply credentials for an authenticated repository | repository `url` |
+| Decide a resolved artifact's required feature ([§9.4](#94-what-resolved-artifacts-bring-with-them)) | feature `name` |
+| Choose which artifact supplies a colliding file ([§9.7](#97-packaging-collisions)) | packaged `path` |
 
 The consumer chooses the path; the producer fixes the leaf. If a producer
 declares `id = "sentry_dsn"`, the application answers under that exact string,
@@ -595,13 +612,31 @@ Within a platform table the consumer is **building for**, an unrecognized key
 **MUST** be rejected, naming the distribution and the key. A consumer **MUST
 NOT** ignore a declaration it does not understand in order to proceed.
 
-**Values fail closed on the same terms.** Some contribution keys take a value
-from a vocabulary the *platform* owns and this document does not enumerate — an
-Android `<data>` attribute, a foreground service type. Where a key is defined
-that way, a consumer **MUST** reject a value it does not implement, naming the
-distribution and the value, and **MUST NOT** substitute a default it does
-understand. A consumer **SHOULD** say which values it does implement, so a
+**Values divide by what the consumer does with them**, and the two halves get
+opposite rules.
+
+| The value | Examples | Rule |
+| --- | --- | --- |
+| **selects behaviour the consumer performs** | a Gradle `configuration`, a value `kind` ([§5.5](#55-value-kinds)) | **Closed** and enumerated here. A consumer **MUST** reject one it does not implement, naming the distribution and the value, and **MUST NOT** substitute a default |
+| **is copied into a platform artifact** | a foreground service type, an Android `<data>` attribute, an Apple required-reason string | **Pass-through.** A consumer **MUST** validate the value's *shape* where this document gives one, and **MUST** write it through unchanged. It **MUST NOT** reject a value merely because it does not recognize it |
+
+A consumer **SHOULD** say which values of a closed set it implements, so a
 producer can tell an unsupported declaration from a misspelled one.
+
+> **Note:** Pass-through is what keeps a producer's pace tied to the platform's
+> releases rather than to this document's *or to its consumer's*. When Android
+> adds a foreground service type, a producer may use it immediately: the
+> consumer copies the string into the manifest, and AGP — which does know the
+> value — accepts or rejects it. Rejecting unknown platform strings would mean a
+> producer waits for every consumer to catch up, while the contract minor it
+> declared says nothing is new. The cost is that a typo now fails in AGP rather
+> than against the sidecar; the record shows the value and the distribution that
+> declared it, so the error still has a trail.
+>
+> This is not a hole in *fail closed*. A pass-through value is not ignored — it
+> reaches the artifact it was written for, and the platform's own validation is
+> what it faces. Failing closed protects against a declaration going nowhere,
+> and this one goes exactly where it was aimed.
 
 An unrecognized **top-level key that is not a table MUST be rejected**, naming
 the distribution and the key.
@@ -980,9 +1015,9 @@ being asked for user-facing text that App Store review reads.
 > file, which is the problem this convention exists to remove — and the
 > dependency's filter cannot be reached any other way.
 
-**Nothing in this section has an open vocabulary.** Some contribution keys
-elsewhere in this document stay open deliberately, because the *platform* owns
-the names — an Android `<data>` attribute, a foreground service type. A
+**Nothing in this section is pass-through.** Some contribution keys elsewhere
+in this document are, because the *platform* owns the names and the consumer
+only copies them — an Android `<data>` attribute, a foreground service type. A
 requirement never does. An action ([§5.3](#53-actions)) carries no vocabulary
 at all: `summary`, `reason`, `instructions` and `acceptance` are prose, `slot`
 is opaque and compared only for equality, and `uses` names values in the same
@@ -1484,8 +1519,9 @@ foreground_service_type = "mediaProjection"
 
 `foreground_service_type` is valid **only** on `kind = "service"`; a consumer
 **MUST** reject it elsewhere, naming the distribution. The value is Android's
-own, written exactly as the platform defines it, and the vocabulary is open per
-[§4.4](#44-unknown-declarations-fail-closed). Android also requires the matching
+own, written exactly as the platform defines it, and the consumer writes it
+through without needing to know the value
+([§4.4](#44-unknown-declarations-fail-closed)). Android also requires the matching
 `FOREGROUND_SERVICE_*` permission, which is an ordinary
 [§6.5](#65-permissions-and-features) contribution.
 
@@ -1518,7 +1554,7 @@ one stereotyped filter, not the intent-filter grammar.
   `exported_required = true`. A consumer **MUST** reject the inconsistent
   combination — a link target that is not exported is unreachable.
 - The fields are Android's own `<data>` attribute names in snake case, and the
-  set is **open** per [§4.4](#44-unknown-declarations-fail-closed): `port`,
+  set is **pass-through** per [§4.4](#44-unknown-declarations-fail-closed): `port`,
   `mime_type`, `path`, `path_pattern` and `path_suffix` are as declarable as the
   three shown. Only `scheme` is **REQUIRED**.
 - Every attribute may take a literal or an inline application value
@@ -2217,28 +2253,63 @@ This section restates §§2–7 and [§9](#9-recording-and-review) as a checklis
 introduces no obligation those sections do not already carry. **Where the two
 differ, the body governs**, and the discrepancy is a defect worth reporting.
 
+> **Caution:** A checklist beside the rules it restates is a second copy to keep
+> in step, and this document has already shipped one drift between them. Two
+> things bound it: every requirement below cites the section it comes from, and
+> `tools/check_spec.py` fails when a section binding a consumer is cited by no
+> requirement. Neither catches a requirement that drifts from the section it
+> names, which is why the body governs. Attaching these identifiers to the rules
+> themselves, and generating this section, is the durable fix and is not done.
+
 Numbering is stable: a later revision appends rather than renumbering, so a
 conformance claim can name the requirements it meets.
 
-### 8.1 Three outcomes, and no others
+### 8.1 Conformance is per platform
 
-What a consumer finds falls into exactly three kinds, named here so that two
-implementations classify the same condition the same way.
+A consumer that builds only for Android is not obliged to implement Xcode, and
+one that builds only for iOS is not obliged to implement Gradle. **Conformance
+is the core plus at least one platform profile**, and a consumer states which:
+*a native-integration v1 Android consumer*, or *v1 Android and iOS*.
 
-| Outcome | Meaning | Produced by |
+| Profile | Requirements |
+| --- | --- |
+| **Core** — every consumer | 1–22, 24, 26, 38–40, 42, 43 |
+| **Android** | 23–25, 27–32, 41, 44, 45 |
+| **iOS** | 33–37, 46 |
+
+Requirement 24 appears in the core because contributed source exists on both
+platforms; its UTF-8 clause binds a consumer that compiles Java. Requirement 26
+locks whichever native graphs the consumer resolves.
+
+A consumer **MUST** fail, naming the distribution, when a sidecar declares a
+platform table for a platform the consumer does not implement and the
+application is building for it — that is requirement 9, and it is what keeps a
+single-platform consumer honest rather than silently partial.
+
+### 8.2 Dispositions, and what recording is not
+
+A finding has one of two dispositions, named here so that two implementations
+classify the same condition the same way:
+
+| Disposition | Meaning | Produced by |
 | --- | --- | --- |
 | **blocking** | the build **MUST NOT** proceed | every numbered requirement below that says *fail* |
-| **advisory** | reported; the build proceeds | the **SHOULD** list in [§8.4](#84-advisory-obligations) |
-| **recorded** | written to the integration record, and not reported as a problem at all | an unsatisfied *conditional* requirement ([§5.4](#54-how-a-requirement-is-satisfied)), and the disclosure [§9](#9-recording-and-review) requires |
+| **advisory** | reported; the build proceeds | the **SHOULD** list in [§8.5](#85-advisory-obligations) |
 
-The third is the one an implementation is likely to lack. [§5.4](#54-how-a-requirement-is-satisfied)
-and [§9](#9-recording-and-review) both require material that neither stops the
-build nor warns about anything. A consumer with only two levels files it under
-one of them and is wrong either way: as a warning it becomes noise to be
-silenced, and as nothing it stops being the durable disclosure that was the
-point.
+**Recording is a separate axis, not a third disposition.** Most of what a
+consumer writes to the integration record is not a finding at all: every
+contribution, every satisfied requirement, and the resolved native graph are
+recorded as a matter of course.
 
-### 8.2 Thematic index
+One case is worth naming because implementations miss it. An unsatisfied
+**conditional** requirement ([§5.4](#54-how-a-requirement-is-satisfied)) is
+recorded and reported, and is neither blocking nor advisory — it is not a
+problem, it is an open question the application has not answered. A consumer
+with only *error* and *warning* files it under one of them and is wrong either
+way: as a warning it becomes noise to be silenced, and as nothing it stops being
+the durable disclosure that was the point.
+
+### 8.3 Thematic index
 
 | Theme | Requirements |
 | --- | --- |
@@ -2250,7 +2321,7 @@ point.
 | Recording, disclosure, attribution | 38–44 |
 | The bootstrap | 45–46 |
 
-### 8.3 Requirements
+### 8.4 Requirements
 
 A conforming consumer **MUST**:
 
@@ -2434,7 +2505,7 @@ A conforming consumer **MUST**:
     delivered to the bootstrap's `application(_:open:options:)`, rather than
     consuming it ([§2.4](#24-obligations-on-the-consumers-bootstrap)).
 
-### 8.4 Advisory obligations
+### 8.5 Advisory obligations
 
 These carry stable identifiers of their own, referenced as 8.S1 and so on, so a
 conformance claim can name the ones it meets. They are reported, never blocking.
@@ -2588,15 +2659,34 @@ Two exceptions exist, because otherwise moving material out of the sidecar and
 into an `.aar` would launder past a rule this document treats as
 security-sensitive:
 
-- A resolved artifact declaring `<uses-feature required="true">` **MUST NOT** be
-  allowed to silently make hardware mandatory. The consumer **MUST** report it,
-  and **MUST** override it to `required="false"` unless the **application
-  itself** independently declares that feature required. Silently shrinking an
-  application's device reach is the same harm whoever authors it.
+- A resolved artifact declaring `<uses-feature required="true">` **MUST NOT**
+  silently make hardware mandatory. A consumer **MUST** report it, naming the
+  artifact and the distribution that pulled it in, and **MUST** fail until the
+  **application** decides: keep it required, or override it to
+  `required="false"`. The application's decision **MUST** be recorded.
 - A resolved artifact declaring an **exported component** **MUST** be reported
   with the same prominence as a contributed one
   ([§6.6](#66-manifest-components)), so the application sees every externally
   reachable surface it is acquiring, whatever declared it.
+
+> **Note:** The first exception used to override the feature to `false`
+> automatically. That was wrong in both directions: silently shrinking device
+> reach is a harm, and silently widening it ships an application onto hardware
+> where the SDK that asked cannot work. Neither is the consumer's call, and the
+> question — *do you want to be installable on devices without this?* — is one
+> the application answers everywhere else in this document.
+>
+> **Why the second exception stops at reporting**, where a sidecar-declared
+> export needs approval. It is a practical line, not a principled one: exported
+> components are ordinary inside resolved artifacts, and a single ads or maps
+> dependency brings several. Gating each would mean approving dozens of
+> components nobody chose, on every build, which earns click-through and then
+> protects nothing. Required features are rare enough to gate; exported
+> components are not. A producer determined to avoid the sidecar's approval gate
+> can publish an artifact, and this document does not pretend otherwise —
+> [§9.4](#94-what-resolved-artifacts-bring-with-them)'s opening paragraph says
+> what it offers for artifact content is attribution and review, not
+> restriction.
 
 Consumer ProGuard rules embedded in a resolved `.aar` **SHOULD** likewise be
 reported: they are appended to the application's shrinker configuration without
@@ -2614,11 +2704,20 @@ passing through [§6.7](#67-shrinker-keep-patterns)'s scoping.
 
 ### 9.5 Secrets are never recorded
 
-A consumer **MUST NOT** write an application-supplied credential — or any value
-the application supplies as a secret — into the integration record, into a
-report, or into a diagnostic. Where a record must refer to one, it refers to the
+A consumer **MUST NOT** write a **build-time credential** — the kind
+[§6.4](#64-maven-repositories) declares with `credentials_required`, supplied by
+indirection under [§2.2](#22-how-the-application-answers) — into the integration
+record, into a report, or into a diagnostic. Where a record must refer to one, it refers to the
 *requirement* (that a repository is authenticated,
 [§6.4](#64-maven-repositories)) and never to the value.
+
+> **Note:** This rule is deliberately confined to that channel, because it is
+> the only one this document can identify. An ordinary application value is
+> embedded in the shipped application and readable by anyone who unzips it —
+> committing an analytics DSN is not a leak — and nothing here marks a value as
+> sensitive. A `sensitive = true` flag on [§5.2](#52-values) is the shape to
+> reach for if a case appears; inventing it now would mean guessing which values
+> deserve it.
 
 > **Caution:** This is the one place where the rest of this section works
 > against itself. The record is durable, diffable, hashes every input, and is
@@ -2647,7 +2746,7 @@ recoverable:
 | its provenance | how it entered the dependency closure ([§3.2](#32-resolution)) |
 | its inputs | a SHA-256 per file, keyed by normalized relative path ([§9.3](#93-hashed-inputs)) |
 | its contributions | each one, in a form two records can be compared by |
-| its requirements | every value and every action, **with its state** — supplied, acknowledged, or unresolved-and-conditional |
+| its requirements | every value and every action, **with its state** — supplied, dismissed, acknowledged, or unresolved. An acknowledgement or a dismissal **MUST** carry the distribution version it was made against and the date it was made |
 | the native graph | every resolved artifact with its checksum ([§6.3](#63-gradle-dependencies)), and every resolved package with its version **and** revision, plus a checksum per binary target ([§7.2](#72-swift-packages)) |
 
 A record that cannot answer one of those rows has not recorded the integration,
@@ -2687,6 +2786,13 @@ C++ runtime, or `META-INF/LICENSE` from almost any pair of libraries. A consumer
 | --- | --- |
 | **Packaging metadata** — files under `META-INF/` that are not code, such as licence texts and build fingerprints | A consumer **MAY** resolve these itself, by a rule that does not depend on resolution order, and **MUST** record what it did |
 | **Anything else, and every native library** | A consumer **MUST NOT** choose silently. It **MUST** fail, naming the path and **both declaring distributions**, unless the application has chosen which artifact supplies the file; where the application has chosen, the consumer **MUST** record the choice |
+
+The application's choice is joined by the **packaged path**, and answers with
+the coordinate of the artifact that supplies it — `(path, artifact)`. A consumer
+**MUST** provide a way for the application to answer in those terms
+([§2.2](#22-how-the-application-answers)). The path is the natural key: it is
+what collided, it is stable across a re-resolution that does not change
+versions, and it is what the diagnostic already names.
 
 A consumer **MUST** record every collision it detected and how it was resolved,
 attributed to the distributions whose declarations pulled the artifacts in.
@@ -2734,7 +2840,7 @@ required for:
 | --- | --- |
 | A new kind of application requirement | An action is prose. A platform construct this document has never heard of is stated in `summary`, `reason` and `acceptance` without the document changing. |
 | A new `slot` | Slots are opaque and compared only for equality ([§5.7](#57-slots)). |
-| A new value in an **open** vocabulary | `foreground_service_type`, `<data>` attributes, and Apple's required-reason strings are the platform's to extend; a consumer rejects what it does not implement. |
+| A new value in a **pass-through** vocabulary | `foreground_service_type`, `<data>` attributes, and Apple's required-reason strings are the platform's to extend, and a consumer copies them through without needing to know them ([§4.4](#44-unknown-declarations-fail-closed)). |
 
 That is the point of the split between contributions and actions. Contribution
 vocabulary is closed and versioned because a consumer is being asked to modify
@@ -2981,9 +3087,16 @@ for a wrapper around a hypothetical cross-platform analytics SDK — the shape a
 application author would otherwise transcribe out of a README.
 
 Read it as the three categories of [§2.1](#21-design-principles). It **owns** a
-Java namespace. It **requires** two floors, a value only the application has,
-and — on iOS, and only if a feature is used — an outcome the application must
-achieve. Everything else it **contributes**.
+Java namespace. It **requires** two floors, two values only the application has,
+and an outcome the application must achieve. Everything else it
+**contributes**.
+
+Note what it does *not* do: nothing here is `conditional`. Attribution is an
+optional feature of this SDK, and [§12](#12-guidance-for-package-authors) says
+optional surface belongs in an optional distribution — `examplytics-attribution`,
+with its own sidecar — rather than in this one behind a flag. `conditional` is
+for the shape that cannot be split, which
+[§12.1](#121-framework-bindings-where-this-guidance-does-not-apply) describes.
 
 ```toml
 # examplytics/_native/native.toml
@@ -3041,27 +3154,25 @@ keep_classes = ["org.example.analytics.**"]
 [ios.requires]
 deployment_target = "15.0"
 
-# A purpose string only the application can write, and only if attribution is
-# enabled. The consumer scaffolds the placeholder and blocks until it is gone.
+# A purpose string only the application can write. The consumer scaffolds the
+# placeholder and blocks until it is gone.
 [[ios.requires.application_value]]
-id = "tracking_purpose"
+id = "analytics_purpose"
 kind = "usage_description"
 key = "NSUserTrackingUsageDescription"
-conditional = true
 reason = """\
-Required only if you enable attribution. The sentence is yours to write: it is \
-shown to the user and read by App Store review."""
+The sentence is yours to write: it is shown to the user and read by App Store \
+review."""
 placeholder = "<TODO: why this app asks to track, in one sentence>"
 
 # An outcome the consumer cannot produce: the capability must be on the App ID
 # and in the provisioning profile before anything can be signed.
 [[ios.requires.application_action]]
 id = "attribution_capability"
-conditional = true
 summary = "Enable the App Attribution capability on your App ID"
 reason = """\
-Required only if you enable attribution. Without it the archive fails at \
-codesign, with a message that names the entitlement and not this package."""
+Without it the archive fails at codesign, with a message that names the \
+entitlement and not this package."""
 acceptance = [
   "The App Attribution capability is enabled on the App ID",
   "The provisioning profile used for release builds carries it",
@@ -3139,7 +3250,7 @@ marks. An unmarked key is 1.0, which is why nothing below carries a mark yet.
 | `from_dependency` | `group:artifact` of a dependency the same sidecar declares, which owns the class |
 | `foreground_service_type` | Android's own value, on a `service` only. Mandatory on Android 14+ for a foreground service |
 | `exported_required` + `reason` | Requests export. The build fails without explicit application approval — it never falls back to unexported |
-| `[[…view_links]]` — `scheme`, `host`, `path_prefix`, and Android's other `<data>` attributes | Generates the browser-return filter. Valid only on an exported activity; `scheme` is required; the attribute set is **open**; each may take a literal or an inline value |
+| `[[…view_links]]` — `scheme`, `host`, `path_prefix`, and Android's other `<data>` attributes | Generates the browser-return filter. Valid only on an exported activity; `scheme` is required; the attribute set is **pass-through**; each may take a literal or an inline value |
 | `[[…intent_filters]]` — `action` | One vendor-defined action, on a component that is neither exported nor carrying `view_links` |
 | **`[android.contributes.r8]`** [§6.7](#67-shrinker-keep-patterns) | |
 | `keep_classes` | Class patterns the shrinker must keep; the consumer generates the `-keep` rules. Each must fall within an owned namespace |
