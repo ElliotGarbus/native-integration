@@ -1958,7 +1958,256 @@ objc_categories = true
 
 ## 8. Consuming tool requirements
 
-*To be written once §§4–7 are ported.*
+Everything a **consumer** must do: the build tool that reads sidecars and
+generates the native project, as distinct from the application it builds or the
+distributions it reads.
+
+This section restates §§2–7 and [§9](#9-recording-and-review) as a checklist. It
+introduces no obligation those sections do not already carry. **Where the two
+differ, the body governs**, and the discrepancy is a defect worth reporting.
+
+Numbering is stable: a later revision appends rather than renumbering, so a
+conformance claim can name the requirements it meets.
+
+### 8.1 Three outcomes, and no others
+
+What a consumer finds falls into exactly three kinds, named here so that two
+implementations classify the same condition the same way.
+
+| Outcome | Meaning | Produced by |
+| --- | --- | --- |
+| **blocking** | the build **MUST NOT** proceed | every numbered requirement below that says *fail* |
+| **advisory** | reported; the build proceeds | the **SHOULD** list in [§8.4](#84-advisory-obligations) |
+| **recorded** | written to the integration record, and not reported as a problem at all | an unsatisfied *conditional* requirement ([§5.4](#54-how-a-requirement-is-satisfied)), and the disclosure [§9](#9-recording-and-review) requires |
+
+The third is the one an implementation is likely to lack. [§5.4](#54-how-a-requirement-is-satisfied)
+and [§9](#9-recording-and-review) both require material that neither stops the
+build nor warns about anything. A consumer with only two levels files it under
+one of them and is wrong either way: as a warning it becomes noise to be
+silenced, and as nothing it stops being the durable disclosure that was the
+point.
+
+### 8.2 Thematic index
+
+| Theme | Requirements |
+| --- | --- |
+| Discovery and the sidecar | 1–9 |
+| Answering, reporting, and scaffolding | 10, 11, 20, 21 |
+| Never satisfy a requirement on the producer's authority | 12, 13, 14, 15, 16 |
+| Composition between distributions | 17, 22, 26, 30, 33 |
+| Generated project material | 23, 24, 25, 27, 28, 29, 31, 32, 34, 35 |
+| Recording, disclosure, attribution | 36, 37, 38, 39, 40, 41, 42 |
+| The bootstrap | 43, 44 |
+| Everywhere | 18, 19, 45, 46 |
+
+### 8.3 A conforming consumer MUST
+
+**Discovery and the sidecar**
+
+1. Restrict candidate producers to the application's resolved dependency
+   closure, and never accept contributions from a distribution outside it,
+   whatever else is installed ([§3.2](#32-resolution)).
+2. Discover by iterating the entry-point group, ignoring entry-point names, and
+   fail when one distribution declares more than one entry
+   ([§3.3](#33-iterate-do-not-look-up-by-name), [§3.4](#34-one-entry-per-distribution)).
+3. Never import the producing package or any module of it, and never execute any
+   content of a sidecar ([§2.1](#21-design-principles), [§3.2](#32-resolution)).
+4. Read the sidecar and every resource it references through the distribution's
+   metadata and file-resource interface, and fail naming the distribution when
+   a resource cannot be materialized or read ([§3.2](#32-resolution)).
+5. Reject a resource that escapes the sidecar directory after normalization, and
+   reject a symlinked resource ([§4.1](#41-location-and-name)).
+6. Exclude the sidecar directory, and every resource under it, from any Python
+   payload it assembles for the device ([§4.1](#41-location-and-name)).
+7. Enforce the contract version gate including the minor, reject a sidecar that
+   under-declares, and be able to state the contract it implements
+   ([§4.3](#43-contract-version)).
+8. Fail closed on an unrecognized key in a platform table it is building, and on
+   a value from a closed vocabulary it does not implement, substituting no
+   default ([§4.4](#44-unknown-declarations-fail-closed)).
+9. Fail when building for a platform a sidecar's `platforms` key omits, naming
+   the distribution and how it entered the closure
+   ([§4.5](#45-platform-support)).
+
+**Answering, reporting, and scaffolding**
+
+10. Provide a way for the application to supply a value, acknowledge an action,
+    suppress a contributed permission, approve an exported component, and supply
+    repository credentials — each joined by the key
+    [§2.2](#22-how-the-application-answers) names — and accept a build-time
+    credential **by indirection** rather than only as a literal in a committed
+    file ([§2.2](#22-how-the-application-answers)).
+11. Report every unmet requirement, naming the distribution, the `reason`, and —
+    for an action — the `summary`, `instructions` and `acceptance`
+    ([§2.3](#23-what-the-consumer-generates)).
+
+**Never satisfy a requirement on the producer's authority**
+
+12. Fail when the application's configuration is below a declared floor, and
+    never raise it to satisfy one ([§5.1](#51-build-floors)).
+13. Fail when a declared value is unsupplied, and never treat a scaffolded
+    placeholder as a supplied value
+    ([§5.2](#52-values), [§5.4](#54-how-a-requirement-is-satisfied)).
+14. Fail when an unconditional action is unacknowledged; record an unsatisfied
+    conditional requirement without failing; and take an acknowledgement as
+    satisfying the requirement
+    ([§5.3](#53-actions), [§5.4](#54-how-a-requirement-is-satisfied)).
+15. Never treat its own observation of the application's project as satisfaction
+    of an action ([§5.4](#54-how-a-requirement-is-satisfied)).
+16. Never write an entitlement, a capability, a bundle file, a build target, or
+    any other application-owned artifact because a producer asked for it
+    ([§2.1](#21-design-principles)).
+
+**Composition between distributions**
+
+17. Fail when two values target the same `(kind, key)` with different content,
+    naming both distributions, and coalesce them when the content is equal
+    ([§5.2](#52-values)).
+18. Name the contributing distribution in **every** diagnostic it emits about
+    declared material ([§2.1](#21-design-principles)).
+19. Ignore entry-point groups for other major versions entirely, rather than
+    attempting to read them ([§10](#10-versioning)).
+20. Never modify a file the application owns unless the application asked it to,
+    and never scaffold an action's acknowledgement other than commented out
+    ([§2.3](#23-what-the-consumer-generates)).
+21. Never execute, apply, or fetch anything named by `instructions` or
+    `acceptance`, and include both in the record's hashed inputs
+    ([§5.6](#56-instructions-and-acceptance-criteria), [§9.3](#93-hashed-inputs)).
+22. Reject a `uses` entry naming no value the same sidecar declares, and report
+    two actions sharing a `slot` together, naming both distributions, without
+    interpreting the slot ([§5.3](#53-actions), [§5.7](#57-slots)).
+
+**Generated project material**
+
+23. Enforce every ownership rule, computing containment on dot-separated
+    segments, and fail on a collision naming the distributions responsible
+    ([§6.1](#61-ownership)).
+24. Compile contributed source with the application's own toolchain, force UTF-8
+    for `.java`, and exclude the source from any Python payload
+    ([§6.2](#62-source)).
+25. Reject a Gradle dependency declaring both or neither of `coordinate` and
+    `module`, reject a changing or unbounded version, reject a processor
+    configuration, never convert a declared version into a `strictly`
+    constraint, and show requested against resolved where they differ
+    ([§6.3](#63-gradle-dependencies)).
+26. Lock the fully resolved native graphs — Gradle and SwiftPM alike,
+    transitives included — resolve from the record thereafter, record a checksum
+    per Maven artifact and per Swift binary target, verify both on subsequent
+    builds, and fail on a mismatch naming the artifact and the distribution
+    ([§6.3](#63-gradle-dependencies), [§7.2](#72-swift-packages)).
+27. Restrict a contributed repository to its declared groups or modules, reject
+    two whose scopes overlap at different URLs, never substitute an exclusivity
+    mechanism for content filtering, report repositories with distinct
+    prominence, reject a syntactically identifiable credential, fail when an
+    authenticated repository has no credentials configured, and never persist a
+    supplied credential anywhere ([§6.4](#64-maven-repositories)).
+28. Merge permission attributes least-restrictively and report the merge;
+    register every producer-declared feature `required = false`; and honor a
+    suppression in the **effective merged manifest**, emitting a merger removal
+    where a resolved dependency contributes the same permission
+    ([§6.5](#65-permissions-and-features)).
+29. Enforce component provenance and uniqueness, reject `foreground_service_type`
+    on a non-service, fail when a component declaring `exported_required` has no
+    application approval — never falling back to an unexported registration —
+    and reject `view_links` or `intent_filters` in an invalid combination
+    ([§6.6](#66-manifest-components)).
+30. Validate `view_links` and generate their filters, including the action and
+    the `DEFAULT` and `BROWSABLE` categories, and show the link data and each
+    `intent_filters` action in the record
+    ([§6.6](#66-manifest-components)).
+31. Validate shrinker keep patterns against owned namespaces, reject a
+    `from_dependency` keep whose pattern matches any class on the effective
+    classpath originating outside that dependency's resolved artifacts, and
+    apply keeps only when the application has enabled shrinking
+    ([§6.7](#67-shrinker-keep-patterns)).
+32. Merge contributed `meta_data` with [§5.2](#52-values)'s delivery as one key
+    space, keeping and reporting the application's own entry where it sets the
+    key, and reject a `queries` entry declaring both or neither of `package` and
+    `provider_authority` ([§6.8](#68-manifest-meta-data), [§6.9](#69-package-visibility)).
+33. Reject two Swift packages sharing a `name`, reject a `branch` requirement,
+    reject a resolved graph containing a path dependency, and make visible in
+    the record that a self-declared package is not pinned by the distribution's
+    own version ([§7.2](#72-swift-packages)).
+34. Reject `accessed_api_types` from a sidecar contributing no Swift source, and
+    merge what it declares into the application's `PrivacyInfo.xcprivacy` in the
+    order [§7.3](#73-source) fixes.
+35. Enforce [§7.4](#74-infoplist)'s TOML-to-plist mapping, fail on a key it
+    manages itself or on two distributions setting one key differently, keep and
+    report the application's own value, reject usage-description and capability
+    keys, validate SKAdNetwork identifiers, and render `SKAdNetworkItems` only
+    from `skadnetwork_identifiers`.
+36. Register declared Python modules against a Swift package the same sidecar
+    declares, reject a dotted or non-identifier `name`, fail on a duplicate
+    module name, make each module importable from first use, and exclude
+    `<name>.py` and `<name>.pyi` from the Python payload
+    ([§7.5](#75-python-modules)).
+37. Link the application target so Objective-C categories in statically linked
+    libraries are loaded when any distribution asks, and report it naming the
+    distributions that asked ([§7.6](#76-objective-c-categories)).
+
+**Recording, disclosure, attribution**
+
+38. Compute the resolution, compare it against the last accepted record, report
+    the delta, require explicit acceptance — including on the first build — and
+    update the record only on acceptance ([§9.1](#91-the-lifecycle)).
+39. Report the distribution, how it entered the closure, and the delta, keeping
+    repository contributions, artifact-sourced material, unmet against
+    conditional requirements, and **staged against remaining** distinct, for one
+    platform's build ([§9.2](#92-the-report)).
+40. Record a SHA-256 per input file, keyed by normalized relative path
+    ([§9.3](#93-hashed-inputs)).
+41. Record and report every permission, feature and component declared by
+    resolved Android artifacts' own manifests, attributed to the artifact;
+    override a resolved artifact's `required="true"` feature unless the
+    application declares it; and report a resolved artifact's exported
+    components with contribution-level prominence
+    ([§9.4](#94-what-resolved-artifacts-bring-with-them)).
+42. Never write an application-supplied credential or secret into the record, a
+    report, or a diagnostic ([§9.5](#95-secrets-are-never-recorded)).
+43. Make every row of [§9.6](#96-what-a-record-must-contain) recoverable from
+    the record, including every value and action with its state.
+44. Detect packaging collisions between the resolved artifacts of different
+    distributions, resolve only packaging metadata on its own authority, fail on
+    any other colliding file the application has not chosen between, and record
+    every collision against the distributions responsible
+    ([§9.7](#97-packaging-collisions)).
+
+**The bootstrap**
+
+45. Make the Android activity its bootstrap generates an
+    `androidx.activity.ComponentActivity` or a subclass
+    ([§2.4](#24-obligations-on-the-consumers-bootstrap)).
+46. Provide a documented means for application code to observe a URL callback
+    delivered to the bootstrap's `application(_:open:options:)`, rather than
+    consuming it ([§2.4](#24-obligations-on-the-consumers-bootstrap)).
+
+### 8.4 Advisory obligations
+
+These carry stable identifiers of their own, referenced as 8.S1 and so on, so a
+conformance claim can name the ones it meets. They are reported, never blocking.
+
+A conforming consumer **SHOULD**:
+
+| | Obligation | |
+| --- | --- | --- |
+| **S1** | Warn about a top-level *table* it does not recognize at all | [§4.4](#44-unknown-declarations-fail-closed) |
+| **S2** | Say which values of a closed vocabulary it implements, so a producer can tell an unsupported declaration from a misspelled one | [§4.4](#44-unknown-declarations-fail-closed) |
+| **S3** | Report the contract it implements where a person can see it | [§4.3](#43-contract-version) |
+| **S4** | Scaffold declared placeholders into the application's own configuration | [§2.3](#23-what-the-consumer-generates) |
+| **S5** | Warn on a single-label owned namespace | [§6.1](#61-ownership) |
+| **S6** | Verify that a `from_dependency` component class exists in the resolved artifact | [§6.6](#66-manifest-components) |
+| **S7** | Carry a permission's `reason` into the record and report | [§6.5](#65-permissions-and-features) |
+| **S8** | Make an active permission suppression visible in standing diagnostics | [§6.5](#65-permissions-and-features) |
+| **S9** | Surface contributed repositories in standing diagnostics | [§6.4](#64-maven-repositories) |
+| **S10** | Attribute a duplicate-symbol error to the distribution whose declared prefix matches | [§7.1](#71-symbol-prefixes) |
+| **S11** | Warn when a remote binary target carries no checksum | [§7.2](#72-swift-packages) |
+| **S12** | Report the fully merged Android manifest's delta, beyond the per-artifact declarations requirement 41 requires | [§9.4](#94-what-resolved-artifacts-bring-with-them) |
+| **S13** | Report consumer ProGuard rules embedded in a resolved `.aar` | [§9.4](#94-what-resolved-artifacts-bring-with-them) |
+
+> **Note:** A consumer that stops at per-artifact declarations rather than
+> implementing S12 **MUST** say so in its own documentation
+> ([§9.4](#94-what-resolved-artifacts-bring-with-them)). An advisory obligation
+> quietly skipped is how a conformance claim overstates itself.
 
 ## 9. Recording and review
 
