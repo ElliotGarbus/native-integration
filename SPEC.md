@@ -1444,8 +1444,20 @@ from_dependency = "com.vendor:sdk"
 > ahead of any application code. Registering one is therefore the startup
 > execution seam [§11](#11-out-of-scope) defers, reached through a manifest
 > attribute rather than through a hook — which is how Sentry initializes today.
-> Admitting it here would grant that capability without deciding to. A producer
-> that needs a provider declares an action ([§5.3](#53-actions)) meanwhile.
+> Admitting it here would grant that capability without deciding to, and the
+> costs are asymmetric: excluding it costs each integrating application one
+> manual step, once, while including it grants an unconditional execution seam
+> to every transitive dependency. A producer that needs a provider declares an
+> action ([§5.3](#53-actions)) meanwhile, with the manifest entry in
+> `instructions`.
+>
+> **What would reopen it:** a producer that needs early initialization, whose
+> vendor provides no declarative loader of its own, and for which publishing a
+> Maven artifact is not reasonable. One such case justifies the narrow form —
+> registration into AndroidX App Startup's shared `InitializationProvider`,
+> where ordering and laziness are the platform's problem rather than this
+> document's. Two justify reopening the general question, and it belongs to the
+> lifecycle decision in [§11](#11-out-of-scope) rather than to this table.
 
 **Provenance.** A component's class comes from one of two places, and the entry
 states which:
@@ -2732,8 +2744,10 @@ asked to report a sentence.
 Anticipated minor-revision work, deliberately excluded from version 1: further
 intent-filter forms beyond `view_links`; conditional contributions (a `when` key
 with a **closed vocabulary** of conditions such as ABI or simulator/device — not
-an expression language); further Gradle configurations; and further
-namespace-scoped shrinker rule forms.
+an expression language); further Gradle configurations; further
+namespace-scoped shrinker rule forms; and `<meta-data>` on a component, which
+the narrow form of provider registration would need
+([§6.6](#66-manifest-components)).
 
 **Version 1 has no way to say "either A or B".** Where a vendor offers two paths
 to the same outcome — a configuration file *or* an initialization class — the
@@ -2853,6 +2867,13 @@ never a source snippet, which would breach [§2.1](#21-design-principles). The
 singleton slots such a design needs — `<application android:name>`, the
 generated entry point — are the consumer's, and a producer **MUST NOT** be able
 to claim one meanwhile.
+
+On Android specifically, the shape that decision would most likely take is
+provider registration — [§6.6](#66-manifest-components) records why `provider`
+is absent from the component vocabulary, and the trigger that would bring it
+back. It is deferred with this question rather than separately from it, because
+a producer that can register a provider can already run code first, whatever
+the rest of the design says.
 
 > **Note:** Unlike the other deferrals here, this one already has a form. *Call
 > `pyfoo.init()` early in your application* is an action
