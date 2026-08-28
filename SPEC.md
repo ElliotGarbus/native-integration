@@ -1546,6 +1546,17 @@ with the same action/data pattern a hand-written `<queries>` entry would use.
 
 Material the consumer stages into the generated Xcode project.
 
+| § | Key | Contributes | How conflicts resolve |
+| --- | --- | --- | --- |
+| [7.1](#71-symbol-prefixes) | `ios.swift_symbol_prefixes` | A declared prefix for contributed Swift type names | N/A — a diagnostic aid, not an enforced claim |
+| [7.2](#72-swift-packages) | `ios.contributes.swift_packages` | A SwiftPM package dependency | Locked to the resolved graph; a branch or path dependency **fails** |
+| [7.3](#73-source) | `ios.contributes.src` | Raw Swift source, compiled into the application target | N/A — no ownership or collision check |
+| [7.3](#73-source) | `ios.contributes.accessed_api_types` | A required-reason API disclosure for contributed source | Union; `reasons` de-duplicated per `type` |
+| [7.4](#74-infoplist) | `ios.contributes.info_plist.values` | A scalar `Info.plist` key | Equal values coalesce, differing values **fail**, the application's own value always wins |
+| [7.4](#74-infoplist) | `ios.contributes.info_plist.append`, `.skadnetwork_identifiers` | An array-valued `Info.plist` key, or an `SKAdNetworkItems` entry | Union |
+| [7.5](#75-python-modules) | `ios.contributes.python_modules` | A Python-extension-module registration (name and init symbol) | Two producers naming the same `name` **fail** |
+| [7.6](#76-objective-c-categories) | `ios.contributes.objc_categories` | A request to load Objective-C categories from static libraries | Union; one producer asking is enough |
+
 ### 7.1 Symbol prefixes
 
 Contributed Swift compiles straight into the application's single target. iOS
