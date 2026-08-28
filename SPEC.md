@@ -183,7 +183,7 @@ configuration, so that what remains is visible where the author already works:
 
 ```toml
 # Added by examplebuild. Required by pysentry.
-[tool.examplebuild.native.pysentry.android.values]
+[tool.examplebuild.native.pysentry.android.application_values]
 sentry_dsn = "<TODO: your Sentry DSN, from Settings → Projects → Client Keys>"
 ```
 
@@ -478,7 +478,7 @@ when the consumer implements both.
 > until an older consumer meets it — at which point the diagnostic blames the
 > consumer's age rather than the producer's declaration.
 
-The declaration reference in Appendix D is the registry that makes the
+The declaration reference in [Appendix B](#appendix-b-declaration-reference) is the registry that makes the
 under-declaration rule checkable. Every key it lists is contract 1.0 unless it
 carries a *Since* note, and a minor revision that adds a key **MUST** record the
 minor there. Without one normative source for *which revision introduced this
@@ -1404,7 +1404,7 @@ placeholder = "<TODO: your registered redirect scheme>"
 [tool.examplebuild.android.exported_components]
 "org.example.mypkg.RedirectActivity" = true
 
-[tool.examplebuild.native.some-oauth-sdk.android.values]
+[tool.examplebuild.native.some-oauth-sdk.android.application_values]
 oauth_redirect_scheme = "myapp-oauth"
 ```
 
@@ -2773,3 +2773,335 @@ use the feature, and nothing is silent for applications that do.
 > stating an unconditional requirement. It converts a build failure that names
 > the problem into a line in a report, and the application discovers the
 > requirement at runtime instead.
+
+
+---
+
+## Appendix A: a complete sidecar
+
+**Non-normative.** Nothing here is special. This is an ordinary `native.toml`
+for a wrapper around a hypothetical cross-platform analytics SDK — the shape an
+application author would otherwise transcribe out of a README.
+
+Read it as the three categories of [§2.1](#21-design-principles). It **owns** a
+Java namespace. It **requires** two floors, a value only the application has,
+and — on iOS, and only if a feature is used — an outcome the application must
+achieve. Everything else it **contributes**.
+
+```toml
+# examplytics/_native/native.toml
+contract = "1"
+platforms = ["android", "ios"]
+
+# ---------------------------------------------------------------- Android ---
+
+# Reserves this Java namespace; no other distribution may write into it.
+[android.owns]
+java_namespaces = ["org.example.analytics"]
+
+# SDK floors the application must build against.
+[android.requires]
+min_sdk = 24
+compile_sdk = 35
+
+# The application supplies this; the consumer writes it to the manifest key the
+# SDK reads at startup, before any Python runs.
+[[android.requires.application_value]]
+id = "analytics_key"
+kind = "manifest_meta_data"
+key = "com.example.analytics.API_KEY"
+reason = "Your project key, from the vendor console under Settings → Client Keys"
+placeholder = "<TODO: your Examplytics project key>"
+
+# Java sources the consumer compiles into the application.
+[android.contributes.src]
+java = ["java"]
+
+# The SDK itself, pulled in via Gradle.
+[[android.contributes.gradle_dependencies]]
+coordinate = "com.example.analytics:android-sdk:4.2.0"
+
+# Needed to deliver events over the network.
+[[android.contributes.permissions]]
+name = "android.permission.INTERNET"
+reason = "Event delivery"
+
+# A service the SDK dispatches delivery events to.
+[[android.contributes.components]]
+kind = "service"
+name = "org.example.analytics.DeliveryService"
+
+  [[android.contributes.components.intent_filters]]
+  action = "com.example.analytics.DELIVER"
+
+# Keeps the SDK's classes through shrinking and obfuscation.
+[android.contributes.r8]
+keep_classes = ["org.example.analytics.**"]
+
+# -------------------------------------------------------------------- iOS ---
+
+# SDK floor the application must build against.
+[ios.requires]
+deployment_target = "15.0"
+
+# A purpose string only the application can write, and only if attribution is
+# enabled. The consumer scaffolds the placeholder and blocks until it is gone.
+[[ios.requires.application_value]]
+id = "tracking_purpose"
+kind = "usage_description"
+key = "NSUserTrackingUsageDescription"
+conditional = true
+reason = """\
+Required only if you enable attribution. The sentence is yours to write: it is \
+shown to the user and read by App Store review."""
+placeholder = "<TODO: why this app asks to track, in one sentence>"
+
+# An outcome the consumer cannot produce: the capability must be on the App ID
+# and in the provisioning profile before anything can be signed.
+[[ios.requires.application_action]]
+id = "attribution_capability"
+conditional = true
+summary = "Enable the App Attribution capability on your App ID"
+reason = """\
+Required only if you enable attribution. Without it the archive fails at \
+codesign, with a message that names the entitlement and not this package."""
+acceptance = [
+  "The App Attribution capability is enabled on the App ID",
+  "The provisioning profile used for release builds carries it",
+]
+
+# The SDK itself, pulled in via Swift Package Manager.
+[[ios.contributes.swift_packages]]
+name = "ExampleAnalytics"
+url = "https://github.com/example/analytics-swift"
+requirement = { from = "4.2.0" }
+products = ["ExampleAnalytics"]
+
+# Lets the SDK detect a companion app. Grants the application nothing.
+[ios.contributes.info_plist.append]
+LSApplicationQueriesSchemes = ["exampleanalytics"]
+```
+
+## Appendix B: declaration reference
+
+Every key a sidecar may contain, with the section that defines it. Descriptions
+are summaries; **where this table and the body differ, the body governs.**
+
+**This table is also the contract-minor registry** ([§4.3](#43-contract-version)).
+Every entry below is contract **1.0**; a key added by a later minor **MUST** be
+marked *Since 1.n* here, and a consumer checks under-declaration against these
+marks. An unmarked key is 1.0, which is why nothing below carries a mark yet.
+
+| Entry | Description |
+| --- | --- |
+| **Top level** | |
+| `contract` | **Required.** Major of this document, optionally with a minor — `"1"` or `"1.1"`. [§4.3](#43-contract-version) |
+| `platforms` | Optional. Where the distribution *functions*, not merely where it contributes; a build for an omitted platform fails. [§4.5](#45-platform-support) |
+| **`[<platform>.requires]` — floors** [§5.1](#51-build-floors) | |
+| `min_sdk`, `compile_sdk`, `target_sdk` | Android floors. The build fails when the application is lower; the consumer never raises it. `target_sdk` changes behavior app-wide, so declare it only when a behavior depends on it |
+| `core_library_desugaring` | Optional boolean. A floor on a boolean axis: the build fails when the application has not enabled desugaring |
+| `deployment_target` | iOS floor, on the same terms |
+| **`[[<platform>.requires.application_value]]`** [§5.2](#52-values) | A string the application supplies and the consumer places |
+| `id` | **Required.** A logical name, unique within the sidecar; identity is (distribution, `id`), scoped by platform |
+| `kind` | **Required.** Where the consumer writes it. A **closed** set — [§5.5](#55-value-kinds) |
+| `key` | The platform key the value is written to. Required except where `kind` is `inline` |
+| `reason` | **Required.** What the value is and where to obtain it |
+| `placeholder` | **Recommended.** Text the consumer scaffolds; the build does not proceed while it stands |
+| `conditional` | Optional, default `false`. Unsatisfied and conditional is recorded, not failed |
+| **`[[<platform>.requires.application_action]]`** [§5.3](#53-actions) | An outcome the application must achieve |
+| `id` | **Required.** The join key; the application acknowledges by (distribution, `id`) |
+| `summary` | **Required.** One line, imperative. What a report shows |
+| `reason` | **Required.** Why it is needed, and what breaks without it |
+| `instructions` | Optional prose telling a reader how to do it. Never acted on by a consumer ([§5.6](#56-instructions-and-acceptance-criteria)) |
+| `acceptance` | **Recommended.** Statements of the **end state**, never of an operation |
+| `uses` | Optional. Value `id`s in the same sidecar that this action consumes |
+| `slot` | Optional. An opaque key naming a contended application-owned surface ([§5.7](#57-slots)) |
+| `conditional` | Optional, default `false` |
+| **`[android.owns]`** [§6.1](#61-ownership) | |
+| `java_namespaces` | Java namespaces this distribution claims exclusively; overlapping claims fail the build. Required when contributing Java/Kotlin, producer-sourced components, or keep patterns |
+| **`[android.contributes.src]`** [§6.2](#62-source) | |
+| `java`, `kotlin` | Directories whose `.java` / `.kt` files the application's own toolchain compiles |
+| **`[[android.contributes.gradle_dependencies]]`** [§6.3](#63-gradle-dependencies) | |
+| `coordinate` | `group:artifact:version`, exactly versioned. **Recommended**, because the version is visible in the sidecar |
+| `module` + `version` | `group:artifact` with a bounded `{ at_least, below }` range. Open-ended and changing versions are invalid |
+| `configuration` | Optional; `implementation` (default), `api`, `compileOnly`, `runtimeOnly`. A **closed** set: processor configurations execute code at build time |
+| **`[[android.contributes.gradle_repositories]]`** [§6.4](#64-maven-repositories) | |
+| `url` | A Maven repository to add to resolution. The most powerful thing a sidecar can contribute |
+| `reason` | **Required.** Why the artifacts are not on Maven Central, and — when authenticated — which credential is needed and where to get it |
+| `groups`, `modules` | **At least one required.** Bounds what the repository may serve |
+| `credentials_required` | Optional. Declares the repository authenticated. A sidecar **MUST NOT** contain the credential itself |
+| **`[[android.contributes.permissions]]`** [§6.5](#65-permissions-and-features) | |
+| `name` | The canonical manifest string — `android.permission.INTERNET`, never a shorthand |
+| `reason` | Recommended; carried into the record and report |
+| `max_sdk_version`, `never_for_location` | Optional. `android:maxSdkVersion` and `android:usesPermissionFlags="neverForLocation"`. Both are minimization; where two distributions differ, the **widest** need wins and the merge is reported |
+| **`[[android.contributes.features]]`** [§6.5](#65-permissions-and-features) | |
+| `name` | Always registered `required="false"`; only the application may promote a feature |
+| **`[[android.contributes.components]]`** [§6.6](#66-manifest-components) | |
+| `kind` | `service`, `activity` or `receiver`. `provider` is deliberately absent: an authority must be unique device-wide, so only the application ID can supply it |
+| `name` | The class. Under an owned namespace unless `from_dependency` says otherwise |
+| `from_dependency` | `group:artifact` of a dependency the same sidecar declares, which owns the class |
+| `foreground_service_type` | Android's own value, on a `service` only. Mandatory on Android 14+ for a foreground service |
+| `exported_required` + `reason` | Requests export. The build fails without explicit application approval — it never falls back to unexported |
+| `[[…view_links]]` — `scheme`, `host`, `path_prefix`, and Android's other `<data>` attributes | Generates the browser-return filter. Valid only on an exported activity; `scheme` is required; the attribute set is **open**; each may take a literal or an inline value |
+| `[[…intent_filters]]` — `action` | One vendor-defined action, on a component that is neither exported nor carrying `view_links` |
+| **`[android.contributes.r8]`** [§6.7](#67-shrinker-keep-patterns) | |
+| `keep_classes` | Class patterns the shrinker must keep; the consumer generates the `-keep` rules. Each must fall within an owned namespace |
+| `[[…r8.keep]]` — `pattern`, `from_dependency` | Keeps a *dependency's* classes instead, checked against what the resolved artifact actually contains |
+| **`[[android.contributes.meta_data]]`** [§6.8](#68-manifest-meta-data) | |
+| `key`, `value`, `reason` | A `<meta-data>` entry the producer knows the value of. `reason` **required**; `value` is a string, integer or boolean; the application's own entry wins |
+| **`[[android.contributes.queries]]`** [§6.9](#69-package-visibility) | |
+| `package`, `provider_authority`, `reason` | Package visibility for the producer's own code. Exactly one of the first two; `reason` **required**. No veto, because removing one breaks the producer silently |
+| **`[ios]`** [§7.1](#71-symbol-prefixes) | |
+| `swift_symbol_prefixes` | Prefixes the producer puts on its Swift type names. Guidance only; it does not cover file-scope functions or extension members |
+| **`[[ios.contributes.swift_packages]]`** [§7.2](#72-swift-packages) | |
+| `name` | Local handle, unique within the sidecar; [§7.5](#75-python-modules) refers to packages by it |
+| `url`, `products` | The repository, and which of its products to link |
+| `requirement` | Exactly one of `{ exact }`, `{ from }`, `{ revision }`. `branch` is invalid |
+| **`[ios.contributes.src]`** [§7.3](#73-source) | |
+| `swift` | Directories of `.swift` staged into the application target. For small shims only |
+| `[[…accessed_api_types]]` — `type`, `reasons`, `reason` | Required-reason APIs the contributed Swift touches, merged into the application's `PrivacyInfo.xcprivacy`. Valid only alongside contributed Swift. Declared as `[[ios.contributes.accessed_api_types]]` |
+| **`[ios.contributes.info_plist]`** [§7.4](#74-infoplist) | |
+| `values` | Scalar keys set verbatim. Collisions fail; `*UsageDescription` and capability keys are rejected |
+| `append` | Array keys merged with the application's and other producers', de-duplicated |
+| `skadnetwork_identifiers` | Ad network identifiers, lowercase and ending `.skadnetwork`. The consumer renders `SKAdNetworkItems` from them |
+| **`[[ios.contributes.python_modules]]`** [§7.5](#75-python-modules) | |
+| `name` | The name Python imports. A single ASCII identifier, no dots |
+| `swift_package` | A package the same sidecar declares, which implements the module |
+| `init` | Optional initialization symbol; defaults to `PyInit_<name>` |
+| **`[ios.contributes]`** [§7.6](#76-objective-c-categories) | |
+| `objc_categories` | Optional boolean. The consumer links the application target so Objective-C categories in static libraries are loaded. Names the behavior, not the flag; no veto |
+
+## Appendix C: a record that satisfies §9
+
+**Non-normative.** [§9](#9-recording-and-review) mandates the content of an
+integration record and deliberately not its format. This is one shape that
+satisfies it, included so that a second implementation has a worked example to
+disagree with rather than a blank page.
+
+```json
+{
+  "contract": "1",
+  "distributions": [
+    {
+      "artifacts": { "com.example.maps:android:4.1.0": "sha256:0d3e…" },
+      "contract": "1",
+      "entries": [
+        "source java/com/example/maps/MapBridge.java",
+        "dependency com.example.maps:android:4.1.0",
+        "REPOSITORY https://maven.example.com/releases → com.example.maps  authenticated — credentials configured",
+        "from com.example.maps:android:4.1.0 (resolved artifact manifest): permission com.example.permission.MAPS_ID"
+      ],
+      "inputs": {
+        "java/com/example/maps/MapBridge.java": "sha256:9f2c…",
+        "native.toml": "sha256:71ff…"
+      },
+      "name": "map-sdk",
+      "origin": "direct dependency",
+      "requirements": [
+        "value  maps_api_key → meta-data com.example.maps.API_KEY   supplied",
+        "action map_deep_links   acknowledged 2026-08-24, map-sdk 4.1.0",
+        "action map_offline_cache   conditional, unresolved"
+      ],
+      "swift": {},
+      "swift_binaries": {},
+      "version": "4.1.0"
+    }
+  ],
+  "platform": "android",
+  "record": 1
+}
+```
+
+Four properties are worth naming, because they are what make the file useful
+rather than merely present:
+
+- **One line per contributed thing.** A set difference over `entries` *is* the
+  delta a reviewer reads, so the report needs no separate computation and a
+  `git diff` is already legible.
+- **Every requirement, with its state.** An action is satisfied by the
+  application's claim that it was done ([§5.4](#54-how-a-requirement-is-satisfied)),
+  so recording the claim — with the version and the date it was made — is what
+  makes it attributable afterwards.
+- **Sorted keys, distributions in normalized-name order, UTF-8, one entry per
+  line.** The record is normally committed; anything that reorders between runs
+  turns review into noise.
+- **No credential, ever.** An authenticated repository appears as
+  `REPOSITORY … authenticated — credentials configured`. That the repository
+  needs a credential is a fact about the integration; the credential is not
+  ([§6.4](#64-maven-repositories), [§9.5](#95-secrets-are-never-recorded)).
+
+## Appendix D: why contributions stay per-distribution
+
+The tempting implementation is to let every distribution write its material into
+one shared location under `site-packages` and let the installer merge them. It
+is less code, and it forecloses most of this document.
+
+A merged tree **destroys provenance at install time**. Once files are overlaid,
+nothing can determine which distribution contributed which file — so collision
+detection, per-distribution attribution, the review record of
+[§9](#9-recording-and-review), and every diagnostic required by requirement 18
+all become impossible.
+
+It also makes a shared source tree last-writer-wins by construction, which is
+the substitution path [§6.1](#61-ownership) exists to close.
+
+Keeping contributions inside each distribution costs an explicit merge step in
+the consumer. That step is where validation, attribution, and collision
+detection live.
+
+## Appendix E: why not a build backend
+
+An alternative is a PEP 517 backend that transforms configuration in the
+producer's `pyproject.toml` into wheel payload. It reads well, and it has been
+built.
+
+It requires one backend wrapper per existing backend, forever, and excludes
+every backend nobody wrote one for. The entry-point metadata and package data
+this convention relies on are standard wheel features every major backend can
+produce — though the *file-inclusion configuration* is backend-specific
+(setuptools `package-data`, with Hatchling, Flit, pdm, and maturin each having
+their own) — and none of them need to know this document exists.
+
+The declaration cannot live in `pyproject.toml` directly: arbitrary `[tool.*]`
+tables do not survive into the wheel or into `site-packages`, so a consumer
+reading installed distributions never sees them. That constraint is what forces
+either a custom backend or static package data, and this convention chooses the
+latter.
+
+## Appendix F: prior art
+
+- **Cargo** — the `links` key gives a crate an exclusive claim on a native
+  library, enforced across the graph; [§6.1](#61-ownership)'s ownership model is
+  the same idea. Cargo's build scripts, by contrast, are exactly the capability
+  [§2.1](#21-design-principles) excludes: powerful, and executable.
+- **pkg-config and SwiftPM system libraries** — the abstraction this convention
+  borrows: a dependency describes what consuming it requires, and the consumer's
+  build system decides how to satisfy it. Declarative data, no executable hooks.
+- **Gradle dependency locking and SwiftPM `Package.resolved`** — the
+  locked-graph semantics [§6.3](#63-gradle-dependencies) and
+  [§7.2](#72-swift-packages) require: exact coordinates are not
+  reproducibility; recorded resolutions are.
+- **AGP manifest placeholders**, as AppAuth uses them — the established
+  mechanism behind [§5.2](#52-values)'s inline values and
+  `manifest_placeholder` kind: the library declares the filter's shape, the
+  application supplies the value.
+- **PEP 561** — the standardization shape: a marker shipped as package data, a
+  consumer that is not an installer, and normative obligations on that consumer,
+  written down after the practice existed.
+- **Expo config plugins** — the executable form of this problem: JavaScript
+  functions a package ships to mutate the generated native project. Widely used,
+  and precisely the capability [§2.1](#21-design-principles) excludes.
+- **Cordova and Capacitor `plugin.xml`** — the *declarative* form, and the more
+  instructive comparison, because it concedes the principle and keeps the
+  capability anyway: `<config-file target="AndroidManifest.xml" parent="/manifest">`
+  admits arbitrary XML at a chosen location. Fifteen years of practice, with the
+  failure [Appendix D](#appendix-d-why-contributions-stay-per-distribution)
+  predicts for merged material — plugin-contributed manifest entries no tool can
+  attribute, refuse, or arbitrate between plugins.
+
+  It is also the contrast for [§5.6](#56-instructions-and-acceptance-criteria).
+  `plugin.xml` and an `instructions` block both let a producer describe work on
+  the application's project, and the difference is who acts: a `<config-file>`
+  is applied by the tool, so its content is build authority, while instructions
+  are read by a person or an agent working with that person's authority. That
+  is why instructions may be free prose and a fragment may not.
