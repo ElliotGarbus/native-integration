@@ -130,6 +130,23 @@ for label, text in (*DOCS, ("README.md", README)):
             problems.append(f"{label}:{line} is not valid JSON: {exc}")
 check("TOML and JSON blocks parse", problems)
 
+# --- 3b. §9.3's digest form, in the record SPEC.md offers as a worked example -
+# The canonical form is 64 lowercase hex characters, unprefixed. An appendix
+# that abbreviates them teaches the one thing a record cannot afford: two
+# consumers eliding to different lengths produce records that never compare.
+problems = []
+DIGEST_KEYS = ("artifacts", "inputs", "swift_binaries")
+for line, body in fenced(NEW, "json"):
+    record = json.loads(body)
+    for dist in record.get("distributions", []):
+        for key in DIGEST_KEYS:
+            for name, digest in (dist.get(key) or {}).items():
+                if not re.fullmatch(r"[0-9a-f]{64}", str(digest)):
+                    problems.append(
+                        f"SPEC.md:{line} {key}[{name}] is {digest!r}, not 64 lowercase hex"
+                    )
+check("record digests are written in §9.3's canonical form", problems)
+
 # --- 4. documented keys exist in the spec -----------------------------------
 # Catches an example or a README block drifting after a schema change.
 problems = []

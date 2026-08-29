@@ -285,6 +285,25 @@ The consumer chooses the path; the producer fixes the leaf. If a producer
 declares `id = "sentry_dsn"`, the application answers under that exact string,
 wherever the consumer nests it.
 
+**Four of those answers are deliberately not scoped to a distribution, and
+apply to every contributor of the thing they name.** A permission suppression,
+an export approval, a required-feature decision and a colliding-path choice all
+address the **merged result** — one manifest entry, one registered component,
+one installed file — which is a thing the application gets once no matter how
+many distributions asked for it. So a suppression of
+`android.permission.INTERNET` withdraws it on behalf of every distribution that
+contributed it, and a consumer **MUST NOT** treat such an answer as applying to
+only one of them. The record is where the breadth becomes visible: it **MUST**
+show which contributions each answer affected, naming every distribution
+involved.
+
+> **Note:** The alternative — joining a suppression by `(distribution, name)` —
+> would let an application withdraw a permission from one producer while a
+> second producer's identical declaration silently put it back, which is a
+> refusal that does not refuse. Values and actions are scoped by distribution
+> for the opposite reason: two producers asking for a client ID are asking for
+> two different strings, and answering one says nothing about the other.
+
 **Identity is scoped by distribution and platform.** Two distributions may each
 declare `id = "client_id"` without collision. One distribution may use the same
 `id` on Android and iOS and mean two different values — which is common, because
@@ -308,9 +327,11 @@ into a file the consumer tells the application to commit.
 A consumer **MUST** report every unmet requirement, naming the distribution
 that declared it, the `reason` — or, for a floor, the declared and configured
 values, since a floor carries no `reason` ([§5.1](#51-build-floors)) — and, for
-an action, the `summary`, `instructions`, and `acceptance`. Omitting the latter
-two would report that something is owed without carrying what a person or agent
-needs to do the work and confirm it.
+an action, the `summary` together with `instructions` and `acceptance`
+**wherever the sidecar declares them**. Both are optional fields
+([§5.3](#53-actions)) and a consumer reports what is there; what it **MUST NOT**
+do is drop them when they exist, which would report that something is owed
+without carrying what a person or agent needs to do the work and confirm it.
 
 A consumer **SHOULD** scaffold declared placeholders into the application's own
 configuration, so that what remains is visible where the author already works:
@@ -1050,6 +1071,9 @@ satisfying the requirement — see [§5.4](#54-how-a-requirement-is-satisfied).
 > [[ios.requires.application_action]]
 > id = "app_group_entitlement"
 > summary = "Enable App Groups and add the identifier above to the entitlement"
+> reason = """\
+> The container is shared through the entitlement, which has to be on the App \
+> ID and in the provisioning profile before anything can be signed."""
 > uses = ["app_group_id"]
 > ```
 >
@@ -1462,6 +1486,34 @@ Rule 3's operand is a *pattern* rather than a name, so it needs one more step
 before this rule applies: [§6.7](#67-shrinker-keep-patterns) defines what part
 of a keep pattern is compared.
 
+Rule 1's operands need one too, since a path is not a namespace. Each directory
+listed in [§6.2](#62-source)'s `java` or `kotlin` is a **source root**, and for
+every file staged from it:
+
+| Operand | How it is derived |
+| --- | --- |
+| the **path** namespace | the file's directory, relative to its source root, with `/` replaced by `.` — `java/org/example/mypkg/Bridge.java` under root `java` yields `org.example.mypkg` |
+| the **declared** namespace | the `package` the file itself declares |
+
+A consumer **MUST** check both against the owned namespaces, and **MUST**
+reject, naming the distribution and the file:
+
+- a file directly in a source root, whose path namespace is empty, or one
+  declaring no `package` — the default package is contained by nothing;
+- a path segment that is not a valid Java identifier
+  (`[A-Za-z_$][A-Za-z0-9_$]*`), since it cannot name a package;
+- a file whose two namespaces are not equal, on either language.
+
+Comparison is **case-sensitive** throughout, as the platform's own is.
+
+> **Note:** `javac` enforces the path-to-package correspondence itself and
+> `kotlinc` does not, which is exactly why the equality check is stated here
+> rather than left to the toolchain: a Kotlin file at
+> `kotlin/org/example/mypkg/Bridge.kt` declaring `package org.other` compiles
+> cleanly and lands a class outside the namespace its distribution claimed.
+> Checking the path alone would miss it, and checking the declaration alone
+> would let a file sit anywhere in the tree.
+
 An owned namespace **SHOULD** be reverse-DNS. A consumer **SHOULD** warn on a
 single-label one: it is ownable and collision-checked like any other, but it
 claims a top-level name for one distribution, which makes accidental overlap
@@ -1574,6 +1626,25 @@ distributions declare the same `group:artifact` with different `configuration`
 values, a consumer **MUST** fail, naming both distributions and the module.
 Equal values coalesce.
 
+**Within one sidecar, a module is declared once.** Two entries naming the same
+`group:artifact` — in either form, or one of each — **MUST** be rejected,
+naming the distribution and the module, unless they are identical in every
+field, in which case the duplicate coalesces. A producer contradicting itself is
+a mistake to report, not a composition to resolve, and it is the one duplicate
+case with a single author who can fix it.
+
+**Across sidecars, every request goes to Gradle as declared.** Two
+distributions may name one module in different forms — an exact `coordinate`
+against a bounded range, or two ranges — and this document defines no second
+resolver: Gradle selects, on the terms
+[§6.3](#63-gradle-dependencies) already fixes, and either finds a version
+satisfying every request or fails. **When it fails, a consumer MUST name every
+distribution whose declaration contributed to the failure**, together with the
+module and each declared form. Gradle's own message names Maven coordinates and
+nothing else; only the consumer knows which Python distributions asked for them,
+and an unattributed conflict is the failure this convention exists to prevent
+a person from having to trace by hand.
+
 > **Note:** The conservative rule, deliberately. `api` and `implementation`
 > differ only in what they expose downstream, so a widest-wins merge would be
 > defensible — but it would silently put a dependency on the application's
@@ -1674,6 +1745,18 @@ coordinates, unless they declare the same `url`, which is not a conflict. Two
 scopes intersect when some coordinate is admitted by both: the same group ID in
 `groups`, the same pair in `modules`, or a `modules` entry whose group another
 repository names in `groups`.
+
+**Two distributions may declare the same repository, and it merges by one
+rule.** Repository identity is the `url`, compared with its scheme
+case-insensitively and the rest byte-for-byte; a consumer **MUST NOT** normalize
+further, since a trailing path segment is a different repository. For entries
+sharing that identity:
+
+| Field | How it merges |
+| --- | --- |
+| `groups`, `modules` | **Union.** Each distribution's bound is added; the result admits what any of them declared, and the overlap rule above does not apply between them |
+| `credentials_required` | **Any `true` wins.** A repository one distribution says is authenticated is authenticated |
+| `reason` | **Every one is kept**, each attributed to the distribution that wrote it, in the record and the report |
 
 A consumer **MUST NOT** substitute Gradle's `exclusiveContent` for content
 filtering.
@@ -2287,6 +2370,10 @@ reason = "Health Connect availability check; the client reports it absent withou
   transitive dependency does so.
 - Entries merge as a **union**. Two distributions naming one package are asking
   for the same visibility.
+- A consumer **MUST** report every contributed entry with its `reason` and its
+  distribution — in the report, not only in the record. Union merging without a
+  veto means the report is the application's only view of what its dependencies
+  ask to see.
 
 The third form, `<intent>`, grants visibility by matching an action and data
 pattern rather than a name. A producer that needs it declares an action
@@ -2436,13 +2523,20 @@ resolved graph containing a path dependency anywhere in it, naming the
 distribution that declared the top-level package and the offending transitive
 package.
 
-A **branch** dependency, by contrast, is close to unreachable in practice:
-SwiftPM itself refuses to resolve a version-pinned package (which is what
-`exact` or `from` produces) against a transitively branch-pinned one, so a
-producer would have to encounter a vendor package that violates SwiftPM's own
-rules to hit this. This document still names it explicitly, both because
-that guarantee is SwiftPM's to keep, not this specification's, and because it
-gives the record and the report the same vocabulary either way.
+A **branch** dependency is rejected on the same terms, and in both places. The
+sidecar grammar excludes it, and a consumer **MUST** additionally reject a
+resolved graph in which any package — the one a sidecar named or a transitive
+one — is pinned to a branch rather than to a version or a revision, naming the
+distribution that declared the top-level package and the offending package.
+
+In practice this is close to unreachable: SwiftPM itself refuses to resolve a
+version-pinned package (which is what `exact` or `from` produces) against a
+transitively branch-pinned one, so a producer would have to encounter a vendor
+package that violates SwiftPM's own rules to hit it. The rule is stated anyway,
+because that guarantee is SwiftPM's to keep rather than this specification's,
+and because a reproducibility claim that rests on another tool's behavior should
+say what happens when the behavior is not there. A branch is a moving pointer;
+the record cannot pin it, which is the whole reason `revision` exists.
 
 **Two distributions may declare the same package.** Their entries are combined
 into one SwiftPM graph and **SwiftPM resolves the constraints**; this document
@@ -2500,6 +2594,12 @@ indirection ([§2.2](#22-how-the-application-answers)), joined by the package
 fail when none is configured, naming the distribution, rather than surfacing
 SwiftPM's own authentication error; and it **MUST NOT** write the credential
 into the generated project, the record, or any diagnostic.
+
+Where two distributions declare the same package `url`,
+[§6.4](#64-maven-repositories)'s merge rule applies unchanged: any `true` makes
+the package authenticated, and every `reason` is kept and attributed. The
+`products` union of [§7.2](#72-swift-packages) is that rule's counterpart for
+what gets linked.
 
 > **Note:** An `ssh` or `scp`-style git URL is refused rather than treated as
 > the authenticated form, even though SwiftPM accepts one. The credential then
@@ -2784,6 +2884,14 @@ build time.
 
 - `swift_package` **MUST** name a package the same sidecar declares. A module
   cannot be registered without the code that implements it.
+- **The implementing product must be one the sidecar links.** A producer
+  **MUST** list, in that package's `products`, the product whose object code
+  exports the module's `init` symbol; and a consumer **MUST** link every
+  product the declaring sidecar named for that package into the application
+  target, rather than only those some other sidecar also asked for. A consumer
+  **SHOULD** verify the symbol is present in the linked binary where its
+  toolchain can, and report its absence against the declaring distribution
+  (8.S15).
 - `name` is the name Python imports, and **MUST** be a single ASCII Python
   identifier: `[A-Za-z_][A-Za-z0-9_]*`. **Dotted names are not permitted.** A
   dotted name would require a parent package object with its own `__path__`
@@ -2802,6 +2910,18 @@ build time.
 A consumer **MUST** exclude both `<name>.py` and `<name>.pyi` from the Python
 payload it assembles for the device, for every module this table registers.
 
+> **Note:** `products` is the only binding between a registration and the code
+> behind it, which is why the obligation is stated in both directions. A package
+> may vend several products, and `swift_package` names the package rather than
+> the product: without the producer's half, a sidecar can register `web_views`
+> against a package whose linked products contain no `PyInit_WebViews` at all,
+> and without the consumer's, a product the producer did list could go unlinked
+> because no other distribution asked for it. Either way the build succeeds and
+> the failure is an `ImportError` on device, which is the outcome this table
+> exists to prevent. A `product` field on this table is the shape to reach for
+> if a real package makes the package-level binding ambiguous in practice;
+> nothing in the cases examined does.
+>
 > **Note:** Producers ship stubs of the same name for type checking off device.
 > A `.py` stub would otherwise sit on `sys.path` as a silent fallback: a
 > registration that failed or was skipped would surface not as `ImportError` but
@@ -2986,14 +3106,18 @@ A conforming consumer **MUST**:
     contributed permission, approve an exported component, supply credentials
     for an authenticated repository or Swift package, **decide a resolved
     artifact's required feature**, and **choose which artifact supplies a
-    colliding path** — each joined by the key that table names, and accept a
+    colliding path** — each joined by the key that table names; apply the four
+    answers joined by something other than `(distribution, id)` to **every**
+    contributor of the name or path they address; and accept a
     build-time credential **by indirection** rather than only as a literal in a
     committed file ([§2.2](#22-how-the-application-answers),
     [§5.4](#54-how-a-requirement-is-satisfied)).
 11. Report every unmet requirement, naming the distribution and the `reason` —
     or, for a floor, which carries none, the declared and configured values —
-    and, for an action, the `summary`, `instructions` and `acceptance`
-    ([§2.3](#23-what-the-consumer-generates), [§5.1](#51-build-floors)).
+    and, for an action, the `summary` plus `instructions` and `acceptance`
+    wherever the sidecar declares them, both being optional fields
+    ([§2.3](#23-what-the-consumer-generates), [§5.1](#51-build-floors),
+    [§5.3](#53-actions)).
 
 **Never satisfy a requirement on the producer's authority**
 
@@ -3052,18 +3176,22 @@ A conforming consumer **MUST**:
 **Generated project material**
 
 23. Enforce every ownership rule, computing containment on dot-separated
-    segments, and fail on a collision naming the distributions responsible
-    ([§6.1](#61-ownership)).
+    segments; derive a contributed file's namespace from its path relative to
+    its source root and check it, its declared `package`, and their equality,
+    case-sensitively; and fail on a collision naming the distributions
+    responsible ([§6.1](#61-ownership), [§6.2](#62-source)).
 24. Compile contributed source with the application's own toolchain and exclude
     it from any Python payload, on both platforms; and, where it compiles Java,
     force UTF-8 for `.java` rather than the platform default
     ([§6.2](#62-source), [§7.3](#73-source)).
 25. Reject a Gradle dependency declaring both or neither of `coordinate` and
     `module`, reject a changing or unbounded version, reject a processor
-    configuration, fail when two declarations of one module disagree on
-    `configuration` naming both distributions, never convert a declared version
-    into a `strictly` constraint, and show requested against resolved where they
-    differ ([§6.3](#63-gradle-dependencies)).
+    configuration, reject two entries in one sidecar naming one module unless
+    they are identical, fail when two declarations of one module disagree on
+    `configuration` naming both distributions, name every distribution whose
+    declaration contributed to a resolution failure, never convert a declared
+    version into a `strictly` constraint, and show requested against resolved
+    where they differ ([§6.3](#63-gradle-dependencies)).
 26. Lock **whichever** native graphs it resolves — Gradle, SwiftPM, or both,
     transitives included — resolve from the record thereafter, record a SHA-256
     per Maven artifact and the declared checksum per Swift binary target, verify
@@ -3076,8 +3204,11 @@ A conforming consumer **MUST**:
     reject two whose scopes overlap at different URLs; never substitute an
     exclusivity mechanism for content filtering; report repositories with
     distinct prominence; reject a syntactically identifiable credential; fail
-    when an authenticated repository has no credentials configured; and never
-    persist a supplied credential anywhere ([§6.4](#64-maven-repositories)).
+    when an authenticated repository has no credentials configured; merge two
+    declarations of one `url` by unioning their scopes, taking any
+    `credentials_required = true`, and keeping every `reason` attributed; and
+    never persist a supplied credential anywhere
+    ([§6.4](#64-maven-repositories)).
 28. Merge permission attributes least-restrictively and report the merge;
     reject a producer-declared `required` on a feature and register every
     producer-declared feature `required = false`; and honor a suppression in the
@@ -3103,13 +3234,15 @@ A conforming consumer **MUST**:
     has enabled shrinking ([§6.7](#67-shrinker-keep-patterns)).
 32. Merge contributed `meta_data` with [§5.2](#52-values)'s delivery as one key
     space, keeping and reporting the application's own entry where it sets the
-    key, and reject a `queries` entry declaring both or neither of `package` and
-    `provider_authority` ([§6.8](#68-manifest-meta-data), [§6.9](#69-package-visibility)).
+    key; reject a `queries` entry declaring both or neither of `package` and
+    `provider_authority`; and report every `queries` entry with its `reason` and
+    its distribution ([§6.8](#68-manifest-meta-data), [§6.9](#69-package-visibility)).
 33. Reject two Swift packages sharing a `name`, a missing or empty `products`,
     a non-`https` `url`, a `branch` requirement, and a resolved graph containing
-    a path dependency; apply [§6.4](#64-maven-repositories)'s credential rules
-    to a package declaring `credentials_required`; and make visible in the
-    record that a self-declared package is not pinned by the distribution's own
+    a path **or branch** dependency anywhere in it; apply
+    [§6.4](#64-maven-repositories)'s credential and same-`url` merge rules to a
+    package declaring `credentials_required`; and make visible in the record
+    that a self-declared package is not pinned by the distribution's own
     version ([§7.2](#72-swift-packages)).
 34. Reject `symbol_prefixes` ([§7.1](#71-symbol-prefixes)) and
     `accessed_api_types` ([§7.3](#73-source)) from a sidecar contributing no
@@ -3127,10 +3260,10 @@ A conforming consumer **MUST**:
     `SKAdNetworkItems` only from `skadnetwork_identifiers`; and report
     contributed `LSApplicationQueriesSchemes` entries naming the distribution.
 36. Register declared Python modules against a Swift package the same sidecar
-    declares, reject a dotted or non-identifier `name`, fail on a duplicate
-    module name, make each module importable from first use, and exclude
-    `<name>.py` and `<name>.pyi` from the Python payload
-    ([§7.5](#75-python-modules)).
+    declares, link every product that sidecar named for the package, reject a
+    dotted or non-identifier `name`, fail on a duplicate module name, make each
+    module importable from first use, and exclude `<name>.py` and `<name>.pyi`
+    from the Python payload ([§7.5](#75-python-modules)).
 37. Link the application target so Objective-C categories in statically linked
     libraries are loaded when any distribution asks, reject
     `objc_categories = false`, and report it naming the distributions that asked
@@ -3140,23 +3273,30 @@ A conforming consumer **MUST**:
 
 38. Compute the resolution, compare it against the last accepted record, report
     the delta, require explicit acceptance — including on the first build — and
-    update the record only on acceptance ([§9.1](#91-the-lifecycle)).
+    update the **accepted resolution** only on acceptance, while persisting the
+    application's own answers when they are given and never requiring
+    acceptance of those ([§9.1](#91-the-lifecycle)).
 39. Report the distribution, how it entered the closure, and the delta, keeping
     repository contributions, artifact-sourced material, unmet against
     conditional requirements, and **staged against remaining** distinct, for one
     platform's build ([§9.2](#92-the-report)).
-40. Record a SHA-256 per input file, keyed by normalized relative path
-    ([§9.3](#93-hashed-inputs)).
+40. Record a SHA-256 per input file, keyed by normalized relative path, and
+    write every digest this document requires as 64 lowercase hexadecimal
+    characters, unprefixed and unabbreviated ([§9.3](#93-hashed-inputs)).
 41. Record and report every permission, feature and component declared by
     resolved Android artifacts' own manifests, attributed to the artifact;
-    override a resolved artifact's `required="true"` feature unless the
-    application declares it; and report a resolved artifact's exported
-    components with contribution-level prominence
+    **fail** on a resolved artifact's `required="true"` feature until the
+    application decides whether to keep or override it, resolving it
+    automatically in neither direction and recording the decision; and report a
+    resolved artifact's exported components with contribution-level prominence
     ([§9.4](#94-what-resolved-artifacts-bring-with-them)).
 42. Never write an application-supplied credential or secret into the record, a
     report, or a diagnostic ([§9.5](#95-secrets-are-never-recorded)).
 43. Make every row of [§9.6](#96-what-a-record-must-contain) recoverable from
-    the record, including every value and action with its state.
+    the record — every value and action with its state, and every
+    application decision the integration as a whole carries: each permission
+    suppression, export approval, required-feature decision and
+    colliding-path choice, with what it affected and the date it was made.
 44. Detect packaging collisions between the resolved artifacts of different
     distributions, resolve on its own authority only the packaging-metadata
     names [§9.7](#97-packaging-collisions) lists — never a file in a
@@ -3197,6 +3337,7 @@ A conforming consumer **SHOULD**:
 | **S12** | Report consumer ProGuard rules embedded in a resolved `.aar` | [§9.4](#94-what-resolved-artifacts-bring-with-them) |
 | **S13** | Warn when a component declares `foreground_service_type` and the same sidecar contributes no `FOREGROUND_SERVICE_*` permission — except for a type the platform exempts from one, today `shortService` | [§6.6](#66-manifest-components) |
 | **S14** | Report a packaging collision detected between resolved Swift packages, which version 1 does not specify detection for | [§9.7](#97-packaging-collisions) |
+| **S15** | Verify that a registered Python module's `init` symbol is present in the linked binary, and report its absence against the declaring distribution | [§7.5](#75-python-modules) |
 
 > **Note:** [§9.4](#94-what-resolved-artifacts-bring-with-them) requires a
 > consumer that stops at per-artifact declarations, rather than implementing
@@ -3227,6 +3368,34 @@ rather than silently writing a record and proceeding. A single bootstrap action
 covering the initial set satisfies this; treating "no record yet" as implicit
 approval does not, because the first build is the one where an application
 acquires *all* of its inherited native surface at once.
+
+**Acceptance gates what producers originate, and nothing the application says
+itself.** The record holds two kinds of thing, and only the first passes through
+steps 2 to 4:
+
+| | Contents | On a change |
+| --- | --- | --- |
+| **The accepted resolution** | every contribution, the hashed inputs, the resolved native graphs with their checksums and revisions, and the material resolved artifacts bring with them ([§9.4](#94-what-resolved-artifacts-bring-with-them)) | reported as a delta and **gated**: the build **MUST NOT** proceed until the application accepts it |
+| **The application's answers** | supplied values, acknowledgements, dismissals, permission suppressions, export approvals, required-feature decisions, colliding-path choices | **recorded as they change**, with the date and the distribution version where [§9.6](#96-what-a-record-must-contain) requires them, and **MUST NOT** require acceptance of themselves |
+
+A consumer **MUST** persist an answer when it is given, whether or not a
+resolution is being accepted in the same build, and **MUST NOT** discard one
+because the resolution has not changed.
+
+> **Note:** Acceptance exists because a producer can change what an application
+> ships without anyone asking. An answer is the opposite: the application is the
+> accepting party, so requiring it to accept its own decision would be a
+> confirmation dialog, and the click-through
+> [§9.6](#96-what-a-record-must-contain) warns about is bought exactly this way.
+> An answer still lands in a durable, diffable file — a suppression or an export
+> approval is a decision review should see — but what it needs is a history, not
+> a gate.
+>
+> The two halves are not independent: approving an export or deciding a required
+> feature is what *unblocks* a contribution the resolution already carries as
+> pending. Withdrawing such an answer changes the built surface, and the next
+> build reports it as what it is — a change the application made, attributed to
+> the application rather than to a producer.
 
 ### 9.2 The report
 
@@ -3286,6 +3455,15 @@ Inputs are hashed for **every** producer, not only path and editable installs.
 The record **MUST** include a SHA-256 per file, keyed by normalized relative path
 (forward slashes, relative to the sidecar directory), covering `native.toml` and
 every resource it references.
+
+**Every digest this document requires is written the same way**, here and for
+the artifact and binary-target checksums of [§6.3](#63-gradle-dependencies) and
+[§7.2](#72-swift-packages): **64 lowercase hexadecimal characters, unprefixed
+and never abbreviated**. A consumer **MUST** write that form and **MUST** reject
+a stored digest that is not it, rather than comparing loosely. The algorithm is
+already fixed, so a `sha256:` prefix carries nothing; an abbreviation carries
+less than it appears to, since two records elided to different lengths cannot be
+compared at all.
 
 The wheel's own hash pins the distribution, but the useful identity for this
 protocol is the material the integration was computed from: per-file hashes let
@@ -3441,8 +3619,32 @@ recoverable:
 | its requirements | every floor it declared with the value it declared; and every value and every action, **with its state** — supplied, dismissed, acknowledged, or unresolved. An acknowledgement or a dismissal **MUST** carry the distribution version it was made against and the date it was made, written as an [RFC 3339](https://www.rfc-editor.org/rfc/rfc3339) full-date in UTC — `2026-08-24` — so that two records of one event compare equal |
 | the native graph | every resolved artifact with its SHA-256 ([§6.3](#63-gradle-dependencies)), and every resolved package with its version **and** revision, plus the declared checksum per binary target ([§7.2](#72-swift-packages)) |
 
-A record that cannot answer one of those rows has not recorded the integration,
-whatever else it contains.
+And for the integration as a whole — these are not per-distribution, because
+each addresses a merged result or a decision the application made about one
+([§2.2](#22-how-the-application-answers)):
+
+| | |
+| --- | --- |
+| the build | the platform it was computed for, and the contract the consumer implements |
+| every **permission suppression** | the permission `name`, and every distribution whose contribution it withdrew ([§6.5](#65-permissions-and-features)) |
+| every **export approval** | the component `name`, the distribution that declared it, and the approval's absence where a component is still pending |
+| every **required-feature decision** | the feature `name`, the resolved artifact that declared it `required="true"`, the distribution that pulled that artifact in, and which way the application decided ([§9.4](#94-what-resolved-artifacts-bring-with-them)) |
+| every **packaging-collision choice** | the packaged `path`, the artifacts that collided, the distributions responsible, and the artifact chosen — by the application or, for packaging metadata, by the consumer's own rule ([§9.7](#97-packaging-collisions)) |
+| every **authenticated repository or package** | that it requires a credential, and never the credential ([§9.5](#95-secrets-are-never-recorded)) |
+
+Each of those decisions **MUST** carry the date it was made, in the same form an
+acknowledgement carries, so that a record shows not only what was decided but
+when. A record that cannot answer one of these rows, or one of the per-distribution
+rows above, has not recorded the integration, whatever else it contains.
+
+> **Note:** These are the answers [§2.2](#22-how-the-application-answers) joins
+> by something other than `(distribution, id)`, and they are the rows an
+> implementation is likeliest to leave out — a suppression looks like the
+> absence of a permission rather than the presence of a decision, and a
+> collision choice looks like a packaging detail. Both are the opposite: they
+> are the places where the application, not a producer, changed what ships, and
+> a record that drops them cannot answer *why is this permission missing* or
+> *which copy of `libc++_shared.so` is in the APK* a year later.
 
 > **Note:** The requirements row does more work here than its counterpart did in
 > the first attempt, which recorded only unsatisfied conditional prerequisites.
@@ -3592,6 +3794,24 @@ genuinely equivalent and both common.
 | **Native runtime lifecycle composition** | No way for a producer to run code at application start, or to participate in an app-delegate callback. Deliberate in version 1, and not on principle — see below |
 | Xcode build settings, compiler and linker flags | Arbitrary build mutation. The exclusion stands for flags in general; [§7.6](#76-objective-c-categories)'s `objc_categories` is the one bounded exception, and it names a behavior rather than passing a flag |
 | Application configuration — *writing* it | The application's own build settings are its own. **Declaring a requirement on it is in scope**, and is what [§5](#5-requirements-on-the-application) is for |
+
+**Three accepted limitations, stated together.** Each is a place where a
+determined or careless producer reaches past a rule and version 1 answers with
+disclosure rather than prevention. None is an oversight; each is argued where it
+applies, and they are gathered here so that a reader assessing the model does
+not have to find them scattered.
+
+| Limitation | What version 1 does instead |
+| --- | --- |
+| **A component exported by a resolved artifact bypasses the sidecar's approval gate** ([§6.6](#66-manifest-components), [§9.4](#94-what-resolved-artifacts-bring-with-them)). Moving a class from a sidecar declaration into a published `.aar` turns an approval into a merge AGP performs | Reports it with the prominence a contributed export gets, attributed to the artifact and to the distribution that pulled it in. Gating it would mean approving dozens of components nobody chose, on every build |
+| **Contributed Swift has no enforceable symbol boundary** ([§7.1](#71-symbol-prefixes), [§7.3](#73-source)). Prefixes are guidance, and reach neither file-scope functions and constants nor extension members, all of which land in the application's own scope | Asks for prefixes, attributes a duplicate-symbol error to the distribution whose prefix matches (8.S10), and points a producer with more than shims at a Swift package, which is its own module |
+| **Package visibility has no application veto** ([§6.9](#69-package-visibility)). A transitive producer's `<queries>` entry widens what the application can see without the application deciding | Requires a `reason` on every entry and reports both, since withholding one would not reduce what the application may do — it would make a dependency's code get a wrong answer with no diagnostic |
+
+The first is the one with a security shape, and it is the reason
+[§9.4](#94-what-resolved-artifacts-bring-with-them) opens by saying what this
+convention offers for artifact content is attribution and review. A model that
+claimed otherwise would be claiming to police arbitrary library code, which
+nothing in this ecosystem does.
 
 **What "in the wheel" excludes, and what it does not.** The qualifier on the
 first four rows is deliberate. A declared Maven coordinate may resolve to an
@@ -4039,11 +4259,16 @@ disagree with rather than a blank page.
     }
   ],
   "contract": "1",
+  "decisions": [
+    "suppressed permission  android.permission.ACCESS_FINE_LOCATION  withdrawn from analytics-shim  2026-08-24",
+    "approved export  org.example.maps.RedirectActivity  (map-sdk)  2026-08-24",
+    "artifact feature  android.hardware.location.gps  required=true → false  in com.example.maps:android:4.1.0, via map-sdk  2026-08-24"
+  ],
   "distributions": [
     {
       "artifacts": {
-        "com.example.maps:android:4.1.0": "sha256:0d3e…",
-        "com.squareup.okhttp3:okhttp:4.12.0": "sha256:5b81…"
+        "com.example.maps:android:4.1.0": "0d3e4f9a17c2b85e6dd0341fbb9a72c5e08d41a6f3c7b2905ea18d43f6c07b21",
+        "com.squareup.okhttp3:okhttp:4.12.0": "5b81c0f2d7a3946e18bb52c07f9d3a6418e2c5b09fa471d38c62e0ab7451f9d0"
       },
       "contract": "1",
       "entries": [
@@ -4052,11 +4277,11 @@ disagree with rather than a blank page.
         "dependency com.squareup.okhttp3:okhttp:4.12.0  (transitive, via com.example.maps:android)",
         "REPOSITORY https://maven.example.com/releases → com.example.maps  authenticated — credentials configured",
         "from com.example.maps:android:4.1.0 (resolved artifact manifest): permission com.example.permission.MAPS_ID",
-        "from com.example.maps:android:4.1.0 (resolved artifact manifest): feature android.hardware.location.gps required=true → application chose required=false, 2026-08-24"
+        "from com.example.maps:android:4.1.0 (resolved artifact manifest): feature android.hardware.location.gps required=true"
       ],
       "inputs": {
-        "java/com/example/maps/MapBridge.java": "sha256:9f2c…",
-        "native.toml": "sha256:71ff…"
+        "java/com/example/maps/MapBridge.java": "9f2c17b40ae83d6512cc0947fa2b81d35e07c6a94b1f28d0e35ba7c61804df92",
+        "native.toml": "71ff3ac8250b91e7d4a6c03fb8215de9074c1a6b39f52840cbe7d1904a63f28c"
       },
       "name": "map-sdk",
       "origin": "direct dependency",
@@ -4090,7 +4315,7 @@ the one distribution that shows the rows a Gradle graph cannot:
       "artifacts": {},
       "contract": "1",
       "entries": ["swift package Charting 2.4.0 (products: Charting)"],
-      "inputs": { "native.toml": "sha256:c40a…" },
+      "inputs": { "native.toml": "c40a92f13b6d8571ee204cb7f3a915d068b4e27ca9013f6d5b82ec4a7091df63" },
       "name": "pycharting",
       "origin": "via some-ui-lib",
       "requirements": [
@@ -4109,7 +4334,7 @@ the one distribution that shows the rows a Gradle graph cannot:
         }
       },
       "swift_binaries": {
-        "ChartingRenderer.xcframework": "sha256:e11d…"
+        "ChartingRenderer.xcframework": "e11d5b0c93a726f4180dc35ba9f27e64108c3d95b2af7016e5c48d3b9207fa14"
       },
       "version": "2.4.0"
     }
@@ -4124,9 +4349,13 @@ Between them the two files carry every row
 contract, provenance, per-file input hashes, contributions, every requirement
 with its state — a floor with the value it was met by, a supplied value, an
 acknowledged action, an unresolved conditional and a dismissed one — both
-resolved graphs with their checksums and revisions, the application's decision
-on a resolved artifact's required feature, and both kinds of packaging
-collision with who decided each. The Swift file is shown short: everything
+resolved graphs with their checksums and revisions, and the decisions the
+application made about the integration as a whole: a permission suppression, an
+export approval, a resolved artifact's required feature, and both kinds of
+packaging collision with who decided each. The `decisions` block is where the
+answers joined by something other than `(distribution, id)` live, since a
+suppression withdraws a permission from every distribution that contributed it
+([§2.2](#22-how-the-application-answers)). The Swift file is shown short: everything
 elided from it is a repeat of a row the Android file already shows.
 
 Four properties are worth naming, because they are what make the file useful
@@ -4146,6 +4375,10 @@ rather than merely present:
   `REPOSITORY … authenticated — credentials configured`. That the repository
   needs a credential is a fact about the integration; the credential is not
   ([§6.4](#64-maven-repositories), [§9.5](#95-secrets-are-never-recorded)).
+- **Digests in full.** Every hash is 64 lowercase hexadecimal characters with no
+  prefix ([§9.3](#93-hashed-inputs)). The values here are invented, but their
+  shape is not: an abbreviated digest cannot be compared against another
+  consumer's, which is the one thing a record exists to make possible.
 
 ## Appendix D: why contributions stay per-distribution
 
