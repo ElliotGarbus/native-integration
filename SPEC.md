@@ -2595,6 +2595,12 @@ fail when none is configured, naming the distribution, rather than surfacing
 SwiftPM's own authentication error; and it **MUST NOT** write the credential
 into the generated project, the record, or any diagnostic.
 
+`reason` is **OPTIONAL** on a package that declares no `credentials_required`,
+and a consumer makes no use of it there. The field is not otherwise reserved:
+[§6.4](#64-maven-repositories), whose rules this section imports unchanged,
+requires a `reason` on every repository, so a producer writing one here by habit
+has not made an error.
+
 Where two distributions declare the same package `url`,
 [§6.4](#64-maven-repositories)'s merge rule applies unchanged: any `true` makes
 the package authenticated, and every `reason` is kept and attributed. The
