@@ -1,0 +1,1089 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elliotgarbus.github.io/native-integration/native-integration-v1.schema.json",
+  "title": "native-integration sidecar, contract 1",
+  "description": "Structural validation only. Namespace containment, cross-reference resolution, closure-wide collision detection and path escape are SPEC.md \u00a78's and are not expressible here; passing this schema is not conformance.",
+  "type": "object",
+  "required": [
+    "contract"
+  ],
+  "additionalProperties": {
+    "type": "object"
+  },
+  "properties": {
+    "contract": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(0|[1-9][0-9]*)(\\.(0|[1-9][0-9]*))?$"
+    },
+    "platforms": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "android",
+          "ios"
+        ]
+      },
+      "minItems": 1
+    },
+    "android": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "requires": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "min_sdk": {
+              "type": "integer"
+            },
+            "compile_sdk": {
+              "type": "integer"
+            },
+            "target_sdk": {
+              "type": "integer"
+            },
+            "core_library_desugaring": {
+              "const": true
+            },
+            "application_value": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "kind": {
+                    "enum": [
+                      "manifest_meta_data",
+                      "manifest_placeholder",
+                      "inline"
+                    ]
+                  },
+                  "key": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "placeholder": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "conditional": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "id",
+                  "kind",
+                  "reason"
+                ],
+                "allOf": [
+                  {
+                    "if": {
+                      "properties": {
+                        "kind": {
+                          "const": "inline"
+                        }
+                      },
+                      "required": [
+                        "kind"
+                      ]
+                    },
+                    "then": true,
+                    "else": {
+                      "required": [
+                        "key"
+                      ]
+                    }
+                  },
+                  {
+                    "if": {
+                      "properties": {
+                        "kind": {
+                          "const": "inline"
+                        }
+                      },
+                      "required": [
+                        "kind"
+                      ]
+                    },
+                    "then": {
+                      "not": {
+                        "required": [
+                          "key"
+                        ]
+                      }
+                    }
+                  }
+                ]
+              }
+            },
+            "application_action": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "summary": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "instructions": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "acceptance": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "uses": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "slot": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "conditional": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "id",
+                  "summary",
+                  "reason"
+                ]
+              }
+            }
+          }
+        },
+        "owns": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "java_namespaces": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "contributes": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "src": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "java": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "kotlin": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            },
+            "gradle_dependencies": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "coordinate": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "module": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "version": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "at_least": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "below": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "at_least",
+                      "below"
+                    ]
+                  },
+                  "configuration": {
+                    "enum": [
+                      "implementation",
+                      "api",
+                      "compileOnly",
+                      "runtimeOnly"
+                    ]
+                  }
+                },
+                "oneOf": [
+                  {
+                    "required": [
+                      "coordinate"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "module"
+                    ]
+                  }
+                ],
+                "allOf": [
+                  {
+                    "if": {
+                      "required": [
+                        "module"
+                      ]
+                    },
+                    "then": {
+                      "required": [
+                        "version"
+                      ]
+                    }
+                  },
+                  {
+                    "if": {
+                      "required": [
+                        "version"
+                      ]
+                    },
+                    "then": {
+                      "not": {
+                        "required": [
+                          "coordinate"
+                        ]
+                      }
+                    }
+                  }
+                ]
+              }
+            },
+            "gradle_repositories": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "minLength": 1,
+                    "pattern": "^[Hh][Tt][Tt][Pp][Ss]://"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "groups": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "modules": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "credentials_required": {
+                    "type": "boolean"
+                  }
+                },
+                "anyOf": [
+                  {
+                    "required": [
+                      "groups"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "modules"
+                    ]
+                  }
+                ],
+                "required": [
+                  "url",
+                  "reason"
+                ]
+              }
+            },
+            "permissions": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "max_sdk_version": {
+                    "type": "integer"
+                  },
+                  "never_for_location": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "name"
+                ]
+              }
+            },
+            "features": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "name"
+                ]
+              }
+            },
+            "components": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "kind": {
+                    "enum": [
+                      "service",
+                      "activity",
+                      "receiver"
+                    ]
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "from_dependency": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "foreground_service_type": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "exported_required": {
+                    "type": "boolean"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "view_links": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "$ref": "#/$defs/stringOrInlineValue"
+                      },
+                      "properties": {
+                        "scheme": {
+                          "$ref": "#/$defs/stringOrInlineValue"
+                        }
+                      },
+                      "propertyNames": {
+                        "pattern": "^[a-z][a-z0-9]*(_[a-z0-9]+)*$"
+                      },
+                      "required": [
+                        "scheme"
+                      ]
+                    }
+                  },
+                  "intent_filters": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "action": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "action"
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "kind",
+                  "name"
+                ],
+                "allOf": [
+                  {
+                    "if": {
+                      "required": [
+                        "exported_required"
+                      ]
+                    },
+                    "then": {
+                      "required": [
+                        "reason"
+                      ]
+                    }
+                  },
+                  {
+                    "if": {
+                      "required": [
+                        "foreground_service_type"
+                      ]
+                    },
+                    "then": {
+                      "properties": {
+                        "kind": {
+                          "const": "service"
+                        }
+                      },
+                      "required": [
+                        "kind"
+                      ]
+                    }
+                  },
+                  {
+                    "if": {
+                      "required": [
+                        "view_links"
+                      ]
+                    },
+                    "then": {
+                      "properties": {
+                        "kind": {
+                          "const": "activity"
+                        }
+                      },
+                      "required": [
+                        "kind"
+                      ]
+                    }
+                  },
+                  {
+                    "if": {
+                      "required": [
+                        "view_links"
+                      ]
+                    },
+                    "then": {
+                      "properties": {
+                        "exported_required": {
+                          "const": true
+                        }
+                      },
+                      "required": [
+                        "exported_required"
+                      ]
+                    }
+                  },
+                  {
+                    "if": {
+                      "required": [
+                        "intent_filters"
+                      ]
+                    },
+                    "then": {
+                      "not": {
+                        "required": [
+                          "exported_required"
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "if": {
+                      "required": [
+                        "intent_filters"
+                      ]
+                    },
+                    "then": {
+                      "not": {
+                        "required": [
+                          "view_links"
+                        ]
+                      }
+                    }
+                  }
+                ]
+              }
+            },
+            "r8": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "keep_classes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "keep": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "pattern": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "from_dependency": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "pattern",
+                      "from_dependency"
+                    ]
+                  }
+                }
+              }
+            },
+            "meta_data": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "key": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "value": {
+                    "type": [
+                      "string",
+                      "integer",
+                      "boolean"
+                    ]
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "key",
+                  "value",
+                  "reason"
+                ]
+              }
+            },
+            "queries": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "package": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "provider_authority": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "oneOf": [
+                  {
+                    "required": [
+                      "package"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "provider_authority"
+                    ]
+                  }
+                ],
+                "required": [
+                  "reason"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "ios": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "requires": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "deployment_target": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^[0-9]+(\\.[0-9]+){0,2}$"
+            },
+            "application_value": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "kind": {
+                    "enum": [
+                      "info_plist",
+                      "usage_description",
+                      "inline"
+                    ]
+                  },
+                  "key": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "placeholder": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "conditional": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "id",
+                  "kind",
+                  "reason"
+                ],
+                "allOf": [
+                  {
+                    "if": {
+                      "properties": {
+                        "kind": {
+                          "const": "inline"
+                        }
+                      },
+                      "required": [
+                        "kind"
+                      ]
+                    },
+                    "then": true,
+                    "else": {
+                      "required": [
+                        "key"
+                      ]
+                    }
+                  },
+                  {
+                    "if": {
+                      "properties": {
+                        "kind": {
+                          "const": "inline"
+                        }
+                      },
+                      "required": [
+                        "kind"
+                      ]
+                    },
+                    "then": {
+                      "not": {
+                        "required": [
+                          "key"
+                        ]
+                      }
+                    }
+                  }
+                ]
+              }
+            },
+            "application_action": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "summary": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "instructions": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "acceptance": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "uses": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "slot": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "conditional": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "id",
+                  "summary",
+                  "reason"
+                ]
+              }
+            }
+          }
+        },
+        "contributes": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "swift_packages": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "url": {
+                    "type": "string",
+                    "minLength": 1,
+                    "pattern": "^[Hh][Tt][Tt][Pp][Ss]://"
+                  },
+                  "products": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "requirement": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "exact": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "from": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "revision": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "minProperties": 1,
+                    "maxProperties": 1
+                  },
+                  "credentials_required": {
+                    "type": "boolean"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "name",
+                  "url",
+                  "products",
+                  "requirement"
+                ]
+              }
+            },
+            "src": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "swift": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "symbol_prefixes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            },
+            "accessed_api_types": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "reasons": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "type",
+                  "reasons"
+                ]
+              }
+            },
+            "info_plist": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "values": {
+                  "type": "object",
+                  "propertyNames": {
+                    "not": {
+                      "anyOf": [
+                        {
+                          "enum": [
+                            "CFBundleIdentifier",
+                            "CFBundleShortVersionString",
+                            "CFBundleURLTypes",
+                            "CFBundleVersion",
+                            "MinimumOSVersion",
+                            "NSUserActivityTypes",
+                            "SKAdNetworkItems",
+                            "UIBackgroundModes",
+                            "UIRequiredDeviceCapabilities"
+                          ]
+                        },
+                        {
+                          "pattern": "UsageDescription$"
+                        }
+                      ]
+                    }
+                  },
+                  "additionalProperties": {
+                    "$ref": "#/$defs/plistValue"
+                  }
+                },
+                "append": {
+                  "type": "object",
+                  "propertyNames": {
+                    "not": {
+                      "anyOf": [
+                        {
+                          "enum": [
+                            "CFBundleIdentifier",
+                            "CFBundleShortVersionString",
+                            "CFBundleURLTypes",
+                            "CFBundleVersion",
+                            "MinimumOSVersion",
+                            "NSUserActivityTypes",
+                            "SKAdNetworkItems",
+                            "UIBackgroundModes",
+                            "UIRequiredDeviceCapabilities"
+                          ]
+                        }
+                      ]
+                    }
+                  },
+                  "additionalProperties": {
+                    "$ref": "#/$defs/plistArray"
+                  }
+                },
+                "skadnetwork_identifiers": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "pattern": "^[a-z0-9]+\\.skadnetwork$"
+                  }
+                }
+              }
+            },
+            "python_modules": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                  },
+                  "swift_package": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "init": {
+                    "type": "string",
+                    "minLength": 1,
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                  }
+                },
+                "required": [
+                  "name",
+                  "swift_package"
+                ]
+              }
+            },
+            "objc_categories": {
+              "const": true
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "stringOrInlineValue": {
+      "oneOf": [
+        {
+          "type": "string",
+          "minLength": 1
+        },
+        {
+          "type": "object",
+          "required": [
+            "application_value"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "application_value": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      ]
+    },
+    "plistArray": {
+      "anyOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "boolean"
+          }
+        }
+      ]
+    },
+    "plistValue": {
+      "anyOf": [
+        {
+          "type": [
+            "string",
+            "integer",
+            "number",
+            "boolean"
+          ]
+        },
+        {
+          "$ref": "#/$defs/plistArray"
+        }
+      ]
+    }
+  }
+}
