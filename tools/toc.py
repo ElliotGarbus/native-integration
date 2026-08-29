@@ -104,7 +104,10 @@ def main() -> int:
             return 1
         print("ok    SPEC.md's table of contents is current")
         return 0
-    SPEC.write_text(updated, encoding="utf-8")
+    # newline: this repository pins LF (.gitattributes) and §9.3 hashes file
+    # bytes, so a generator emitting CRLF on Windows would fail its own --check
+    # against an LF checkout while passing on Linux.
+    SPEC.write_text(updated, encoding="utf-8", newline="\n")
     print(f"wrote {len(build(text).splitlines())} entries into SPEC.md")
     return 0
 

@@ -149,7 +149,10 @@ def main() -> int:
         print(f"ok    {OUTPUT.relative_to(ROOT)} is current")
         return 0
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
-    OUTPUT.write_text(content, encoding="utf-8")
+    # newline: this repository pins LF (.gitattributes) and §9.3 hashes file
+    # bytes, so a generator emitting CRLF on Windows would fail its own --check
+    # against an LF checkout while passing on Linux.
+    OUTPUT.write_text(content, encoding="utf-8", newline="\n")
     print(f"wrote {OUTPUT.relative_to(ROOT)}")
     return 0
 
