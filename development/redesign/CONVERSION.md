@@ -86,6 +86,26 @@ key-presence test is a stated list a person or an agent can walk. Whether that
 is a fair trade is the thing support evidence has to answer; the point here is
 that the cost is three cases across seven integrations, not a general loss.
 
+## V26 — one key entered on argument, and no sidecar asked for it
+
+`credentials_required` on `[[ios.contributes.swift_packages]]` came from a
+review of the finished text rather than from a converted integration: §6.4
+gives an authenticated Maven repository a credential story — never in the
+sidecar, supplied by indirection, never persisted — and §7.2 gave a private
+Swift package none, which enterprise vendors would reach immediately. The
+prediction is plausible and the key mirrors §6.4 exactly. It is still the only
+vocabulary in the specification that no case in this repository exercises.
+
+Worth recording rather than smoothing over, because every other key arrived the
+other way round: a sidecar needed it and the text followed. **The trigger is a
+first private-package case — one produces the evidence, and none before a
+freeze is the argument for dropping the key rather than keeping it on the
+strength of the argument that added it.**
+
+The non-normative slot identifiers in §5.7 are a milder instance of the same
+thing: drawn from the extension points these conversions produced, and marked
+as a convenience so two producers reach one string, not as a vocabulary.
+
 ## What stayed exactly the same
 
 Everything in the automated core. Gradle coordinates and ranges, the Maven

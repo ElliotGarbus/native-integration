@@ -274,6 +274,22 @@ def is_skeleton(doc: dict) -> bool:
     return bool(found) and all(not e for e in found)
 
 
+def literal_prefix(pattern: str) -> str:
+    """The part of a shrinker keep pattern that §6.7 compares to a namespace.
+
+    The longest leading run of complete dot-separated segments containing no
+    wildcard, so `org.example.mypkg.**` yields `org.example.mypkg` and
+    `org.example.my*.Foo` yields `org.example` — which an owned
+    `org.example.mypkg` does not contain, and which is the point.
+    """
+    kept: list[str] = []
+    for segment in pattern.split("."):
+        if "*" in segment or "?" in segment:
+            break
+        kept.append(segment)
+    return ".".join(kept)
+
+
 def sidecar_sources():
     for path in EXAMPLES:
         raw = path.read_text(encoding="utf-8")
@@ -334,8 +350,8 @@ for rel, raw, doc in sidecar_sources():
     if isinstance(r8, dict):
         owned = android.get("owns", {}).get("java_namespaces", [])
         for pattern in r8.get("keep_classes", []) or []:
-            base = pattern.rstrip("*").rstrip(".")
-            if not any(base == o or base.startswith(o + ".") for o in owned):
+            base = literal_prefix(pattern)
+            if not base or not any(base == o or base.startswith(o + ".") for o in owned):
                 problems.append(
                     f"{rel} keep_classes `{pattern}` is not under an owned namespace "
                     f"{owned or '[]'} — a dependency's classes need [[r8.keep]]"
@@ -605,8 +621,9 @@ check("Appendix B covers every key SPEC.md declares", problems)
 problems = []
 for path in sorted((ROOT / "development" / "redesign" / "examples").rglob("*.toml")):
     rel = path.relative_to(ROOT)
+    raw = path.read_text(encoding="utf-8")
     try:
-        doc = tomllib.loads(path.read_text(encoding="utf-8"))
+        doc = tomllib.loads(raw)
     except tomllib.TOMLDecodeError as exc:
         problems.append(f"{rel} does not parse: {exc}")
         continue
@@ -619,6 +636,53 @@ for path in sorted((ROOT / "development" / "redesign" / "examples").rglob("*.tom
             continue
         if key not in appendix_b:
             problems.append(f"{rel} uses `{key}`, which Appendix B does not list")
+
+    # §5 — one `id` per platform table, across values and actions alike
+    for platform in ("android", "ios"):
+        table = doc.get(platform, {})
+        values = entries(table, "requires", "application_value")
+        actions = entries(table, "requires", "application_action")
+        ids = [r.get("id") for r in (*values, *actions)]
+        for dupe in sorted({i for i in ids if i and ids.count(i) > 1}):
+            problems.append(f"{rel} [{platform}] declares requirement id `{dupe}` more than once")
+
+        # §5.5 — `key` belongs to every kind but `inline`, and an `inline`
+        # value is consumed by a view_links reference or an action's `uses`
+        used = {u for a in actions for u in a.get("uses", [])}
+        referenced = set(re.findall(r'application_value\s*=\s*"([^"]+)"', raw))
+        declared = {v.get("id") for v in values}
+        for ident in sorted(used - declared):
+            problems.append(f"{rel} [{platform}] action `uses` undeclared value `{ident}`")
+        for value in values:
+            kind, ident = value.get("kind"), value.get("id")
+            if kind == "inline":
+                if "key" in value:
+                    problems.append(f"{rel} inline value `{ident}` declares a `key`")
+                if ident not in used | referenced:
+                    problems.append(
+                        f"{rel} inline value `{ident}` is neither referenced nor `uses`d"
+                    )
+            elif "key" not in value:
+                problems.append(f"{rel} value `{ident}` of kind `{kind}` needs a `key`")
+            if kind == "usage_description" and not value.get("key", "").endswith(
+                "UsageDescription"
+            ):
+                problems.append(f"{rel} usage_description `{ident}` names `{value.get('key')}`")
+            if kind == "info_plist" and value.get("key", "").endswith("UsageDescription"):
+                problems.append(
+                    f"{rel} info_plist value `{ident}` names a usage-description key"
+                )
+
+    # §6.4, §7.2 — repositories and packages are https, and a package states
+    # the products it is linked for
+    for repo in entries(doc.get("android", {}), "contributes", "gradle_repositories"):
+        if not repo.get("url", "").startswith("https://"):
+            problems.append(f"{rel} repository url is not https: {repo.get('url')}")
+    for pkg in entries(doc.get("ios", {}), "contributes", "swift_packages"):
+        if not pkg.get("url", "").startswith("https://"):
+            problems.append(f"{rel} swift package url is not https: {pkg.get('url')}")
+        if not pkg.get("products"):
+            problems.append(f"{rel} swift package `{pkg.get('name')}` declares no products")
 check("the converted sidecars obey the current specification", problems)
 
 
