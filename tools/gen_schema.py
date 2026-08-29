@@ -59,7 +59,11 @@ def expand(declaration_id: str, platform: str) -> str | None:
     if declaration_id.startswith("<platform>."):
         return declaration_id.replace("<platform>", platform, 1)
     if declaration_id.split(".", maxsplit=1)[0] in PLATFORMS:
-        return declaration_id if declaration_id.startswith(f"{platform}.") else None
+        # A bare platform name is a legitimate scope — §6.1's `java_namespaces`
+        # rule spans `owns` and `contributes`, so it hangs off the table itself.
+        if declaration_id == platform or declaration_id.startswith(f"{platform}."):
+            return declaration_id
+        return None
     return declaration_id
 
 
@@ -88,10 +92,13 @@ def leaf_schema(entry: dict) -> dict[str, Any]:
     if kind == "inline_table":
         keys = list(entry["table_keys"])
         value_type = JSON_TYPE[entry.get("table_value_type", "string")]
+        member: dict[str, Any] = {"type": value_type, "minLength": 1}
+        if bound := entry.get("table_value_pattern"):
+            member["pattern"] = "^" + bound + "$"
         node = {
             "type": "object",
             "additionalProperties": False,
-            "properties": {k: {"type": value_type, "minLength": 1} for k in keys},
+            "properties": {k: dict(member) for k in keys},
         }
         if entry.get("table_keys_exactly_one"):
             # §7.2's requirement forms. `additionalProperties: false` is what
@@ -122,13 +129,69 @@ def leaf_schema(entry: dict) -> dict[str, Any]:
             # §6.4 compares the scheme case-insensitively, as RFC 3986 defines
             # it, so `HTTPS://` is the same scheme and is valid. Nothing else
             # about the URL is normalized.
-            node["pattern"] = "^[Hh][Tt][Tt][Pp][Ss]://"
+            #
+            # Where the declaration also forbids user-info, the authority is
+            # required to hold no `@`: §6.4 makes `https://user:pass@host/…` a
+            # syntactically identifiable credential a consumer MUST reject, and
+            # §7.2 imports that rule unchanged.
+            node["pattern"] = (
+                "^[Hh][Tt][Tt][Pp][Ss]://[^/@]+(/.*)?$"
+                if entry.get("forbids_user_info")
+                else "^[Hh][Tt][Tt][Pp][Ss]://"
+            )
     return node
 
 
-def constraint_schema(rule: dict) -> dict[str, Any]:
+def nested_required(path: str) -> dict[str, Any]:
+    """`{"required": [...]}` for a dotted path, nesting through each step."""
+    head, _, rest = path.partition(".")
+    if not rest:
+        return {"required": [head]}
+    return {"required": [head], "properties": {head: nested_required(rest)}}
+
+
+def constraint_schema(rule: dict, registers: dict) -> dict[str, Any]:
     """One `[[constraints]]` entry as a JSON Schema `if`/`then`."""
-    field, other = rule["field"], rule["other"]
+    field, other = rule["field"], rule.get("other", "")
+
+    if rule["rule"] == "pattern_if_equals":
+        return {
+            "if": {"properties": {other: {"const": rule["value"]}}, "required": [other]},
+            "then": {"properties": {field: {"pattern": "^" + rule["pattern"] + "$"}}},
+        }
+    if rule["rule"] == "pattern_forbidden_if_equals":
+        return {
+            "if": {"properties": {other: {"const": rule["value"]}}, "required": [other]},
+            "then": {
+                "properties": {
+                    field: {"not": {"pattern": "^" + rule["pattern"] + "$"}}
+                }
+            },
+        }
+    if rule["rule"] == "registers_forbidden_if_equals":
+        refused = sorted({m for r in rule["registers"] for m in registers[r]["members"]})
+        return {
+            "if": {"properties": {other: {"const": rule["value"]}}, "required": [other]},
+            "then": {"properties": {field: {"not": {"enum": refused}}}},
+        }
+    if rule["rule"] == "requires_present":
+        return {"if": {"required": [field]}, "then": nested_required(other)}
+    if rule["rule"] == "required_if_any_present":
+        return {
+            "if": {"anyOf": [nested_required(p) for p in rule["any_of"]]},
+            "then": nested_required(field),
+        }
+    if rule["rule"] == "platform_table_requires_listing":
+        # §4.5: a platform table for a name `platforms` omits is a
+        # contradiction. No `platforms` key makes no claim, so this only bites
+        # where the key is present.
+        return {
+            "if": {
+                "required": [other],
+                "properties": {other: {"not": {"contains": {"const": field}}}},
+            },
+            "then": {"not": {"required": [field]}},
+        }
 
     if rule["rule"] == "required_unless_equals":
         return {
@@ -195,9 +258,10 @@ def open_table_schema(entry: dict, registers: dict) -> dict[str, Any]:
     if "usage_description_suffix" in entry.get("refuses", []):
         forbidden.append({"pattern": "UsageDescription$"})
 
-    value = {"$ref": "#/$defs/plistValue"}
-    if entry.get("value_type") == "plist_array":
-        value = {"$ref": "#/$defs/plistArray"}
+    value = {
+        "plist_scalar": {"$ref": "#/$defs/plistScalar"},
+        "plist_array": {"$ref": "#/$defs/plistArray"},
+    }[entry["value_type"]]
 
     return {
         "type": "object",
@@ -234,7 +298,7 @@ def insert(tree: dict[str, Any], path: list[str], node: dict[str, Any]) -> None:
     """
     parent = walk(tree, path[:-1])["properties"]
     existing = parent.get(path[-1])
-    if existing is not None:
+    if existing is not None and isinstance(node, dict) and isinstance(existing, dict):
         target = node["items"] if node.get("type") == "array" else node
         source = existing["items"] if existing.get("type") == "array" else existing
         target.setdefault("properties", {}).update(source.get("properties", {}))
@@ -256,9 +320,15 @@ def platform_schema(registry: dict, platform: str) -> dict[str, Any]:
         resolved = expand(declaration_id, platform)
         if resolved is None or "." not in resolved:
             continue  # another platform's, or a top-level key
-        if entry.get("forbidden"):
-            continue  # `additionalProperties: false` already refuses it
         path = resolved.split(".")[1:]
+
+        if entry.get("forbidden"):
+            # §6.5's `required` on a feature must be rejected "with a diagnostic
+            # naming this rule — not the generic unknown-key message", so it
+            # gets a property of its own that is unsatisfiable rather than
+            # falling through to `additionalProperties: false`.
+            insert(root, path, False)
+            continue
 
         if entry["node"] in ("table", "array_of_tables"):
             insert(root, path, container_schema(entry))
@@ -280,11 +350,13 @@ def platform_schema(registry: dict, platform: str) -> dict[str, Any]:
                 mark_required(root, path)
 
     for rule in registry["constraints"]:
+        if not rule["scope"]:
+            continue  # a document-root rule; applied in build()
         scope = expand(rule["scope"], platform)
         if scope is None:
             continue
         walk(root, scope.split(".")[1:]).setdefault("allOf", []).append(
-            constraint_schema(rule)
+            constraint_schema(rule, registry["registers"])
         )
 
     return root
@@ -333,12 +405,7 @@ def build(registry: dict) -> dict[str, Any]:
                     for t in ("string", "integer", "number", "boolean")
                 ]
             },
-            "plistValue": {
-                "anyOf": [
-                    {"type": ["string", "integer", "number", "boolean"]},
-                    {"$ref": "#/$defs/plistArray"},
-                ]
-            },
+            "plistScalar": {"type": ["string", "integer", "number", "boolean"]},
         },
     }
 
@@ -349,6 +416,12 @@ def build(registry: dict) -> dict[str, Any]:
 
     for platform in PLATFORMS:
         schema["properties"][platform] = platform_schema(registry, platform)
+
+    for rule in registry["constraints"]:
+        if not rule["scope"]:
+            schema.setdefault("allOf", []).append(
+                constraint_schema(rule, registry["registers"])
+            )
 
     return schema
 

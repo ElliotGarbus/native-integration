@@ -147,7 +147,7 @@ merge = "maximum"
 since = "1.0"
 section = "5.1"
 anchor = "51-build-floors"
-description = "iOS floor, on the same terms. One to three ASCII-decimal components, compared component-wise and numerically with absent components read as zero"
+description = "The iOS floor, and a **TOML string** where the three above are integers. One to three ASCII-decimal components, compared component-wise and numerically with absent components read as zero"
 
 
 # ------------------------------------------------------------------- Values ---
@@ -267,7 +267,7 @@ unique_within = "platform_table_requirements"
 since = "1.0"
 section = "5.3"
 anchor = "53-actions"
-description = "**Required.** The join key; the application acknowledges by (distribution, `id`)"
+description = "**Required.** A logical name, unique among the requirements in one platform table; identity is (distribution, platform, `id`), and the application acknowledges by it"
 
 [declarations."<platform>.requires.application_action.summary"]
 node = "field"
@@ -331,12 +331,12 @@ resolves_to = "<platform>.requires.application_value.id"
 since = "1.0"
 section = "5.3"
 anchor = "53-actions"
-description = "Optional. Value `id`s in the same sidecar that this action consumes"
+description = "Optional. Value `id`s this action consumes, which **MUST** resolve to values the same sidecar declares for the **same platform**"
 
 [declarations."<platform>.requires.application_action.slot"]
 node = "field"
 type = "string"
-passthrough = true
+opaque = true
 category = "requires"
 platform = "both"
 required = false
@@ -377,7 +377,7 @@ items = "string"
 category = "owns"
 platform = "android"
 required = false
-required_when = "contributes java or kotlin source, producer-sourced components, or keep patterns"
+required_when = "contributes java or kotlin source, producer-sourced components, or `keep_classes` patterns under its own namespace — not dependency keeps"
 merge = "exclusive"
 since = "1.0"
 section = "6.1"
@@ -429,10 +429,15 @@ exactly_one_of = ["coordinate", "module"]
 since = "1.0"
 section = "6.3"
 anchor = "63-gradle-dependencies"
+description = "A dependency is spelled in **exactly one** of two forms — an exact `coordinate`, or a `module` with a bounded `version`. Declaring both, or neither, is rejected"
 
 [declarations."android.contributes.gradle_dependencies.coordinate"]
 node = "field"
 type = "string"
+# §6.3: `group:artifact:version`, and changing versions (`-SNAPSHOT`),
+# unbounded dynamic versions (`+`, `latest.release`) and ranges spelled inside
+# a coordinate are invalid.
+pattern = '(?!.*(-SNAPSHOT|\+|latest\.|\[|\]|\(|\)|,))[^:\s]+:[^:\s]+:[^:\s]+'
 category = "contributes"
 platform = "android"
 required = false
@@ -444,6 +449,8 @@ description = "`group:artifact:version`, exactly versioned. The version is visib
 [declarations."android.contributes.gradle_dependencies.module"]
 node = "field"
 type = "string"
+# §6.3: `group:artifact`, with the version carried by `version`.
+pattern = '[^:\s]+:[^:\s]+'
 category = "contributes"
 platform = "android"
 required = false
@@ -458,6 +465,8 @@ type = "inline_table"
 table_keys = ["at_least", "below"]
 table_keys_required = ["at_least", "below"]
 table_value_type = "string"
+# §6.3: a bound is a version, never a changing or dynamic one.
+table_value_pattern = '(?!.*(-SNAPSHOT|\+|latest\.))[0-9A-Za-z][0-9A-Za-z._-]*'
 category = "contributes"
 platform = "android"
 required = false
@@ -466,7 +475,7 @@ forbidden_when = "coordinate"
 since = "1.0"
 section = "6.3"
 anchor = "63-gradle-dependencies"
-description = "**Required** with `module`, and **both** `at_least` (inclusive) and `below` (exclusive) are required within it. Open-ended and changing versions are invalid"
+description = "**Required** with `module` and **forbidden** with `coordinate`. **Both** `at_least` (inclusive) and `below` (exclusive) are required within it; a range open at either end is invalid, as are changing (`-SNAPSHOT`) and dynamic (`+`, `latest.release`) versions"
 
 [declarations."android.contributes.gradle_dependencies.configuration"]
 node = "field"
@@ -499,6 +508,9 @@ node = "field"
 type = "string"
 scheme = "https"
 scheme_case_insensitive = true
+# §6.4: a consumer MUST reject a credential where one is syntactically
+# identifiable — at minimum, URL user-info. §7.2 imports the rule unchanged.
+forbids_user_info = true
 category = "contributes"
 platform = "android"
 required = true
@@ -874,7 +886,7 @@ required = true
 since = "1.0"
 section = "6.8"
 anchor = "68-manifest-meta-data"
-description = "**Required.** A string, integer or boolean, mapped to `android:value` as the text verbatim, the digits, or `true`/`false`. Equality is by type as well as content, and the application's own entry wins"
+description = "**Required.** A string, integer or boolean, mapped to `android:value` as the text verbatim, the digits, or `true`/`false`. Equality is by type as well as content, and the application's own entry wins. A value **MAY** be a resource reference — anything beginning `@` or `?` — only where the same sidecar declares an action asking the application to supply it"
 
 [declarations."android.contributes.meta_data.reason"]
 node = "field"
@@ -961,6 +973,9 @@ node = "field"
 type = "string"
 scheme = "https"
 scheme_case_insensitive = true
+# §6.4: a consumer MUST reject a credential where one is syntactically
+# identifiable — at minimum, URL user-info. §7.2 imports the rule unchanged.
+forbids_user_info = true
 category = "contributes"
 platform = "ios"
 required = true
@@ -1315,6 +1330,36 @@ other = "kind"
 value = "inline"
 section = "5.5"
 
+# §5.5's two *UsageDescription rules are a pair: `usage_description` MUST name
+# such a key and `info_plist` MUST NOT, and `info_plist` reaches no key §7.4
+# refuses.
+[[constraints]]
+scope = "<platform>.requires.application_value"
+rule = "pattern_if_equals"
+field = "key"
+other = "kind"
+value = "usage_description"
+pattern = '.*UsageDescription'
+section = "5.5"
+
+[[constraints]]
+scope = "<platform>.requires.application_value"
+rule = "pattern_forbidden_if_equals"
+field = "key"
+other = "kind"
+value = "info_plist"
+pattern = '.*UsageDescription'
+section = "5.5"
+
+[[constraints]]
+scope = "<platform>.requires.application_value"
+rule = "registers_forbidden_if_equals"
+field = "key"
+other = "kind"
+value = "info_plist"
+registers = ["capability_keys", "consumer_managed_keys"]
+section = "5.5"
+
 [[constraints]]
 scope = "android.contributes.gradle_dependencies"
 rule = "required_if_present"
@@ -1373,3 +1418,56 @@ rule = "forbidden_if_present"
 field = "intent_filters"
 other = "view_links"
 section = "6.6"
+
+# §7.2 — a `reason` is REQUIRED when the entry declares `credentials_required`.
+[[constraints]]
+scope = "ios.contributes.swift_packages"
+rule = "required_if_present"
+field = "reason"
+other = "credentials_required"
+section = "7.2"
+
+# §7.1 and §7.3 — both are invalid in a sidecar contributing no Swift source.
+# The declarative half is what a schema can see: the `swift` key's presence.
+# Whether a declared root that stages no file also counts is ambiguity A12, and
+# is stricter than this rather than looser, so nothing here widens on it.
+[[constraints]]
+scope = "ios.contributes.src"
+rule = "requires_present"
+field = "symbol_prefixes"
+other = "swift"
+section = "7.1"
+
+[[constraints]]
+scope = "ios.contributes"
+rule = "requires_present"
+field = "accessed_api_types"
+other = "src.swift"
+section = "7.3"
+
+# §6.1 — `java_namespaces` is REQUIRED when the distribution contributes Java or
+# Kotlin source. The other two triggers it names — producer-sourced components
+# and `keep_classes` under its own namespace — need namespace containment, which
+# is §8's and is deliberately out of the schema's reach.
+[[constraints]]
+scope = "android"
+rule = "required_if_any_present"
+field = "owns.java_namespaces"
+any_of = ["contributes.src.java", "contributes.src.kotlin"]
+section = "6.1"
+
+# §4.5 — declaring a platform table for a platform `platforms` omits is a
+# contradiction a consumer MUST reject.
+[[constraints]]
+scope = ""
+rule = "platform_table_requires_listing"
+field = "android"
+other = "platforms"
+section = "4.5"
+
+[[constraints]]
+scope = ""
+rule = "platform_table_requires_listing"
+field = "ios"
+other = "platforms"
+section = "4.5"

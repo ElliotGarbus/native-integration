@@ -121,6 +121,76 @@
                         ]
                       }
                     }
+                  },
+                  {
+                    "if": {
+                      "properties": {
+                        "kind": {
+                          "const": "usage_description"
+                        }
+                      },
+                      "required": [
+                        "kind"
+                      ]
+                    },
+                    "then": {
+                      "properties": {
+                        "key": {
+                          "pattern": "^.*UsageDescription$"
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "if": {
+                      "properties": {
+                        "kind": {
+                          "const": "info_plist"
+                        }
+                      },
+                      "required": [
+                        "kind"
+                      ]
+                    },
+                    "then": {
+                      "properties": {
+                        "key": {
+                          "not": {
+                            "pattern": "^.*UsageDescription$"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "if": {
+                      "properties": {
+                        "kind": {
+                          "const": "info_plist"
+                        }
+                      },
+                      "required": [
+                        "kind"
+                      ]
+                    },
+                    "then": {
+                      "properties": {
+                        "key": {
+                          "not": {
+                            "enum": [
+                              "CFBundleIdentifier",
+                              "CFBundleShortVersionString",
+                              "CFBundleURLTypes",
+                              "CFBundleVersion",
+                              "MinimumOSVersion",
+                              "NSUserActivityTypes",
+                              "UIBackgroundModes",
+                              "UIRequiredDeviceCapabilities"
+                            ]
+                          }
+                        }
+                      }
+                    }
                   }
                 ]
               }
@@ -223,11 +293,13 @@
                 "properties": {
                   "coordinate": {
                     "type": "string",
-                    "minLength": 1
+                    "minLength": 1,
+                    "pattern": "^(?!.*(-SNAPSHOT|\\+|latest\\.|\\[|\\]|\\(|\\)|,))[^:\\s]+:[^:\\s]+:[^:\\s]+$"
                   },
                   "module": {
                     "type": "string",
-                    "minLength": 1
+                    "minLength": 1,
+                    "pattern": "^[^:\\s]+:[^:\\s]+$"
                   },
                   "version": {
                     "type": "object",
@@ -235,11 +307,13 @@
                     "properties": {
                       "at_least": {
                         "type": "string",
-                        "minLength": 1
+                        "minLength": 1,
+                        "pattern": "^(?!.*(-SNAPSHOT|\\+|latest\\.))[0-9A-Za-z][0-9A-Za-z._-]*$"
                       },
                       "below": {
                         "type": "string",
-                        "minLength": 1
+                        "minLength": 1,
+                        "pattern": "^(?!.*(-SNAPSHOT|\\+|latest\\.))[0-9A-Za-z][0-9A-Za-z._-]*$"
                       }
                     },
                     "required": [
@@ -307,7 +381,7 @@
                   "url": {
                     "type": "string",
                     "minLength": 1,
-                    "pattern": "^[Hh][Tt][Tt][Pp][Ss]://"
+                    "pattern": "^[Hh][Tt][Tt][Pp][Ss]://[^/@]+(/.*)?$"
                   },
                   "reason": {
                     "type": "string",
@@ -384,7 +458,8 @@
                   "name": {
                     "type": "string",
                     "minLength": 1
-                  }
+                  },
+                  "required": false
                 },
                 "required": [
                   "name"
@@ -423,6 +498,7 @@
                     "type": "string",
                     "minLength": 1
                   },
+                  "exported": false,
                   "view_links": {
                     "type": "array",
                     "items": {
@@ -660,7 +736,65 @@
             }
           }
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "anyOf": [
+              {
+                "required": [
+                  "contributes"
+                ],
+                "properties": {
+                  "contributes": {
+                    "required": [
+                      "src"
+                    ],
+                    "properties": {
+                      "src": {
+                        "required": [
+                          "java"
+                        ]
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "required": [
+                  "contributes"
+                ],
+                "properties": {
+                  "contributes": {
+                    "required": [
+                      "src"
+                    ],
+                    "properties": {
+                      "src": {
+                        "required": [
+                          "kotlin"
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "then": {
+            "required": [
+              "owns"
+            ],
+            "properties": {
+              "owns": {
+                "required": [
+                  "java_namespaces"
+                ]
+              }
+            }
+          }
+        }
+      ]
     },
     "ios": {
       "type": "object",
@@ -750,6 +884,76 @@
                         ]
                       }
                     }
+                  },
+                  {
+                    "if": {
+                      "properties": {
+                        "kind": {
+                          "const": "usage_description"
+                        }
+                      },
+                      "required": [
+                        "kind"
+                      ]
+                    },
+                    "then": {
+                      "properties": {
+                        "key": {
+                          "pattern": "^.*UsageDescription$"
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "if": {
+                      "properties": {
+                        "kind": {
+                          "const": "info_plist"
+                        }
+                      },
+                      "required": [
+                        "kind"
+                      ]
+                    },
+                    "then": {
+                      "properties": {
+                        "key": {
+                          "not": {
+                            "pattern": "^.*UsageDescription$"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "if": {
+                      "properties": {
+                        "kind": {
+                          "const": "info_plist"
+                        }
+                      },
+                      "required": [
+                        "kind"
+                      ]
+                    },
+                    "then": {
+                      "properties": {
+                        "key": {
+                          "not": {
+                            "enum": [
+                              "CFBundleIdentifier",
+                              "CFBundleShortVersionString",
+                              "CFBundleURLTypes",
+                              "CFBundleVersion",
+                              "MinimumOSVersion",
+                              "NSUserActivityTypes",
+                              "UIBackgroundModes",
+                              "UIRequiredDeviceCapabilities"
+                            ]
+                          }
+                        }
+                      }
+                    }
                   }
                 ]
               }
@@ -824,7 +1028,7 @@
                   "url": {
                     "type": "string",
                     "minLength": 1,
-                    "pattern": "^[Hh][Tt][Tt][Pp][Ss]://"
+                    "pattern": "^[Hh][Tt][Tt][Pp][Ss]://[^/@]+(/.*)?$"
                   },
                   "products": {
                     "type": "array",
@@ -867,6 +1071,20 @@
                   "url",
                   "products",
                   "requirement"
+                ],
+                "allOf": [
+                  {
+                    "if": {
+                      "required": [
+                        "credentials_required"
+                      ]
+                    },
+                    "then": {
+                      "required": [
+                        "reason"
+                      ]
+                    }
+                  }
                 ]
               }
             },
@@ -888,7 +1106,21 @@
                     "minLength": 1
                   }
                 }
-              }
+              },
+              "allOf": [
+                {
+                  "if": {
+                    "required": [
+                      "symbol_prefixes"
+                    ]
+                  },
+                  "then": {
+                    "required": [
+                      "swift"
+                    ]
+                  }
+                }
+              ]
             },
             "accessed_api_types": {
               "type": "array",
@@ -947,7 +1179,7 @@
                     }
                   },
                   "additionalProperties": {
-                    "$ref": "#/$defs/plistValue"
+                    "$ref": "#/$defs/plistScalar"
                   }
                 },
                 "append": {
@@ -1015,7 +1247,28 @@
             "objc_categories": {
               "const": true
             }
-          }
+          },
+          "allOf": [
+            {
+              "if": {
+                "required": [
+                  "accessed_api_types"
+                ]
+              },
+              "then": {
+                "required": [
+                  "src"
+                ],
+                "properties": {
+                  "src": {
+                    "required": [
+                      "swift"
+                    ]
+                  }
+                }
+              }
+            }
+          ]
         }
       }
     }
@@ -1070,20 +1323,61 @@
         }
       ]
     },
-    "plistValue": {
-      "anyOf": [
-        {
-          "type": [
-            "string",
-            "integer",
-            "number",
-            "boolean"
-          ]
-        },
-        {
-          "$ref": "#/$defs/plistArray"
-        }
+    "plistScalar": {
+      "type": [
+        "string",
+        "integer",
+        "number",
+        "boolean"
       ]
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": [
+          "platforms"
+        ],
+        "properties": {
+          "platforms": {
+            "not": {
+              "contains": {
+                "const": "android"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "not": {
+          "required": [
+            "android"
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "platforms"
+        ],
+        "properties": {
+          "platforms": {
+            "not": {
+              "contains": {
+                "const": "ios"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "not": {
+          "required": [
+            "ios"
+          ]
+        }
+      }
+    }
+  ]
 }

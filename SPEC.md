@@ -4169,7 +4169,7 @@ place: the value kinds of [§5.5](#55-value-kinds), the Gradle configurations of
 | `compile_sdk` | An Android floor, on the same terms as `min_sdk` |
 | `target_sdk` | An Android floor, on the same terms. It changes behavior app-wide, so declare it only when a behavior depends on it, and a consumer gives it the prominence a repository contribution gets |
 | `core_library_desugaring` | Optional boolean, and only `true` is valid — a consumer rejects `false`. A floor on a boolean axis: the build fails when the application has not enabled desugaring |
-| `deployment_target` | iOS floor, on the same terms. One to three ASCII-decimal components, compared component-wise and numerically with absent components read as zero |
+| `deployment_target` | The iOS floor, and a **TOML string** where the three above are integers. One to three ASCII-decimal components, compared component-wise and numerically with absent components read as zero |
 | **`[[<platform>.requires.application_value]]`** [§5.2](#52-values) | A string the application supplies and the consumer places |
 | `id` | **Required.** A logical name, unique among the requirements in one platform table; identity is (distribution, platform, `id`) |
 | `kind` | **Required.** Where the consumer writes it. A **closed** set — [§5.5](#55-value-kinds). `info_plist` may not name a usage-description, capability, external-reach or consumer-managed key; `usage_description` may name only a `*UsageDescription` one |
@@ -4178,12 +4178,12 @@ place: the value kinds of [§5.5](#55-value-kinds), the Gradle configurations of
 | `placeholder` | **Recommended.** Text the consumer scaffolds; the build does not proceed while it stands |
 | `conditional` | Optional, default `false`. Unsatisfied and conditional is recorded, not failed |
 | **`[[<platform>.requires.application_action]]`** [§5.3](#53-actions) | An outcome the application must achieve |
-| `id` | **Required.** The join key; the application acknowledges by (distribution, `id`) |
+| `id` | **Required.** A logical name, unique among the requirements in one platform table; identity is (distribution, platform, `id`), and the application acknowledges by it |
 | `summary` | **Required.** One line, imperative. What a report shows |
 | `reason` | **Required.** Why it is needed, and what breaks without it |
 | `instructions` | Optional prose telling a reader how to do it. Never acted on by a consumer ([§5.6](#56-instructions-and-acceptance-criteria)) |
 | `acceptance` | **Recommended.** Statements of the **end state**, never of an operation |
-| `uses` | Optional. Value `id`s in the same sidecar that this action consumes |
+| `uses` | Optional. Value `id`s this action consumes, which **MUST** resolve to values the same sidecar declares for the **same platform** |
 | `slot` | Optional. An opaque key naming a contended application-owned surface ([§5.7](#57-slots)) |
 | `conditional` | Optional, default `false` |
 | **`[android.owns]`** [§6.1](#61-ownership) | |
@@ -4191,10 +4191,10 @@ place: the value kinds of [§5.5](#55-value-kinds), the Gradle configurations of
 | **`[android.contributes.src]`** [§6.2](#62-source) | |
 | `java` | Directories whose `.java` files the application's own toolchain compiles |
 | `kotlin` | Directories whose `.kt` files the application's own toolchain compiles |
-| **`[[android.contributes.gradle_dependencies]]`** [§6.3](#63-gradle-dependencies) | |
+| **`[[android.contributes.gradle_dependencies]]`** [§6.3](#63-gradle-dependencies) | A dependency is spelled in **exactly one** of two forms — an exact `coordinate`, or a `module` with a bounded `version`. Declaring both, or neither, is rejected |
 | `coordinate` | `group:artifact:version`, exactly versioned. The version is visible in the sidecar, but it states no upper bound: Gradle may resolve past a major the producer never compiled against |
 | `module` | `group:artifact`, paired with a bounded `version`. **Recommended** where the producer's own source compiles against the dependency, because `below` is the only way to say which major it cannot survive |
-| `version` | **Required** with `module`, and **both** `at_least` (inclusive) and `below` (exclusive) are required within it. Open-ended and changing versions are invalid |
+| `version` | **Required** with `module` and **forbidden** with `coordinate`. **Both** `at_least` (inclusive) and `below` (exclusive) are required within it; a range open at either end is invalid, as are changing (`-SNAPSHOT`) and dynamic (`+`, `latest.release`) versions |
 | `configuration` | Optional; `implementation` (default), `api`, `compileOnly`, `runtimeOnly`. A **closed** set: processor configurations execute code at build time |
 | **`[[android.contributes.gradle_repositories]]`** [§6.4](#64-maven-repositories) | |
 | `url` | A Maven repository to add to resolution, **`https` only** (scheme compared case-insensitively). The most powerful thing a sidecar can contribute |
@@ -4229,7 +4229,7 @@ place: the value kinds of [§5.5](#55-value-kinds), the Gradle configurations of
 | `from_dependency` | **Required.** `group:artifact` of a dependency the same sidecar declares; the pattern is evaluated against the effective compilation classpath and rejected where it matches a class from outside that dependency |
 | **`[[android.contributes.meta_data]]`** [§6.8](#68-manifest-meta-data) | |
 | `key` | The manifest entry's name, written exactly as the vendor code reads it. **Not** scoped by the declaring distribution, and it shares one key space with [§5.2](#52-values)'s `manifest_meta_data` delivery |
-| `value` | **Required.** A string, integer or boolean, mapped to `android:value` as the text verbatim, the digits, or `true`/`false`. Equality is by type as well as content, and the application's own entry wins |
+| `value` | **Required.** A string, integer or boolean, mapped to `android:value` as the text verbatim, the digits, or `true`/`false`. Equality is by type as well as content, and the application's own entry wins. A value **MAY** be a resource reference — anything beginning `@` or `?` — only where the same sidecar declares an action asking the application to supply it |
 | `reason` | **Required.** The key is global, its effect is invisible in Python, and the report is where an application sees what a transitive dependency turned on |
 | **`[[android.contributes.queries]]`** [§6.9](#69-package-visibility) | |
 | `package` | An application ID. **Exactly one** of `package` or `provider_authority` is required |

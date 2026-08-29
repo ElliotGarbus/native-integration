@@ -883,161 +883,324 @@ except ImportError:  # pragma: no cover - the check degrades rather than lying
 check("every current-specification sidecar validates against the generated schema", problems)
 
 # --- 19. the schema refuses what it claims to refuse -------------------------
-# A schema nothing is known to fail is a schema that might accept anything. Each
-# case below is one Phase 0 marked schema-detectable; the point is the floor,
-# not coverage — namespace containment and the merge rules are §8's and are
-# deliberately out of reach here.
-MUST_FAIL = {
-    "a Gradle configuration outside the closed set": """
-        contract = "1"
+# A schema nothing is known to fail is a schema that might accept anything.
+#
+# Each case names the instance path and the JSON Schema keyword that must
+# reject it. Asserting only "this document is invalid" is too weak: several of
+# these violate more than one rule, so removing the rule under test would leave
+# the case failing for an unrelated reason and the regression would not show.
+#
+# TOML_STRICT is the validator used here, and it is deliberately stricter than
+# the published schema. JSON Schema defines `integer` as any number with a zero
+# fractional part, so a standard validator accepts `min_sdk = 24.0` where §5.1
+# rejects it — "`24.0` is a float". A schema cannot express TOML's lexical
+# integer/float distinction at all, so `gen_schema.py` records the gap in the
+# schema's own description and §8 requirement 12 puts the check in a consumer's
+# code. This repository's own gate does not have to be that lenient.
+def _toml_integer(checker, instance):
+    return isinstance(instance, int) and not isinstance(instance, bool)
+
+
+def _toml_float(checker, instance):
+    return isinstance(instance, float)
+
+
+MUST_FAIL: dict[str, tuple[str, str, str]] = {
+    # closed vocabularies and forms
+    "a Gradle configuration outside the closed set": (
+        '''contract = "1"
         [[android.contributes.gradle_dependencies]]
         coordinate = "g:a:1"
-        configuration = "kapt"
-    """,
-    "both coordinate and module": """
-        contract = "1"
+        configuration = "kapt"''',
+        "android.contributes.gradle_dependencies.0.configuration", "enum",
+    ),
+    "a component kind outside the closed set": (
+        '''contract = "1"
+        [[android.contributes.components]]
+        kind = "provider"
+        name = "org.example.P"''',
+        "android.contributes.components.0.kind", "enum",
+    ),
+    "a branch Swift requirement": (
+        '''contract = "1"
+        [[ios.contributes.swift_packages]]
+        name = "P"
+        url = "https://example.com/p"
+        products = ["P"]
+        requirement = { branch = "main" }''',
+        "ios.contributes.swift_packages.0.requirement", "additionalProperties",
+    ),
+    "two Swift requirement forms at once": (
+        '''contract = "1"
+        [[ios.contributes.swift_packages]]
+        name = "P"
+        url = "https://example.com/p"
+        products = ["P"]
+        requirement = { exact = "1.0.0", from = "1.0.0" }''',
+        "ios.contributes.swift_packages.0.requirement", "maxProperties",
+    ),
+    "a platform name this document does not define": (
+        '''contract = "1"
+        platforms = ["web"]''',
+        "platforms.0", "enum",
+    ),
+
+    # the two dependency forms
+    "both coordinate and module": (
+        '''contract = "1"
         [[android.contributes.gradle_dependencies]]
         coordinate = "g:a:1"
         module = "g:a"
-        version = { at_least = "1", below = "2" }
-    """,
-    "neither coordinate nor module": """
-        contract = "1"
+        version = { at_least = "1", below = "2" }''',
+        "android.contributes.gradle_dependencies.0", "oneOf",
+    ),
+    "neither coordinate nor module": (
+        '''contract = "1"
         [[android.contributes.gradle_dependencies]]
-        configuration = "api"
-    """,
-    "a version range open at one end": """
-        contract = "1"
+        configuration = "api"''',
+        "android.contributes.gradle_dependencies.0", "oneOf",
+    ),
+    "a version range open at one end": (
+        '''contract = "1"
         [[android.contributes.gradle_dependencies]]
         module = "g:a"
-        version = { at_least = "1" }
-    """,
-    "an iOS value kind inside the Android table": """
-        contract = "1"
+        version = { at_least = "1" }''',
+        "android.contributes.gradle_dependencies.0.version", "required",
+    ),
+    "a module with no version": (
+        '''contract = "1"
+        [[android.contributes.gradle_dependencies]]
+        module = "g:a"''',
+        "android.contributes.gradle_dependencies.0", "required",
+    ),
+    "a coordinate with no version component": (
+        '''contract = "1"
+        [[android.contributes.gradle_dependencies]]
+        coordinate = "g:a"''',
+        "android.contributes.gradle_dependencies.0.coordinate", "pattern",
+    ),
+    "a dynamic version inside a coordinate": (
+        '''contract = "1"
+        [[android.contributes.gradle_dependencies]]
+        coordinate = "g:a:+"''',
+        "android.contributes.gradle_dependencies.0.coordinate", "pattern",
+    ),
+    "a changing version inside a coordinate": (
+        '''contract = "1"
+        [[android.contributes.gradle_dependencies]]
+        coordinate = "g:a:1.0-SNAPSHOT"''',
+        "android.contributes.gradle_dependencies.0.coordinate", "pattern",
+    ),
+    "a range spelled inside a coordinate": (
+        '''contract = "1"
+        [[android.contributes.gradle_dependencies]]
+        coordinate = "g:a:[1.0,2.0)"''',
+        "android.contributes.gradle_dependencies.0.coordinate", "pattern",
+    ),
+    "a module that is not group:artifact": (
+        '''contract = "1"
+        [[android.contributes.gradle_dependencies]]
+        module = "notacoordinate"
+        version = { at_least = "1", below = "2" }''',
+        "android.contributes.gradle_dependencies.0.module", "pattern",
+    ),
+    "a changing version in a bound": (
+        '''contract = "1"
+        [[android.contributes.gradle_dependencies]]
+        module = "g:a"
+        version = { at_least = "1.0-SNAPSHOT", below = "2" }''',
+        "android.contributes.gradle_dependencies.0.version.at_least", "pattern",
+    ),
+
+    # value kinds, keys and the platform column
+    "an iOS value kind inside the Android table": (
+        '''contract = "1"
         [[android.requires.application_value]]
         id = "x"
         kind = "info_plist"
         key = "K"
-        reason = "r"
-    """,
-    "a `key` on an inline value": """
-        contract = "1"
+        reason = "r"''',
+        "android.requires.application_value.0.kind", "enum",
+    ),
+    "a `key` on an inline value": (
+        '''contract = "1"
         [[ios.requires.application_value]]
         id = "x"
         kind = "inline"
         key = "K"
-        reason = "r"
-    """,
-    "a missing `key` on a delivering value": """
-        contract = "1"
+        reason = "r"''',
+        "ios.requires.application_value.0", "not",
+    ),
+    "a missing `key` on a delivering value": (
+        '''contract = "1"
         [[ios.requires.application_value]]
         id = "x"
         kind = "info_plist"
-        reason = "r"
-    """,
-    "a boolean floor declared false": """
-        contract = "1"
+        reason = "r"''',
+        "ios.requires.application_value.0", "required",
+    ),
+    "an info_plist value naming a usage description": (
+        '''contract = "1"
+        [[ios.requires.application_value]]
+        id = "x"
+        kind = "info_plist"
+        key = "NSCameraUsageDescription"
+        reason = "r"''',
+        "ios.requires.application_value.0.key", "not",
+    ),
+    "a usage_description naming another key": (
+        '''contract = "1"
+        [[ios.requires.application_value]]
+        id = "x"
+        kind = "usage_description"
+        key = "CFBundleName"
+        reason = "r"''',
+        "ios.requires.application_value.0.key", "pattern",
+    ),
+    "an info_plist value naming a capability key": (
+        '''contract = "1"
+        [[ios.requires.application_value]]
+        id = "x"
+        kind = "info_plist"
+        key = "UIBackgroundModes"
+        reason = "r"''',
+        "ios.requires.application_value.0.key", "not",
+    ),
+    "an info_plist value naming a consumer-managed key": (
+        '''contract = "1"
+        [[ios.requires.application_value]]
+        id = "x"
+        kind = "info_plist"
+        key = "CFBundleIdentifier"
+        reason = "r"''',
+        "ios.requires.application_value.0.key", "not",
+    ),
+
+    # floors
+    "a boolean floor declared false": (
+        '''contract = "1"
         [android.requires]
-        core_library_desugaring = false
-    """,
-    "objc_categories declared false": """
-        contract = "1"
+        core_library_desugaring = false''',
+        "android.requires.core_library_desugaring", "const",
+    ),
+    "objc_categories declared false": (
+        '''contract = "1"
         [ios.contributes]
-        objc_categories = false
-    """,
-    "an Android floor as a string": """
-        contract = "1"
+        objc_categories = false''',
+        "ios.contributes.objc_categories", "const",
+    ),
+    "an Android floor as a string": (
+        '''contract = "1"
         [android.requires]
-        min_sdk = "24"
-    """,
-    "a malformed deployment_target": """
-        contract = "1"
+        min_sdk = "24"''',
+        "android.requires.min_sdk", "type",
+    ),
+    "an Android floor as a float": (
+        '''contract = "1"
+        [android.requires]
+        min_sdk = 24.0''',
+        "android.requires.min_sdk", "type",
+    ),
+    "a malformed deployment_target": (
+        '''contract = "1"
         [ios.requires]
-        deployment_target = "15.0.0.1"
-    """,
-    "an iOS floor in the Android table": """
-        contract = "1"
+        deployment_target = "15.0.0.1"''',
+        "ios.requires.deployment_target", "pattern",
+    ),
+    "an iOS floor in the Android table": (
+        '''contract = "1"
         [android.requires]
-        deployment_target = "15.0"
-    """,
-    "a branch Swift requirement": """
-        contract = "1"
-        [[ios.contributes.swift_packages]]
-        name = "P"
-        url = "https://example.com/p"
-        products = ["P"]
-        requirement = { branch = "main" }
-    """,
-    "an empty products list": """
-        contract = "1"
-        [[ios.contributes.swift_packages]]
-        name = "P"
-        url = "https://example.com/p"
-        products = []
-        requirement = { exact = "1.0.0" }
-    """,
-    "a non-https package url": """
-        contract = "1"
-        [[ios.contributes.swift_packages]]
-        name = "P"
-        url = "git@example.com:p.git"
-        products = ["P"]
-        requirement = { exact = "1.0.0" }
-    """,
-    "an empty platforms list": """
-        contract = "1"
-        platforms = []
-    """,
-    "a platform name this document does not define": """
-        contract = "1"
-        platforms = ["web"]
-    """,
-    "a misspelled top-level scalar": """
-        contract = "1"
-        platfroms = ["ios"]
-    """,
-    "an unknown key in a platform table": """
-        contract = "1"
+        deployment_target = "15.0"''',
+        "android.requires", "additionalProperties",
+    ),
+
+    # platforms
+    "an empty platforms list": (
+        '''contract = "1"
+        platforms = []''',
+        "platforms", "minItems",
+    ),
+    "an Android table under platforms = [ios]": (
+        '''contract = "1"
+        platforms = ["ios"]
+        [android.requires]
+        min_sdk = 24''',
+        "", "not",
+    ),
+    "an iOS table under platforms = [android]": (
+        '''contract = "1"
+        platforms = ["android"]
+        [ios.requires]
+        deployment_target = "15.0"''',
+        "", "not",
+    ),
+
+    # fail closed
+    "a misspelled top-level scalar": (
+        '''contract = "1"
+        platfroms = ["ios"]''',
+        "platfroms", "type",
+    ),
+    "an unknown key in a platform table": (
+        '''contract = "1"
         [android.contributes]
-        permisions = []
-    """,
-    "a producer-declared feature `required`": """
-        contract = "1"
+        permisions = []''',
+        "android.contributes", "additionalProperties",
+    ),
+    "a malformed contract value": (
+        '''contract = "1.0.0"''',
+        "contract", "pattern",
+    ),
+    "a missing contract": (
+        '''platforms = ["ios"]''',
+        "", "required",
+    ),
+
+    # keys a producer may not spell
+    "a producer-declared feature `required`": (
+        '''contract = "1"
         [[android.contributes.features]]
         name = "android.hardware.camera"
-        required = true
-    """,
-    "a producer-declared `exported`": """
-        contract = "1"
+        required = true''',
+        "android.contributes.features.0", "features/items/properties",
+    ),
+    "a producer-declared `exported`": (
+        '''contract = "1"
         [[android.contributes.components]]
         kind = "service"
         name = "org.example.S"
-        exported = true
-    """,
-    "an exported component with no reason": """
-        contract = "1"
+        exported = true''',
+        "android.contributes.components.0", "components/items/properties",
+    ),
+
+    # components
+    "an exported component with no reason": (
+        '''contract = "1"
         [[android.contributes.components]]
         kind = "activity"
         name = "org.example.A"
-        exported_required = true
-    """,
-    "a foreground service type on a non-service": """
-        contract = "1"
+        exported_required = true''',
+        "android.contributes.components.0", "required",
+    ),
+    "a foreground service type on a non-service": (
+        '''contract = "1"
         [[android.contributes.components]]
         kind = "activity"
         name = "org.example.A"
-        foreground_service_type = "mediaProjection"
-    """,
-    "view_links on an unexported component": """
-        contract = "1"
+        foreground_service_type = "mediaProjection"''',
+        "android.contributes.components.0.kind", "const",
+    ),
+    "view_links on an unexported component": (
+        '''contract = "1"
         [[android.contributes.components]]
         kind = "activity"
         name = "org.example.A"
         [[android.contributes.components.view_links]]
-        scheme = "myapp"
-    """,
-    "intent_filters beside view_links": """
-        contract = "1"
+        scheme = "myapp"''',
+        "android.contributes.components.0", "required",
+    ),
+    "intent_filters beside view_links": (
+        '''contract = "1"
         [[android.contributes.components]]
         kind = "activity"
         name = "org.example.A"
@@ -1046,10 +1209,11 @@ MUST_FAIL = {
         [[android.contributes.components.view_links]]
         scheme = "myapp"
         [[android.contributes.components.intent_filters]]
-        action = "com.example.ACTION"
-    """,
-    "a camelCase view_links attribute": """
-        contract = "1"
+        action = "com.example.ACTION"''',
+        "android.contributes.components.0", "not",
+    ),
+    "a camelCase view_links attribute": (
+        '''contract = "1"
         [[android.contributes.components]]
         kind = "activity"
         name = "org.example.A"
@@ -1057,75 +1221,240 @@ MUST_FAIL = {
         reason = "r"
         [[android.contributes.components.view_links]]
         scheme = "myapp"
-        pathPrefix = "/cb"
-    """,
-    "an r8 keep with no from_dependency": """
-        contract = "1"
+        pathPrefix = "/cb"''',
+        "android.contributes.components.0.view_links.0", "view_links/items/propertyNames",
+    ),
+    "a non-string view_links value": (
+        '''contract = "1"
+        [[android.contributes.components]]
+        kind = "activity"
+        name = "org.example.A"
+        exported_required = true
+        reason = "r"
+        [[android.contributes.components.view_links]]
+        scheme = "myapp"
+        port = 8080''',
+        "android.contributes.components.0.view_links.0.port", "oneOf",
+    ),
+
+    # shrinker, queries
+    "an r8 keep with no from_dependency": (
+        '''contract = "1"
         [[android.contributes.r8.keep]]
-        pattern = "okhttp3.**"
-    """,
-    "a queries entry naming both targets": """
-        contract = "1"
+        pattern = "okhttp3.**"''',
+        "android.contributes.r8.keep.0", "required",
+    ),
+    "a queries entry naming both targets": (
+        '''contract = "1"
         [[android.contributes.queries]]
         package = "com.example"
         provider_authority = "com.example.provider"
+        reason = "r"''',
+        "android.contributes.queries.0", "oneOf",
+    ),
+
+    # repositories and packages
+    "a non-https repository url": (
+        '''contract = "1"
+        [[android.contributes.gradle_repositories]]
+        url = "http://example.com/m"
         reason = "r"
-    """,
-    "a consumer-managed Info.plist key": """
-        contract = "1"
+        groups = ["g"]''',
+        "android.contributes.gradle_repositories.0.url", "pattern",
+    ),
+    "a repository url carrying user-info": (
+        '''contract = "1"
+        [[android.contributes.gradle_repositories]]
+        url = "https://user:pass@example.com/m"
+        reason = "r"
+        groups = ["g"]''',
+        "android.contributes.gradle_repositories.0.url", "pattern",
+    ),
+    "a repository bounded by neither groups nor modules": (
+        '''contract = "1"
+        [[android.contributes.gradle_repositories]]
+        url = "https://example.com/m"
+        reason = "r"''',
+        "android.contributes.gradle_repositories.0", "anyOf",
+    ),
+    "a package url carrying user-info": (
+        '''contract = "1"
+        [[ios.contributes.swift_packages]]
+        name = "P"
+        url = "https://user:pass@example.com/p"
+        products = ["P"]
+        requirement = { exact = "1.0.0" }''',
+        "ios.contributes.swift_packages.0.url", "pattern",
+    ),
+    "an empty products list": (
+        '''contract = "1"
+        [[ios.contributes.swift_packages]]
+        name = "P"
+        url = "https://example.com/p"
+        products = []
+        requirement = { exact = "1.0.0" }''',
+        "ios.contributes.swift_packages.0.products", "minItems",
+    ),
+    "an authenticated package with no reason": (
+        '''contract = "1"
+        [[ios.contributes.swift_packages]]
+        name = "P"
+        url = "https://example.com/p"
+        products = ["P"]
+        requirement = { exact = "1.0.0" }
+        credentials_required = true''',
+        "ios.contributes.swift_packages.0", "required",
+    ),
+
+    # contributed Swift
+    "symbol_prefixes with no contributed Swift": (
+        '''contract = "1"
+        [ios.contributes.src]
+        symbol_prefixes = ["MyPkg"]''',
+        "ios.contributes.src", "required",
+    ),
+    "accessed_api_types with no contributed Swift": (
+        '''contract = "1"
+        [[ios.contributes.accessed_api_types]]
+        type = "NSPrivacyAccessedAPICategoryUserDefaults"
+        reasons = ["CA92.1"]''',
+        "ios.contributes", "required",
+    ),
+
+    # ownership
+    "Java source with no owned namespace": (
+        '''contract = "1"
+        [android.contributes.src]
+        java = ["java"]''',
+        "android", "required",
+    ),
+    "Kotlin source with no owned namespace": (
+        '''contract = "1"
+        [android.contributes.src]
+        kotlin = ["kotlin"]''',
+        "android", "required",
+    ),
+
+    # Info.plist
+    "a consumer-managed Info.plist key": (
+        '''contract = "1"
         [ios.contributes.info_plist.values]
-        CFBundleIdentifier = "com.example"
-    """,
-    "a capability key offered through append": """
-        contract = "1"
+        CFBundleIdentifier = "com.example"''',
+        "ios.contributes.info_plist.values", "values/propertyNames",
+    ),
+    "a capability key offered through append": (
+        '''contract = "1"
         [ios.contributes.info_plist.append]
-        UIBackgroundModes = ["remote-notification"]
-    """,
-    "a usage description offered through values": """
-        contract = "1"
+        UIBackgroundModes = ["remote-notification"]''',
+        "ios.contributes.info_plist.append", "append/propertyNames",
+    ),
+    "a usage description offered through values": (
+        '''contract = "1"
         [ios.contributes.info_plist.values]
-        NSCameraUsageDescription = "why"
-    """,
-    "SKAdNetworkItems offered through append": """
-        contract = "1"
+        NSCameraUsageDescription = "why"''',
+        "ios.contributes.info_plist.values", "values/propertyNames",
+    ),
+    "SKAdNetworkItems offered through append": (
+        '''contract = "1"
         [ios.contributes.info_plist.append]
-        SKAdNetworkItems = ["x"]
-    """,
-    "a mixed-type Info.plist array": """
-        contract = "1"
+        SKAdNetworkItems = ["x"]''',
+        "ios.contributes.info_plist.append", "append/propertyNames",
+    ),
+    "an array offered through values": (
+        '''contract = "1"
+        [ios.contributes.info_plist.values]
+        LSApplicationQueriesSchemes = ["a"]''',
+        "ios.contributes.info_plist.values.LSApplicationQueriesSchemes", "type",
+    ),
+    "a mixed-type Info.plist array": (
+        '''contract = "1"
         [ios.contributes.info_plist.append]
-        LSApplicationQueriesSchemes = ["a", 1]
-    """,
-    "an uppercase SKAdNetwork identifier": """
-        contract = "1"
+        K = ["a", 1]''',
+        "ios.contributes.info_plist.append.K", "anyOf",
+    ),
+    "an Info.plist array mixing integers and floats": (
+        '''contract = "1"
+        [ios.contributes.info_plist.append]
+        K = [1, 1.5]''',
+        "ios.contributes.info_plist.append.K", "anyOf",
+    ),
+    "an uppercase SKAdNetwork identifier": (
+        '''contract = "1"
         [ios.contributes.info_plist]
-        skadnetwork_identifiers = ["SU67R6K2V3.skadnetwork"]
-    """,
-    "a dotted Python module name": """
-        contract = "1"
+        skadnetwork_identifiers = ["SU67R6K2V3.skadnetwork"]''',
+        "ios.contributes.info_plist.skadnetwork_identifiers.0", "pattern",
+    ),
+
+    # Python modules
+    "a dotted Python module name": (
+        '''contract = "1"
         [[ios.contributes.python_modules]]
         name = "web.views"
-        swift_package = "P"
-    """,
-    "a malformed contract value": """
-        contract = "1.0.0"
-    """,
-    "a missing contract": """
-        platforms = ["ios"]
-    """,
+        swift_package = "P"''',
+        "ios.contributes.python_modules.0.name", "pattern",
+    ),
+    "a Python module naming no package": (
+        '''contract = "1"
+        [[ios.contributes.python_modules]]
+        name = "web_views"''',
+        "ios.contributes.python_modules.0", "required",
+    ),
+
+    # meta_data
+    "a float meta_data value": (
+        '''contract = "1"
+        [[android.contributes.meta_data]]
+        key = "k"
+        value = 1.5
+        reason = "r"''',
+        "android.contributes.meta_data.0.value", "type",
+    ),
+    "a meta_data entry with no reason": (
+        '''contract = "1"
+        [[android.contributes.meta_data]]
+        key = "k"
+        value = "v"''',
+        "android.contributes.meta_data.0", "required",
+    ),
 }
+
 problems = []
 try:
     from jsonschema import Draft202012Validator
+    from jsonschema.validators import extend
 
-    validator = Draft202012Validator(SCHEMA)
-    for name, body in MUST_FAIL.items():
+    TOML_STRICT = extend(
+        Draft202012Validator,
+        type_checker=Draft202012Validator.TYPE_CHECKER.redefine(
+            "integer", _toml_integer
+        ).redefine("number", _toml_float),
+    )
+    strict = TOML_STRICT(SCHEMA)
+
+    for name, (body, where, keyword) in MUST_FAIL.items():
         document = tomllib.loads(textwrap.dedent(body))
-        if validator.is_valid(document):
+        signatures = {
+            (
+                ".".join(str(part) for part in error.absolute_path),
+                str(error.validator),
+                "/".join(str(part) for part in error.absolute_schema_path),
+            )
+            for error in strict.iter_errors(document)
+        }
+        if not signatures:
             problems.append(f"the schema accepts {name}, and SPEC.md does not")
+        elif not any(
+            path == where
+            and (not keyword or keyword == validator or keyword in schema_path)
+            for path, validator, schema_path in signatures
+        ):
+            problems.append(
+                f"{name} is rejected, but not at {where or '<root>'}"
+                f"/{keyword or 'any'} — got {sorted(signatures)}"
+            )
 except ImportError:  # pragma: no cover
     problems.append("jsonschema is not installed, so the negative cases were not exercised")
-check("the schema refuses what SPEC.md refuses", problems)
+check("the schema refuses what SPEC.md refuses, for the stated reason", problems)
 
 
 print()

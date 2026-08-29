@@ -131,7 +131,7 @@ declaration = "<platform>.requires.application_value.id"
 section = "5.2"
 anchor = "52-values"
 severity = "blocking"
-summary = "`<platform>.requires.application_value.id` repeats a value that must be unique"
+summary = "`<platform>.requires.application_value.id` repeats a value that must be unique in one platform table requirements"
 
 [diagnostics."ni.decl.<platform>.requires.application_value.kind.missing"]
 declaration = "<platform>.requires.application_value.kind"
@@ -216,13 +216,6 @@ section = "5.3"
 anchor = "53-actions"
 severity = "blocking"
 summary = "`<platform>.requires.application_action.id` is not of the type this declaration takes"
-
-[diagnostics."ni.decl.<platform>.requires.application_action.id.duplicate"]
-declaration = "<platform>.requires.application_action.id"
-section = "5.3"
-anchor = "53-actions"
-severity = "blocking"
-summary = "`<platform>.requires.application_action.id` repeats a value that must be unique"
 
 [diagnostics."ni.decl.<platform>.requires.application_action.summary.missing"]
 declaration = "<platform>.requires.application_action.summary"
@@ -350,12 +343,26 @@ anchor = "63-gradle-dependencies"
 severity = "blocking"
 summary = "`android.contributes.gradle_dependencies.coordinate` is not of the type this declaration takes"
 
+[diagnostics."ni.decl.android.contributes.gradle_dependencies.coordinate.pattern"]
+declaration = "android.contributes.gradle_dependencies.coordinate"
+section = "6.3"
+anchor = "63-gradle-dependencies"
+severity = "blocking"
+summary = "`android.contributes.gradle_dependencies.coordinate` does not match the form this declaration fixes"
+
 [diagnostics."ni.decl.android.contributes.gradle_dependencies.module.type"]
 declaration = "android.contributes.gradle_dependencies.module"
 section = "6.3"
 anchor = "63-gradle-dependencies"
 severity = "blocking"
 summary = "`android.contributes.gradle_dependencies.module` is not of the type this declaration takes"
+
+[diagnostics."ni.decl.android.contributes.gradle_dependencies.module.pattern"]
+declaration = "android.contributes.gradle_dependencies.module"
+section = "6.3"
+anchor = "63-gradle-dependencies"
+severity = "blocking"
+summary = "`android.contributes.gradle_dependencies.module` does not match the form this declaration fixes"
 
 [diagnostics."ni.decl.android.contributes.gradle_dependencies.version.type"]
 declaration = "android.contributes.gradle_dependencies.version"
@@ -581,13 +588,6 @@ anchor = "66-manifest-components"
 severity = "blocking"
 summary = "`android.contributes.components.foreground_service_type` is not of the type this declaration takes"
 
-[diagnostics."ni.decl.android.contributes.components.foreground_service_type.invalid-context"]
-declaration = "android.contributes.components.foreground_service_type"
-section = "6.6"
-anchor = "66-manifest-components"
-severity = "blocking"
-summary = "`android.contributes.components.foreground_service_type` is declared where it is not valid"
-
 [diagnostics."ni.decl.android.contributes.components.exported_required.type"]
 declaration = "android.contributes.components.exported_required"
 section = "6.6"
@@ -609,12 +609,12 @@ anchor = "66-manifest-components"
 severity = "blocking"
 summary = "`android.contributes.components.exported` must not be declared by a producer"
 
-[diagnostics."ni.decl.android.contributes.components.view_links.unknown-key"]
+[diagnostics."ni.decl.android.contributes.components.view_links.open-key-pattern"]
 declaration = "android.contributes.components.view_links"
-section = "4.4"
-anchor = "44-unknown-declarations-fail-closed"
+section = "6.6"
+anchor = "66-manifest-components"
 severity = "blocking"
-summary = "`android.contributes.components.view_links` carries a key this specification does not define"
+summary = "`android.contributes.components.view_links` carries a key that is not `[a-z][a-z0-9]*(_[a-z0-9]+)*`, which the conversion to a platform attribute name is defined only for"
 
 [diagnostics."ni.decl.android.contributes.components.view_links.scheme.missing"]
 declaration = "android.contributes.components.view_links.scheme"
@@ -824,7 +824,7 @@ declaration = "ios.contributes.swift_packages.name"
 section = "7.2"
 anchor = "72-swift-packages"
 severity = "blocking"
-summary = "`ios.contributes.swift_packages.name` repeats a value that must be unique"
+summary = "`ios.contributes.swift_packages.name` repeats a value that must be unique in one sidecar"
 
 [diagnostics."ni.decl.ios.contributes.swift_packages.url.missing"]
 declaration = "ios.contributes.swift_packages.url"
@@ -916,13 +916,6 @@ section = "7.1"
 anchor = "71-symbol-prefixes"
 severity = "blocking"
 summary = "`ios.contributes.src.symbol_prefixes` is not of the type this declaration takes"
-
-[diagnostics."ni.decl.ios.contributes.src.symbol_prefixes.invalid-context"]
-declaration = "ios.contributes.src.symbol_prefixes"
-section = "7.1"
-anchor = "71-symbol-prefixes"
-severity = "blocking"
-summary = "`ios.contributes.src.symbol_prefixes` is declared where it is not valid"
 
 [diagnostics."ni.decl.ios.contributes.accessed_api_types.unknown-key"]
 declaration = "ios.contributes.accessed_api_types"
@@ -1085,6 +1078,27 @@ anchor = "55-value-kinds"
 severity = "blocking"
 summary = "`key` must be absent when `kind` is `inline`"
 
+[diagnostics."ni.constraint.<platform>.requires.application_value.key.pattern-if-equals.kind"]
+declaration = "<platform>.requires.application_value.key"
+section = "5.5"
+anchor = "55-value-kinds"
+severity = "blocking"
+summary = "`key` must match `.*UsageDescription` when `kind` is `usage_description`"
+
+[diagnostics."ni.constraint.<platform>.requires.application_value.key.pattern-forbidden-if-equals.kind"]
+declaration = "<platform>.requires.application_value.key"
+section = "5.5"
+anchor = "55-value-kinds"
+severity = "blocking"
+summary = "`key` must not match `.*UsageDescription` when `kind` is `info_plist`"
+
+[diagnostics."ni.constraint.<platform>.requires.application_value.key.registers-forbidden-if-equals.kind"]
+declaration = "<platform>.requires.application_value.key"
+section = "5.5"
+anchor = "55-value-kinds"
+severity = "blocking"
+summary = "`key` names a key this specification refuses when `kind` is `info_plist`"
+
 [diagnostics."ni.constraint.android.contributes.gradle_dependencies.version.required-if-present.module"]
 declaration = "android.contributes.gradle_dependencies.version"
 section = "6.3"
@@ -1125,7 +1139,7 @@ declaration = "android.contributes.components.view_links"
 section = "6.6"
 anchor = "66-manifest-components"
 severity = "blocking"
-summary = "`view_links` is valid only where `exported_required` is `True`"
+summary = "`view_links` is valid only where `exported_required` is `true`"
 
 [diagnostics."ni.constraint.android.contributes.components.intent_filters.forbidden-if-present.exported_required"]
 declaration = "android.contributes.components.intent_filters"
@@ -1140,6 +1154,48 @@ section = "6.6"
 anchor = "66-manifest-components"
 severity = "blocking"
 summary = "`intent_filters` must be absent when `view_links` is declared"
+
+[diagnostics."ni.constraint.ios.contributes.swift_packages.reason.required-if-present.credentials_required"]
+declaration = "ios.contributes.swift_packages.reason"
+section = "7.2"
+anchor = "72-swift-packages"
+severity = "blocking"
+summary = "`reason` is required when `credentials_required` is declared"
+
+[diagnostics."ni.constraint.ios.contributes.src.symbol_prefixes.requires-present.swift"]
+declaration = "ios.contributes.src.symbol_prefixes"
+section = "7.1"
+anchor = "71-symbol-prefixes"
+severity = "blocking"
+summary = "`symbol_prefixes` is valid only where `swift` is declared"
+
+[diagnostics."ni.constraint.ios.contributes.accessed_api_types.requires-present.src.swift"]
+declaration = "ios.contributes.accessed_api_types"
+section = "7.3"
+anchor = "73-source"
+severity = "blocking"
+summary = "`accessed_api_types` is valid only where `src.swift` is declared"
+
+[diagnostics."ni.constraint.android.owns.java_namespaces.required-if-any-present"]
+declaration = "android.owns.java_namespaces"
+section = "6.1"
+anchor = "61-ownership"
+severity = "blocking"
+summary = "`owns.java_namespaces` is required when any of `contributes.src.java`, `contributes.src.kotlin` is declared"
+
+[diagnostics."ni.constraint.android.platform-table-requires-listing.platforms"]
+declaration = "android"
+section = "4.5"
+anchor = "45-platform-support"
+severity = "blocking"
+summary = "a `android` table contradicts a `platforms` key that omits it"
+
+[diagnostics."ni.constraint.ios.platform-table-requires-listing.platforms"]
+declaration = "ios"
+section = "4.5"
+anchor = "45-platform-support"
+severity = "blocking"
+summary = "a `ios` table contradicts a `platforms` key that omits it"
 
 [diagnostics."ni.req.1"]
 requirement = 1
@@ -1211,7 +1267,7 @@ profile = "core"
 section = "8.4"
 anchor = "84-requirements"
 severity = "blocking"
-summary = "Enforce `platforms` entirely: reject an empty list and a name this document does not define, reject a platform table for a name the key omits, and fail when building for a platform the key omits, naming the distribution and how it entered the closure. And fail, rather than building partially, when asked to build for a platform whose conformance profile it does not implement ([§4.5](#45-platform-support), [§8.1](#81-conformance-is-per-platform)). Answering, reporting, and scaffolding"
+summary = "Enforce `platforms` entirely: reject an empty list and a name this document does not define, reject a platform table for a name the key omits, and fail when building for a platform the key omits, naming the distribution and how it entered the closure. And fail, rather than building partially, when asked to build for a platform whose conformance profile it does not implement ([§4.5](#45-platform-support), [§8.1](#81-conformance-is-per-platform))."
 
 [diagnostics."ni.req.10"]
 requirement = 10
@@ -1227,7 +1283,7 @@ profile = "core"
 section = "8.4"
 anchor = "84-requirements"
 severity = "blocking"
-summary = "Report every unmet requirement, naming the distribution and the `reason` — or, for a floor, which carries none, the declared and configured values — and, for an action, the `summary` plus `instructions` and `acceptance` wherever the sidecar declares them, both being optional fields ([§2.3](#23-what-the-consumer-generates), [§5.1](#51-build-floors), [§5.3](#53-actions)). Never satisfy a requirement on the producer's authority"
+summary = "Report every unmet requirement, naming the distribution and the `reason` — or, for a floor, which carries none, the declared and configured values — and, for an action, the `summary` plus `instructions` and `acceptance` wherever the sidecar declares them, both being optional fields ([§2.3](#23-what-the-consumer-generates), [§5.1](#51-build-floors), [§5.3](#53-actions))."
 
 [diagnostics."ni.req.12"]
 requirement = 12
@@ -1267,7 +1323,7 @@ profile = "core"
 section = "8.4"
 anchor = "84-requirements"
 severity = "blocking"
-summary = "Never invent the content of an application-owned artifact — an entitlement, a capability, a bundle file, a build target — on a producer's declaration alone. Placing a string the *application* supplied is exactly what [§5.5](#55-value-kinds)'s kinds are for and is not this ([§2.1](#21-design-principles)). Composition between distributions"
+summary = "Never invent the content of an application-owned artifact — an entitlement, a capability, a bundle file, a build target — on a producer's declaration alone. Placing a string the *application* supplied is exactly what [§5.5](#55-value-kinds)'s kinds are for and is not this ([§2.1](#21-design-principles))."
 
 [diagnostics."ni.req.17"]
 requirement = 17
@@ -1315,7 +1371,7 @@ profile = "core"
 section = "8.4"
 anchor = "84-requirements"
 severity = "blocking"
-summary = "Reject two requirements in one platform table sharing an `id`; reject a `uses` entry naming no value the same sidecar declares for the same platform; and report two actions sharing a `slot` together, naming both distributions, without interpreting the slot ([§5](#5-requirements-on-the-application), [§5.3](#53-actions), [§5.7](#57-slots)). Generated project material"
+summary = "Reject two requirements in one platform table sharing an `id`; reject a `uses` entry naming no value the same sidecar declares for the same platform; and report two actions sharing a `slot` together, naming both distributions, without interpreting the slot ([§5](#5-requirements-on-the-application), [§5.3](#53-actions), [§5.7](#57-slots))."
 
 [diagnostics."ni.req.23"]
 requirement = 23
@@ -1435,7 +1491,7 @@ profile = "ios"
 section = "8.4"
 anchor = "84-requirements"
 severity = "blocking"
-summary = "Link the application target so Objective-C categories in statically linked libraries are loaded when any distribution asks, reject `objc_categories = false`, and report it naming the distributions that asked ([§7.6](#76-objective-c-categories)). Recording, disclosure, attribution"
+summary = "Link the application target so Objective-C categories in statically linked libraries are loaded when any distribution asks, reject `objc_categories = false`, and report it naming the distributions that asked ([§7.6](#76-objective-c-categories))."
 
 [diagnostics."ni.req.38"]
 requirement = 38
@@ -1491,7 +1547,7 @@ profile = "android"
 section = "8.4"
 anchor = "84-requirements"
 severity = "blocking"
-summary = "Detect packaging collisions between the resolved artifacts of different distributions, resolve on its own authority only the packaging-metadata names [§9.7](#97-packaging-collisions) lists — never a file in a subdirectory of `META-INF/` — fail on any other colliding file the application has not chosen between, and record every collision against the distributions responsible ([§9.7](#97-packaging-collisions)). The bootstrap"
+summary = "Detect packaging collisions between the resolved artifacts of different distributions, resolve on its own authority only the packaging-metadata names [§9.7](#97-packaging-collisions) lists — never a file in a subdirectory of `META-INF/` — fail on any other colliding file the application has not chosen between, and record every collision against the distributions responsible ([§9.7](#97-packaging-collisions))."
 
 [diagnostics."ni.req.45"]
 requirement = 45

@@ -8,9 +8,9 @@ fails when any of them would produce a diff against what is committed.
 | --- | --- | --- |
 | `SPEC.md` Appendix B | `tools/gen_appendix_b.py` | 100 rows, between `<!-- appendix-b -->` delimiters |
 | `schema/native-integration-v1.schema.json` | `tools/gen_schema.py` | draft 2020-12, structural validation only |
-| `contract/diagnostics-v1.toml` | `tools/gen_error_ids.py` | 223 stable diagnostic IDs |
+| `contract/diagnostics-v1.toml` | `tools/gen_error_ids.py` | 231 stable diagnostic IDs |
 
-The registry holds **97 declarations**, **10 between-key constraints**, and
+The registry holds **97 declarations**, **19 between-key constraints**, and
 **4 refusal registers** (§7.4's capability keys and consumer-managed keys,
 §6.1's reserved namespaces, §9.7's packaging-metadata filenames). Every entry is
 contract 1.0; nothing carries a *Since* mark, which matches Appendix B's own
@@ -153,12 +153,11 @@ table. That is exactly what the constraint expresses.
 `development/redesign/examples/`, SPEC.md's own Appendix A, and every whole
 sidecar in `README.md`.
 
-**Refused by it, all failing as they must:** 35 cases in
-`tools/check_spec.py`'s `MUST_FAIL` table, one per schema-detectable rule Phase 0
-identified — a Gradle configuration outside the closed set, `coordinate` and
-`module` together, an iOS value kind inside `[android]`, a `key` on an `inline`
-value, `core_library_desugaring = false`, a `branch` Swift requirement, a
-camelCase `view_links` attribute, a consumer-managed plist key, and the rest.
+**Refused by it, all failing as they must:** 67 cases in
+`tools/check_spec.py`'s `MUST_FAIL` table. Each names the instance path and the
+JSON Schema keyword — or schema-path fragment — that must do the rejecting, so a
+case cannot pass for an unrelated reason and a removed rule cannot hide behind a
+second violation in the same fixture.
 
 ### `examples/` is not among them, and this is the D7 problem
 
@@ -201,8 +200,8 @@ adding a rule renumbers nothing:
 
 | Family | Count | Example |
 | --- | --- | --- |
-| `ni.decl.<declaration-id>.<check>` | 152 | `ni.decl.android.contributes.components.kind.value` |
-| `ni.constraint.<scope>.<field>.<rule>.<other>` | 10 | `ni.constraint.<platform>.requires.application_value.key.forbidden-if-equals.kind` |
+| `ni.decl.<declaration-id>.<check>` | 151 | `ni.decl.android.contributes.components.kind.value` |
+| `ni.constraint.<scope>.<field>.<rule>.<other>` | 19 | `ni.constraint.<platform>.requires.application_value.key.forbidden-if-equals.kind` |
 | `ni.req.<n>` | 46 | `ni.req.25` |
 | `ni.adv.<Sn>` | 15 | `ni.adv.S13` |
 
@@ -267,3 +266,69 @@ misrepresents or silently widens. The places I would look first:
 6. **The refusal registers.** A5 closed the consumer-managed list at four. §5.5
    still spells it "such as", so the specification now says one thing in two
    places — the registry follows §7.4.
+
+
+---
+
+## 8. The adversarial review, and what it changed
+
+The Phase 1 gate ran and returned 22 findings. **Every one was reproduced before
+being acted on**, and all 19 claimed widenings were real: probed against the
+committed schema, each accepted a document `SPEC.md` rejects. The review also
+caught a counting error of mine — `MUST_FAIL` held **37** cases, not the 35 this
+document and two commit messages claimed.
+
+### Closed
+
+| | Was accepted | Now |
+| --- | --- | --- |
+| 1 | an `info_plist` value naming a `*UsageDescription`, capability, external-reach or consumer-managed key; a `usage_description` naming anything else | three new `[[constraints]]` rules, §5.5 |
+| 2 | `coordinate = "x"`, `g:a:+`, `g:a:1-SNAPSHOT`, `g:a:[1.0,2.0)`, `module = "x"`, `at_least = "1-SNAPSHOT"` | grammar patterns on `coordinate`, `module`, and both version bounds, §6.3 |
+| 3 | `https://user:pass@host/…` in a repository or package `url` | `forbids_user_info` on both, §6.4 |
+| 4 | `platforms = ["ios"]` beside an `[android]` table | a root constraint per platform, §4.5 |
+| 6 | an array under `info_plist.values`, which the registry already called scalar | a `plistScalar` `$def`; the generator was ignoring `value_type` |
+| 7 | `credentials_required` with no `reason` | the `required_when` the registry recorded and the generator dropped, §7.2 |
+| 8 | `symbol_prefixes` and `accessed_api_types` with no contributed Swift | `requires_present`, §7.1 and §7.3 |
+| 9 | Java or Kotlin source with no `java_namespaces` | `required_if_any_present`, §6.1 |
+
+Findings 10–15 were registry misstatements and are corrected: `slot` is no
+longer marked `passthrough` (§5.5 says nothing in that section is), the
+`java_namespaces` trigger is scoped to `keep_classes` under the distribution's
+own namespace, `meta_data.value` carries its `@`/`?` resource-reference
+condition, an action's identity says `(distribution, platform, id)` and its
+`uses` says *same platform*, the Gradle rows state the two forms are exclusive,
+and `deployment_target` says it is a **TOML string** where the three rows above
+it are integers.
+
+Findings 16–20 were diagnostic-generation defects, all fixed: six requirement
+summaries were absorbing §8.4's next theme heading; `view_links` was emitting an
+`unknown-key` ID that contradicts §4.4's one stated exception, and had no ID for
+the key-shape rule it actually enforces; two failure states had two IDs each;
+and one summary rendered TOML `true` as Python `True`.
+
+Findings 21 and 22 were about the negatives themselves, and are the reason the
+table grew from 37 cases to **67**. Each case now names where and how it must
+fail, so a fixture violating several rules can no longer mask the removal of the
+one under test, and the two forbidden keys fail through their own `false`
+subschema rather than through the generic `additionalProperties`.
+
+### Not closed, and why
+
+**Finding 5 — TOML integers against JSON numbers — cannot be fixed in the
+published schema.** JSON Schema defines `integer` as any number with a zero
+fractional part, so *any* conforming validator accepts `min_sdk = 24.0` where
+§5.1 says "`24.0` is a float" and rejects it. The registry's types were correct
+and the review said so; the limitation is the format's.
+
+Three things were done instead. `tools/check_spec.py` validates with a
+TOML-strict type checker — `integer` means a TOML integer, `number` means a TOML
+float — which also makes `[1, 1.5]` the mixed-type array §7.4 forbids. The
+schema's own `description` records that it cannot carry the distinction. And the
+check belongs to a consumer's code, which is where §8 requirement 12 already
+puts it, so Phase 3 inherits it rather than it being lost.
+
+**Finding 9 is closed only for its source trigger.** §6.1 also requires
+`java_namespaces` when a sidecar contributes producer-sourced components or
+keep patterns under its own namespace. Both need namespace containment, which
+the work brief reserves for Phase 3 and the schema is explicitly not to reach
+for.
