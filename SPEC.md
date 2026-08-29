@@ -4157,15 +4157,19 @@ place: the value kinds of [§5.5](#55-value-kinds), the Gradle configurations of
 [§4.5](#45-platform-support), and the capability and external-reach keys of
 [§7.4](#74-infoplist).
 
+<!-- appendix-b -->
+
 | Entry | Description |
 | --- | --- |
 | **Top level** | |
 | `contract` | **Required.** Major of this document, optionally with a minor — `"1"` or `"1.1"`. [§4.3](#43-contract-version) |
 | `platforms` | Optional. Where the distribution *functions*, not merely where it contributes; a build for an omitted platform fails. [§4.5](#45-platform-support) |
 | **`[<platform>.requires]` — floors** [§5.1](#51-build-floors) | |
-| `min_sdk`, `compile_sdk`, `target_sdk` | Android floors, and **TOML integers** — `"24"` and `24.0` are rejected. The build fails when the application is lower; the consumer never raises it. `target_sdk` changes behavior app-wide, so declare it only when a behavior depends on it |
+| `min_sdk` | An Android floor, and a **TOML integer** — `"24"` and `24.0` are rejected. The build fails when the application is lower; the consumer never raises it |
+| `compile_sdk` | An Android floor, on the same terms as `min_sdk` |
+| `target_sdk` | An Android floor, on the same terms. It changes behavior app-wide, so declare it only when a behavior depends on it, and a consumer gives it the prominence a repository contribution gets |
 | `core_library_desugaring` | Optional boolean, and only `true` is valid — a consumer rejects `false`. A floor on a boolean axis: the build fails when the application has not enabled desugaring |
-| `deployment_target` | iOS floor, on the same terms |
+| `deployment_target` | iOS floor, on the same terms. One to three ASCII-decimal components, compared component-wise and numerically with absent components read as zero |
 | **`[[<platform>.requires.application_value]]`** [§5.2](#52-values) | A string the application supplies and the consumer places |
 | `id` | **Required.** A logical name, unique among the requirements in one platform table; identity is (distribution, platform, `id`) |
 | `kind` | **Required.** Where the consumer writes it. A **closed** set — [§5.5](#55-value-kinds). `info_plist` may not name a usage-description, capability, external-reach or consumer-managed key; `usage_description` may name only a `*UsageDescription` one |
@@ -4185,40 +4189,54 @@ place: the value kinds of [§5.5](#55-value-kinds), the Gradle configurations of
 | **`[android.owns]`** [§6.1](#61-ownership) | |
 | `java_namespaces` | Java namespaces this distribution claims exclusively; overlapping claims fail the build. Required when contributing Java/Kotlin, producer-sourced components, or keep patterns |
 | **`[android.contributes.src]`** [§6.2](#62-source) | |
-| `java`, `kotlin` | Directories whose `.java` / `.kt` files the application's own toolchain compiles |
+| `java` | Directories whose `.java` files the application's own toolchain compiles |
+| `kotlin` | Directories whose `.kt` files the application's own toolchain compiles |
 | **`[[android.contributes.gradle_dependencies]]`** [§6.3](#63-gradle-dependencies) | |
 | `coordinate` | `group:artifact:version`, exactly versioned. The version is visible in the sidecar, but it states no upper bound: Gradle may resolve past a major the producer never compiled against |
-| `module` + `version` | `group:artifact` with a bounded `{ at_least, below }` range. Open-ended and changing versions are invalid. **Recommended** where the producer's own source compiles against the dependency, because `below` is the only way to say which major it cannot survive |
+| `module` | `group:artifact`, paired with a bounded `version`. **Recommended** where the producer's own source compiles against the dependency, because `below` is the only way to say which major it cannot survive |
+| `version` | **Required** with `module`, and **both** `at_least` (inclusive) and `below` (exclusive) are required within it. Open-ended and changing versions are invalid |
 | `configuration` | Optional; `implementation` (default), `api`, `compileOnly`, `runtimeOnly`. A **closed** set: processor configurations execute code at build time |
 | **`[[android.contributes.gradle_repositories]]`** [§6.4](#64-maven-repositories) | |
 | `url` | A Maven repository to add to resolution, **`https` only** (scheme compared case-insensitively). The most powerful thing a sidecar can contribute |
 | `reason` | **Required.** Why the artifacts are not on Maven Central, and — when authenticated — which credential is needed and where to get it |
-| `groups`, `modules` | **At least one required.** Bounds what the repository may serve, by **exact** match on a group ID or a `group:artifact` pair — never a prefix, so `org.example` does not admit `org.example.tools` |
+| `groups` | **At least one of `groups`/`modules` required.** Bounds what the repository may serve, by **exact** match on a group ID — never a prefix, so `org.example` does not admit `org.example.tools` |
+| `modules` | **At least one of `groups`/`modules` required.** Bounds the repository by **exact** match on a `group:artifact` pair |
 | `credentials_required` | Optional. Declares the repository authenticated. A sidecar **MUST NOT** contain the credential itself |
 | **`[[android.contributes.permissions]]`** [§6.5](#65-permissions-and-features) | |
 | `name` | The canonical manifest string — `android.permission.INTERNET`, never a shorthand |
 | `reason` | Recommended; carried into the record and report |
-| `max_sdk_version`, `never_for_location` | Optional. `android:maxSdkVersion` and `android:usesPermissionFlags="neverForLocation"`. Both are minimization; where two distributions differ, the **widest** need wins and the merge is reported |
+| `max_sdk_version` | Optional. `android:maxSdkVersion`. Minimization; where two distributions differ, the **widest** need wins and the merge is reported |
+| `never_for_location` | Optional. `android:usesPermissionFlags="neverForLocation"`, and it holds only when **every** declaration of that permission asserts it |
 | **`[[android.contributes.features]]`** [§6.5](#65-permissions-and-features) | |
 | `name` | Always registered `required="false"`; only the application may promote a feature |
+| `required` | **Not a field.** A producer **MUST NOT** declare it, and a consumer rejects it with a diagnostic naming this rule rather than the generic unknown-key one |
 | **`[[android.contributes.components]]`** [§6.6](#66-manifest-components) | |
 | `kind` | `service`, `activity` or `receiver`. `provider` is deliberately absent: a provider runs before application code, which is the startup seam §11 defers |
 | `name` | The class. Under an owned namespace unless `from_dependency` says otherwise |
 | `from_dependency` | `group:artifact` of a dependency the same sidecar declares, which owns the class |
 | `foreground_service_type` | Android's own value, on a `service` only. Mandatory on Android 14+ for a foreground service |
-| `exported_required` + `reason` | Requests export. The build fails without explicit application approval — it never falls back to unexported |
-| `[[…view_links]]` — `scheme`, `host`, `path_prefix`, and Android's other `<data>` attributes | Generates the browser-return filter. Valid only on an exported activity; `scheme` is required; values are strings, literal or inline. The **attribute names are open** — the one place an unrecognized key is written through rather than rejected — and snake case converts to the platform's name mechanically ([§6.6](#66-manifest-components)) |
-| `[[…intent_filters]]` — `action` | One vendor-defined action, on a component that is neither exported nor carrying `view_links` |
+| `exported_required` | Requests export. The build fails without explicit application approval — it never falls back to unexported |
+| `reason` | **Required when `exported_required` is present.** Why the component is useless unless reachable |
+| `exported` | **Not a field.** Components are registered `android:exported="false"` by default and a producer **MUST NOT** declare export directly; use `exported_required` |
+| **`[[android.contributes.components.view_links]]`** [§6.6](#66-manifest-components) | Generates the browser-return filter. Valid only on an exported activity; values are strings, literal or inline. The **attribute names are open** — the one place an unrecognized key is written through rather than rejected — and snake case converts to the platform's name mechanically ([§6.6](#66-manifest-components)) |
+| `scheme` | **Required.** The only `<data>` attribute a `view_links` entry must carry. `host`, `port`, `path`, `path_prefix`, `path_pattern`, `path_suffix`, `mime_type` and every other attribute the platform defines are equally declarable |
+| **`[[android.contributes.components.intent_filters]]`** [§6.6](#66-manifest-components) | |
+| `action` | One vendor-defined action, on a component that is neither exported nor carrying `view_links`. Exactly one per filter; no categories and no data element |
 | **`[android.contributes.r8]`** [§6.7](#67-shrinker-keep-patterns) | |
-| `keep_classes` | Class patterns the shrinker must keep; the consumer generates the `-keep` rules. Each must fall within an owned namespace |
-| `[[…r8.keep]]` — `pattern`, `from_dependency` | Keeps a *dependency's* classes instead, checked against what the resolved artifact actually contains |
+| `keep_classes` | Class patterns the shrinker must keep; the consumer generates the `-keep` rules. Each must fall within an owned namespace, by its wildcard-free literal prefix |
+| **`[[android.contributes.r8.keep]]`** [§6.7](#67-shrinker-keep-patterns) | |
+| `pattern` | **Required.** Keeps a *dependency's* classes instead of an owned namespace's, checked against what the resolved artifact actually contains |
+| `from_dependency` | **Required.** `group:artifact` of a dependency the same sidecar declares; the pattern is evaluated against the effective compilation classpath and rejected where it matches a class from outside that dependency |
 | **`[[android.contributes.meta_data]]`** [§6.8](#68-manifest-meta-data) | |
-| `key`, `value`, `reason` | A `<meta-data>` entry the producer knows the value of. `reason` **required**; `value` is a string, integer or boolean; the application's own entry wins |
+| `key` | The manifest entry's name, written exactly as the vendor code reads it. **Not** scoped by the declaring distribution, and it shares one key space with [§5.2](#52-values)'s `manifest_meta_data` delivery |
+| `value` | **Required.** A string, integer or boolean, mapped to `android:value` as the text verbatim, the digits, or `true`/`false`. Equality is by type as well as content, and the application's own entry wins |
+| `reason` | **Required.** The key is global, its effect is invisible in Python, and the report is where an application sees what a transitive dependency turned on |
 | **`[[android.contributes.queries]]`** [§6.9](#69-package-visibility) | |
-| `package`, `provider_authority`, `reason` | Package visibility for the producer's own code. Exactly one of the first two; `reason` **required**. No veto, because removing one breaks the producer silently |
-
+| `package` | An application ID. **Exactly one** of `package` or `provider_authority` is required |
+| `provider_authority` | A content provider authority. **Exactly one** of `package` or `provider_authority` is required |
+| `reason` | **Required.** Package visibility for the producer's own code. No veto, because removing one breaks the producer silently |
 | **`[[ios.contributes.swift_packages]]`** [§7.2](#72-swift-packages) | |
-| `name` | Local handle, unique within the sidecar; [§7.5](#75-python-modules) refers to packages by it |
+| `name` | **Required.** Local handle, unique within the sidecar; [§7.5](#75-python-modules) refers to packages by it |
 | `url` | The package repository. **Required**, and **MUST** be `https` |
 | `products` | **Required**, non-empty. Which of the package's products the application target links |
 | `requirement` | Exactly one of `{ exact }`, `{ from }`, `{ revision }`. `branch` is invalid |
@@ -4228,18 +4246,21 @@ place: the value kinds of [§5.5](#55-value-kinds), the Gradle configurations of
 | `swift` | Directories of `.swift` staged into the application target. For small shims only |
 | `symbol_prefixes` | Prefixes the producer puts on its contributed Swift type names ([§7.1](#71-symbol-prefixes)). Guidance only; it does not cover file-scope functions or extension members, and it is invalid without contributed source |
 | **`[[ios.contributes.accessed_api_types]]`** [§7.3](#73-source) — a sibling of `src`, not a child of it | |
-| `type`, `reasons`, `reason` | Required-reason APIs the contributed Swift touches, merged into the application's `PrivacyInfo.xcprivacy`. Valid only in a sidecar that also contributes Swift source |
+| `type` | **Required.** Apple's canonical string for a required-reason API category, written exactly as Apple defines it. Valid only in a sidecar that also contributes Swift source |
+| `reasons` | **Required.** Apple's canonical reason codes, merged into the application's `PrivacyInfo.xcprivacy` and de-duplicated per `type` |
+| `reason` | Recommended prose. Apple's codes are opaque by design, and the record is where an application reads what its dependencies claim |
 | **`[ios.contributes.info_plist]`** [§7.4](#74-infoplist) | |
-| `values` | Scalar keys set verbatim. Collisions fail; `*UsageDescription`, capability, external-reach and consumer-managed keys are rejected |
-| `append` | Array keys merged with the application's and other producers', de-duplicated. Rejects the same keys `values` does |
-| *(both)* | A key occupies **one** mode across the effective set: array under `append`, scalar under `values` or through an `info_plist` value ([§5.5](#55-value-kinds)). Claimed both ways, it fails |
+| `values` | Scalar keys set verbatim. Collisions fail; `*UsageDescription`, capability, external-reach and consumer-managed keys are rejected. A key occupies **one** mode across the effective set — scalar here or through an `info_plist` value ([§5.5](#55-value-kinds)), array under `append` — and claimed both ways it fails |
+| `append` | Array keys merged with the application's and other producers', de-duplicated in a deterministic order. Rejects the same capability, external-reach and consumer-managed keys `values` does, and claims the key as an array for the one-mode rule above |
 | `skadnetwork_identifiers` | Ad network identifiers, lowercase and ending `.skadnetwork`. The consumer renders `SKAdNetworkItems` from them |
 | **`[[ios.contributes.python_modules]]`** [§7.5](#75-python-modules) | |
-| `name` | The name Python imports. A single ASCII identifier, no dots |
-| `swift_package` | A package the same sidecar declares, which implements the module |
+| `name` | **Required.** The name Python imports. A single ASCII identifier, no dots |
+| `swift_package` | **Required.** A package the same sidecar declares, which implements the module |
 | `init` | Optional initialization symbol; defaults to `PyInit_<name>` |
 | **`[ios.contributes]`** [§7.6](#76-objective-c-categories) | |
 | `objc_categories` | Optional boolean, and only `true` is valid — a consumer rejects `false`. The consumer links the application target so Objective-C categories in static libraries are loaded. Names the behavior, not the flag; no veto |
+
+<!-- /appendix-b -->
 
 ## Appendix C: a record that satisfies §9
 
