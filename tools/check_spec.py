@@ -706,12 +706,38 @@ for path in sorted((ROOT / "development" / "redesign" / "examples").rglob("*.tom
         if value.get("kind") == "info_plist" and value.get("key") in REFUSED_PLIST:
             problems.append(f"{rel} info_plist value writes refused key `{value.get('key')}`")
 
+    # §5.5 — the Platform column is normative: a kind belongs to one table
+    KIND_PLATFORM = {
+        "manifest_meta_data": "android",
+        "manifest_placeholder": "android",
+        "info_plist": "ios",
+        "usage_description": "ios",
+        "inline": None,
+    }
+    for platform in ("android", "ios"):
+        for value in entries(doc.get(platform, {}), "requires", "application_value"):
+            kind = value.get("kind")
+            if kind not in KIND_PLATFORM:
+                problems.append(f"{rel} value `{value.get('id')}` has unknown kind `{kind}`")
+            elif KIND_PLATFORM[kind] not in (None, platform):
+                problems.append(
+                    f"{rel} [{platform}] value `{value.get('id')}` uses `{kind}`, "
+                    f"which belongs to [{KIND_PLATFORM[kind]}]"
+                )
+
     # §7.4 — one key belongs to one mode, and neither mode admits a refused key
     plist = doc.get("ios", {}).get("contributes", {}).get("info_plist", {})
     if isinstance(plist, dict):
         scalar, arrays = plist.get("values", {}) or {}, plist.get("append", {}) or {}
-        for key in sorted(set(scalar) & set(arrays)):
-            problems.append(f"{rel} declares `{key}` under both values and append")
+        # a value of kind `info_plist` writes one string, so it is a scalar
+        # claim on that key like any `values` entry
+        delivered = {
+            v.get("key")
+            for v in entries(doc.get("ios", {}), "requires", "application_value")
+            if v.get("kind") == "info_plist"
+        }
+        for key in sorted((set(scalar) | delivered) & set(arrays)):
+            problems.append(f"{rel} claims `{key}` as both an array and a scalar")
         for key in sorted((set(scalar) | set(arrays)) & REFUSED_PLIST):
             problems.append(f"{rel} contributes refused Info.plist key `{key}`")
 

@@ -1145,6 +1145,21 @@ does not implement, naming the distribution and the value.
 | `usage_description` | iOS | a `*UsageDescription` key | the value under that key, verbatim |
 | `inline` | Android, iOS | *(omitted)* | nothing directly; the value is consumed where it was declared for — see below |
 
+**The Platform column is normative.** A `kind` is valid only in a table for the
+platform its row names: `manifest_meta_data` and `manifest_placeholder` under
+`[android]`, `info_plist` and `usage_description` under `[ios]`, `inline` under
+either. A consumer **MUST** reject a kind declared in the other platform's
+table, naming the distribution, the `id` and the kind.
+
+> **Note:** Without that, a consumer implementing both platforms has no reason
+> to object to `kind = "info_plist"` inside `[android]`, and would write an
+> `Info.plist` key from an answer the application filed under `android` —
+> where, since identity is `(distribution, platform, id)`, it may have meant an
+> entirely different string. A single-platform consumer catches this by
+> accident, having never implemented the other platform's kinds, and two
+> consumers disagreeing about the same sidecar is the outcome this column now
+> prevents.
+
 **The two `*UsageDescription` rules are a pair.** `info_plist` **MUST NOT** name
 a key ending in `UsageDescription`, and `usage_description` **MUST** name one: a
 consumer **MUST** reject either mismatch, naming the distribution and the key.
@@ -2581,14 +2596,10 @@ LSApplicationQueriesSchemes = ["examplescheme"]
 
 Two contribution modes, by shape:
 
-- **`values`** — scalar keys, set verbatim. A consumer **MUST** fail on a key
-  that collides with one it manages itself — the identity and version keys it
-  derives from the application's own project settings, such as
-  `CFBundleIdentifier`, `CFBundleShortVersionString`, `CFBundleVersion`, and
-  `MinimumOSVersion` — and on two distributions setting the same key to
-  different values, naming the distributions. Two distributions
-  setting the same key to the **same** value coalesce, preserving both
-  provenance records. A key the **application** also sets is the application's:
+- **`values`** — scalar keys, set verbatim. A consumer **MUST** fail on two
+  distributions setting the same key to different values, naming the
+  distributions. Two distributions setting the same key to the **same** value
+  coalesce, preserving both provenance records. A key the **application** also sets is the application's:
   the consumer **MUST** keep the application's value and report the override.
 - **`append`** — array-valued keys. Contributions from all distributions and the
   application are concatenated and de-duplicated in a deterministic order: the
@@ -2597,11 +2608,20 @@ Two contribution modes, by shape:
   since an order fixed by a name that two consumers spell differently is not
   fixed at all.
 
-**A key belongs to one mode.** Across the effective set — every distribution
-and the application — a key declared under `append` is an array key, and a key
-declared under `values` is a scalar one. A consumer **MUST** fail when one key
-is declared both ways, naming both declarers, and **MUST NOT** merge a scalar
-into an array or an array into a scalar.
+**Consumer-managed keys are refused in every channel.** The identity and version
+keys a consumer derives from the application's own project settings —
+`CFBundleIdentifier`, `CFBundleShortVersionString`, `CFBundleVersion`,
+`MinimumOSVersion` — are the consumer's to write. It **MUST** reject one in
+`values`, in `append`, or as the `key` of an `info_plist` value
+([§5.5](#55-value-kinds)), naming the distribution and the key.
+
+**A key belongs to one mode, and the requirement side counts.** Across the
+effective set — every distribution and the application — a key declared under
+`append` is an array key; a key declared under `values`, **or delivered by a
+value of kind `info_plist`** ([§5.5](#55-value-kinds)), is a scalar one, since
+the consumer writes one string to it either way. A consumer **MUST** fail when
+one key is claimed both ways, naming both declarers, and **MUST NOT** merge a
+scalar into an array or an array into a scalar.
 
 > **Note:** This is the general form of the rule
 > `skadnetwork_identifiers` needed as a special case, and it deliberately
@@ -2611,6 +2631,12 @@ into an array or an array into a scalar.
 > declarations that disagree about a key's shape have no unambiguous plist form
 > and no order-independent winner, which is the same ground
 > [§5.2](#52-values)'s differing-content rule stands on.
+>
+> `LSApplicationQueriesSchemes` is also the likeliest thing the requirement half
+> catches. It is the array key producers actually contribute, and a value of
+> kind `info_plist` naming it would ask the consumer to write one string where a
+> list belongs — the array-against-scalar collision this rule closes on the
+> contribution side, arriving through the other channel.
 
 **TOML-to-plist mapping.** "Set verbatim" is not enough for two implementations
 to agree, so the correspondence is fixed:
@@ -2980,8 +3006,9 @@ A conforming consumer **MUST**:
     the prominence [§5.1](#51-build-floors) requires.
 13. Fail when a declared value is unsupplied, never treat a scaffolded
     placeholder as a supplied value, require `key` on every value kind but
-    `inline` and reject it on that one, and reject an `inline` value that
-    neither a contribution references nor an action `uses`
+    `inline` and reject it on that one, reject an `inline` value that
+    neither a contribution references nor an action `uses`, and reject a `kind`
+    declared in a table for the platform it does not belong to
     ([§5.2](#52-values), [§5.4](#54-how-a-requirement-is-satisfied),
     [§5.5](#55-value-kinds)).
 14. Fail when an unconditional action is unacknowledged; record an unsatisfied
@@ -3084,21 +3111,21 @@ A conforming consumer **MUST**:
     to a package declaring `credentials_required`; and make visible in the
     record that a self-declared package is not pinned by the distribution's own
     version ([§7.2](#72-swift-packages)).
-34. Reject `accessed_api_types` and `symbol_prefixes` from a sidecar
-    contributing no Swift source, and merge what `accessed_api_types` declares
-    into the application's `PrivacyInfo.xcprivacy` in the order
-    [§7.3](#73-source) fixes ([§7.1](#71-symbol-prefixes)).
-35. Enforce [§7.4](#74-infoplist)'s TOML-to-plist mapping, fail on a key it
-    manages itself, on two distributions setting one key differently, or on one
-    key declared under both `values` and `append`; keep and report the
-    application's own value; reject a capability, external-reach or
-    consumer-managed key wherever it arrives — `values`, `append`, or a value
-    of kind `info_plist`; reject a
-    usage-description key in `values` and a `usage_description` whose `key`
-    does not end in `UsageDescription` ([§5.5](#55-value-kinds)); validate
-    SKAdNetwork identifiers; render `SKAdNetworkItems` only from
-    `skadnetwork_identifiers`; and report contributed
-    `LSApplicationQueriesSchemes` entries naming the distribution.
+34. Reject `symbol_prefixes` ([§7.1](#71-symbol-prefixes)) and
+    `accessed_api_types` ([§7.3](#73-source)) from a sidecar contributing no
+    Swift source, and merge what `accessed_api_types` declares into the
+    application's `PrivacyInfo.xcprivacy` in the order
+    [§7.3](#73-source) fixes.
+35. Enforce [§7.4](#74-infoplist)'s TOML-to-plist mapping; fail on two
+    distributions setting one key differently, and on one key claimed both as
+    an array (`append`) and as a scalar — `values` or a value of kind
+    `info_plist` alike; keep and report the application's own value; reject a
+    capability, external-reach or consumer-managed key wherever it arrives, in
+    those three channels alike; reject a usage-description key in `values`, and
+    a `usage_description` whose `key` does not end in `UsageDescription`
+    ([§5.5](#55-value-kinds)); validate SKAdNetwork identifiers; render
+    `SKAdNetworkItems` only from `skadnetwork_identifiers`; and report
+    contributed `LSApplicationQueriesSchemes` entries naming the distribution.
 36. Register declared Python modules against a Swift package the same sidecar
     declares, reject a dotted or non-identifier `name`, fail on a duplicate
     module name, make each module importable from first use, and exclude
@@ -3910,7 +3937,7 @@ place: the value kinds of [§5.5](#55-value-kinds), the Gradle configurations of
 | `contract` | **Required.** Major of this document, optionally with a minor — `"1"` or `"1.1"`. [§4.3](#43-contract-version) |
 | `platforms` | Optional. Where the distribution *functions*, not merely where it contributes; a build for an omitted platform fails. [§4.5](#45-platform-support) |
 | **`[<platform>.requires]` — floors** [§5.1](#51-build-floors) | |
-| `min_sdk`, `compile_sdk`, `target_sdk` | Android floors. The build fails when the application is lower; the consumer never raises it. `target_sdk` changes behavior app-wide, so declare it only when a behavior depends on it |
+| `min_sdk`, `compile_sdk`, `target_sdk` | Android floors, and **TOML integers** — `"24"` and `24.0` are rejected. The build fails when the application is lower; the consumer never raises it. `target_sdk` changes behavior app-wide, so declare it only when a behavior depends on it |
 | `core_library_desugaring` | Optional boolean, and only `true` is valid — a consumer rejects `false`. A floor on a boolean axis: the build fails when the application has not enabled desugaring |
 | `deployment_target` | iOS floor, on the same terms |
 | **`[[<platform>.requires.application_value]]`** [§5.2](#52-values) | A string the application supplies and the consumer places |
@@ -3977,8 +4004,9 @@ place: the value kinds of [§5.5](#55-value-kinds), the Gradle configurations of
 | **`[[ios.contributes.accessed_api_types]]`** [§7.3](#73-source) — a sibling of `src`, not a child of it | |
 | `type`, `reasons`, `reason` | Required-reason APIs the contributed Swift touches, merged into the application's `PrivacyInfo.xcprivacy`. Valid only in a sidecar that also contributes Swift source |
 | **`[ios.contributes.info_plist]`** [§7.4](#74-infoplist) | |
-| `values` | Scalar keys set verbatim. Collisions fail; `*UsageDescription` and capability keys are rejected |
-| `append` | Array keys merged with the application's and other producers', de-duplicated |
+| `values` | Scalar keys set verbatim. Collisions fail; `*UsageDescription`, capability, external-reach and consumer-managed keys are rejected |
+| `append` | Array keys merged with the application's and other producers', de-duplicated. Rejects the same keys `values` does |
+| *(both)* | A key occupies **one** mode across the effective set: array under `append`, scalar under `values` or through an `info_plist` value ([§5.5](#55-value-kinds)). Claimed both ways, it fails |
 | `skadnetwork_identifiers` | Ad network identifiers, lowercase and ending `.skadnetwork`. The consumer renders `SKAdNetworkItems` from them |
 | **`[[ios.contributes.python_modules]]`** [§7.5](#75-python-modules) | |
 | `name` | The name Python imports. A single ASCII identifier, no dots |
