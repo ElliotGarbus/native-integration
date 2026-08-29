@@ -16,8 +16,16 @@ jobs:
         with:
           # tomllib is stdlib from 3.11
           python-version: "3.12"
+      - name: Install the schema validator
+        run: python3 -m pip install jsonschema
       - name: Check consistency
         run: python3 tools/check_spec.py
+      - name: Check Appendix B matches the registry
+        run: python3 tools/gen_appendix_b.py --check
+      - name: Check the JSON Schema matches the registry
+        run: python3 tools/gen_schema.py --check
+      - name: Check the diagnostic IDs match the registry
+        run: python3 tools/gen_error_ids.py --check
       - name: Check the requirement map is current
         run: python3 tools/requirements_table.py --check
       - name: Check the table of contents is current

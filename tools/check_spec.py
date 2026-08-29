@@ -19,6 +19,7 @@ from __future__ import annotations
 import json
 import re
 import sys
+import textwrap
 import tomllib
 from pathlib import Path
 
@@ -794,6 +795,337 @@ for line, body in toml_blocks(README):
         check_v1_sidecar(f"README.md:{line}", body, doc, problems)
 
 check("sidecars in the redesign examples and README obey SPEC.md", problems)
+
+# --- 16. the registry regenerates its three targets without a diff ----------
+# The drift guard. Without it `contract/v1.toml` is a second source of truth
+# rather than the source of truth: a key edited in Appendix B by hand, or a
+# rule added to §8 without a diagnostic ID, would pass everything above.
+sys.path.insert(0, str(ROOT / "tools"))
+
+import gen_appendix_b  # noqa: E402
+import gen_error_ids  # noqa: E402
+import gen_schema  # noqa: E402
+
+REGISTRY = tomllib.loads((ROOT / "contract" / "v1.toml").read_text(encoding="utf-8"))
+
+problems = []
+if gen_appendix_b.rewritten(NEW, gen_appendix_b.build(REGISTRY["declarations"])) != NEW:
+    problems.append("SPEC.md Appendix B — run: python3 tools/gen_appendix_b.py")
+if (
+    json.dumps(gen_schema.build(REGISTRY), indent=2, sort_keys=False) + "\n"
+    != (ROOT / "schema" / "native-integration-v1.schema.json").read_text(encoding="utf-8")
+):
+    problems.append("schema/native-integration-v1.schema.json — run: python3 tools/gen_schema.py")
+if gen_error_ids.build() != (ROOT / "contract" / "diagnostics-v1.toml").read_text(encoding="utf-8"):
+    problems.append("contract/diagnostics-v1.toml — run: python3 tools/gen_error_ids.py")
+check("the registry's generated targets are current", problems)
+
+# --- 17. the registry agrees with SPEC.md ------------------------------------
+# Anchors, because a section link that does not resolve makes `explain` useless;
+# and the closed vocabularies, because Appendix B's own introduction names six
+# and §4.3's under-declaration rule is checked against exactly those.
+problems = []
+anchors = heading_anchors(NEW)
+for declaration_id, entry in REGISTRY["declarations"].items():
+    if entry["anchor"] not in anchors:
+        problems.append(f"{declaration_id} cites #{entry['anchor']}, which SPEC.md has no heading for")
+for name, register in REGISTRY["registers"].items():
+    if register["anchor"] not in anchors:
+        problems.append(f"register {name} cites #{register['anchor']}, which SPEC.md has no heading for")
+
+closed = {i for i, e in REGISTRY["declarations"].items() if e.get("closed")}
+expected_closed = {
+    "platforms",
+    "<platform>.requires.application_value.kind",
+    "android.contributes.gradle_dependencies.configuration",
+    "android.contributes.components.kind",
+    "ios.contributes.swift_packages.requirement",
+}
+if closed != expected_closed:
+    problems.append(
+        f"the registry's closed vocabularies are {sorted(closed)}; Appendix B names "
+        f"{sorted(expected_closed)} plus §7.4's capability keys, which are a register"
+    )
+if not REGISTRY["registers"]["capability_keys"].get("closed"):
+    problems.append("§7.4's capability keys are a closed list and the register does not say so")
+check("the registry agrees with SPEC.md's anchors and closed vocabularies", problems)
+
+# --- 18. every current-specification sidecar validates against the schema ----
+# `examples/` is deliberately not here: it still holds the first attempt's
+# sidecar, which `development/redesign/examples/` is the current-model
+# conversion of. See development/findings/phase1-registry.md.
+SCHEMA = json.loads((ROOT / "schema" / "native-integration-v1.schema.json").read_text(encoding="utf-8"))
+problems = []
+try:
+    from jsonschema import Draft202012Validator
+
+    Draft202012Validator.check_schema(SCHEMA)
+    validator = Draft202012Validator(SCHEMA)
+
+    sidecars = [
+        (str(p.relative_to(ROOT)), tomllib.loads(p.read_text(encoding="utf-8")))
+        for p in sorted((ROOT / "development" / "redesign" / "examples").rglob("native.toml"))
+    ]
+    appendix_a = NEW[NEW.index("## Appendix A") : NEW.index("## Appendix B")]
+    for line, body in toml_blocks(appendix_a):
+        sidecars.append((f"SPEC.md Appendix A:{line}", tomllib.loads(body)))
+    for line, body in toml_blocks(README):
+        doc = tomllib.loads(body)
+        if "contract" in doc and not (doc.keys() & {"tool", "project"}):
+            sidecars.append((f"README.md:{line}", doc))
+
+    for label, doc in sidecars:
+        for error in sorted(validator.iter_errors(doc), key=lambda e: list(e.absolute_path)):
+            where = ".".join(str(p) for p in error.absolute_path) or "<root>"
+            problems.append(f"{label} fails the schema at {where}: {error.message}")
+except ImportError:  # pragma: no cover - the check degrades rather than lying
+    problems.append("jsonschema is not installed, so the schema was not exercised")
+check("every current-specification sidecar validates against the generated schema", problems)
+
+# --- 19. the schema refuses what it claims to refuse -------------------------
+# A schema nothing is known to fail is a schema that might accept anything. Each
+# case below is one Phase 0 marked schema-detectable; the point is the floor,
+# not coverage — namespace containment and the merge rules are §8's and are
+# deliberately out of reach here.
+MUST_FAIL = {
+    "a Gradle configuration outside the closed set": """
+        contract = "1"
+        [[android.contributes.gradle_dependencies]]
+        coordinate = "g:a:1"
+        configuration = "kapt"
+    """,
+    "both coordinate and module": """
+        contract = "1"
+        [[android.contributes.gradle_dependencies]]
+        coordinate = "g:a:1"
+        module = "g:a"
+        version = { at_least = "1", below = "2" }
+    """,
+    "neither coordinate nor module": """
+        contract = "1"
+        [[android.contributes.gradle_dependencies]]
+        configuration = "api"
+    """,
+    "a version range open at one end": """
+        contract = "1"
+        [[android.contributes.gradle_dependencies]]
+        module = "g:a"
+        version = { at_least = "1" }
+    """,
+    "an iOS value kind inside the Android table": """
+        contract = "1"
+        [[android.requires.application_value]]
+        id = "x"
+        kind = "info_plist"
+        key = "K"
+        reason = "r"
+    """,
+    "a `key` on an inline value": """
+        contract = "1"
+        [[ios.requires.application_value]]
+        id = "x"
+        kind = "inline"
+        key = "K"
+        reason = "r"
+    """,
+    "a missing `key` on a delivering value": """
+        contract = "1"
+        [[ios.requires.application_value]]
+        id = "x"
+        kind = "info_plist"
+        reason = "r"
+    """,
+    "a boolean floor declared false": """
+        contract = "1"
+        [android.requires]
+        core_library_desugaring = false
+    """,
+    "objc_categories declared false": """
+        contract = "1"
+        [ios.contributes]
+        objc_categories = false
+    """,
+    "an Android floor as a string": """
+        contract = "1"
+        [android.requires]
+        min_sdk = "24"
+    """,
+    "a malformed deployment_target": """
+        contract = "1"
+        [ios.requires]
+        deployment_target = "15.0.0.1"
+    """,
+    "an iOS floor in the Android table": """
+        contract = "1"
+        [android.requires]
+        deployment_target = "15.0"
+    """,
+    "a branch Swift requirement": """
+        contract = "1"
+        [[ios.contributes.swift_packages]]
+        name = "P"
+        url = "https://example.com/p"
+        products = ["P"]
+        requirement = { branch = "main" }
+    """,
+    "an empty products list": """
+        contract = "1"
+        [[ios.contributes.swift_packages]]
+        name = "P"
+        url = "https://example.com/p"
+        products = []
+        requirement = { exact = "1.0.0" }
+    """,
+    "a non-https package url": """
+        contract = "1"
+        [[ios.contributes.swift_packages]]
+        name = "P"
+        url = "git@example.com:p.git"
+        products = ["P"]
+        requirement = { exact = "1.0.0" }
+    """,
+    "an empty platforms list": """
+        contract = "1"
+        platforms = []
+    """,
+    "a platform name this document does not define": """
+        contract = "1"
+        platforms = ["web"]
+    """,
+    "a misspelled top-level scalar": """
+        contract = "1"
+        platfroms = ["ios"]
+    """,
+    "an unknown key in a platform table": """
+        contract = "1"
+        [android.contributes]
+        permisions = []
+    """,
+    "a producer-declared feature `required`": """
+        contract = "1"
+        [[android.contributes.features]]
+        name = "android.hardware.camera"
+        required = true
+    """,
+    "a producer-declared `exported`": """
+        contract = "1"
+        [[android.contributes.components]]
+        kind = "service"
+        name = "org.example.S"
+        exported = true
+    """,
+    "an exported component with no reason": """
+        contract = "1"
+        [[android.contributes.components]]
+        kind = "activity"
+        name = "org.example.A"
+        exported_required = true
+    """,
+    "a foreground service type on a non-service": """
+        contract = "1"
+        [[android.contributes.components]]
+        kind = "activity"
+        name = "org.example.A"
+        foreground_service_type = "mediaProjection"
+    """,
+    "view_links on an unexported component": """
+        contract = "1"
+        [[android.contributes.components]]
+        kind = "activity"
+        name = "org.example.A"
+        [[android.contributes.components.view_links]]
+        scheme = "myapp"
+    """,
+    "intent_filters beside view_links": """
+        contract = "1"
+        [[android.contributes.components]]
+        kind = "activity"
+        name = "org.example.A"
+        exported_required = true
+        reason = "r"
+        [[android.contributes.components.view_links]]
+        scheme = "myapp"
+        [[android.contributes.components.intent_filters]]
+        action = "com.example.ACTION"
+    """,
+    "a camelCase view_links attribute": """
+        contract = "1"
+        [[android.contributes.components]]
+        kind = "activity"
+        name = "org.example.A"
+        exported_required = true
+        reason = "r"
+        [[android.contributes.components.view_links]]
+        scheme = "myapp"
+        pathPrefix = "/cb"
+    """,
+    "an r8 keep with no from_dependency": """
+        contract = "1"
+        [[android.contributes.r8.keep]]
+        pattern = "okhttp3.**"
+    """,
+    "a queries entry naming both targets": """
+        contract = "1"
+        [[android.contributes.queries]]
+        package = "com.example"
+        provider_authority = "com.example.provider"
+        reason = "r"
+    """,
+    "a consumer-managed Info.plist key": """
+        contract = "1"
+        [ios.contributes.info_plist.values]
+        CFBundleIdentifier = "com.example"
+    """,
+    "a capability key offered through append": """
+        contract = "1"
+        [ios.contributes.info_plist.append]
+        UIBackgroundModes = ["remote-notification"]
+    """,
+    "a usage description offered through values": """
+        contract = "1"
+        [ios.contributes.info_plist.values]
+        NSCameraUsageDescription = "why"
+    """,
+    "SKAdNetworkItems offered through append": """
+        contract = "1"
+        [ios.contributes.info_plist.append]
+        SKAdNetworkItems = ["x"]
+    """,
+    "a mixed-type Info.plist array": """
+        contract = "1"
+        [ios.contributes.info_plist.append]
+        LSApplicationQueriesSchemes = ["a", 1]
+    """,
+    "an uppercase SKAdNetwork identifier": """
+        contract = "1"
+        [ios.contributes.info_plist]
+        skadnetwork_identifiers = ["SU67R6K2V3.skadnetwork"]
+    """,
+    "a dotted Python module name": """
+        contract = "1"
+        [[ios.contributes.python_modules]]
+        name = "web.views"
+        swift_package = "P"
+    """,
+    "a malformed contract value": """
+        contract = "1.0.0"
+    """,
+    "a missing contract": """
+        platforms = ["ios"]
+    """,
+}
+problems = []
+try:
+    from jsonschema import Draft202012Validator
+
+    validator = Draft202012Validator(SCHEMA)
+    for name, body in MUST_FAIL.items():
+        document = tomllib.loads(textwrap.dedent(body))
+        if validator.is_valid(document):
+            problems.append(f"the schema accepts {name}, and SPEC.md does not")
+except ImportError:  # pragma: no cover
+    problems.append("jsonschema is not installed, so the negative cases were not exercised")
+check("the schema refuses what SPEC.md refuses", problems)
 
 
 print()
