@@ -155,11 +155,17 @@ for path in EXAMPLES:
         if key not in SPEC:
             problems.append(f"{path.relative_to(ROOT)} uses `{key}`, absent from first-attempt.md")
 for line, body in toml_blocks(README):
-    for key in keys_of(tomllib.loads(body)):
-        # pyproject.toml fragments legitimately name the producer's own package
-        if key not in SPEC and not key.startswith(("project", "tool")) and key != "kivmob":
-            problems.append(f"README.md:{line} uses `{key}`, absent from first-attempt.md")
-check("keys used in examples and README exist in SPEC", problems)
+    doc = tomllib.loads(body)
+    # A `[project]` or `[tool.*]` fragment is the package's own build
+    # configuration — backend keys and its own distribution name, none of it
+    # this convention's vocabulary. Everything else is sidecar keys, and
+    # README documents the current specification, so they are SPEC.md's.
+    if doc.keys() & {"project", "tool"}:
+        continue
+    for key in keys_of(doc):
+        if key not in NEW:
+            problems.append(f"README.md:{line} uses `{key}`, absent from SPEC.md")
+check("keys used in examples and README exist in their specification", problems)
 
 # --- 5. RFC 2119 keywords are marked ----------------------------------------
 # Bolded topic sentences (**… MUST …**) and prose about a keyword ("an
@@ -311,7 +317,7 @@ def sidecar_sources():
     for path in EXAMPLES:
         raw = path.read_text(encoding="utf-8")
         yield str(path.relative_to(ROOT)), raw, tomllib.loads(raw)
-    for label, text in (("first-attempt.md", SPEC), ("README.md", README)):
+    for label, text in (("first-attempt.md", SPEC),):
         for line, body in toml_blocks(text):
             doc = tomllib.loads(body)
             # Only whole sidecars. §4.3 requires `contract`, so its presence is
@@ -635,17 +641,8 @@ check("Appendix B covers every key SPEC.md declares", problems)
 # An example nothing checks is a claim about the specification that nobody is
 # testing — which is how the probe's own Airship sidecar carried fields that had
 # been removed from the model weeks earlier.
-problems = []
-for path in sorted((ROOT / "development" / "redesign" / "examples").rglob("*.toml")):
-    rel = path.relative_to(ROOT)
-    raw = path.read_text(encoding="utf-8")
-    try:
-        doc = tomllib.loads(raw)
-    except tomllib.TOMLDecodeError as exc:
-        problems.append(f"{rel} does not parse: {exc}")
-        continue
-    if doc.keys() & {"tool", "project"}:
-        continue  # an application's own configuration, not a sidecar
+def check_v1_sidecar(rel: str, raw: str, doc: dict, problems: list[str]) -> None:
+    """Every rule SPEC.md states that a sidecar alone can be checked against."""
     if doc.get("contract") != "1":
         problems.append(f"{rel} declares contract {doc.get('contract')!r}, not \"1\"")
     for key in sorted(keys_of(doc)):
@@ -777,7 +774,26 @@ for path in sorted((ROOT / "development" / "redesign" / "examples").rglob("*.tom
             problems.append(f"{rel} swift package url is not https: {pkg.get('url')}")
         if not pkg.get("products"):
             problems.append(f"{rel} swift package `{pkg.get('name')}` declares no products")
-check("the converted sidecars obey the current specification", problems)
+problems = []
+for path in sorted((ROOT / "development" / "redesign" / "examples").rglob("*.toml")):
+    raw = path.read_text(encoding="utf-8")
+    try:
+        doc = tomllib.loads(raw)
+    except tomllib.TOMLDecodeError as exc:
+        problems.append(f"{path.relative_to(ROOT)} does not parse: {exc}")
+        continue
+    if doc.keys() & {"tool", "project"}:
+        continue  # an application's own configuration, not a sidecar
+    check_v1_sidecar(str(path.relative_to(ROOT)), raw, doc, problems)
+
+# README.md documents the current specification, so its whole sidecars are held
+# to it too — the same rules, the same failures, one source of truth for both.
+for line, body in toml_blocks(README):
+    doc = tomllib.loads(body)
+    if "contract" in doc and not (doc.keys() & {"tool", "project"}):
+        check_v1_sidecar(f"README.md:{line}", body, doc, problems)
+
+check("sidecars in the redesign examples and README obey SPEC.md", problems)
 
 
 print()

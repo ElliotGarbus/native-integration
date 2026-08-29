@@ -2,34 +2,42 @@
 
 **A convention for Python packages to declare what they need from a native mobile app build.**
 
-> **Status: draft, seeking review.** No build tool implements this yet. A
-> [reference reader](#the-reference-reader) in this repository does, and is a
-> draft alongside the text — it exists so the consumer obligations are tested
-> against real sidecars rather than only asserted. This repository exists so the
-> design can be argued over; feedback from maintainers of other toolchains is
-> the point — see [Getting involved](#getting-involved).
+> **Status: draft, complete, seeking review.** [**SPEC.md**](SPEC.md) is the
+> specification — written end to end, validated in CI, and through three rounds
+> of review. No build tool implements it yet. This repository exists so the
+> design can be argued over before anything freezes; feedback from maintainers
+> of other toolchains is the point — see
+> [Getting involved](#getting-involved).
+>
+> **It is the second attempt.** The first is kept whole at
+> [`development/first-attempt.md`](development/first-attempt.md) for its
+> reasoning and its eighteen worked sidecars. What those eighteen kept adding
+> was *tables* — thirteen for application prerequisites alone — an unbounded
+> obligation against two vendors who ship new constructs every year. So the
+> model was rebuilt around a smaller automated core and two ways to state what
+> is left: a **value** the application supplies, and an **action** it performs.
+> Neither attempt was released, so the rebuild took version 1 rather than
+> renumbering around a version nobody had to support. Its reasoning, and seven
+> sidecars converted to it, are in
+> [`development/redesign/`](development/redesign/).
 >
 > The spec has been stress-tested against **eighteen integration cases** — four
 > existing Python packages, and fourteen clean-sheet sidecars covering Firebase,
 > Sentry, Stripe, Mapbox, Meta, Airship, Agora, Health Connect, TensorFlow Lite
-> and a three-package mediated-ads set — which changed it substantially, plus a
-> survey of forty further SDKs. See
-> [Tested against real packages](#tested-against-real-packages).
+> and a three-package mediated-ads set — plus a survey of forty further SDKs.
+> See [Tested against real packages](#tested-against-real-packages).
+>
+> **The reference reader still implements the first attempt.** Its architecture
+> survived the rebuild; its rule set did not. So
+> [`docs/REQUIREMENTS.md`](docs/REQUIREMENTS.md) and the pytest suite describe
+> the first attempt faithfully and the current specification only in part, and
+> the converted sidecars are validated structurally rather than by an
+> implementation. That is the next piece of work, said here rather than
+> discovered later.
 >
 > **The contract is deliberately unfrozen.** Nothing here has been built into a
 > build tool or run on a device yet, and freezing before that would freeze in
 > guesses — see [What happens before a freeze](#what-happens-before-a-freeze).
->
-> **Being restructured, right now.** What eighteen examples kept adding was
-> *tables* — thirteen of them for application prerequisites alone — and that
-> growth is unbounded while Apple and Google keep shipping constructs. The
-> specification is being rewritten around a smaller automated core plus a
-> generic way to tell an application author what remains to be done by hand.
-> The first attempt is [`development/first-attempt.md`](development/first-attempt.md),
-> kept whole for its reasoning and its evidence; the redesign, and the five
-> hardest sidecars re-expressed against it, are in
-> [`development/redesign/`](development/redesign/). Sections below still
-> describe the first attempt's machinery.
 
 ## The problem
 
@@ -54,9 +62,10 @@ That inversion **is** the problem.
 A package ships a small TOML file declaring its native requirements — Maven
 coordinates, permissions, manifest components, SwiftPM packages, `Info.plist`
 keys, any glue source it must contribute, a Swift package that *is* its Python
-extension module, and the prerequisites only the app can satisfy. A build tool discovers it through an entry point, reads it **without
-importing the package**, validates its prerequisites, and stages its
-contributions into the generated Gradle or Xcode project.
+extension module, and the requirements only the app can satisfy. A build tool
+discovers it through an entry point, reads it **without importing the
+package**, checks those requirements, and stages its contributions into the
+generated Gradle or Xcode project.
 
 The package author adds two things to their own `pyproject.toml`:
 
@@ -77,8 +86,24 @@ platforms = ["android"]
 [android.owns]
 java_namespaces = ["org.kivmob"]
 
+# The floors the app author no longer has to look up.
+[android.requires]
+min_sdk = 23
+compile_sdk = 35
+
+# The one thing the package cannot know: your own AdMob account's ID.
+# `id` is what the app answers under, `kind` and `key` are where the build tool
+# writes it, and `placeholder` is what it scaffolds until you replace it.
+[[android.requires.application_value]]
+id = "admob_app_id"
+kind = "manifest_meta_data"
+key = "com.google.android.gms.ads.APPLICATION_ID"
+reason = "Your AdMob application ID, from the AdMob console"
+placeholder = "<TODO: ca-app-pub-…~… from the AdMob console>"
+
 [[android.contributes.gradle_dependencies]]
-coordinate = "com.google.android.gms:play-services-ads:25.2.0"
+module = "com.google.android.gms:play-services-ads"
+version = { at_least = "24.0.0", below = "25.0.0" }
 
 [android.contributes.src]
 java = ["java"]
@@ -90,18 +115,6 @@ reason = "Ad delivery"
 [[android.contributes.permissions]]
 name = "android.permission.ACCESS_NETWORK_STATE"
 reason = "Connectivity checks before ad requests"
-
-# The floors the app author no longer has to look up.
-[android.requires]
-compile_sdk = 35
-min_sdk = 23
-
-# The one thing the package cannot know: your own AdMob account's ID.
-# `id` is what the app answers under; `manifest_meta_data` is the key the SDK reads.
-[[android.requires.application_values]]
-id = "admob_app_id"
-reason = "Your AdMob application ID, from the AdMob console"
-manifest_meta_data = "com.google.android.gms.ads.APPLICATION_ID"
 ```
 
 *(Illustrative. Today's KivMob also ships a separately-published bridge artifact
@@ -109,21 +122,38 @@ from its own Maven repository; a package adopting this convention would put that
 Java in its own wheel via `contributes.src`, which is the shape shown here.)*
 
 Its **native integration material** falls into three categories: **`owns`**
-(exclusive claims, like a Java namespace — collision-checked across all
-packages), **`requires`** (conditions the app must satisfy — SDK floors,
-entitlements, iOS purpose strings, a config file, an app extension, or
-credentials for an authenticated repository), and **`contributes`** (material the build tool
-stages on the package's behalf).
+(exclusive claims, like a Java namespace — collision-checked across every
+package in the dependency closure), **`requires`** (what the application must
+do), and **`contributes`** (material the build tool stages on the package's
+behalf).
 
-The line between the last two is where most of the design lives, and it falls in
-a specific place: **when the application owns the artifact, the package states
-the need rather than writing it.** Your entitlements, your `Info.plist`, your
-bundle, your extra build targets — a package can say it needs them and the build
-tool reports it, but nothing reaches in. A contribution that writes half of a
-two-part requirement is worse than a prerequisite naming both, because it looks
-finished.
+`requires` has exactly three shapes, and the whole taxonomy that used to sit
+here collapsed into them:
 
-A package that binds a whole platform framework can also mark a prerequisite
+- a **floor** — `min_sdk`, `compile_sdk`, a deployment target — checked against
+  your build, never raised for you;
+- a **value** — a string the build tool can place deterministically once you
+  supply it. It scaffolds the `placeholder` into your own `pyproject.toml` and
+  the build does not proceed while that placeholder stands;
+- an **action** — an outcome only you can reach: an entitlement on your App ID,
+  a notification icon someone has to draw, a class WeChat resolves by name. It
+  carries a `summary`, a `reason`, and optional `instructions` and
+  `acceptance` criteria a person or a coding agent can work from, and you
+  acknowledge it when it is done.
+
+**Manual is a first-class outcome, not a gap.** An action is stated, reported,
+attributed and recorded — the difference between a requirement the convention
+cannot automate and one it cannot mention.
+
+The line between `requires` and `contributes` is where most of the design
+lives, and it falls in a specific place: **when the application owns the
+artifact, the package states the need rather than writing it.** Your
+entitlements, your `Info.plist`, your bundle, your extra build targets — a
+package can say it needs them and the build tool reports it, but nothing
+reaches in. A partial automation that looks complete is worse than a clear
+task.
+
+A package that binds a whole platform framework can also mark a requirement
 **conditional** — *"you need this only if you call
 `requestAlwaysAuthorization()`"* — so apps that never touch a feature are not
 made to carry it.
@@ -150,11 +180,13 @@ version, SDK-licence acceptance and an AndroidX flag; this convention models
 neither those nor anything else that belongs to the build tool rather than to a
 package.
 
-Read the full [first attempt](development/first-attempt.md) — superseded, but
-the most complete statement of the model so far. Every key a sidecar may
-contain is listed with a one-line description in its
-[Appendix D](development/first-attempt.md#appendix-d-declaration-reference),
-which is the faster way in if you are writing one or reviewing one.
+Read [**SPEC.md**](SPEC.md) for the whole model. If you are writing a sidecar or
+reviewing one, the faster way in is
+[Appendix A](SPEC.md#appendix-a-a-complete-sidecar), which shows one whole, and
+[Appendix B](SPEC.md#appendix-b-declaration-reference), which lists every key a
+sidecar may contain with a one-line description. The contents block at the top
+of the specification routes by what you are doing — writing a sidecar, building
+a consumer, or answering one as an application.
 
 ## What makes this different from "put the Java in a wheel"
 
@@ -218,6 +250,14 @@ Everything the Python packaging ecosystem already handles stays there. This
 convention covers only what wheels have no story for: the Gradle/JVM and
 Xcode/SwiftPM side.
 
+Three further limits are things the specification cannot *enforce* rather than
+things it declines to model, and
+[§11](SPEC.md#11-out-of-scope) states them together: a component exported by a
+resolved Maven artifact bypasses the approval gate a sidecar-declared one faces,
+contributed Swift has no symbol boundary a consumer can hold, and package
+visibility has no application veto. Each is answered with disclosure instead —
+worth reading before deciding whether the model is strong enough for you.
+
 One qualifier on the binaries rows, because it is the difference between
 "excluded" and "the main iOS use case": what is out of scope is a **binary in a
 wheel**. A Swift package that *implements* a Python extension module in source —
@@ -243,6 +283,13 @@ build backend can produce — the file-inclusion configuration is backend-specif
 their own) — so this is implementable today by a single tool, and by a second
 tool without coordination.
 
+It is a file rather than a `[tool.native_integration]` table for a mechanical
+reason: arbitrary `[tool.*]` tables are build-time configuration and do not
+survive into the wheel or the installed distribution, so a consumer reading
+installed metadata never sees them. Copying them across would take a build
+backend, and that means one wrapper per backend, forever
+([§4.1](SPEC.md#41-location-and-name)).
+
 If it spreads, the precedent for writing it up is
 [PEP 561](https://peps.python.org/pep-0561/): a marker file, a consumer that is
 not an installer (there, a type checker), and normative obligations on that
@@ -253,10 +300,23 @@ interoperability specification rather than a PEP.
 ## Tested against real packages
 
 Before asking anyone to implement a consumer, **eighteen integration cases** were
-expressed against this spec as `native.toml` sidecars — four existing Python
-packages, and fourteen clean-sheet sidecars written from vendor documentation —
-plus a survey of forty further SDKs read against the text without writing
-sidecars for them.
+expressed as `native.toml` sidecars — four existing Python packages, and
+fourteen clean-sheet sidecars written from vendor documentation — plus a survey
+of forty further SDKs read against the text without writing sidecars for them.
+
+That evidence was gathered against the **first attempt**, and it is what
+condemned it: the table below is a record of the model growing a table per
+construct. The rebuild kept the automated core those cases validated — Gradle
+coordinates and ranges, bounded Maven repositories, permissions, components,
+shrinker keeps, Swift packages, the locked graphs and the record — and replaced
+the prerequisite taxonomy. **Seven of the cases have since been re-expressed
+against the current specification**, in
+[`development/redesign/examples/`](development/redesign/examples/), and none of
+them needed a capability it lacks.
+
+Section numbers and table names in the Outcome column are the **first
+attempt's** — `application_files`, `app_extensions` and the rest are the tables
+that no longer exist, and that is the finding the column is recording.
 
 | Case | Pressure on the spec | Outcome |
 | --- | --- | --- |
@@ -281,22 +341,26 @@ requirement was nearly always a missing *table* — an application value, a
 config file, a package-visibility declaration — never a missing way for the
 application to answer. The clearest refusals held up too: Firebase's Gradle
 plugin and Crashlytics' symbol upload stay unreachable because the spec
-declines build-time execution, not because something is missing. What did land
-from that pressure: iOS application values, package-visibility (`<queries>`),
-an Android prerequisite family mirroring iOS's, verified App Links, and several
-smaller vocabulary additions (SKAdNetwork identifiers, permission attributes,
-manifest placeholders, core-library desugaring, Objective-C category loading) —
-plus two obligations on **build tools** themselves: generating a modern Android
-host activity and not swallowing iOS URL callbacks, and detecting packaging
-collisions between two packages' artifacts rather than picking one silently.
+declines build-time execution, not because something is missing.
+
+That is exactly the pattern the rebuild answers. A missing table meant a
+producer could not state a real requirement at all; an **action** states any of
+them in prose, and the specification never learns what `launchMode` is. Two
+findings from those rounds bind build tools rather than packages and carried
+over unchanged: generating a modern Android host activity and not swallowing
+iOS URL callbacks, and detecting packaging collisions between two packages'
+artifacts rather than picking one silently.
 
 [**examples/**](examples/) carries one integration in full — the package's
 declaration and the application's reply side by side — if you would rather see
-the authority split than read about it. The full round-by-round account, every
-sidecar, and the design history behind each decision — including what was cut
-back, deferred or withdrawn — are under [**development/**](development/):
-[the sidecars](development/examples/) with their findings,
-[SURVEY.md](development/SURVEY.md), and [PROPOSALS.md](development/PROPOSALS.md).
+the authority split than read about it. It is the first attempt's version;
+[`development/redesign/examples/pystripe/`](development/redesign/examples/pystripe/)
+is the same pair converted, and the two read side by side are the shortest
+account of what changed. The full round-by-round history — every sidecar, every
+finding, and what was cut back, deferred or withdrawn — is under
+[**development/**](development/): [the sidecars](development/examples/),
+[SURVEY.md](development/SURVEY.md), [PROPOSALS.md](development/PROPOSALS.md),
+and [redesign/](development/redesign/) for the rebuild itself.
 
 ## Getting involved
 
@@ -314,8 +378,9 @@ Particularly wanted, most useful first:
    been written and every one by the same hand, which is the gap no further
    example of mine can close. Pick a package you know and try to declare its
    native half; where you get stuck is the finding.
-2. **If you maintain a build tool: could your bootstrap meet §2.3?** That
-   clause requires the bootstrap's Android activity to be an
+2. **If you maintain a build tool: could your bootstrap meet
+   [§2.4](SPEC.md#24-obligations-on-the-consumers-bootstrap)?** That clause
+   requires the bootstrap's Android activity to be an
    `androidx.activity.ComponentActivity`, and its iOS app delegate not to
    swallow URL callbacks. It is the only place this convention makes a demand
    on a tool's own architecture, and the cost of it is knowable only by
@@ -335,7 +400,8 @@ Issues are for concrete defects: a rule that contradicts another, an example
 that no longer matches the specification, a requirement you could not implement.
 
 Disagreement is more useful than agreement. The specification has been through
-six rounds of examples and a forty-SDK survey, and each changed it
+six rounds of examples, a forty-SDK survey, a rebuild that replaced thirteen
+tables with two, and three rounds of review since — each changed it
 substantially; the places it is wrong now are the places nobody has looked yet.
 The contract stays unfrozen until this has been built and run —
 [what happens before a freeze](#what-happens-before-a-freeze) says in what
@@ -343,12 +409,17 @@ order, and what would make it ready.
 
 ## The reference reader
 
-[**`src/native_integration/`**](src/README.md) is a reader for this
-specification — discovery, parsing, validation, and rule enforcement — so that
-the consumer obligations of [§8](development/first-attempt.md#8-consuming-tool-requirements) are code
-paths a build tool gets by *using* it, rather than prose it has to remember to
-implement. It is not a build tool: it never writes a Gradle or Xcode project,
-never resolves a Maven coordinate, and never runs anything.
+[**`src/native_integration/`**](src/README.md) is a reader — discovery,
+parsing, validation, and rule enforcement — so that a specification's consumer
+obligations are code paths a build tool gets by *using* it, rather than prose it
+has to remember to implement. It is not a build tool: it never writes a Gradle
+or Xcode project, never resolves a Maven coordinate, and never runs anything.
+
+**It implements the first attempt, not [SPEC.md](SPEC.md).** The rebuild
+replaced the thirteen prerequisite tables it validates with a value and an
+action, and rewriting the rule set against the current text is the next piece of
+work in this repository. Read the code for its architecture — the ports, the
+rule registry, the diagnostics — and read the specification for the rules.
 
 ```python
 integration = read(platform=Platform.ANDROID, closure=..., application=..., record_path=...)
@@ -356,15 +427,16 @@ print(integration.report())
 integration.raise_for_errors()
 ```
 
-[`docs/REQUIREMENTS.md`](docs/REQUIREMENTS.md) maps every §8 requirement to the
-code path that discharges it, generated from the rule registry and from first-attempt.md
-so it cannot drift.
+[`docs/REQUIREMENTS.md`](docs/REQUIREMENTS.md) maps every one of the first
+attempt's §8 requirements to the code path that discharges it, generated from
+the rule registry and from that document so the two cannot drift.
 
 Two things it does deliberately, because they are the obligations most easily
-lost:
+lost — and both carry into the current specification unchanged:
 
 - **A diagnostic cannot be constructed without naming a distribution.** That is
-  requirement 8.15, enforced by a constructor rather than by discipline.
+  [SPEC.md](SPEC.md)'s requirement 18, enforced by a constructor rather than by
+  discipline.
 - **A missing port raises rather than passing.** Four obligations need something
   only a build tool has — a locked dependency graph with per-artifact checksums,
   an archive listing, the manifest inside a resolved `.aar`. Those are protocols
@@ -377,14 +449,17 @@ publish it.
 
 ## Checks
 
-`python3 tools/check_spec.py` validates both specifications against themselves
-and against the eighteen worked examples: that every `§` reference and link
-resolves, the consumer requirements are sequentially numbered and wholly
-indexed, every TOML and JSON block parses, no section binding a consumer goes
-uncited by the checklist, every documented sidecar obeys the rules the
-specification states, every key appears in the declaration reference, no
-rationale callout hides a requirement, and no RFC 2119 keyword is left unmarked.
-It runs in CI on every push and pull request.
+`python3 tools/check_spec.py` validates both specifications against themselves,
+against the eighteen worked examples, and against the seven converted ones: that
+every `§` reference and link resolves, the consumer requirements are
+sequentially numbered, wholly indexed and each in exactly one conformance
+profile, every TOML and JSON block parses, no section binding a consumer goes
+uncited by the checklist, every sidecar obeys the rules the specification
+states — value kinds in the right platform table, `inline` values that
+something consumes, exact repository scopes, integer floors, `https` URLs — every
+key appears in the declaration reference, record digests are written in the
+canonical form, no rationale callout hides a requirement, and no RFC 2119
+keyword is left unmarked. It runs in CI on every push and pull request.
 
 Each check exists because the corresponding mistake shipped at least once. They
 cover mechanical drift only — a section that contradicts itself still needs a
@@ -397,14 +472,16 @@ section is worse than none.
 
 `python3 -m pytest` runs the reference reader's own suite, which asks a
 different question of the same files: not whether the documents agree with each
-other, but whether all eighteen sidecars survive an implementation of the rules the
-specification states. Both run in CI on every push and pull request.
+other, but whether all eighteen sidecars survive an implementation of the rules
+— the first attempt's, until the reader is rewritten. Both run in CI on every
+push and pull request.
 
 ## What happens before a freeze
 
-Version 1 is a draft amended in place, and it stays that way on purpose. §4.3's
-version gate exists so that a producer can declare which contract it needs and a
-consumer can reject what it cannot implement — machinery that starts mattering
+Version 1 is a draft amended in place, and it stays that way on purpose.
+[§4.3](SPEC.md#43-contract-version)'s version gate exists so that a producer can
+declare which contract it needs and a consumer can reject what it cannot
+implement — machinery that starts mattering
 when **producers publish** against a fixed contract, not when a consumer starts
 building. A tool built against a moving draft is cheap to keep in step. A
 contract frozen before anything has been built freezes in guesses.
@@ -414,20 +491,26 @@ So, in order:
 1. **Review from people who did not write this.** Eighteen sidecars, one hand.
    The specific asks are in [Getting involved](#getting-involved).
 2. **A real consumer.** [KivyForge](https://github.com/ElliotGarbus/kivyforge) is
-   the intended first one. §8's forty-one requirements and
-   [`docs/REQUIREMENTS.md`](docs/REQUIREMENTS.md) are what an implementer works
-   from; the reference reader shows one way to discharge them and is not the
-   only way.
+   the intended first one. [§8](SPEC.md#8-consuming-tool-requirements)'s
+   forty-six numbered requirements and fifteen advisory obligations — grouped
+   into a core profile plus one per platform, so an Android-only tool can
+   conform without implementing Xcode — are what an implementer works from.
 3. **Real packages, and applications that use them.** Sidecars shipped in
    wheels, resolved by that consumer, built into an APK and an `.ipa` that runs.
 4. **Then consider a freeze.**
 
 Stages 2 and 3 are also how the open questions get answered rather than argued.
-Every deferral in [development/SURVEY.md](development/SURVEY.md) carries a
-trigger that only a real build can pull: a toolchain floor a consumer genuinely
-cannot meet, a second vendor needing a packaging option, a producer whose own
-code contacts a tracking domain. And §2.3's host obligation lands directly on
-whichever toolchain implements first — the cost of it is knowable only by trying.
+Each deferral carries a trigger only a real build can pull: two producers
+needing early initialization would reopen provider registration and the
+lifecycle question ([§6.6](SPEC.md#66-manifest-components),
+[§11](SPEC.md#11-out-of-scope)); support traffic showing applications
+acknowledging a requirement they did not meet would reopen verification
+([`development/redesign/review-01.md`](development/redesign/review-01.md) §3);
+a private Swift package would be the first case for a key added on argument
+alone ([`development/redesign/CONVERSION.md`](development/redesign/CONVERSION.md)
+V26). And [§2.4](SPEC.md#24-obligations-on-the-consumers-bootstrap)'s bootstrap
+obligation lands directly on whichever toolchain implements first — the cost of
+it is knowable only by trying.
 
 **What would make it ready**, so the decision is a check rather than a judgement
 call:
@@ -438,11 +521,24 @@ call:
   rather than wrote it.
 - **One integration on a device.** Nothing here has ever been run: eighteen
   sidecars, two hundred tests, zero installed applications.
-- **A round that finds no new table.** Each round so far has added
-  capability; the signal to stop is a round that produces only corrections.
+- **A round that produces only corrections.** The tables that used to grow every
+  round are gone, so that signal has changed shape: what would now say the model
+  is done is a round of review or conversion that finds defects to repair and no
+  capability to add. The last three rounds have been trending that way and have
+  not got there.
+- **The reference reader rewritten against this specification**, so that
+  `docs/REQUIREMENTS.md` and the test suite describe what the document says
+  rather than what its predecessor said.
 
 ## Planned
 
+- **The reference reader against the current specification.** Its architecture
+  survives — the ports, the rule registry, the diagnostics that cannot be built
+  without naming a distribution — and its rule set does not. When it moves, the
+  converted sidecars graduate from `development/redesign/examples/` to
+  `examples/`, the frozen eighteen move under `development/` with the document
+  they belong to, and `docs/REQUIREMENTS.md` describes [SPEC.md](SPEC.md)
+  instead of its predecessor. This is the pacing item for everything below it.
 - A conformance test suite any consumer can run against itself. The reference
   reader is the start of one — its rule registry is the list of behaviours a
   suite would have to check — but a suite has to be runnable against a *tool*
