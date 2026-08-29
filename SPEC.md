@@ -18,11 +18,36 @@ to do.
 
 ## Contents
 
-Writing a sidecar? [Appendix A](#appendix-a-a-complete-sidecar) shows one whole,
-and [Appendix B](#appendix-b-declaration-reference) lists every key it may
-contain. Building a tool that reads them?
-[§8](#8-consuming-tool-requirements) is the checklist, and §§2–7 and
+**Writing a sidecar for a package with both platforms, or unsure where to
+start?** [Appendix A](#appendix-a-a-complete-sidecar) shows one whole, and
+[Appendix B](#appendix-b-declaration-reference) lists every key it may contain.
+[§1](#1-terminology) and [§2](#2-overview) explain the model those keys
+declare into; [§12](#12-guidance-for-package-authors) has guidance specific to
+producers.
+
+**Writing Android contributions only?** [§6](#6-android-declarations) is the
+normative reference for every key under `[android.contributes]`, and
+[§12](#12-guidance-for-package-authors) again for guidance once §6's mechanics
+are clear. [§7](#7-ios-declarations) does not apply.
+
+**Writing iOS contributions only?** [§7](#7-ios-declarations) is the
+equivalent normative reference for `[ios.contributes]`. [§6](#6-android-declarations)
+does not apply.
+
+**Building a consuming tool** — one that reads sidecars and generates a native
+project? [§8](#8-consuming-tool-requirements) is the checklist, and §§2–7 and
 [§9](#9-recording-and-review) are what it refers to.
+
+**Building or maintaining an application that depends on packages using this
+convention?** [§2.2](#22-how-the-application-answers) is how a value or action
+is answered from `pyproject.toml`, and [§9](#9-recording-and-review) is what
+the consumer's report — the thing naming what still needs a decision — looks
+like.
+
+**Reviewing a build's output, an audit, or a compliance sign-off?**
+[§9](#9-recording-and-review) is the record a consumer must produce, and
+[Appendix C](#appendix-c-a-record-that-satisfies-9) shows one that satisfies
+it.
 
 > Callouts like this one are **rationale**: why a rule is the way it is, and
 > what goes wrong without it. They state no requirement, and a reader who skips
