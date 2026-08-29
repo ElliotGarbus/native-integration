@@ -1,0 +1,9 @@
+contract = "1"
+
+# Both distributions claim the same namespace. §6.1 rule 5: two distributions
+# claiming overlapping namespaces fail, naming both.
+[android.owns]
+java_namespaces = ["org.shared.glue"]
+
+[android.contributes.src]
+java = ["java"]

@@ -1,0 +1,278 @@
+# The conformance record
+
+**The normalized form a consumer emits so that two consumers can be compared.**
+
+[§9](../SPEC.md#9-recording-and-review) mandates what an integration record must
+contain and deliberately not how it is written: "A lockfile entry, a checksum
+file beside the generated project, or any other durable artifact satisfies the
+record." That freedom is right for a build tool and useless for a test suite —
+two conforming consumers can produce records that agree on every fact and share
+no bytes.
+
+This file defines one serialization, for that comparison and nothing else.
+
+| | |
+| --- | --- |
+| **What it is** | a projection of the integration record onto a fixed, diffable form |
+| **What it is not** | a required record format. A consumer's own record stays whatever [§9.6](../SPEC.md#96-what-a-record-must-contain) leaves it |
+| **Who emits it** | a consumer being tested, on request — a `--conformance-record` flag or equivalent |
+| **Status** | non-normative to [SPEC.md](../SPEC.md); binding only on a conformance claim made through this corpus |
+
+**Where this file and SPEC.md disagree, SPEC.md governs and this file is the
+defect** ([conformance/README.md](README.md)).
+
+---
+
+## 1. The shape
+
+A conformance record is a UTF-8 text file. Every line is one **fact**. The file
+is the **sorted set** of its facts:
+
+- lines are sorted **bytewise**, ascending, over the whole file;
+- a fact appears **exactly once** — a duplicate line is invalid, not a repeat;
+- lines end with `\n`, including the last; there is no BOM and no blank line.
+
+Sorting the whole file is what makes two consumers comparable without agreeing
+on anything else. It also means `diff` is the entire comparison algorithm, which
+is what [run.py](run.py) does.
+
+> Bytewise sort groups the file usefully on its own, because every fact begins
+> with its verb and then its subject: all `build` facts, then `decision`, then
+> each distribution's block together in normalized-name order. That is a
+> consequence, not a rule — nothing may depend on the grouping.
+
+## 2. Lexical rules
+
+```
+fact      = verb SP operand *( SP operand )
+operand   = bare / key "=" value
+key       = 1*( lowercase / digit / "-" )
+value     = bare / quoted / list
+bare      = 1*( ALPHA / DIGIT / "." / "_" / "-" / ":" / "/" / "@" / "+" / "~" / "*" )
+quoted    = DQUOTE *( qchar ) DQUOTE
+qchar     = %x20-21 / %x23-5B / %x5D-10FFFF / "\" ( DQUOTE / "\" / "n" )
+list      = value *( "," value )
+```
+
+- A value that is not `bare` **is** quoted. A value that is `bare` is **never**
+  quoted — one spelling per value, or the sort is not deterministic.
+- `\n` inside a quoted value is a line feed. No other escape exists; a tab, a
+  carriage return, or any other control character is written `\n`-free and
+  literal is not permitted, so prose is normalized to `\n` line breaks first.
+- List members are sorted bytewise and de-duplicated.
+- Keyed operands within one fact are sorted bytewise by key.
+
+### Normalization, before anything is written
+
+| | |
+| --- | --- |
+| distribution name | [§1](../SPEC.md#1-terminology)'s normalized form — lowercased, runs of `-`, `_`, `.` collapsed to one `-` |
+| path | forward slashes, relative to the sidecar directory, no `./` prefix ([§9.3](../SPEC.md#93-hashed-inputs)) |
+| digest | 64 lowercase hexadecimal characters, unprefixed, never abbreviated ([§9.3](../SPEC.md#93-hashed-inputs)) |
+| date | [RFC 3339](https://www.rfc-editor.org/rfc/rfc3339) full-date in UTC — `2026-08-24` ([§9.6](../SPEC.md#96-what-a-record-must-contain)) |
+| boolean | `true` / `false` |
+| version | as the ecosystem spells it; never re-rendered |
+
+A record covers **one platform's build** ([§9.2](../SPEC.md#92-the-report)). The
+iOS half of an application lives in its own file.
+
+## 3. Facts
+
+Three verbs. The set is closed: a consumer emitting a verb this file does not
+define has emitted a record `run.py` will refuse.
+
+### 3.1 `build`
+
+```
+build contract 1.0
+build platform android
+```
+
+`contract` is the contract the **consumer** implements
+([§4.3](../SPEC.md#43-contract-version)); `platform` is what the resolution was
+computed for.
+
+### 3.2 `dist`
+
+Subject is the normalized distribution name. Every fact a distribution
+contributes is one line.
+
+**Identity and provenance** ([§9.6](../SPEC.md#96-what-a-record-must-contain),
+[§3.2](../SPEC.md#32-resolution))
+
+```
+dist map-sdk version 4.1.0
+dist map-sdk contract 1
+dist map-sdk origin direct
+dist analytics-shim origin via=some-ui-lib
+```
+
+`origin` is `direct`, or `via=` naming the producer's immediate dependents,
+sorted. Where several paths exist a consumer reports at least the immediate
+dependents, and what it reports is deterministic across runs.
+
+**Inputs** ([§9.3](../SPEC.md#93-hashed-inputs))
+
+```
+dist map-sdk input java/com/example/maps/MapBridge.java sha256=9f2c…df92
+dist map-sdk input native.toml sha256=71ff…f28c
+```
+
+**Ownership** ([§6.1](../SPEC.md#61-ownership))
+
+```
+dist map-sdk owns java-namespace org.example.maps
+```
+
+**Requirements** ([§5](../SPEC.md#5-requirements-on-the-application),
+[§5.4](../SPEC.md#54-how-a-requirement-is-satisfied))
+
+```
+dist map-sdk floor min_sdk declared=24 configured=26 state=met
+dist map-sdk value maps_api_key kind=manifest_meta_data key=com.example.maps.API_KEY state=supplied
+dist map-sdk value maps_optional kind=inline conditional=true state=dismissed date=2026-08-24 version=4.1.0
+dist map-sdk action map_deep_links state=acknowledged date=2026-08-24 version=4.1.0
+dist map-sdk action map_offline_cache conditional=true state=unresolved
+dist map-sdk action airship_nse slot=com.apple.usernotifications.service conditional=true state=unresolved
+dist map-sdk action app_group_entitlement uses=app_group_id state=unresolved
+```
+
+`state` is one of `met` / `unmet` (floors), or `supplied` / `unresolved` /
+`dismissed` (values), or `acknowledged` / `unresolved` / `dismissed` (actions).
+`conditional=true` appears only where the sidecar declares it. `date` and
+`version` appear on an acknowledgement or a dismissal and nowhere else, because
+[§9.6](../SPEC.md#96-what-a-record-must-contain) requires them there.
+
+**Contributions** ([§6](../SPEC.md#6-android-declarations),
+[§7](../SPEC.md#7-ios-declarations)). One verb-phrase per contribution kind, so
+that a set difference over these lines *is* the delta a reviewer reads.
+
+```
+dist map-sdk contributes source java/com/example/maps/MapBridge.java
+dist map-sdk contributes gradle-dependency com.example.maps:android configuration=implementation requested=4.1.0 resolved=4.1.0
+dist map-sdk contributes gradle-repository https://maven.example.com/releases authenticated=true groups=com.example.maps reason="Hosts the maps SDK, which is not on Maven Central"
+dist map-sdk contributes permission android.permission.INTERNET reason="Map tile delivery"
+dist map-sdk contributes permission android.permission.ACCESS_FINE_LOCATION max-sdk=30 never-for-location=false
+dist map-sdk contributes feature android.hardware.location.gps required=false
+dist map-sdk contributes component org.example.maps.RedirectActivity kind=activity exported=true
+dist map-sdk contributes component com.vendor.sdk.Receiver kind=receiver exported=false from-dependency=com.vendor:sdk
+dist map-sdk contributes view-link org.example.maps.RedirectActivity host=oauth2redirect path-prefix=/callback scheme=myapp-oauth
+dist map-sdk contributes intent-filter org.example.maps.Messaging action=com.google.firebase.MESSAGING_EVENT
+dist map-sdk contributes keep org.example.maps.**
+dist map-sdk contributes keep okhttp3.** from-dependency=com.squareup.okhttp3:okhttp
+dist map-sdk contributes meta-data com.example.maps.MODE type=string value=fast
+dist map-sdk contributes query package=com.google.android.apps.healthdata reason="Availability check"
+dist pycharting contributes swift-package Charting products=Charting requirement=from:2.4.0 url=https://github.com/example/charting
+dist pycharting contributes swift-source swift/Shim.swift
+dist pycharting contributes symbol-prefix PyChart
+dist pycharting contributes accessed-api NSPrivacyAccessedAPICategoryUserDefaults reasons=CA92.1
+dist pycharting contributes plist-value CADisableMinimumFrameDurationOnPhone type=boolean value=true
+dist pycharting contributes plist-append LSApplicationQueriesSchemes value=examplescheme
+dist pycharting contributes skadnetwork su67r6k2v3.skadnetwork
+dist pycharting contributes python-module web_views init=PyInit_WebViews swift-package=PyWebViews
+dist pycharting contributes objc-categories
+```
+
+A `view-link`'s `<data>` attributes are written in the sidecar's snake-case
+spelling, not the platform's, so that a record does not depend on
+[§6.6](../SPEC.md#66-manifest-components)'s conversion having been performed.
+`plist-append` emits one fact per array member, which is what makes a
+de-duplicated union comparable.
+
+**The resolved native graph** ([§6.3](../SPEC.md#63-gradle-dependencies),
+[§7.2](../SPEC.md#72-swift-packages))
+
+```
+dist map-sdk artifact com.example.maps:android:4.1.0 sha256=0d3e…7b21
+dist map-sdk artifact com.squareup.okhttp3:okhttp:4.12.0 sha256=5b81…f9d0 transitive=true
+dist pycharting package https://github.com/example/charting requested=from:2.4.0 revision=8a1f…e15b version=2.4.0
+dist pycharting package https://github.com/example/charting-core revision=b73c…de77 transitive=true version=1.2.0
+dist pycharting binary-target ChartingRenderer.xcframework checksum=e11d…fa14
+```
+
+**What resolved artifacts brought with them**
+([§9.4](../SPEC.md#94-what-resolved-artifacts-bring-with-them))
+
+```
+dist map-sdk artifact-declares com.example.maps:android:4.1.0 permission com.example.permission.MAPS_ID
+dist map-sdk artifact-declares com.example.maps:android:4.1.0 feature android.hardware.location.gps required=true
+dist map-sdk artifact-declares com.example.maps:android:4.1.0 component com.example.maps.PublicActivity exported=true
+```
+
+These are attributed to the **artifact**, not to the sidecar, which is the whole
+point of §9.4. The `dist` subject says which distribution pulled it in.
+
+### 3.3 `decision`
+
+The answers [§2.2](../SPEC.md#22-how-the-application-answers) joins by something
+other than `(distribution, id)`, plus the credential facts
+[§9.5](../SPEC.md#95-secrets-are-never-recorded) allows. These are
+integration-wide, so they carry no `dist` subject — each names the distributions
+it affected instead.
+
+```
+decision approve-export org.example.maps.RedirectActivity date=2026-08-24 distribution=map-sdk
+decision artifact-feature android.hardware.location.gps artifact=com.example.maps:android:4.1.0 date=2026-08-24 distribution=map-sdk keep=optional
+decision collision lib/arm64-v8a/libc++_shared.so artifacts=com.example.maps:android:4.1.0,com.vendor:sdk:2.0.0 chosen=com.example.maps:android:4.1.0 date=2026-08-24 decided=application distributions=analytics-shim,map-sdk
+decision credential-required package=https://git.example.com/vendor/vendorkit
+decision credential-required repository=https://maven.example.com/releases
+decision suppress-permission android.permission.ACCESS_FINE_LOCATION date=2026-08-24 withdrew=analytics-shim,map-sdk
+```
+
+`approve-export` is emitted for a component still **pending** too, as
+`state=pending` with no `date` — [§9.6](../SPEC.md#96-what-a-record-must-contain)
+requires "the approval's absence where a component is still pending" to be
+recoverable.
+
+**No credential value ever appears.** A `credential-required` fact states that a
+repository or package needs one; that is a fact about the integration, and the
+credential is not ([§9.5](../SPEC.md#95-secrets-are-never-recorded)).
+
+## 4. What is deliberately not in it
+
+| | Why |
+| --- | --- |
+| An action's `summary`, `instructions` and `acceptance` | Inline in `native.toml`, so the `input` digest already pins them ([§9.3](../SPEC.md#93-hashed-inputs)). Restating prose would make the comparison sensitive to line wrapping |
+| The report's rendering | [§9.2](../SPEC.md#92-the-report) mandates distinctions, not a format. A corpus that fixed the rendering would be testing a spelling the specification refuses to fix |
+| Anything the consumer generated | The manifest, the Gradle files, the Xcode project. Those are the consumer's, and two conforming consumers differ |
+| Timestamps other than a decision's date | A record diffed between runs must not change because time passed |
+
+A `reason` **is** included where [§6.4](../SPEC.md#64-maven-repositories),
+[§6.5](../SPEC.md#65-permissions-and-features) and
+[§6.9](../SPEC.md#69-package-visibility) require it to be kept and attributed —
+those are the three places the specification makes prose part of the record
+rather than part of the report.
+
+## 5. Worked example
+
+This is [`core/R01_dependency_closure/expected/android.record`](core/R01_dependency_closure/expected/android.record)
+verbatim — the corpus's shortest complete case, and its digests are the real
+SHA-256 of the bytes in that case's `input/`:
+
+```
+build contract 1.0
+build platform android
+dist examplytics contract 1
+dist examplytics contributes permission android.permission.INTERNET reason="Event delivery"
+dist examplytics contributes source java/org/example/analytics/Bridge.java
+dist examplytics floor compile_sdk declared=35 configured=35 state=met
+dist examplytics floor min_sdk declared=24 configured=26 state=met
+dist examplytics input java/org/example/analytics/Bridge.java sha256=22ea0ee0c3006cac66f6d0240d32ac4c3dc6828179de7084d34c6ba3adce2836
+dist examplytics input native.toml sha256=3de10e32e5acdc2e46c4a3b55a1263a3a0547188407fb799d39df73e5e2b0a5a
+dist examplytics origin direct
+dist examplytics owns java-namespace org.example.analytics
+dist examplytics value analytics_key kind=manifest_meta_data key=com.example.analytics.API_KEY state=supplied
+dist examplytics version 1.0.0
+```
+
+Every line is a fact [§9.6](../SPEC.md#96-what-a-record-must-contain) requires
+to be recoverable, and the file is its own sorted order.
+
+## 6. Digests in a fixture
+
+A fixture's `input` digests are the SHA-256 of the bytes in its own `input/`
+directory, so they are real and a consumer computes the same ones. Where a
+fixture does not exercise hashing, `run.py` accepts the digest placeholder form
+`sha256=<any 64 hex>` only when the case sets `ignore_digests = true`, which
+exists so that a case about, say, namespace collision is not also a test of file
+hashing.

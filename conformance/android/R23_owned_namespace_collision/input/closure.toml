@@ -1,0 +1,13 @@
+platform = "android"
+
+[[distribution]]
+name = "pyalpha"
+version = "1.0.0"
+origin = "direct"
+entry_point = "pyalpha._native"
+
+[[distribution]]
+name = "pybeta"
+version = "2.0.0"
+origin = "via=pyalpha"
+entry_point = "pybeta._native"

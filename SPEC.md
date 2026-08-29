@@ -123,6 +123,7 @@ it.
 - [Appendix C: a record that satisfies §9](#appendix-c-a-record-that-satisfies-9)
 - [Appendix D: why contributions stay per-distribution](#appendix-d-why-contributions-stay-per-distribution)
 - [Appendix E: prior art](#appendix-e-prior-art)
+- [Appendix F: the conformance record](#appendix-f-the-conformance-record)
 
 <!-- /toc -->
 
@@ -3039,6 +3040,20 @@ classify the same condition the same way:
 | **blocking** | the build **MUST NOT** proceed | every numbered requirement below that says *fail* |
 | **advisory** | reported; the build proceeds | the **SHOULD** list in [§8.5](#85-advisory-obligations) |
 
+**Blocking and advisory classify findings, not requirements.** A numbered
+requirement below that defines no finding is a **conformance obligation**: a
+violation makes the consumer non-conforming, and carries no runtime disposition
+unless the requirement explicitly says the build must fail. Requirement 45 is
+the clearest case — a bootstrap either generates a `ComponentActivity` or does
+not, and a consumer is not being asked to emit a diagnostic about itself.
+
+> **Note:** This matters where a conformance suite is involved, because the two
+> are checked differently. A finding is observed by running a build and reading
+> what came out; an obligation is observed by inspecting what the consumer
+> produced — the generated project, the payload it assembled, the record it
+> wrote. Filing an obligation under *advisory* would say the build may proceed,
+> which is not the question being asked about it.
+
 **Recording is a separate axis, not a third disposition.** Most of what a
 consumer writes to the integration record is not a finding at all: every
 contribution, every satisfied requirement, and the resolved native graph are
@@ -4463,3 +4478,30 @@ detection live.
   is applied by the tool, so its content is build authority, while instructions
   are read by a person or an agent working with that person's authority. That
   is why instructions may be free prose and a fragment may not.
+
+## Appendix F: the conformance record
+
+**Non-normative.** [§9.6](#96-what-a-record-must-contain) fixes what an
+integration record must contain and deliberately not how it is written, and
+[Appendix C](#appendix-c-a-record-that-satisfies-9) shows one shape that
+satisfies it. That freedom is right for a build tool and useless for comparing
+two of them: two conforming consumers can agree on every fact and share no
+bytes, and *two consumers read one sidecar and agree* is the test this document
+is waiting on.
+
+So the conformance corpus defines one serialization — a projection of the record
+onto a fixed, line-sorted, diffable form — in
+[`conformance/record-format.md`](conformance/record-format.md), with the corpus
+itself under [`conformance/`](conformance/).
+
+Three things about its status, because a test format is exactly the kind of
+artifact that quietly becomes a second specification:
+
+- It **adds no obligation**. A consumer's own record stays whatever §9.6 leaves
+  it. What the format asks for is an export, on request, of facts §9.6 already
+  requires to be recoverable.
+- It is **binding only on a conformance claim made through the corpus**. A
+  consumer that never runs the corpus owes it nothing.
+- Where the format and this document disagree, **this document governs and the
+  format is the defect**. The corpus states the same rule about its own
+  fixtures.

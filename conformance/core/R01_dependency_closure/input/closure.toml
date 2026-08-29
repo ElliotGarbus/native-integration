@@ -1,0 +1,16 @@
+# The application's resolved dependency closure for the target platform (§3.2).
+# `pyunrelated` is installed in the same environment and is NOT in the closure:
+# requirement 1 says a consumer never accepts contributions from it.
+platform = "android"
+
+[[distribution]]
+name = "examplytics"
+version = "1.0.0"
+origin = "direct"
+entry_point = "examplytics._native"
+
+[[distribution]]
+name = "pyunrelated"
+version = "9.9.9"
+origin = "not-in-closure"
+entry_point = "pyunrelated._native"

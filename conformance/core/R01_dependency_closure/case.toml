@@ -1,0 +1,25 @@
+# §8.4 requirement 1: restrict candidate producers to the application's resolved
+# dependency closure, and never accept contributions from a distribution outside
+# it, whatever else is installed alongside.
+#
+# `pyunrelated` is in input/closure.toml marked `not-in-closure` and ships no
+# sidecar directory of its own: a consumer that enumerates entry points across
+# whatever is installed, rather than filtering against the closure, has nothing
+# to fail on here — which is why the assertion below carries the weight and the
+# record carries the rest.
+requirement = 1
+profile     = "core"
+section     = "3.2"
+
+outcome = "accept"
+
+diagnostics = []
+advisories  = []
+
+assertions = [
+  "no_producer_import",
+  "sidecar_excluded_from_payload",
+  "contributed_source_excluded_from_payload",
+]
+
+record = "android.record"

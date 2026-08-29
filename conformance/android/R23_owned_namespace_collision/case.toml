@@ -1,0 +1,23 @@
+# §8.4 requirement 23, via §6.1 rule 5: two distributions claiming overlapping
+# Java namespaces fail the build, naming both.
+#
+# This is a category-1 case — a non-conforming consumer here is dangerous rather
+# than merely wrong. `pybeta` claims `org.shared.glue`, which `pyalpha` already
+# owns, and both ship a class at the same path. A consumer that resolves by
+# order rather than failing lets one distribution's class silently replace the
+# other's, which is the substitution §6.1 exists to close.
+#
+# Containment is computed on dot-separated segments (§6.1), so this is an exact
+# overlap and not a prefix accident.
+requirement = 23
+profile     = "android"
+section     = "6.1"
+
+outcome = "blocking"
+
+diagnostics = ["ni.req.23"]
+advisories  = []
+
+assertions = ["every_diagnostic_names_a_distribution"]
+
+# The build does not proceed, so there is no resolution to record.

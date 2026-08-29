@@ -1,0 +1,9 @@
+# The application's own configuration, in a neutral spelling. §2.2 fixes the
+# capability a consumer must offer and deliberately not its syntax, so a
+# consumer under test adapts this into whatever it actually reads.
+[build]
+min_sdk = 26
+compile_sdk = 35
+
+[answers.values]
+"examplytics.analytics_key" = "ak_live_4f2c19"

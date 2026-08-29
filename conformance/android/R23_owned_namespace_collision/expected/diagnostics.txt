@@ -1,0 +1,4 @@
+# Authored from §6.1 rule 5, not from any implementation's output. A consumer's
+# wording is its own; what §8.4 requirement 18 fixes is that both distributions
+# are named.
+ni.req.23  pyalpha, pybeta  org.shared.glue claimed by more than one distribution

@@ -1,0 +1,22 @@
+contract = "1"
+
+[android.owns]
+java_namespaces = ["org.example.analytics"]
+
+[android.requires]
+min_sdk = 24
+compile_sdk = 35
+
+[[android.requires.application_value]]
+id = "analytics_key"
+kind = "manifest_meta_data"
+key = "com.example.analytics.API_KEY"
+reason = "Your project key, from the vendor console"
+placeholder = "<TODO: your Examplytics project key>"
+
+[android.contributes.src]
+java = ["java"]
+
+[[android.contributes.permissions]]
+name = "android.permission.INTERNET"
+reason = "Event delivery"
