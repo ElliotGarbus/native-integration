@@ -13,7 +13,7 @@ to do.
 > [`development/first-attempt.md`](development/first-attempt.md) for its
 > reasoning and its evidence. Neither was ever released, so this takes version 1
 > rather than renumbering around a version nobody had to support.
- 
+
 ---
 
 ## Contents
@@ -181,6 +181,8 @@ The key words **MUST**, **MUST NOT**, **REQUIRED**, **SHOULD**, **SHOULD NOT**,
 | **Consumer** | A tool that reads declarations and generates a native app project. Consumers are build tools, not installers. |
 | **Application** | The app being built. Its own configuration is outside this document. |
 | **Dependency closure** | The application's direct dependencies and their transitive requirements, as resolved for the target platform. |
+| **Effective set** | The distributions in that closure which ship a sidecar, together with everything those sidecars declare, after this document's validation and merge rules have been applied. What a build stages, reports and records is the effective set. |
+| **Normalized name** | A distribution's name lowercased with each run of `-`, `_` and `.` replaced by a single `-`, as [PEP 503](https://peps.python.org/pep-0503/) defines it. Where this document fixes an order or a join by distribution name, it means this form. |
 | **Sidecar** | The declaration file a producer ships. |
 | **Contribution** | Native material the consumer stages on the producer's behalf. |
 | **Value** | A string the application supplies and the consumer writes to a platform key. |
@@ -304,10 +306,11 @@ into a file the consumer tells the application to commit.
 ### 2.3 What the consumer generates
 
 A consumer **MUST** report every unmet requirement, naming the distribution
-that declared it, the `reason`, and — for an action — the `summary`,
-`instructions`, and `acceptance`. Omitting the latter two would report that
-something is owed without carrying what a person or agent needs to do the work
-and confirm it.
+that declared it, the `reason` — or, for a floor, the declared and configured
+values, since a floor carries no `reason` ([§5.1](#51-build-floors)) — and, for
+an action, the `summary`, `instructions`, and `acceptance`. Omitting the latter
+two would report that something is owed without carrying what a person or agent
+needs to do the work and confirm it.
 
 A consumer **SHOULD** scaffold declared placeholders into the application's own
 configuration, so that what remains is visible where the author already works:
@@ -574,6 +577,17 @@ The sidecar directory **MUST** contain an `__init__.py`, typically empty.
 > import systems — so the entry point's dotted path would not be reliably
 > portable. A regular package makes it one unambiguous thing.
 
+> **Note: why this is a file, and not a table in `pyproject.toml`.** The obvious
+> home for a declaration is the producer's own `pyproject.toml`, under
+> `[tool.native_integration]`. It does not work: arbitrary `[tool.*]` tables are
+> build-time configuration and do not survive into the wheel or into the
+> installed distribution, so a consumer reading installed metadata never sees
+> them. A build backend could copy them across — and that is a backend wrapper
+> per backend, forever, excluding every backend nobody wrote one for. Package
+> data and entry points are the two things every major backend already emits
+> without knowing this document exists, which is why the declaration rides on
+> those and on nothing else.
+
 **Referenced resources.** Every path a sidecar declares is interpreted relative
 to `native.toml` and **MUST NOT** escape its directory, checked *after* path
 normalization and symlink resolution. Symlinked resources are not permitted in
@@ -659,6 +673,12 @@ what lets a package author decide whether adopting a minor strands their users.
 Within a platform table the consumer is **building for**, an unrecognized key
 **MUST** be rejected, naming the distribution and the key. A consumer **MUST
 NOT** ignore a declaration it does not understand in order to proceed.
+
+**One exception exists, and this document contains no other.** The `<data>`
+attributes of a `view_links` entry ([§6.6](#66-manifest-components)) are
+Android's own names, and an unrecognized one is written through rather than
+rejected. It is stated there, bounded to that one table, and argued on the same
+ground as the pass-through rule below.
 
 **Values divide by what the consumer does with them**, and the two halves get
 opposite rules.
@@ -788,10 +808,24 @@ A consumer **MUST** fail, naming the distribution, when the application's
 configured value is lower, or when a declared boolean floor is not enabled. A
 consumer **MUST NOT** raise the application's configuration to satisfy a floor.
 
-**How the iOS and Android kinds compare.** The Android floors are integers and
-compare as integers. The iOS `deployment_target` is a string, and comparing it
-as one would make `"9.0"` higher than `"15.0"`, so the comparison is fixed
-here:
+**A floor is always unconditional, and carries no `reason`.** It takes no
+`conditional` key — a build either meets a minimum or does not, and there is
+nothing for an application to dismiss — so
+[§5.4](#54-how-a-requirement-is-satisfied)'s three states describe values and
+actions only. It also carries no `reason` field, because the declaration is
+self-describing: where [§5.4](#54-how-a-requirement-is-satisfied) and
+[§2.3](#23-what-the-consumer-generates) require an unmet requirement to be
+reported with its `reason`, an unmet floor is instead reported with **the
+declared value and the application's configured one**, which is the whole of
+what a reader needs.
+
+**How the iOS and Android kinds compare.** `min_sdk`, `compile_sdk` and
+`target_sdk` **MUST** be TOML integers, and compare as integers. A consumer
+**MUST** reject any other type, naming the distribution and the key: `"24"` is
+a string and `24.0` is a float, and a document that accepted either would be
+inviting two consumers to differ over which coercions are allowed. The iOS
+`deployment_target` is a string, and comparing it as one would make `"9.0"`
+higher than `"15.0"`, so the comparison is fixed here:
 
 - The value **MUST** match `[0-9]+(\.[0-9]+){0,2}` — one to three ASCII-decimal
   components. A consumer **MUST** reject anything else, naming the distribution
@@ -1009,15 +1043,21 @@ satisfying the requirement — see [§5.4](#54-how-a-requirement-is-satisfied).
 > ```toml
 > [[ios.requires.application_value]]
 > id = "app_group_id"
-> kind = "info_plist"
-> key = "com.example.app-group"
+> kind = "inline"
 > reason = "The App Group identifier this SDK shares data through"
+> placeholder = "group.<TODO: your bundle id>.example"
 >
 > [[ios.requires.application_action]]
 > id = "app_group_entitlement"
 > summary = "Enable App Groups and add the identifier above to the entitlement"
 > uses = ["app_group_id"]
 > ```
+>
+> The value is `inline` because nothing on iOS reads an App Group identifier
+> from a platform key the consumer could write — the identifier belongs in an
+> entitlement, on targets the consumer does not own. `uses` is what consumes it
+> ([§5.5](#55-value-kinds)), and the author reads it out of the scaffolded
+> placeholder while doing the work the action describes.
 >
 > Without `uses`, these would read as two unrelated line items, and nothing
 > would stop an application author from acknowledging the action while the
@@ -1036,14 +1076,19 @@ satisfying the requirement — see [§5.4](#54-how-a-requirement-is-satisfied).
 | --- | --- |
 | Floor | is configured at or above the declared value |
 | Value | has supplied a non-empty string that is not the placeholder |
-| Action | has acknowledged it by `(distribution, id)` |
+| Action | has acknowledged it by `(distribution, id)`, **and** every value in its `uses` is supplied ([§5.3](#53-actions)) |
 
 A consumer **MUST**:
 
 - fail the build when an **unconditional** (`conditional == false`)
-  requirement is unsatisfied, naming the distribution and the `reason`;
+  requirement is unsatisfied, naming the distribution and the `reason` — or,
+  for a floor, which carries no `reason`, the declared and configured values
+  ([§5.1](#51-build-floors));
 - record an unsatisfied **conditional** (`conditional == true`) requirement in
   the integration record and **MUST NOT** fail the build for it.
+
+Only values and actions take `conditional`; a floor is always unconditional
+([§5.1](#51-build-floors)), so everything below is about those two shapes.
 
 Declare `conditional = true` when you cannot tell whether the requirement
 applies and the application can. State the triggering condition in `reason`.
@@ -1107,6 +1152,23 @@ The kind exists so that a report can tell an author they are being asked for
 user-facing text that App Store review reads, and a `usage_description` free to
 write any `Info.plist` key would be that label attached to something else.
 
+**`info_plist` reaches no key [§7.4](#74-infoplist) refuses.** A value of that
+kind **MUST NOT** name a capability or external-reach key — `UIBackgroundModes`,
+`UIRequiredDeviceCapabilities`, `CFBundleURLTypes`, `NSUserActivityTypes`, and
+whatever a later minor adds to that closed list — nor a key the consumer manages
+itself, such as `CFBundleIdentifier` or `CFBundleShortVersionString`. A consumer
+**MUST** reject either, naming the distribution and the key.
+
+> **Note:** Without this rule the requirement side is a way around the
+> contribution side. [§7.4](#74-infoplist) refuses those keys as contributions
+> because writing one grants the application a capability, restricts who may
+> install it, or makes it reachable from outside; routing the same key through
+> an application-supplied value changes none of that. It would change only who
+> typed the string — and would produce exactly the false-complete state that
+> list exists to prevent, with `UIBackgroundModes` set in the plist and the
+> background mode not actually working, because the entitlement and the App
+> Store declaration behind it were never part of the transaction.
+
 **An `inline` value is consumed, not written.** It is the one kind with no
 `key`, because the consumer places it somewhere another declaration in the
 same sidecar already names. Exactly two sites do that:
@@ -1117,8 +1179,17 @@ same sidecar already names. Exactly two sites do that:
 | An action in the same sidecar and platform table that names the `id` in `uses` ([§5.3](#53-actions)) | `uses = ["app_group_id"]` |
 
 A consumer **MUST** reject an `inline` value that neither site consumes, naming
-the distribution and the `id`, and **MUST** reject an inline reference naming no
-value the same sidecar declares for the same platform.
+the distribution and the `id`. It **MUST** also reject an inline reference —
+`{ application_value = "…" }` — that names anything but a value of kind
+`inline` declared by the same sidecar for the same platform: an unresolved
+`id`, or an `id` belonging to a value of another kind, is invalid either way.
+
+> **Note:** The second half of that rule keeps one string from having two
+> destinations. A reference to a `manifest_meta_data` value would ask the
+> consumer both to write the `<meta-data>` entry that value's `key` names and to
+> splice the same string into a generated filter — a second delivery site the
+> declaration never asked for, and one two consumers would disagree about
+> allowing. A producer that genuinely needs both declares two values.
 
 > **Note:** Without that rule `inline` is the hole the other four kinds were
 > shaped to close. A value's whole contract is that the application supplies a
@@ -1224,7 +1295,7 @@ conflict: each reads as a reasonable, self-contained request, and an
 application author acting on them one at a time creates two extension
 targets — which iOS does not run side by side — or overwrites one vendor's
 handler with the other's, and finds out only when that vendor's feature
- silently stops working.
+silently stops working.
 
 Nothing about this is specific to notifications. An iOS broadcast upload
 extension (screen recording), a file provider extension, and a share
@@ -1495,8 +1566,11 @@ Equal values coalesce.
 > tells two producers to agree, which is cheap, and can be relaxed if a real
 > composition needs it.
 
-**A declared version is a minimum, not a pin.** Gradle may select a higher
-version when something else in the graph requires it. A consumer **MUST NOT**
+**A declared version is a minimum, not a pin — within whatever bound it
+states.** Gradle may select a higher version when something else in the graph
+requires it: freely above a `coordinate`, which states no ceiling, and only
+below `below` in the bounded form, where a request past the ceiling has no
+solution and fails instead. A consumer **MUST NOT**
 silently convert a declaration into a `strictly` constraint — that would make
 two producers naming different versions of one library unresolvable, and
 composing independently-authored packages is the point. Where the selected
@@ -1552,7 +1626,10 @@ groups = ["org.example"]
 `reason` is **REQUIRED**. At least one of `groups` (Maven group IDs) or
 `modules` (`group:artifact` pairs) is **REQUIRED**. `url` **MUST** be an
 `https` URL; a consumer **MUST** reject any other scheme, naming the
-distribution and the URL.
+distribution and the URL. The scheme is compared **case-insensitively**, as
+[RFC 3986](https://www.rfc-editor.org/rfc/rfc3986#section-3.1) defines it, so
+`HTTPS://` is the same scheme and is valid; nothing else about the URL is
+normalized.
 
 **The normative requirement is bounded participation.** The contributed
 repository **MUST NOT** participate in resolution for anything outside the
@@ -1836,7 +1913,9 @@ through without needing to know the value
 `FOREGROUND_SERVICE_*` permission, which is an ordinary
 [§6.5](#65-permissions-and-features) contribution, and a producer declaring a
 type **SHOULD** declare that permission in the same sidecar. A consumer
-**SHOULD** warn when one appears without the other (8.S13).
+**SHOULD** warn when one appears without the other (8.S13), **except where the
+declared type is one the platform exempts from a type permission** — today that
+is `shortService`, and only that.
 
 > **Note:** This is a warning, not a build failure, because turning it into one
 > would require this document to maintain Android's own type-to-permission
@@ -1854,6 +1933,15 @@ type **SHOULD** declare that permission in the same sidecar. A consumer
 > permission that type needs. That is enough to catch the omission before it
 > surfaces as the platform refusing the service at runtime, without risking a
 > failure this document cannot actually justify.
+>
+> The one exemption is named because otherwise the advisory is unsilenceable
+> for a legitimate producer: a `shortService` needs no type permission, so a
+> warning about its absence can only be answered by declaring a permission the
+> service does not use. One string is a far smaller obligation than the mapping,
+> and it is stated as *what the platform exempts today* rather than as a closed
+> set. If Android exempts another type, a consumer warns until it learns the
+> new name — a false warning on an advisory check, which is the residual this
+> design accepts and a blocking check could not.
 
 **Export.** Components are registered `android:exported="false"` by default. A
 producer **MUST NOT** declare `exported = true` directly. A producer **MAY**
@@ -1898,16 +1986,42 @@ one stereotyped filter, not the intent-filter grammar.
 - Valid only on `kind = "activity"` entries that declare
   `exported_required = true`. A consumer **MUST** reject the inconsistent
   combination — a link target that is not exported is unreachable.
-- The fields are Android's own `<data>` attribute names in snake case, and the
-  set is **pass-through** per [§4.4](#44-unknown-declarations-fail-closed): `port`,
-  `mime_type`, `path`, `path_pattern` and `path_suffix` are as declarable as the
-  three shown. Only `scheme` is **REQUIRED**.
-- Every attribute may take a literal or an inline application value
-  ([§5.5](#55-value-kinds)).
+- The fields are Android's own `<data>` attribute names in snake case. Only
+  `scheme` is **REQUIRED**; `host`, `port`, `path`, `path_prefix`,
+  `path_pattern`, `path_suffix`, `mime_type` and every other `<data>` attribute
+  the platform defines are equally declarable.
+- **An unrecognized attribute here is written through, not rejected**, and this
+  is the one exception to [§4.4](#44-unknown-declarations-fail-closed)'s rule
+  that an unknown key in a platform table fails closed. The names belong to
+  Android, which adds to them — `ssp`, `ssp_prefix` and
+  `path_advanced_pattern` all postdate the attributes above — and
+  [§10](#10-versioning) already treats `<data>` attributes as pass-through
+  vocabulary that needs no contract minor. The exception reaches the attributes
+  of a `view_links` entry and nothing else.
+- **The platform attribute name is derived mechanically**, so that two
+  consumers write the same manifest: lower-case the first `_`-separated
+  segment, capitalize the first letter of each later segment, join them, and
+  write `android:<name>`. `path_prefix` becomes `android:pathPrefix`,
+  `mime_type` becomes `android:mimeType`, `ssp` stays `android:ssp`. A consumer
+  **MUST** reject a key that is not
+  `[a-z][a-z0-9]*(_[a-z0-9]+)*`, naming the distribution and the key —
+  the conversion is defined only for that shape.
+- Every attribute's value is a **string**: a literal, or an inline application
+  value ([§5.5](#55-value-kinds)). A consumer **MUST** reject any other TOML
+  type, naming the distribution and the attribute.
 - The consumer **generates** the filter: `android.intent.action.VIEW`, the
   `DEFAULT` and `BROWSABLE` categories, and one `<data>` element. Actions and
   categories are not spellable; they are implied by the type.
 - The record and report **MUST** show the link data alongside the export.
+
+> **Note:** The cost of the exception is the same one
+> [§4.4](#44-unknown-declarations-fail-closed) accepts for pass-through values:
+> a misspelled `path_prfix` reaches the manifest as `android:pathPrfix` and
+> fails in AAPT rather than against the sidecar. What keeps that traceable is
+> that the attribute and the distribution that declared it are in the record.
+> Enumerating the attributes instead would buy a better message for a typo and
+> charge a contract minor every time Android adds a `<data>` name — the
+> maintenance trade this document makes the other way everywhere else.
 
 Verified App Links are **not contributable**. `android:autoVerify` requires an
 `assetlinks.json` file on the application's own domain, which is application
@@ -2249,7 +2363,8 @@ products = ["Shim"]
 refers to packages by it, so two entries sharing a `name` are invalid even when
 their URLs differ; a consumer **MUST** reject that, naming the distribution.
 
-`url` **MUST** be an `https` URL, on [§6.4](#64-maven-repositories)'s terms: a
+`url` **MUST** be an `https` URL, on [§6.4](#64-maven-repositories)'s terms —
+including that the scheme is compared case-insensitively: a
 consumer **MUST** reject any other scheme, naming the distribution. `products`
 is **REQUIRED** and **MUST** be a non-empty list of product names the package
 vends; the consumer links exactly those and no others. A package whose products
@@ -2434,8 +2549,9 @@ reason = "Caches the last selected region so the shim can restore it"
 - `reason` is **RECOMMENDED** prose. Apple's codes are opaque by design, and the
   record is where an application reads what its dependencies claim.
 - Entries merge as a **union**: the application's own entries first, then each
-  distribution's in normalized distribution-name order, with the `reasons` for
-  one `type` unioned and de-duplicated.
+  distribution's in normalized distribution-name order
+  ([§1](#1-terminology)), with the `reasons` for one `type` unioned and
+  de-duplicated.
 
 > **Caution:** A consumer cannot verify this declaration. Nothing checks that
 > the declared categories match what the contributed Swift actually calls, and
@@ -2477,7 +2593,24 @@ Two contribution modes, by shape:
 - **`append`** — array-valued keys. Contributions from all distributions and the
   application are concatenated and de-duplicated in a deterministic order: the
   application's entries first, then each distribution's in normalized
-  distribution-name order.
+  distribution-name order — **normalized** as [§1](#1-terminology) defines it,
+  since an order fixed by a name that two consumers spell differently is not
+  fixed at all.
+
+**A key belongs to one mode.** Across the effective set — every distribution
+and the application — a key declared under `append` is an array key, and a key
+declared under `values` is a scalar one. A consumer **MUST** fail when one key
+is declared both ways, naming both declarers, and **MUST NOT** merge a scalar
+into an array or an array into a scalar.
+
+> **Note:** This is the general form of the rule
+> `skadnetwork_identifiers` needed as a special case, and it deliberately
+> requires no list of which Apple keys hold arrays. The declarations say which:
+> `LSApplicationQueriesSchemes` is an array key because producers declare it
+> under `append`, not because this document knows Apple's schema. Two
+> declarations that disagree about a key's shape have no unambiguous plist form
+> and no order-independent winner, which is the same ground
+> [§5.2](#52-values)'s differing-content rule stands on.
 
 **TOML-to-plist mapping.** "Set verbatim" is not enough for two implementations
 to agree, so the correspondence is fixed:
@@ -2495,9 +2628,11 @@ and inline or nested tables — naming the distribution and the key. An array
 **MUST** be homogeneous: a mixed-type array has no unambiguous plist form.
 
 **Usage descriptions are not contributable.** A consumer **MUST** reject any
-`values` key whose name ends in `UsageDescription`, or which is otherwise a
-purpose string, naming the distribution and directing the producer to
-[§5.2](#52-values)'s `usage_description` kind. That text is user-facing,
+`values` key whose name ends in `UsageDescription`, naming the distribution and
+directing the producer to [§5.2](#52-values)'s `usage_description` kind. The
+suffix is the whole test — every purpose string Apple defines carries it — and
+a vaguer one ("or anything that is otherwise a purpose string") would be
+unimplementable, leaving two consumers to reject different keys. That text is user-facing,
 localized, and read by App Store review; it is a claim about what *the
 application* does with the data, and a `values` entry is the one place a
 producer could write it by accident.
@@ -2724,14 +2859,15 @@ is the core plus at least one platform profile**, and a consumer states which:
 | Profile | Requirements |
 | --- | --- |
 | **Core** — every consumer | 1–22, 24, 26, 38–40, 42, 43 |
-| **Android** | 23–25, 27–32, 41, 44, 45 |
+| **Android** | 23, 25, 27–32, 41, 44, 45 |
 | **iOS** | 33–37, 46 |
 
-Requirement 24 appears in the core because contributed source exists on both
-platforms — [§6.2](#62-source) and [§7.3](#73-source) — and every consumer
-excludes it from the Python payload; its `javac` charset clause binds only a
-consumer that compiles Java. Requirement 26 locks whichever native graphs the
-consumer resolves.
+Requirement 24 appears in the core, and **only** there, because contributed
+source exists on both platforms — [§6.2](#62-source) and [§7.3](#73-source) —
+and every consumer excludes it from the Python payload; its `javac` charset
+clause binds only a consumer that compiles Java, which is why the Android row
+does not repeat it. Requirement 26 locks whichever native graphs the consumer
+resolves. Every requirement appears in exactly one row.
 
 **A consumer MUST fail when asked to build for a platform whose profile it does
 not implement** (requirement 9's second clause), rather than building it while
@@ -2803,15 +2939,17 @@ A conforming consumer **MUST**:
    `contract` value, reject a sidecar that under-declares — by key, by table, or
    by a value from a closed vocabulary — and be able to state the contract it
    implements ([§4.3](#43-contract-version)).
-8. Fail closed on an unrecognized key in a platform table it is building, on an
-   unrecognized top-level key that is not a table, and on a value from a closed
-   vocabulary it does not implement — a value `kind`, a Gradle configuration, a
-   capability key — substituting no default
+8. Fail closed on an unrecognized key in a platform table it is building —
+   excepting only a `view_links` attribute ([§6.6](#66-manifest-components)) —
+   on an unrecognized top-level key that is not a table, and on a value from a
+   closed vocabulary it does not implement — a value `kind`, a Gradle
+   configuration, a capability key — substituting no default
    ([§4.4](#44-unknown-declarations-fail-closed), [§5.5](#55-value-kinds)).
-9. Fail when building for a platform a sidecar's `platforms` key omits, naming
-   the distribution and how it entered the closure; and fail, rather than
-   building partially, when asked to build for a platform whose conformance
-   profile it does not implement
+9. Enforce `platforms` entirely: reject an empty list and a name this document
+   does not define, reject a platform table for a name the key omits, and fail
+   when building for a platform the key omits, naming the distribution and how
+   it entered the closure. And fail, rather than building partially, when asked
+   to build for a platform whose conformance profile it does not implement
    ([§4.5](#45-platform-support), [§8.1](#81-conformance-is-per-platform)).
 
 **Answering, reporting, and scaffolding**
@@ -2826,17 +2964,20 @@ A conforming consumer **MUST**:
     build-time credential **by indirection** rather than only as a literal in a
     committed file ([§2.2](#22-how-the-application-answers),
     [§5.4](#54-how-a-requirement-is-satisfied)).
-11. Report every unmet requirement, naming the distribution, the `reason`, and —
-    for an action — the `summary`, `instructions` and `acceptance`
-    ([§2.3](#23-what-the-consumer-generates)).
+11. Report every unmet requirement, naming the distribution and the `reason` —
+    or, for a floor, which carries none, the declared and configured values —
+    and, for an action, the `summary`, `instructions` and `acceptance`
+    ([§2.3](#23-what-the-consumer-generates), [§5.1](#51-build-floors)).
 
 **Never satisfy a requirement on the producer's authority**
 
 12. Fail when the application's configuration is below a declared floor,
-    comparing `deployment_target` component-wise and numerically; reject a
-    boolean floor declared `false`; never raise the application's configuration
-    to satisfy a floor; and report every declared floor with its distribution,
-    giving `target_sdk` the prominence [§5.1](#51-build-floors) requires.
+    reporting the declared and configured values; reject a non-integer Android
+    floor and a malformed `deployment_target`, comparing the latter
+    component-wise and numerically; reject a boolean floor declared `false`;
+    never raise the application's configuration to satisfy a floor; and record
+    and report every declared floor with its distribution, giving `target_sdk`
+    the prominence [§5.1](#51-build-floors) requires.
 13. Fail when a declared value is unsupplied, never treat a scaffolded
     placeholder as a supplied value, require `key` on every value kind but
     `inline` and reject it on that one, and reject an `inline` value that
@@ -2850,8 +2991,10 @@ A conforming consumer **MUST**:
     ([§5.3](#53-actions), [§5.4](#54-how-a-requirement-is-satisfied)).
 15. Never treat its own observation of the application's project as satisfaction
     of an action ([§5.4](#54-how-a-requirement-is-satisfied)).
-16. Never write an entitlement, a capability, a bundle file, a build target, or
-    any other application-owned artifact because a producer asked for it
+16. Never **invent** the content of an application-owned artifact — an
+    entitlement, a capability, a bundle file, a build target — on a producer's
+    declaration alone. Placing a string the *application* supplied is exactly
+    what [§5.5](#55-value-kinds)'s kinds are for and is not this
     ([§2.1](#21-design-principles)).
 
 **Composition between distributions**
@@ -2894,11 +3037,12 @@ A conforming consumer **MUST**:
     `configuration` naming both distributions, never convert a declared version
     into a `strictly` constraint, and show requested against resolved where they
     differ ([§6.3](#63-gradle-dependencies)).
-26. Lock the fully resolved native graphs — Gradle and SwiftPM alike,
+26. Lock **whichever** native graphs it resolves — Gradle, SwiftPM, or both,
     transitives included — resolve from the record thereafter, record a SHA-256
     per Maven artifact and the declared checksum per Swift binary target, verify
     both on subsequent builds, and fail on a mismatch naming the artifact and
-    the distribution
+    the distribution. A single-platform consumer owes this for its own
+    ecosystem's graph and nothing more
     ([§6.3](#63-gradle-dependencies), [§7.2](#72-swift-packages)).
 27. Restrict a contributed repository to its declared groups or modules by
     **exact** match, never by prefix or pattern; reject a non-`https` URL;
@@ -2919,8 +3063,11 @@ A conforming consumer **MUST**:
     and reject `view_links` or `intent_filters` in an invalid combination
     ([§6.6](#66-manifest-components)).
 30. Validate `view_links` and generate their filters, including the action and
-    the `DEFAULT` and `BROWSABLE` categories, and show the link data and each
-    `intent_filters` action in the record
+    the `DEFAULT` and `BROWSABLE` categories; write an attribute it does not
+    recognize through, converting the snake-case key to the platform's
+    attribute name by [§6.6](#66-manifest-components)'s rule and rejecting a
+    key that rule does not cover or a value that is not a string; and show the
+    link data and each `intent_filters` action in the record
     ([§6.6](#66-manifest-components)).
 31. Validate shrinker keep patterns against owned namespaces by their
     wildcard-free literal prefix, reject a `from_dependency` keep whose pattern
@@ -2942,13 +3089,16 @@ A conforming consumer **MUST**:
     into the application's `PrivacyInfo.xcprivacy` in the order
     [§7.3](#73-source) fixes ([§7.1](#71-symbol-prefixes)).
 35. Enforce [§7.4](#74-infoplist)'s TOML-to-plist mapping, fail on a key it
-    manages itself or on two distributions setting one key differently, keep and
-    report the application's own value, reject capability and external-reach
-    keys, reject a usage-description key in `values` and a `usage_description`
-    whose `key` does not end in `UsageDescription`
-    ([§5.5](#55-value-kinds)), validate SKAdNetwork identifiers, render
-    `SKAdNetworkItems` only from `skadnetwork_identifiers`, and report
-    contributed `LSApplicationQueriesSchemes` entries naming the distribution.
+    manages itself, on two distributions setting one key differently, or on one
+    key declared under both `values` and `append`; keep and report the
+    application's own value; reject a capability, external-reach or
+    consumer-managed key wherever it arrives — `values`, `append`, or a value
+    of kind `info_plist`; reject a
+    usage-description key in `values` and a `usage_description` whose `key`
+    does not end in `UsageDescription` ([§5.5](#55-value-kinds)); validate
+    SKAdNetwork identifiers; render `SKAdNetworkItems` only from
+    `skadnetwork_identifiers`; and report contributed
+    `LSApplicationQueriesSchemes` entries naming the distribution.
 36. Register declared Python modules against a Swift package the same sidecar
     declares, reject a dotted or non-identifier `name`, fail on a duplicate
     module name, make each module importable from first use, and exclude
@@ -3018,7 +3168,8 @@ A conforming consumer **SHOULD**:
 | **S10** | Attribute a duplicate-symbol error to the distribution whose declared prefix matches | [§7.1](#71-symbol-prefixes) |
 | **S11** | Report the fully merged Android manifest's delta, beyond the per-artifact declarations requirement 41 requires | [§9.4](#94-what-resolved-artifacts-bring-with-them) |
 | **S12** | Report consumer ProGuard rules embedded in a resolved `.aar` | [§9.4](#94-what-resolved-artifacts-bring-with-them) |
-| **S13** | Warn when a component declares `foreground_service_type` and the same sidecar contributes no `FOREGROUND_SERVICE_*` permission | [§6.6](#66-manifest-components) |
+| **S13** | Warn when a component declares `foreground_service_type` and the same sidecar contributes no `FOREGROUND_SERVICE_*` permission — except for a type the platform exempts from one, today `shortService` | [§6.6](#66-manifest-components) |
+| **S14** | Report a packaging collision detected between resolved Swift packages, which version 1 does not specify detection for | [§9.7](#97-packaging-collisions) |
 
 > **Note:** [§9.4](#94-what-resolved-artifacts-bring-with-them) requires a
 > consumer that stops at per-artifact declarations, rather than implementing
@@ -3054,10 +3205,11 @@ acquires *all* of its inherited native surface at once.
 
 A report **MUST** carry three things: the distribution, **how it entered the
 dependency closure**, and the delta. It covers **one platform's build**, since
-that is what a consumer computes ([§2.2](#22-how-the-application-answers)).
+that is what a consumer computes and what it conforms for
+([§8.1](#81-conformance-is-per-platform)).
 
 ```
-android build — 12 contributions staged, 1 value and 2 actions outstanding
+android build — 12 contributions staged, 1 floor, 1 value and 2 actions outstanding
 
 analytics-shim 2.1.0  (via some-ui-lib)
   + permission   android.permission.ACCESS_FINE_LOCATION  ("optional BLE discovery")
@@ -3066,6 +3218,8 @@ analytics-shim 2.1.0  (via some-ui-lib)
 map-sdk 4.1.0  (direct dependency)
   ! REPOSITORY  https://maven.example.com/releases  → groups: com.example.maps
                 authenticated — no credentials configured        ✗ BLOCKING
+  ! TARGET_SDK  requires 34, application is configured for 33     ✗ BLOCKING
+  = floor       min_sdk 24  (application: 26)
   + dependency  com.example.maps:android:4.1.0
   + from com.example.maps:android:4.1.0 (resolved artifact manifest):
       + permission  com.example.permission.MAPS_ID
@@ -3080,11 +3234,12 @@ map-sdk 4.1.0  (direct dependency)
 The middle element matters most for the case that motivates the requirement: a
 transitive dependency the application author has never heard of.
 
-The shape of that second entry is normative in four respects:
+The shape of that second entry is normative in five respects:
 
 | Requirement | Why |
 | --- | --- |
 | A repository contribution is set apart, never folded into a list | [§6.4](#64-maven-repositories) |
+| Every declared floor appears with the distribution that declared it, and a declared `target_sdk` is set apart with the same prominence a repository gets | [§5.1](#51-build-floors) — it changes behavior application-wide, and composes silently upward |
 | Contributions arriving from a **resolved artifact's own manifest** are attributed to that artifact, not to the distribution that declared the coordinate | [§9.4](#94-what-resolved-artifacts-bring-with-them) |
 | An unmet requirement is distinguished from an unresolved **conditional** one | [§5.4](#54-how-a-requirement-is-satisfied) — the first blocks the build, the second is guidance |
 | **What was staged is distinguished from what remains** | the whole point of this convention: the application author needs to see the boundary between work that was done for them and work that is theirs |
@@ -3151,12 +3306,10 @@ declarations rather than the merged result.
 remains a **SHOULD**: there is no equivalent merge step, and no comparable
 manifest to read.
 
-**Native dependencies are a trust boundary, and two rules cross it.** The
-restrictions in §§5–7 constrain effects *authored by the sidecar*. An `.aar` may
-carry a manifest, resources, JNI libraries and consumer ProGuard rules; a Swift
-package may vend binary targets. Those artifacts remain subject to their own
-ecosystem's authority model, and this convention provides **attribution and
-review** for their native effects, not restriction.
+**Native dependencies are a trust boundary, and two rules cross it.** An `.aar`
+may carry a manifest, resources, JNI libraries and consumer ProGuard rules; a
+Swift package may vend binary targets. Those artifacts remain subject to their
+own ecosystem's authority model, on the terms this section opened with.
 
 This is not a claim that AGP's own manifest merge is unsafe — a developer
 adding a Gradle dependency directly has always accepted the same merge, at
@@ -3197,10 +3350,7 @@ security-sensitive:
 > components nobody chose, on every build, which earns click-through and then
 > protects nothing. Required features are rare enough to gate; exported
 > components are not. A producer determined to avoid the sidecar's approval gate
-> can publish an artifact, and this document does not pretend otherwise —
-> [§9.4](#94-what-resolved-artifacts-bring-with-them)'s opening paragraph says
-> what it offers for artifact content is attribution and review, not
-> restriction.
+> can publish an artifact, which is the limit this section opened by stating.
 
 Consumer ProGuard rules embedded in a resolved `.aar` **SHOULD** likewise be
 reported: they are appended to the application's shrinker configuration without
@@ -3261,7 +3411,7 @@ recoverable:
 | its provenance | how it entered the dependency closure ([§3.2](#32-resolution)) |
 | its inputs | a SHA-256 per file, keyed by normalized relative path ([§9.3](#93-hashed-inputs)) |
 | its contributions | each one, in a form two records can be compared by |
-| its requirements | every value and every action, **with its state** — supplied, dismissed, acknowledged, or unresolved. An acknowledgement or a dismissal **MUST** carry the distribution version it was made against and the date it was made |
+| its requirements | every floor it declared with the value it declared; and every value and every action, **with its state** — supplied, dismissed, acknowledged, or unresolved. An acknowledgement or a dismissal **MUST** carry the distribution version it was made against and the date it was made, written as an [RFC 3339](https://www.rfc-editor.org/rfc/rfc3339) full-date in UTC — `2026-08-24` — so that two records of one event compare equal |
 | the native graph | every resolved artifact with its SHA-256 ([§6.3](#63-gradle-dependencies)), and every resolved package with its version **and** revision, plus the declared checksum per binary target ([§7.2](#72-swift-packages)) |
 
 A record that cannot answer one of those rows has not recorded the integration,
@@ -3328,6 +3478,17 @@ versions, and it is what the diagnostic already names.
 A consumer **MUST** record every collision it detected and how it was resolved,
 attributed to the distributions whose declarations pulled the artifacts in.
 
+**Version 1 defines this for Android, and requirement 44 is in the Android
+profile for that reason.** iOS is not collision-free — two Swift packages can
+vend resources under one name, or `.xcframework` slices that overlap — but the
+detection has no equivalent bounded input: there is no set of resolved archives
+to enumerate the way an `.aar` graph enumerates, and SwiftPM and Xcode surface
+their own conflicts at different stages. A consumer that builds for iOS
+**SHOULD** report a collision it does detect there, naming the packages and the
+distributions that declared them, and an iOS-only consumer claiming conformance
+is not thereby claiming to have solved a problem this document has not
+specified.
+
 > **Note:** This is a consumer obligation rather than a declaration because a
 > collision is not a property of any producer: it exists only in a
 > combination, and no producer can know what it will be composed with. What
@@ -3343,9 +3504,9 @@ consumer implementing version *N* **MUST** ignore groups for other major
 versions entirely, rather than attempting to read them.
 
 Within a major, the `contract` minor ([§4.3](#43-contract-version)) negotiates
-capabilities: minor revisions add optional keys and tables, producers declare
-the smallest contract they use, and an older consumer rejects a newer
-declaration visibly instead of mis-building it.
+capabilities: minor revisions add optional keys, tables, and values in closed
+vocabularies; producers declare the smallest contract they use; and an older
+consumer rejects a newer declaration visibly instead of mis-building it.
 
 Any change that would alter the meaning of an existing key, or make a previously
 valid sidecar invalid, requires a new major version and a new group name.
@@ -3364,7 +3525,8 @@ required for:
 | --- | --- |
 | A new kind of application requirement | An action is prose. A platform construct this document has never heard of is stated in `summary`, `reason` and `acceptance` without the document changing. |
 | A new `slot` | Slots are opaque and compared only for equality ([§5.7](#57-slots)). |
-| A new value in a **pass-through** vocabulary | `foreground_service_type`, `<data>` attributes, and Apple's required-reason strings are the platform's to extend, and a consumer copies them through without needing to know them ([§4.4](#44-unknown-declarations-fail-closed)). |
+| A new value in a **pass-through** vocabulary | `foreground_service_type` and Apple's required-reason strings are the platform's to extend, and a consumer copies them through without needing to know them ([§4.4](#44-unknown-declarations-fail-closed)). |
+| A new `<data>` attribute on `view_links` | The one place where the *names* are open too, not only their values: a consumer converts an unrecognized attribute to Android's spelling and writes it through ([§6.6](#66-manifest-components)). |
 
 That is the point of the split between contributions and actions. Contribution
 vocabulary is closed and versioned because a consumer is being asked to modify
@@ -3657,9 +3819,12 @@ placeholder = "<TODO: your Examplytics project key>"
 [android.contributes.src]
 java = ["java"]
 
-# The SDK itself, pulled in via Gradle.
+# The SDK itself, pulled in via Gradle. The bounded form, because the Java above
+# calls this SDK's API: `below` is what stops Gradle resolving to a major that
+# glue code will not compile against (§6.3).
 [[android.contributes.gradle_dependencies]]
-coordinate = "com.example.analytics:android-sdk:4.2.0"
+module = "com.example.analytics:android-sdk"
+version = { at_least = "4.2.0", below = "5.0.0" }
 
 # Needed to deliver events over the network.
 [[android.contributes.permissions]]
@@ -3746,11 +3911,11 @@ place: the value kinds of [§5.5](#55-value-kinds), the Gradle configurations of
 | `platforms` | Optional. Where the distribution *functions*, not merely where it contributes; a build for an omitted platform fails. [§4.5](#45-platform-support) |
 | **`[<platform>.requires]` — floors** [§5.1](#51-build-floors) | |
 | `min_sdk`, `compile_sdk`, `target_sdk` | Android floors. The build fails when the application is lower; the consumer never raises it. `target_sdk` changes behavior app-wide, so declare it only when a behavior depends on it |
-| `core_library_desugaring` | Optional boolean. A floor on a boolean axis: the build fails when the application has not enabled desugaring |
+| `core_library_desugaring` | Optional boolean, and only `true` is valid — a consumer rejects `false`. A floor on a boolean axis: the build fails when the application has not enabled desugaring |
 | `deployment_target` | iOS floor, on the same terms |
 | **`[[<platform>.requires.application_value]]`** [§5.2](#52-values) | A string the application supplies and the consumer places |
 | `id` | **Required.** A logical name, unique among the requirements in one platform table; identity is (distribution, platform, `id`) |
-| `kind` | **Required.** Where the consumer writes it. A **closed** set — [§5.5](#55-value-kinds) |
+| `kind` | **Required.** Where the consumer writes it. A **closed** set — [§5.5](#55-value-kinds). `info_plist` may not name a usage-description, capability, external-reach or consumer-managed key; `usage_description` may name only a `*UsageDescription` one |
 | `key` | The platform key the value is written to. **Required** for every kind but `inline`, where it **MUST** be absent — an `inline` value is consumed by a contribution that references it or an action that `uses` it ([§5.5](#55-value-kinds)) |
 | `reason` | **Required.** What the value is and where to obtain it |
 | `placeholder` | **Recommended.** Text the consumer scaffolds; the build does not proceed while it stands |
@@ -3773,9 +3938,9 @@ place: the value kinds of [§5.5](#55-value-kinds), the Gradle configurations of
 | `module` + `version` | `group:artifact` with a bounded `{ at_least, below }` range. Open-ended and changing versions are invalid. **Recommended** where the producer's own source compiles against the dependency, because `below` is the only way to say which major it cannot survive |
 | `configuration` | Optional; `implementation` (default), `api`, `compileOnly`, `runtimeOnly`. A **closed** set: processor configurations execute code at build time |
 | **`[[android.contributes.gradle_repositories]]`** [§6.4](#64-maven-repositories) | |
-| `url` | A Maven repository to add to resolution. The most powerful thing a sidecar can contribute |
+| `url` | A Maven repository to add to resolution, **`https` only** (scheme compared case-insensitively). The most powerful thing a sidecar can contribute |
 | `reason` | **Required.** Why the artifacts are not on Maven Central, and — when authenticated — which credential is needed and where to get it |
-| `groups`, `modules` | **At least one required.** Bounds what the repository may serve |
+| `groups`, `modules` | **At least one required.** Bounds what the repository may serve, by **exact** match on a group ID or a `group:artifact` pair — never a prefix, so `org.example` does not admit `org.example.tools` |
 | `credentials_required` | Optional. Declares the repository authenticated. A sidecar **MUST NOT** contain the credential itself |
 | **`[[android.contributes.permissions]]`** [§6.5](#65-permissions-and-features) | |
 | `name` | The canonical manifest string — `android.permission.INTERNET`, never a shorthand |
@@ -3789,7 +3954,7 @@ place: the value kinds of [§5.5](#55-value-kinds), the Gradle configurations of
 | `from_dependency` | `group:artifact` of a dependency the same sidecar declares, which owns the class |
 | `foreground_service_type` | Android's own value, on a `service` only. Mandatory on Android 14+ for a foreground service |
 | `exported_required` + `reason` | Requests export. The build fails without explicit application approval — it never falls back to unexported |
-| `[[…view_links]]` — `scheme`, `host`, `path_prefix`, and Android's other `<data>` attributes | Generates the browser-return filter. Valid only on an exported activity; `scheme` is required; the attribute set is **pass-through**; each may take a literal or an inline value |
+| `[[…view_links]]` — `scheme`, `host`, `path_prefix`, and Android's other `<data>` attributes | Generates the browser-return filter. Valid only on an exported activity; `scheme` is required; values are strings, literal or inline. The **attribute names are open** — the one place an unrecognized key is written through rather than rejected — and snake case converts to the platform's name mechanically ([§6.6](#66-manifest-components)) |
 | `[[…intent_filters]]` — `action` | One vendor-defined action, on a component that is neither exported nor carrying `view_links` |
 | **`[android.contributes.r8]`** [§6.7](#67-shrinker-keep-patterns) | |
 | `keep_classes` | Class patterns the shrinker must keep; the consumer generates the `-keep` rules. Each must fall within an owned namespace |
@@ -3804,7 +3969,8 @@ place: the value kinds of [§5.5](#55-value-kinds), the Gradle configurations of
 | `url` | The package repository. **Required**, and **MUST** be `https` |
 | `products` | **Required**, non-empty. Which of the package's products the application target links |
 | `requirement` | Exactly one of `{ exact }`, `{ from }`, `{ revision }`. `branch` is invalid |
-| `credentials_required` | Optional. Declares the repository authenticated; [§6.4](#64-maven-repositories)'s credential rules apply unchanged, and `reason` is then **required** |
+| `credentials_required` | Optional. Declares the repository authenticated; [§6.4](#64-maven-repositories)'s credential rules apply unchanged |
+| `reason` | **Required when `credentials_required` is set**, and unused otherwise: which credential is needed and where to obtain it |
 | **`[ios.contributes.src]`** [§7.3](#73-source) | |
 | `swift` | Directories of `.swift` staged into the application target. For small shims only |
 | `symbol_prefixes` | Prefixes the producer puts on its contributed Swift type names ([§7.1](#71-symbol-prefixes)). Guidance only; it does not cover file-scope functions or extension members, and it is invalid without contributed source |
@@ -3819,7 +3985,7 @@ place: the value kinds of [§5.5](#55-value-kinds), the Gradle configurations of
 | `swift_package` | A package the same sidecar declares, which implements the module |
 | `init` | Optional initialization symbol; defaults to `PyInit_<name>` |
 | **`[ios.contributes]`** [§7.6](#76-objective-c-categories) | |
-| `objc_categories` | Optional boolean. The consumer links the application target so Objective-C categories in static libraries are loaded. Names the behavior, not the flag; no veto |
+| `objc_categories` | Optional boolean, and only `true` is valid — a consumer rejects `false`. The consumer links the application target so Objective-C categories in static libraries are loaded. Names the behavior, not the flag; no veto |
 
 ## Appendix C: a record that satisfies §9
 
@@ -3839,7 +4005,7 @@ disagree with rather than a blank page.
     },
     {
       "chosen": "com.example.maps:android:4.1.0",
-      "decided": "consumer (packaging metadata, first by artifact order)",
+      "decided": "consumer (packaging metadata; rule: lowest coordinate)",
       "distributions": ["analytics-shim", "map-sdk"],
       "path": "META-INF/LICENSE.txt"
     }
@@ -3856,7 +4022,6 @@ disagree with rather than a blank page.
         "source java/com/example/maps/MapBridge.java",
         "dependency com.example.maps:android:4.1.0  requested 4.1.0 → resolved 4.1.0",
         "dependency com.squareup.okhttp3:okhttp:4.12.0  (transitive, via com.example.maps:android)",
-        "floor min_sdk 24",
         "REPOSITORY https://maven.example.com/releases → com.example.maps  authenticated — credentials configured",
         "from com.example.maps:android:4.1.0 (resolved artifact manifest): permission com.example.permission.MAPS_ID",
         "from com.example.maps:android:4.1.0 (resolved artifact manifest): feature android.hardware.location.gps required=true → application chose required=false, 2026-08-24"
@@ -3868,6 +4033,7 @@ disagree with rather than a blank page.
       "name": "map-sdk",
       "origin": "direct dependency",
       "requirements": [
+        "floor  min_sdk 24   (application: 26)",
         "value  maps_api_key → meta-data com.example.maps.API_KEY   supplied",
         "action map_deep_links   acknowledged 2026-08-24, map-sdk 4.1.0",
         "action map_offline_cache   conditional, unresolved",
@@ -3876,7 +4042,22 @@ disagree with rather than a blank page.
       "swift": {},
       "swift_binaries": {},
       "version": "4.1.0"
-    },
+    }
+  ],
+  "platform": "android",
+  "record": 1
+}
+```
+
+A record covers one platform's build ([§9.2](#92-the-report)), so the Swift
+half of the same application lives in its own file. This is that file, cut to
+the one distribution that shows the rows a Gradle graph cannot:
+
+```json
+{
+  "collisions": [],
+  "contract": "1",
+  "distributions": [
     {
       "artifacts": {},
       "contract": "1",
@@ -3884,7 +4065,9 @@ disagree with rather than a blank page.
       "inputs": { "native.toml": "sha256:c40a…" },
       "name": "pycharting",
       "origin": "via some-ui-lib",
-      "requirements": [],
+      "requirements": [
+        "floor  deployment_target 15.0   (application: 16.0)"
+      ],
       "swift": {
         "https://github.com/example/charting": {
           "requested": "from 2.4.0",
@@ -3903,22 +4086,20 @@ disagree with rather than a blank page.
       "version": "2.4.0"
     }
   ],
-  "platform": "android",
+  "platform": "ios",
   "record": 1
 }
 ```
 
-One elision, so the shape is not read as complete: this record is an `android`
-build ([§9.2](#92-the-report)), so `pycharting`'s Swift graph would in reality
-sit in that application's `ios` record rather than beside a Gradle one. It is
-shown here because a document with one worked record should show both graph
-shapes, and repeating the whole file for one platform's rows teaches nothing.
-Everything else [§9.6](#96-what-a-record-must-contain) requires is present:
-distribution and version, contract, provenance, per-file input hashes,
-contributions, every requirement with its state — supplied, acknowledged,
-dismissed, unresolved — the resolved graphs with checksums and revisions, the
-application's decision on a resolved artifact's required feature, and both
-kinds of packaging collision with who decided each.
+Between them the two files carry every row
+[§9.6](#96-what-a-record-must-contain) requires: distribution and version,
+contract, provenance, per-file input hashes, contributions, every requirement
+with its state — a floor with the value it was met by, a supplied value, an
+acknowledged action, an unresolved conditional and a dismissed one — both
+resolved graphs with their checksums and revisions, the application's decision
+on a resolved artifact's required feature, and both kinds of packaging
+collision with who decided each. The Swift file is shown short: everything
+elided from it is a repeat of a row the Android file already shows.
 
 Four properties are worth naming, because they are what make the file useful
 rather than merely present:

@@ -1,6 +1,7 @@
 """Generate the worked integration records for `development/examples/mediated-ads/`.
 
-Appendix E shows the shape of a §9 record, hand-written and non-normative. This
+The first attempt's Appendix E — SPEC.md's Appendix C — shows the shape of a
+record, hand-written and non-normative. This
 writes a real one, from the three sidecars in that directory and the
 `app-pyproject.toml` beside them — including the `origin` line for a package the
 application never named, which is the case the whole convention exists for.

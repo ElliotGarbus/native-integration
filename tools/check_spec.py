@@ -664,6 +664,12 @@ for path in sorted((ROOT / "development" / "redesign" / "examples").rglob("*.tom
                     )
             elif "key" not in value:
                 problems.append(f"{rel} value `{ident}` of kind `{kind}` needs a `key`")
+            elif ident in referenced:
+                # §5.5 — an inline reference resolves only to a kind `inline`
+                # value; any other kind already has a delivery site of its own.
+                problems.append(
+                    f"{rel} inline reference names `{ident}`, of kind `{kind}` rather than inline"
+                )
             if kind == "usage_description" and not value.get("key", "").endswith(
                 "UsageDescription"
             ):
@@ -672,6 +678,51 @@ for path in sorted((ROOT / "development" / "redesign" / "examples").rglob("*.tom
                 problems.append(
                     f"{rel} info_plist value `{ident}` names a usage-description key"
                 )
+
+    # §5.1 — Android floors are integers; TOML booleans are not
+    for platform, keys in (("android", ("min_sdk", "compile_sdk", "target_sdk")),):
+        floors = doc.get(platform, {}).get("requires", {})
+        for key in keys:
+            if key in floors and not (
+                isinstance(floors[key], int) and not isinstance(floors[key], bool)
+            ):
+                problems.append(f"{rel} {key} is {floors[key]!r}, not an integer")
+    target = doc.get("ios", {}).get("requires", {}).get("deployment_target")
+    if target is not None and not re.fullmatch(r"[0-9]+(\.[0-9]+){0,2}", str(target)):
+        problems.append(f"{rel} deployment_target {target!r} is malformed")
+
+    # §5.5, §7.4 — the keys a producer may not reach through an Info.plist value
+    REFUSED_PLIST = {
+        "UIBackgroundModes",
+        "UIRequiredDeviceCapabilities",
+        "CFBundleURLTypes",
+        "NSUserActivityTypes",
+        "CFBundleIdentifier",
+        "CFBundleShortVersionString",
+        "CFBundleVersion",
+        "MinimumOSVersion",
+    }
+    for value in entries(doc.get("ios", {}), "requires", "application_value"):
+        if value.get("kind") == "info_plist" and value.get("key") in REFUSED_PLIST:
+            problems.append(f"{rel} info_plist value writes refused key `{value.get('key')}`")
+
+    # §7.4 — one key belongs to one mode, and neither mode admits a refused key
+    plist = doc.get("ios", {}).get("contributes", {}).get("info_plist", {})
+    if isinstance(plist, dict):
+        scalar, arrays = plist.get("values", {}) or {}, plist.get("append", {}) or {}
+        for key in sorted(set(scalar) & set(arrays)):
+            problems.append(f"{rel} declares `{key}` under both values and append")
+        for key in sorted((set(scalar) | set(arrays)) & REFUSED_PLIST):
+            problems.append(f"{rel} contributes refused Info.plist key `{key}`")
+
+    # §6.6 — a view_links attribute converts to a platform name mechanically
+    for comp in entries(doc.get("android", {}), "contributes", "components"):
+        for link in comp.get("view_links", []) or []:
+            for attr, val in link.items():
+                if not re.fullmatch(r"[a-z][a-z0-9]*(_[a-z0-9]+)*", attr):
+                    problems.append(f"{rel} view_links attribute `{attr}` has no conversion")
+                if not isinstance(val, (str, dict)):
+                    problems.append(f"{rel} view_links `{attr}` is not a string or inline ref")
 
     # §6.4, §7.2 — repositories and packages are https, and a package states
     # the products it is linked for
