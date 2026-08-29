@@ -1,0 +1,1615 @@
+# Stable diagnostic IDs for contract 1. GENERATED — do not edit.
+#
+# Written by tools/gen_error_ids.py from contract/v1.toml and SPEC.md §8.
+# Every ID is keyed to a name rather than a position, so adding a rule
+# renumbers nothing and an ID stays citable across revisions.
+#
+# `native-integration explain <id>` resolves each of these to its rule
+# text, its section anchor, and a minimal correct fragment.
+
+[diagnostics."ni.decl.contract.missing"]
+declaration = "contract"
+section = "4.3"
+anchor = "43-contract-version"
+severity = "blocking"
+summary = "`contract` is required and is absent"
+
+[diagnostics."ni.decl.contract.type"]
+declaration = "contract"
+section = "4.3"
+anchor = "43-contract-version"
+severity = "blocking"
+summary = "`contract` is not of the type this declaration takes"
+
+[diagnostics."ni.decl.contract.pattern"]
+declaration = "contract"
+section = "4.3"
+anchor = "43-contract-version"
+severity = "blocking"
+summary = "`contract` does not match the form this declaration fixes"
+
+[diagnostics."ni.decl.platforms.type"]
+declaration = "platforms"
+section = "4.5"
+anchor = "45-platform-support"
+severity = "blocking"
+summary = "`platforms` is not of the type this declaration takes"
+
+[diagnostics."ni.decl.platforms.value"]
+declaration = "platforms"
+section = "4.5"
+anchor = "45-platform-support"
+severity = "blocking"
+summary = "`platforms` names a value outside its closed vocabulary"
+
+[diagnostics."ni.decl.platforms.empty"]
+declaration = "platforms"
+section = "4.5"
+anchor = "45-platform-support"
+severity = "blocking"
+summary = "`platforms` is empty, and an empty list is invalid here"
+
+[diagnostics."ni.decl.<platform>.requires.unknown-key"]
+declaration = "<platform>.requires"
+section = "4.4"
+anchor = "44-unknown-declarations-fail-closed"
+severity = "blocking"
+summary = "`<platform>.requires` carries a key this specification does not define"
+
+[diagnostics."ni.decl.android.requires.min_sdk.type"]
+declaration = "android.requires.min_sdk"
+section = "5.1"
+anchor = "51-build-floors"
+severity = "blocking"
+summary = "`android.requires.min_sdk` is not of the type this declaration takes"
+
+[diagnostics."ni.decl.android.requires.compile_sdk.type"]
+declaration = "android.requires.compile_sdk"
+section = "5.1"
+anchor = "51-build-floors"
+severity = "blocking"
+summary = "`android.requires.compile_sdk` is not of the type this declaration takes"
+
+[diagnostics."ni.decl.android.requires.target_sdk.type"]
+declaration = "android.requires.target_sdk"
+section = "5.1"
+anchor = "51-build-floors"
+severity = "blocking"
+summary = "`android.requires.target_sdk` is not of the type this declaration takes"
+
+[diagnostics."ni.decl.android.requires.core_library_desugaring.type"]
+declaration = "android.requires.core_library_desugaring"
+section = "5.1"
+anchor = "51-build-floors"
+severity = "blocking"
+summary = "`android.requires.core_library_desugaring` is not of the type this declaration takes"
+
+[diagnostics."ni.decl.android.requires.core_library_desugaring.false"]
+declaration = "android.requires.core_library_desugaring"
+section = "5.1"
+anchor = "51-build-floors"
+severity = "blocking"
+summary = "`android.requires.core_library_desugaring` is declared `false`, and only `true` says anything"
+
+[diagnostics."ni.decl.ios.requires.deployment_target.type"]
+declaration = "ios.requires.deployment_target"
+section = "5.1"
+anchor = "51-build-floors"
+severity = "blocking"
+summary = "`ios.requires.deployment_target` is not of the type this declaration takes"
+
+[diagnostics."ni.decl.ios.requires.deployment_target.pattern"]
+declaration = "ios.requires.deployment_target"
+section = "5.1"
+anchor = "51-build-floors"
+severity = "blocking"
+summary = "`ios.requires.deployment_target` does not match the form this declaration fixes"
+
+[diagnostics."ni.decl.<platform>.requires.application_value.unknown-key"]
+declaration = "<platform>.requires.application_value"
+section = "4.4"
+anchor = "44-unknown-declarations-fail-closed"
+severity = "blocking"
+summary = "`<platform>.requires.application_value` carries a key this specification does not define"
+
+[diagnostics."ni.decl.<platform>.requires.application_value.id.missing"]
+declaration = "<platform>.requires.application_value.id"
+section = "5.2"
+anchor = "52-values"
+severity = "blocking"
+summary = "`<platform>.requires.application_value.id` is required and is absent"
+
+[diagnostics."ni.decl.<platform>.requires.application_value.id.type"]
+declaration = "<platform>.requires.application_value.id"
+section = "5.2"
+anchor = "52-values"
+severity = "blocking"
+summary = "`<platform>.requires.application_value.id` is not of the type this declaration takes"
+
+[diagnostics."ni.decl.<platform>.requires.application_value.id.duplicate"]
+declaration = "<platform>.requires.application_value.id"
+section = "5.2"
+anchor = "52-values"
+severity = "blocking"
+summary = "`<platform>.requires.application_value.id` repeats a value that must be unique"
+
+[diagnostics."ni.decl.<platform>.requires.application_value.kind.missing"]
+declaration = "<platform>.requires.application_value.kind"
+section = "5.5"
+anchor = "55-value-kinds"
+severity = "blocking"
+summary = "`<platform>.requires.application_value.kind` is required and is absent"
+
+[diagnostics."ni.decl.<platform>.requires.application_value.kind.type"]
+declaration = "<platform>.requires.application_value.kind"
+section = "5.5"
+anchor = "55-value-kinds"
+severity = "blocking"
+summary = "`<platform>.requires.application_value.kind` is not of the type this declaration takes"
+
+[diagnostics."ni.decl.<platform>.requires.application_value.kind.value"]
+declaration = "<platform>.requires.application_value.kind"
+section = "5.5"
+anchor = "55-value-kinds"
+severity = "blocking"
+summary = "`<platform>.requires.application_value.kind` names a value outside its closed vocabulary"
+
+[diagnostics."ni.decl.<platform>.requires.application_value.kind.wrong-platform"]
+declaration = "<platform>.requires.application_value.kind"
+section = "5.5"
+anchor = "55-value-kinds"
+severity = "blocking"
+summary = "`<platform>.requires.application_value.kind` names a value belonging to the other platform"
+
+[diagnostics."ni.decl.<platform>.requires.application_value.key.type"]
+declaration = "<platform>.requires.application_value.key"
+section = "5.2"
+anchor = "52-values"
+severity = "blocking"
+summary = "`<platform>.requires.application_value.key` is not of the type this declaration takes"
+
+[diagnostics."ni.decl.<platform>.requires.application_value.reason.missing"]
+declaration = "<platform>.requires.application_value.reason"
+section = "5.2"
+anchor = "52-values"
+severity = "blocking"
+summary = "`<platform>.requires.application_value.reason` is required and is absent"
+
+[diagnostics."ni.decl.<platform>.requires.application_value.reason.type"]
+declaration = "<platform>.requires.application_value.reason"
+section = "5.2"
+anchor = "52-values"
+severity = "blocking"
+summary = "`<platform>.requires.application_value.reason` is not of the type this declaration takes"
+
+[diagnostics."ni.decl.<platform>.requires.application_value.placeholder.type"]
+declaration = "<platform>.requires.application_value.placeholder"
+section = "5.2"
+anchor = "52-values"
+severity = "blocking"
+summary = "`<platform>.requires.application_value.placeholder` is not of the type this declaration takes"
+
+[diagnostics."ni.decl.<platform>.requires.application_value.conditional.type"]
+declaration = "<platform>.requires.application_value.conditional"
+section = "5.4"
+anchor = "54-how-a-requirement-is-satisfied"
+severity = "blocking"
+summary = "`<platform>.requires.application_value.conditional` is not of the type this declaration takes"
+
+[diagnostics."ni.decl.<platform>.requires.application_action.unknown-key"]
+declaration = "<platform>.requires.application_action"
+section = "4.4"
+anchor = "44-unknown-declarations-fail-closed"
+severity = "blocking"
+summary = "`<platform>.requires.application_action` carries a key this specification does not define"
+
+[diagnostics."ni.decl.<platform>.requires.application_action.id.missing"]
+declaration = "<platform>.requires.application_action.id"
+section = "5.3"
+anchor = "53-actions"
+severity = "blocking"
+summary = "`<platform>.requires.application_action.id` is required and is absent"
+
+[diagnostics."ni.decl.<platform>.requires.application_action.id.type"]
+declaration = "<platform>.requires.application_action.id"
+section = "5.3"
+anchor = "53-actions"
+severity = "blocking"
+summary = "`<platform>.requires.application_action.id` is not of the type this declaration takes"
+
+[diagnostics."ni.decl.<platform>.requires.application_action.id.duplicate"]
+declaration = "<platform>.requires.application_action.id"
+section = "5.3"
+anchor = "53-actions"
+severity = "blocking"
+summary = "`<platform>.requires.application_action.id` repeats a value that must be unique"
+
+[diagnostics."ni.decl.<platform>.requires.application_action.summary.missing"]
+declaration = "<platform>.requires.application_action.summary"
+section = "5.3"
+anchor = "53-actions"
+severity = "blocking"
+summary = "`<platform>.requires.application_action.summary` is required and is absent"
+
+[diagnostics."ni.decl.<platform>.requires.application_action.summary.type"]
+declaration = "<platform>.requires.application_action.summary"
+section = "5.3"
+anchor = "53-actions"
+severity = "blocking"
+summary = "`<platform>.requires.application_action.summary` is not of the type this declaration takes"
+
+[diagnostics."ni.decl.<platform>.requires.application_action.reason.missing"]
+declaration = "<platform>.requires.application_action.reason"
+section = "5.3"
+anchor = "53-actions"
+severity = "blocking"
+summary = "`<platform>.requires.application_action.reason` is required and is absent"
+
+[diagnostics."ni.decl.<platform>.requires.application_action.reason.type"]
+declaration = "<platform>.requires.application_action.reason"
+section = "5.3"
+anchor = "53-actions"
+severity = "blocking"
+summary = "`<platform>.requires.application_action.reason` is not of the type this declaration takes"
+
+[diagnostics."ni.decl.<platform>.requires.application_action.instructions.type"]
+declaration = "<platform>.requires.application_action.instructions"
+section = "5.3"
+anchor = "53-actions"
+severity = "blocking"
+summary = "`<platform>.requires.application_action.instructions` is not of the type this declaration takes"
+
+[diagnostics."ni.decl.<platform>.requires.application_action.acceptance.type"]
+declaration = "<platform>.requires.application_action.acceptance"
+section = "5.3"
+anchor = "53-actions"
+severity = "blocking"
+summary = "`<platform>.requires.application_action.acceptance` is not of the type this declaration takes"
+
+[diagnostics."ni.decl.<platform>.requires.application_action.uses.type"]
+declaration = "<platform>.requires.application_action.uses"
+section = "5.3"
+anchor = "53-actions"
+severity = "blocking"
+summary = "`<platform>.requires.application_action.uses` is not of the type this declaration takes"
+
+[diagnostics."ni.decl.<platform>.requires.application_action.uses.unresolved"]
+declaration = "<platform>.requires.application_action.uses"
+section = "5.3"
+anchor = "53-actions"
+severity = "blocking"
+summary = "`<platform>.requires.application_action.uses` names something the same sidecar does not declare"
+
+[diagnostics."ni.decl.<platform>.requires.application_action.slot.type"]
+declaration = "<platform>.requires.application_action.slot"
+section = "5.7"
+anchor = "57-slots"
+severity = "blocking"
+summary = "`<platform>.requires.application_action.slot` is not of the type this declaration takes"
+
+[diagnostics."ni.decl.<platform>.requires.application_action.conditional.type"]
+declaration = "<platform>.requires.application_action.conditional"
+section = "5.4"
+anchor = "54-how-a-requirement-is-satisfied"
+severity = "blocking"
+summary = "`<platform>.requires.application_action.conditional` is not of the type this declaration takes"
+
+[diagnostics."ni.decl.android.owns.unknown-key"]
+declaration = "android.owns"
+section = "4.4"
+anchor = "44-unknown-declarations-fail-closed"
+severity = "blocking"
+summary = "`android.owns` carries a key this specification does not define"
+
+[diagnostics."ni.decl.android.owns.java_namespaces.type"]
+declaration = "android.owns.java_namespaces"
+section = "6.1"
+anchor = "61-ownership"
+severity = "blocking"
+summary = "`android.owns.java_namespaces` is not of the type this declaration takes"
+
+[diagnostics."ni.decl.android.contributes.src.unknown-key"]
+declaration = "android.contributes.src"
+section = "4.4"
+anchor = "44-unknown-declarations-fail-closed"
+severity = "blocking"
+summary = "`android.contributes.src` carries a key this specification does not define"
+
+[diagnostics."ni.decl.android.contributes.src.java.type"]
+declaration = "android.contributes.src.java"
+section = "6.2"
+anchor = "62-source"
+severity = "blocking"
+summary = "`android.contributes.src.java` is not of the type this declaration takes"
+
+[diagnostics."ni.decl.android.contributes.src.kotlin.type"]
+declaration = "android.contributes.src.kotlin"
+section = "6.2"
+anchor = "62-source"
+severity = "blocking"
+summary = "`android.contributes.src.kotlin` is not of the type this declaration takes"
+
+[diagnostics."ni.decl.android.contributes.gradle_dependencies.exactly-one-of"]
+declaration = "android.contributes.gradle_dependencies"
+section = "6.3"
+anchor = "63-gradle-dependencies"
+severity = "blocking"
+summary = "`android.contributes.gradle_dependencies` declares both or neither of `coordinate`, `module`"
+
+[diagnostics."ni.decl.android.contributes.gradle_dependencies.unknown-key"]
+declaration = "android.contributes.gradle_dependencies"
+section = "4.4"
+anchor = "44-unknown-declarations-fail-closed"
+severity = "blocking"
+summary = "`android.contributes.gradle_dependencies` carries a key this specification does not define"
+
+[diagnostics."ni.decl.android.contributes.gradle_dependencies.coordinate.type"]
+declaration = "android.contributes.gradle_dependencies.coordinate"
+section = "6.3"
+anchor = "63-gradle-dependencies"
+severity = "blocking"
+summary = "`android.contributes.gradle_dependencies.coordinate` is not of the type this declaration takes"
+
+[diagnostics."ni.decl.android.contributes.gradle_dependencies.module.type"]
+declaration = "android.contributes.gradle_dependencies.module"
+section = "6.3"
+anchor = "63-gradle-dependencies"
+severity = "blocking"
+summary = "`android.contributes.gradle_dependencies.module` is not of the type this declaration takes"
+
+[diagnostics."ni.decl.android.contributes.gradle_dependencies.version.type"]
+declaration = "android.contributes.gradle_dependencies.version"
+section = "6.3"
+anchor = "63-gradle-dependencies"
+severity = "blocking"
+summary = "`android.contributes.gradle_dependencies.version` is not of the type this declaration takes"
+
+[diagnostics."ni.decl.android.contributes.gradle_dependencies.configuration.type"]
+declaration = "android.contributes.gradle_dependencies.configuration"
+section = "6.3"
+anchor = "63-gradle-dependencies"
+severity = "blocking"
+summary = "`android.contributes.gradle_dependencies.configuration` is not of the type this declaration takes"
+
+[diagnostics."ni.decl.android.contributes.gradle_dependencies.configuration.value"]
+declaration = "android.contributes.gradle_dependencies.configuration"
+section = "6.3"
+anchor = "63-gradle-dependencies"
+severity = "blocking"
+summary = "`android.contributes.gradle_dependencies.configuration` names a value outside its closed vocabulary"
+
+[diagnostics."ni.decl.android.contributes.gradle_repositories.at-least-one-of"]
+declaration = "android.contributes.gradle_repositories"
+section = "6.4"
+anchor = "64-maven-repositories"
+severity = "blocking"
+summary = "`android.contributes.gradle_repositories` declares neither of `groups`, `modules`"
+
+[diagnostics."ni.decl.android.contributes.gradle_repositories.unknown-key"]
+declaration = "android.contributes.gradle_repositories"
+section = "4.4"
+anchor = "44-unknown-declarations-fail-closed"
+severity = "blocking"
+summary = "`android.contributes.gradle_repositories` carries a key this specification does not define"
+
+[diagnostics."ni.decl.android.contributes.gradle_repositories.url.missing"]
+declaration = "android.contributes.gradle_repositories.url"
+section = "6.4"
+anchor = "64-maven-repositories"
+severity = "blocking"
+summary = "`android.contributes.gradle_repositories.url` is required and is absent"
+
+[diagnostics."ni.decl.android.contributes.gradle_repositories.url.type"]
+declaration = "android.contributes.gradle_repositories.url"
+section = "6.4"
+anchor = "64-maven-repositories"
+severity = "blocking"
+summary = "`android.contributes.gradle_repositories.url` is not of the type this declaration takes"
+
+[diagnostics."ni.decl.android.contributes.gradle_repositories.url.scheme"]
+declaration = "android.contributes.gradle_repositories.url"
+section = "6.4"
+anchor = "64-maven-repositories"
+severity = "blocking"
+summary = "`android.contributes.gradle_repositories.url` is not an `https` URL"
+
+[diagnostics."ni.decl.android.contributes.gradle_repositories.reason.missing"]
+declaration = "android.contributes.gradle_repositories.reason"
+section = "6.4"
+anchor = "64-maven-repositories"
+severity = "blocking"
+summary = "`android.contributes.gradle_repositories.reason` is required and is absent"
+
+[diagnostics."ni.decl.android.contributes.gradle_repositories.reason.type"]
+declaration = "android.contributes.gradle_repositories.reason"
+section = "6.4"
+anchor = "64-maven-repositories"
+severity = "blocking"
+summary = "`android.contributes.gradle_repositories.reason` is not of the type this declaration takes"
+
+[diagnostics."ni.decl.android.contributes.gradle_repositories.groups.type"]
+declaration = "android.contributes.gradle_repositories.groups"
+section = "6.4"
+anchor = "64-maven-repositories"
+severity = "blocking"
+summary = "`android.contributes.gradle_repositories.groups` is not of the type this declaration takes"
+
+[diagnostics."ni.decl.android.contributes.gradle_repositories.modules.type"]
+declaration = "android.contributes.gradle_repositories.modules"
+section = "6.4"
+anchor = "64-maven-repositories"
+severity = "blocking"
+summary = "`android.contributes.gradle_repositories.modules` is not of the type this declaration takes"
+
+[diagnostics."ni.decl.android.contributes.gradle_repositories.credentials_required.type"]
+declaration = "android.contributes.gradle_repositories.credentials_required"
+section = "6.4"
+anchor = "64-maven-repositories"
+severity = "blocking"
+summary = "`android.contributes.gradle_repositories.credentials_required` is not of the type this declaration takes"
+
+[diagnostics."ni.decl.android.contributes.permissions.unknown-key"]
+declaration = "android.contributes.permissions"
+section = "4.4"
+anchor = "44-unknown-declarations-fail-closed"
+severity = "blocking"
+summary = "`android.contributes.permissions` carries a key this specification does not define"
+
+[diagnostics."ni.decl.android.contributes.permissions.name.missing"]
+declaration = "android.contributes.permissions.name"
+section = "6.5"
+anchor = "65-permissions-and-features"
+severity = "blocking"
+summary = "`android.contributes.permissions.name` is required and is absent"
+
+[diagnostics."ni.decl.android.contributes.permissions.name.type"]
+declaration = "android.contributes.permissions.name"
+section = "6.5"
+anchor = "65-permissions-and-features"
+severity = "blocking"
+summary = "`android.contributes.permissions.name` is not of the type this declaration takes"
+
+[diagnostics."ni.decl.android.contributes.permissions.reason.type"]
+declaration = "android.contributes.permissions.reason"
+section = "6.5"
+anchor = "65-permissions-and-features"
+severity = "blocking"
+summary = "`android.contributes.permissions.reason` is not of the type this declaration takes"
+
+[diagnostics."ni.decl.android.contributes.permissions.max_sdk_version.type"]
+declaration = "android.contributes.permissions.max_sdk_version"
+section = "6.5"
+anchor = "65-permissions-and-features"
+severity = "blocking"
+summary = "`android.contributes.permissions.max_sdk_version` is not of the type this declaration takes"
+
+[diagnostics."ni.decl.android.contributes.permissions.never_for_location.type"]
+declaration = "android.contributes.permissions.never_for_location"
+section = "6.5"
+anchor = "65-permissions-and-features"
+severity = "blocking"
+summary = "`android.contributes.permissions.never_for_location` is not of the type this declaration takes"
+
+[diagnostics."ni.decl.android.contributes.features.unknown-key"]
+declaration = "android.contributes.features"
+section = "4.4"
+anchor = "44-unknown-declarations-fail-closed"
+severity = "blocking"
+summary = "`android.contributes.features` carries a key this specification does not define"
+
+[diagnostics."ni.decl.android.contributes.features.name.missing"]
+declaration = "android.contributes.features.name"
+section = "6.5"
+anchor = "65-permissions-and-features"
+severity = "blocking"
+summary = "`android.contributes.features.name` is required and is absent"
+
+[diagnostics."ni.decl.android.contributes.features.name.type"]
+declaration = "android.contributes.features.name"
+section = "6.5"
+anchor = "65-permissions-and-features"
+severity = "blocking"
+summary = "`android.contributes.features.name` is not of the type this declaration takes"
+
+[diagnostics."ni.decl.android.contributes.features.required.forbidden"]
+declaration = "android.contributes.features.required"
+section = "6.5"
+anchor = "65-permissions-and-features"
+severity = "blocking"
+summary = "`android.contributes.features.required` must not be declared by a producer"
+
+[diagnostics."ni.decl.android.contributes.components.unknown-key"]
+declaration = "android.contributes.components"
+section = "4.4"
+anchor = "44-unknown-declarations-fail-closed"
+severity = "blocking"
+summary = "`android.contributes.components` carries a key this specification does not define"
+
+[diagnostics."ni.decl.android.contributes.components.kind.missing"]
+declaration = "android.contributes.components.kind"
+section = "6.6"
+anchor = "66-manifest-components"
+severity = "blocking"
+summary = "`android.contributes.components.kind` is required and is absent"
+
+[diagnostics."ni.decl.android.contributes.components.kind.type"]
+declaration = "android.contributes.components.kind"
+section = "6.6"
+anchor = "66-manifest-components"
+severity = "blocking"
+summary = "`android.contributes.components.kind` is not of the type this declaration takes"
+
+[diagnostics."ni.decl.android.contributes.components.kind.value"]
+declaration = "android.contributes.components.kind"
+section = "6.6"
+anchor = "66-manifest-components"
+severity = "blocking"
+summary = "`android.contributes.components.kind` names a value outside its closed vocabulary"
+
+[diagnostics."ni.decl.android.contributes.components.name.missing"]
+declaration = "android.contributes.components.name"
+section = "6.6"
+anchor = "66-manifest-components"
+severity = "blocking"
+summary = "`android.contributes.components.name` is required and is absent"
+
+[diagnostics."ni.decl.android.contributes.components.name.type"]
+declaration = "android.contributes.components.name"
+section = "6.6"
+anchor = "66-manifest-components"
+severity = "blocking"
+summary = "`android.contributes.components.name` is not of the type this declaration takes"
+
+[diagnostics."ni.decl.android.contributes.components.from_dependency.type"]
+declaration = "android.contributes.components.from_dependency"
+section = "6.6"
+anchor = "66-manifest-components"
+severity = "blocking"
+summary = "`android.contributes.components.from_dependency` is not of the type this declaration takes"
+
+[diagnostics."ni.decl.android.contributes.components.from_dependency.unresolved"]
+declaration = "android.contributes.components.from_dependency"
+section = "6.6"
+anchor = "66-manifest-components"
+severity = "blocking"
+summary = "`android.contributes.components.from_dependency` names something the same sidecar does not declare"
+
+[diagnostics."ni.decl.android.contributes.components.foreground_service_type.type"]
+declaration = "android.contributes.components.foreground_service_type"
+section = "6.6"
+anchor = "66-manifest-components"
+severity = "blocking"
+summary = "`android.contributes.components.foreground_service_type` is not of the type this declaration takes"
+
+[diagnostics."ni.decl.android.contributes.components.foreground_service_type.invalid-context"]
+declaration = "android.contributes.components.foreground_service_type"
+section = "6.6"
+anchor = "66-manifest-components"
+severity = "blocking"
+summary = "`android.contributes.components.foreground_service_type` is declared where it is not valid"
+
+[diagnostics."ni.decl.android.contributes.components.exported_required.type"]
+declaration = "android.contributes.components.exported_required"
+section = "6.6"
+anchor = "66-manifest-components"
+severity = "blocking"
+summary = "`android.contributes.components.exported_required` is not of the type this declaration takes"
+
+[diagnostics."ni.decl.android.contributes.components.reason.type"]
+declaration = "android.contributes.components.reason"
+section = "6.6"
+anchor = "66-manifest-components"
+severity = "blocking"
+summary = "`android.contributes.components.reason` is not of the type this declaration takes"
+
+[diagnostics."ni.decl.android.contributes.components.exported.forbidden"]
+declaration = "android.contributes.components.exported"
+section = "6.6"
+anchor = "66-manifest-components"
+severity = "blocking"
+summary = "`android.contributes.components.exported` must not be declared by a producer"
+
+[diagnostics."ni.decl.android.contributes.components.view_links.unknown-key"]
+declaration = "android.contributes.components.view_links"
+section = "4.4"
+anchor = "44-unknown-declarations-fail-closed"
+severity = "blocking"
+summary = "`android.contributes.components.view_links` carries a key this specification does not define"
+
+[diagnostics."ni.decl.android.contributes.components.view_links.scheme.missing"]
+declaration = "android.contributes.components.view_links.scheme"
+section = "6.6"
+anchor = "66-manifest-components"
+severity = "blocking"
+summary = "`android.contributes.components.view_links.scheme` is required and is absent"
+
+[diagnostics."ni.decl.android.contributes.components.view_links.scheme.type"]
+declaration = "android.contributes.components.view_links.scheme"
+section = "6.6"
+anchor = "66-manifest-components"
+severity = "blocking"
+summary = "`android.contributes.components.view_links.scheme` is not of the type this declaration takes"
+
+[diagnostics."ni.decl.android.contributes.components.intent_filters.unknown-key"]
+declaration = "android.contributes.components.intent_filters"
+section = "4.4"
+anchor = "44-unknown-declarations-fail-closed"
+severity = "blocking"
+summary = "`android.contributes.components.intent_filters` carries a key this specification does not define"
+
+[diagnostics."ni.decl.android.contributes.components.intent_filters.action.missing"]
+declaration = "android.contributes.components.intent_filters.action"
+section = "6.6"
+anchor = "66-manifest-components"
+severity = "blocking"
+summary = "`android.contributes.components.intent_filters.action` is required and is absent"
+
+[diagnostics."ni.decl.android.contributes.components.intent_filters.action.type"]
+declaration = "android.contributes.components.intent_filters.action"
+section = "6.6"
+anchor = "66-manifest-components"
+severity = "blocking"
+summary = "`android.contributes.components.intent_filters.action` is not of the type this declaration takes"
+
+[diagnostics."ni.decl.android.contributes.r8.unknown-key"]
+declaration = "android.contributes.r8"
+section = "4.4"
+anchor = "44-unknown-declarations-fail-closed"
+severity = "blocking"
+summary = "`android.contributes.r8` carries a key this specification does not define"
+
+[diagnostics."ni.decl.android.contributes.r8.keep_classes.type"]
+declaration = "android.contributes.r8.keep_classes"
+section = "6.7"
+anchor = "67-shrinker-keep-patterns"
+severity = "blocking"
+summary = "`android.contributes.r8.keep_classes` is not of the type this declaration takes"
+
+[diagnostics."ni.decl.android.contributes.r8.keep.unknown-key"]
+declaration = "android.contributes.r8.keep"
+section = "4.4"
+anchor = "44-unknown-declarations-fail-closed"
+severity = "blocking"
+summary = "`android.contributes.r8.keep` carries a key this specification does not define"
+
+[diagnostics."ni.decl.android.contributes.r8.keep.pattern.missing"]
+declaration = "android.contributes.r8.keep.pattern"
+section = "6.7"
+anchor = "67-shrinker-keep-patterns"
+severity = "blocking"
+summary = "`android.contributes.r8.keep.pattern` is required and is absent"
+
+[diagnostics."ni.decl.android.contributes.r8.keep.pattern.type"]
+declaration = "android.contributes.r8.keep.pattern"
+section = "6.7"
+anchor = "67-shrinker-keep-patterns"
+severity = "blocking"
+summary = "`android.contributes.r8.keep.pattern` is not of the type this declaration takes"
+
+[diagnostics."ni.decl.android.contributes.r8.keep.from_dependency.missing"]
+declaration = "android.contributes.r8.keep.from_dependency"
+section = "6.7"
+anchor = "67-shrinker-keep-patterns"
+severity = "blocking"
+summary = "`android.contributes.r8.keep.from_dependency` is required and is absent"
+
+[diagnostics."ni.decl.android.contributes.r8.keep.from_dependency.type"]
+declaration = "android.contributes.r8.keep.from_dependency"
+section = "6.7"
+anchor = "67-shrinker-keep-patterns"
+severity = "blocking"
+summary = "`android.contributes.r8.keep.from_dependency` is not of the type this declaration takes"
+
+[diagnostics."ni.decl.android.contributes.r8.keep.from_dependency.unresolved"]
+declaration = "android.contributes.r8.keep.from_dependency"
+section = "6.7"
+anchor = "67-shrinker-keep-patterns"
+severity = "blocking"
+summary = "`android.contributes.r8.keep.from_dependency` names something the same sidecar does not declare"
+
+[diagnostics."ni.decl.android.contributes.meta_data.unknown-key"]
+declaration = "android.contributes.meta_data"
+section = "4.4"
+anchor = "44-unknown-declarations-fail-closed"
+severity = "blocking"
+summary = "`android.contributes.meta_data` carries a key this specification does not define"
+
+[diagnostics."ni.decl.android.contributes.meta_data.key.missing"]
+declaration = "android.contributes.meta_data.key"
+section = "6.8"
+anchor = "68-manifest-meta-data"
+severity = "blocking"
+summary = "`android.contributes.meta_data.key` is required and is absent"
+
+[diagnostics."ni.decl.android.contributes.meta_data.key.type"]
+declaration = "android.contributes.meta_data.key"
+section = "6.8"
+anchor = "68-manifest-meta-data"
+severity = "blocking"
+summary = "`android.contributes.meta_data.key` is not of the type this declaration takes"
+
+[diagnostics."ni.decl.android.contributes.meta_data.value.missing"]
+declaration = "android.contributes.meta_data.value"
+section = "6.8"
+anchor = "68-manifest-meta-data"
+severity = "blocking"
+summary = "`android.contributes.meta_data.value` is required and is absent"
+
+[diagnostics."ni.decl.android.contributes.meta_data.value.type"]
+declaration = "android.contributes.meta_data.value"
+section = "6.8"
+anchor = "68-manifest-meta-data"
+severity = "blocking"
+summary = "`android.contributes.meta_data.value` is not of the type this declaration takes"
+
+[diagnostics."ni.decl.android.contributes.meta_data.reason.missing"]
+declaration = "android.contributes.meta_data.reason"
+section = "6.8"
+anchor = "68-manifest-meta-data"
+severity = "blocking"
+summary = "`android.contributes.meta_data.reason` is required and is absent"
+
+[diagnostics."ni.decl.android.contributes.meta_data.reason.type"]
+declaration = "android.contributes.meta_data.reason"
+section = "6.8"
+anchor = "68-manifest-meta-data"
+severity = "blocking"
+summary = "`android.contributes.meta_data.reason` is not of the type this declaration takes"
+
+[diagnostics."ni.decl.android.contributes.queries.exactly-one-of"]
+declaration = "android.contributes.queries"
+section = "6.9"
+anchor = "69-package-visibility"
+severity = "blocking"
+summary = "`android.contributes.queries` declares both or neither of `package`, `provider_authority`"
+
+[diagnostics."ni.decl.android.contributes.queries.unknown-key"]
+declaration = "android.contributes.queries"
+section = "4.4"
+anchor = "44-unknown-declarations-fail-closed"
+severity = "blocking"
+summary = "`android.contributes.queries` carries a key this specification does not define"
+
+[diagnostics."ni.decl.android.contributes.queries.package.type"]
+declaration = "android.contributes.queries.package"
+section = "6.9"
+anchor = "69-package-visibility"
+severity = "blocking"
+summary = "`android.contributes.queries.package` is not of the type this declaration takes"
+
+[diagnostics."ni.decl.android.contributes.queries.provider_authority.type"]
+declaration = "android.contributes.queries.provider_authority"
+section = "6.9"
+anchor = "69-package-visibility"
+severity = "blocking"
+summary = "`android.contributes.queries.provider_authority` is not of the type this declaration takes"
+
+[diagnostics."ni.decl.android.contributes.queries.reason.missing"]
+declaration = "android.contributes.queries.reason"
+section = "6.9"
+anchor = "69-package-visibility"
+severity = "blocking"
+summary = "`android.contributes.queries.reason` is required and is absent"
+
+[diagnostics."ni.decl.android.contributes.queries.reason.type"]
+declaration = "android.contributes.queries.reason"
+section = "6.9"
+anchor = "69-package-visibility"
+severity = "blocking"
+summary = "`android.contributes.queries.reason` is not of the type this declaration takes"
+
+[diagnostics."ni.decl.ios.contributes.swift_packages.unknown-key"]
+declaration = "ios.contributes.swift_packages"
+section = "4.4"
+anchor = "44-unknown-declarations-fail-closed"
+severity = "blocking"
+summary = "`ios.contributes.swift_packages` carries a key this specification does not define"
+
+[diagnostics."ni.decl.ios.contributes.swift_packages.name.missing"]
+declaration = "ios.contributes.swift_packages.name"
+section = "7.2"
+anchor = "72-swift-packages"
+severity = "blocking"
+summary = "`ios.contributes.swift_packages.name` is required and is absent"
+
+[diagnostics."ni.decl.ios.contributes.swift_packages.name.type"]
+declaration = "ios.contributes.swift_packages.name"
+section = "7.2"
+anchor = "72-swift-packages"
+severity = "blocking"
+summary = "`ios.contributes.swift_packages.name` is not of the type this declaration takes"
+
+[diagnostics."ni.decl.ios.contributes.swift_packages.name.duplicate"]
+declaration = "ios.contributes.swift_packages.name"
+section = "7.2"
+anchor = "72-swift-packages"
+severity = "blocking"
+summary = "`ios.contributes.swift_packages.name` repeats a value that must be unique"
+
+[diagnostics."ni.decl.ios.contributes.swift_packages.url.missing"]
+declaration = "ios.contributes.swift_packages.url"
+section = "7.2"
+anchor = "72-swift-packages"
+severity = "blocking"
+summary = "`ios.contributes.swift_packages.url` is required and is absent"
+
+[diagnostics."ni.decl.ios.contributes.swift_packages.url.type"]
+declaration = "ios.contributes.swift_packages.url"
+section = "7.2"
+anchor = "72-swift-packages"
+severity = "blocking"
+summary = "`ios.contributes.swift_packages.url` is not of the type this declaration takes"
+
+[diagnostics."ni.decl.ios.contributes.swift_packages.url.scheme"]
+declaration = "ios.contributes.swift_packages.url"
+section = "7.2"
+anchor = "72-swift-packages"
+severity = "blocking"
+summary = "`ios.contributes.swift_packages.url` is not an `https` URL"
+
+[diagnostics."ni.decl.ios.contributes.swift_packages.products.missing"]
+declaration = "ios.contributes.swift_packages.products"
+section = "7.2"
+anchor = "72-swift-packages"
+severity = "blocking"
+summary = "`ios.contributes.swift_packages.products` is required and is absent"
+
+[diagnostics."ni.decl.ios.contributes.swift_packages.products.type"]
+declaration = "ios.contributes.swift_packages.products"
+section = "7.2"
+anchor = "72-swift-packages"
+severity = "blocking"
+summary = "`ios.contributes.swift_packages.products` is not of the type this declaration takes"
+
+[diagnostics."ni.decl.ios.contributes.swift_packages.products.empty"]
+declaration = "ios.contributes.swift_packages.products"
+section = "7.2"
+anchor = "72-swift-packages"
+severity = "blocking"
+summary = "`ios.contributes.swift_packages.products` is empty, and an empty list is invalid here"
+
+[diagnostics."ni.decl.ios.contributes.swift_packages.requirement.missing"]
+declaration = "ios.contributes.swift_packages.requirement"
+section = "7.2"
+anchor = "72-swift-packages"
+severity = "blocking"
+summary = "`ios.contributes.swift_packages.requirement` is required and is absent"
+
+[diagnostics."ni.decl.ios.contributes.swift_packages.requirement.type"]
+declaration = "ios.contributes.swift_packages.requirement"
+section = "7.2"
+anchor = "72-swift-packages"
+severity = "blocking"
+summary = "`ios.contributes.swift_packages.requirement` is not of the type this declaration takes"
+
+[diagnostics."ni.decl.ios.contributes.swift_packages.credentials_required.type"]
+declaration = "ios.contributes.swift_packages.credentials_required"
+section = "7.2"
+anchor = "72-swift-packages"
+severity = "blocking"
+summary = "`ios.contributes.swift_packages.credentials_required` is not of the type this declaration takes"
+
+[diagnostics."ni.decl.ios.contributes.swift_packages.reason.type"]
+declaration = "ios.contributes.swift_packages.reason"
+section = "7.2"
+anchor = "72-swift-packages"
+severity = "blocking"
+summary = "`ios.contributes.swift_packages.reason` is not of the type this declaration takes"
+
+[diagnostics."ni.decl.ios.contributes.src.unknown-key"]
+declaration = "ios.contributes.src"
+section = "4.4"
+anchor = "44-unknown-declarations-fail-closed"
+severity = "blocking"
+summary = "`ios.contributes.src` carries a key this specification does not define"
+
+[diagnostics."ni.decl.ios.contributes.src.swift.type"]
+declaration = "ios.contributes.src.swift"
+section = "7.3"
+anchor = "73-source"
+severity = "blocking"
+summary = "`ios.contributes.src.swift` is not of the type this declaration takes"
+
+[diagnostics."ni.decl.ios.contributes.src.symbol_prefixes.type"]
+declaration = "ios.contributes.src.symbol_prefixes"
+section = "7.1"
+anchor = "71-symbol-prefixes"
+severity = "blocking"
+summary = "`ios.contributes.src.symbol_prefixes` is not of the type this declaration takes"
+
+[diagnostics."ni.decl.ios.contributes.src.symbol_prefixes.invalid-context"]
+declaration = "ios.contributes.src.symbol_prefixes"
+section = "7.1"
+anchor = "71-symbol-prefixes"
+severity = "blocking"
+summary = "`ios.contributes.src.symbol_prefixes` is declared where it is not valid"
+
+[diagnostics."ni.decl.ios.contributes.accessed_api_types.unknown-key"]
+declaration = "ios.contributes.accessed_api_types"
+section = "4.4"
+anchor = "44-unknown-declarations-fail-closed"
+severity = "blocking"
+summary = "`ios.contributes.accessed_api_types` carries a key this specification does not define"
+
+[diagnostics."ni.decl.ios.contributes.accessed_api_types.type.missing"]
+declaration = "ios.contributes.accessed_api_types.type"
+section = "7.3"
+anchor = "73-source"
+severity = "blocking"
+summary = "`ios.contributes.accessed_api_types.type` is required and is absent"
+
+[diagnostics."ni.decl.ios.contributes.accessed_api_types.type.type"]
+declaration = "ios.contributes.accessed_api_types.type"
+section = "7.3"
+anchor = "73-source"
+severity = "blocking"
+summary = "`ios.contributes.accessed_api_types.type` is not of the type this declaration takes"
+
+[diagnostics."ni.decl.ios.contributes.accessed_api_types.reasons.missing"]
+declaration = "ios.contributes.accessed_api_types.reasons"
+section = "7.3"
+anchor = "73-source"
+severity = "blocking"
+summary = "`ios.contributes.accessed_api_types.reasons` is required and is absent"
+
+[diagnostics."ni.decl.ios.contributes.accessed_api_types.reasons.type"]
+declaration = "ios.contributes.accessed_api_types.reasons"
+section = "7.3"
+anchor = "73-source"
+severity = "blocking"
+summary = "`ios.contributes.accessed_api_types.reasons` is not of the type this declaration takes"
+
+[diagnostics."ni.decl.ios.contributes.accessed_api_types.reason.type"]
+declaration = "ios.contributes.accessed_api_types.reason"
+section = "7.3"
+anchor = "73-source"
+severity = "blocking"
+summary = "`ios.contributes.accessed_api_types.reason` is not of the type this declaration takes"
+
+[diagnostics."ni.decl.ios.contributes.info_plist.unknown-key"]
+declaration = "ios.contributes.info_plist"
+section = "4.4"
+anchor = "44-unknown-declarations-fail-closed"
+severity = "blocking"
+summary = "`ios.contributes.info_plist` carries a key this specification does not define"
+
+[diagnostics."ni.decl.ios.contributes.info_plist.skadnetwork_identifiers.type"]
+declaration = "ios.contributes.info_plist.skadnetwork_identifiers"
+section = "7.4"
+anchor = "74-infoplist"
+severity = "blocking"
+summary = "`ios.contributes.info_plist.skadnetwork_identifiers` is not of the type this declaration takes"
+
+[diagnostics."ni.decl.ios.contributes.info_plist.skadnetwork_identifiers.pattern"]
+declaration = "ios.contributes.info_plist.skadnetwork_identifiers"
+section = "7.4"
+anchor = "74-infoplist"
+severity = "blocking"
+summary = "`ios.contributes.info_plist.skadnetwork_identifiers` does not match the form this declaration fixes"
+
+[diagnostics."ni.decl.ios.contributes.python_modules.unknown-key"]
+declaration = "ios.contributes.python_modules"
+section = "4.4"
+anchor = "44-unknown-declarations-fail-closed"
+severity = "blocking"
+summary = "`ios.contributes.python_modules` carries a key this specification does not define"
+
+[diagnostics."ni.decl.ios.contributes.python_modules.name.missing"]
+declaration = "ios.contributes.python_modules.name"
+section = "7.5"
+anchor = "75-python-modules"
+severity = "blocking"
+summary = "`ios.contributes.python_modules.name` is required and is absent"
+
+[diagnostics."ni.decl.ios.contributes.python_modules.name.type"]
+declaration = "ios.contributes.python_modules.name"
+section = "7.5"
+anchor = "75-python-modules"
+severity = "blocking"
+summary = "`ios.contributes.python_modules.name` is not of the type this declaration takes"
+
+[diagnostics."ni.decl.ios.contributes.python_modules.name.pattern"]
+declaration = "ios.contributes.python_modules.name"
+section = "7.5"
+anchor = "75-python-modules"
+severity = "blocking"
+summary = "`ios.contributes.python_modules.name` does not match the form this declaration fixes"
+
+[diagnostics."ni.decl.ios.contributes.python_modules.swift_package.missing"]
+declaration = "ios.contributes.python_modules.swift_package"
+section = "7.5"
+anchor = "75-python-modules"
+severity = "blocking"
+summary = "`ios.contributes.python_modules.swift_package` is required and is absent"
+
+[diagnostics."ni.decl.ios.contributes.python_modules.swift_package.type"]
+declaration = "ios.contributes.python_modules.swift_package"
+section = "7.5"
+anchor = "75-python-modules"
+severity = "blocking"
+summary = "`ios.contributes.python_modules.swift_package` is not of the type this declaration takes"
+
+[diagnostics."ni.decl.ios.contributes.python_modules.swift_package.unresolved"]
+declaration = "ios.contributes.python_modules.swift_package"
+section = "7.5"
+anchor = "75-python-modules"
+severity = "blocking"
+summary = "`ios.contributes.python_modules.swift_package` names something the same sidecar does not declare"
+
+[diagnostics."ni.decl.ios.contributes.python_modules.init.type"]
+declaration = "ios.contributes.python_modules.init"
+section = "7.5"
+anchor = "75-python-modules"
+severity = "blocking"
+summary = "`ios.contributes.python_modules.init` is not of the type this declaration takes"
+
+[diagnostics."ni.decl.ios.contributes.python_modules.init.pattern"]
+declaration = "ios.contributes.python_modules.init"
+section = "7.5"
+anchor = "75-python-modules"
+severity = "blocking"
+summary = "`ios.contributes.python_modules.init` does not match the form this declaration fixes"
+
+[diagnostics."ni.decl.ios.contributes.unknown-key"]
+declaration = "ios.contributes"
+section = "4.4"
+anchor = "44-unknown-declarations-fail-closed"
+severity = "blocking"
+summary = "`ios.contributes` carries a key this specification does not define"
+
+[diagnostics."ni.decl.ios.contributes.objc_categories.type"]
+declaration = "ios.contributes.objc_categories"
+section = "7.6"
+anchor = "76-objective-c-categories"
+severity = "blocking"
+summary = "`ios.contributes.objc_categories` is not of the type this declaration takes"
+
+[diagnostics."ni.decl.ios.contributes.objc_categories.false"]
+declaration = "ios.contributes.objc_categories"
+section = "7.6"
+anchor = "76-objective-c-categories"
+severity = "blocking"
+summary = "`ios.contributes.objc_categories` is declared `false`, and only `true` says anything"
+
+[diagnostics."ni.constraint.<platform>.requires.application_value.key.required-unless-equals.kind"]
+declaration = "<platform>.requires.application_value.key"
+section = "5.2"
+anchor = "52-values"
+severity = "blocking"
+summary = "`key` is required unless `kind` is `inline`"
+
+[diagnostics."ni.constraint.<platform>.requires.application_value.key.forbidden-if-equals.kind"]
+declaration = "<platform>.requires.application_value.key"
+section = "5.5"
+anchor = "55-value-kinds"
+severity = "blocking"
+summary = "`key` must be absent when `kind` is `inline`"
+
+[diagnostics."ni.constraint.android.contributes.gradle_dependencies.version.required-if-present.module"]
+declaration = "android.contributes.gradle_dependencies.version"
+section = "6.3"
+anchor = "63-gradle-dependencies"
+severity = "blocking"
+summary = "`version` is required when `module` is declared"
+
+[diagnostics."ni.constraint.android.contributes.gradle_dependencies.version.forbidden-if-present.coordinate"]
+declaration = "android.contributes.gradle_dependencies.version"
+section = "6.3"
+anchor = "63-gradle-dependencies"
+severity = "blocking"
+summary = "`version` must be absent when `coordinate` is declared"
+
+[diagnostics."ni.constraint.android.contributes.components.reason.required-if-present.exported_required"]
+declaration = "android.contributes.components.reason"
+section = "6.6"
+anchor = "66-manifest-components"
+severity = "blocking"
+summary = "`reason` is required when `exported_required` is declared"
+
+[diagnostics."ni.constraint.android.contributes.components.foreground_service_type.requires-equals.kind"]
+declaration = "android.contributes.components.foreground_service_type"
+section = "6.6"
+anchor = "66-manifest-components"
+severity = "blocking"
+summary = "`foreground_service_type` is valid only where `kind` is `service`"
+
+[diagnostics."ni.constraint.android.contributes.components.view_links.requires-equals.kind"]
+declaration = "android.contributes.components.view_links"
+section = "6.6"
+anchor = "66-manifest-components"
+severity = "blocking"
+summary = "`view_links` is valid only where `kind` is `activity`"
+
+[diagnostics."ni.constraint.android.contributes.components.view_links.requires-equals.exported_required"]
+declaration = "android.contributes.components.view_links"
+section = "6.6"
+anchor = "66-manifest-components"
+severity = "blocking"
+summary = "`view_links` is valid only where `exported_required` is `True`"
+
+[diagnostics."ni.constraint.android.contributes.components.intent_filters.forbidden-if-present.exported_required"]
+declaration = "android.contributes.components.intent_filters"
+section = "6.6"
+anchor = "66-manifest-components"
+severity = "blocking"
+summary = "`intent_filters` must be absent when `exported_required` is declared"
+
+[diagnostics."ni.constraint.android.contributes.components.intent_filters.forbidden-if-present.view_links"]
+declaration = "android.contributes.components.intent_filters"
+section = "6.6"
+anchor = "66-manifest-components"
+severity = "blocking"
+summary = "`intent_filters` must be absent when `view_links` is declared"
+
+[diagnostics."ni.req.1"]
+requirement = 1
+profile = "core"
+section = "8.4"
+anchor = "84-requirements"
+severity = "blocking"
+summary = "Restrict candidate producers to the application's resolved dependency closure — evaluating environment markers and extras for the target platform and Python version, never for the build host — and never accept contributions from a distribution outside it, whatever else is installed ([§3.2](#32-resolution))."
+
+[diagnostics."ni.req.2"]
+requirement = 2
+profile = "core"
+section = "8.4"
+anchor = "84-requirements"
+severity = "blocking"
+summary = "Discover by iterating the entry-point group, ignoring entry-point names, and fail when one distribution declares more than one entry ([§3.3](#33-iterate-do-not-look-up-by-name), [§3.4](#34-one-entry-per-distribution))."
+
+[diagnostics."ni.req.3"]
+requirement = 3
+profile = "core"
+section = "8.4"
+anchor = "84-requirements"
+severity = "blocking"
+summary = "Never import the producing package or any module of it, and never execute any content of a sidecar ([§2.1](#21-design-principles), [§3.2](#32-resolution))."
+
+[diagnostics."ni.req.4"]
+requirement = 4
+profile = "core"
+section = "8.4"
+anchor = "84-requirements"
+severity = "blocking"
+summary = "Read the sidecar and every resource it references through the distribution's metadata and file-resource interface, and fail naming the distribution when a resource cannot be materialized or read ([§3.2](#32-resolution))."
+
+[diagnostics."ni.req.5"]
+requirement = 5
+profile = "core"
+section = "8.4"
+anchor = "84-requirements"
+severity = "blocking"
+summary = "Reject a resource that escapes the sidecar directory after normalization, and reject a symlinked resource ([§4.1](#41-location-and-name))."
+
+[diagnostics."ni.req.6"]
+requirement = 6
+profile = "core"
+section = "8.4"
+anchor = "84-requirements"
+severity = "blocking"
+summary = "Exclude the sidecar directory, and every resource under it, from any Python payload it assembles for the device ([§4.1](#41-location-and-name))."
+
+[diagnostics."ni.req.7"]
+requirement = 7
+profile = "core"
+section = "8.4"
+anchor = "84-requirements"
+severity = "blocking"
+summary = "Enforce the contract version gate including the minor, reject a malformed `contract` value, reject a sidecar that under-declares — by key, by table, or by a value from a closed vocabulary — and be able to state the contract it implements ([§4.3](#43-contract-version))."
+
+[diagnostics."ni.req.8"]
+requirement = 8
+profile = "core"
+section = "8.4"
+anchor = "84-requirements"
+severity = "blocking"
+summary = "Fail closed on an unrecognized key in a platform table it is building — excepting only a `view_links` attribute ([§6.6](#66-manifest-components)) — on an unrecognized top-level key that is not a table, and on a value from a closed vocabulary it does not implement — a value `kind`, a Gradle configuration, a capability key — substituting no default ([§4.4](#44-unknown-declarations-fail-closed), [§5.5](#55-value-kinds))."
+
+[diagnostics."ni.req.9"]
+requirement = 9
+profile = "core"
+section = "8.4"
+anchor = "84-requirements"
+severity = "blocking"
+summary = "Enforce `platforms` entirely: reject an empty list and a name this document does not define, reject a platform table for a name the key omits, and fail when building for a platform the key omits, naming the distribution and how it entered the closure. And fail, rather than building partially, when asked to build for a platform whose conformance profile it does not implement ([§4.5](#45-platform-support), [§8.1](#81-conformance-is-per-platform)). Answering, reporting, and scaffolding"
+
+[diagnostics."ni.req.10"]
+requirement = 10
+profile = "core"
+section = "8.4"
+anchor = "84-requirements"
+severity = "blocking"
+summary = "Provide a way for the application to answer every row of [§2.2](#22-how-the-application-answers)'s table — supply a value, acknowledge an action, dismiss a conditional requirement, suppress a contributed permission, approve an exported component, supply credentials for an authenticated repository or Swift package, decide a resolved artifact's required feature, and choose which artifact supplies a colliding path — each joined by the key that table names; apply the four answers joined by something other than `(distribution, id)` to every contributor of the name or path they address; and accept a build-time credential by indirection rather than only as a literal in a committed file ([§2.2](#22-how-the-application-answers), [§5.4](#54-how-a-requirement-is-satisfied))."
+
+[diagnostics."ni.req.11"]
+requirement = 11
+profile = "core"
+section = "8.4"
+anchor = "84-requirements"
+severity = "blocking"
+summary = "Report every unmet requirement, naming the distribution and the `reason` — or, for a floor, which carries none, the declared and configured values — and, for an action, the `summary` plus `instructions` and `acceptance` wherever the sidecar declares them, both being optional fields ([§2.3](#23-what-the-consumer-generates), [§5.1](#51-build-floors), [§5.3](#53-actions)). Never satisfy a requirement on the producer's authority"
+
+[diagnostics."ni.req.12"]
+requirement = 12
+profile = "core"
+section = "8.4"
+anchor = "84-requirements"
+severity = "blocking"
+summary = "Fail when the application's configuration is below a declared floor, reporting the declared and configured values; reject a non-integer Android floor and a malformed `deployment_target`, comparing the latter component-wise and numerically; reject a boolean floor declared `false`; never raise the application's configuration to satisfy a floor; and record and report every declared floor with its distribution, giving `target_sdk` the prominence [§5.1](#51-build-floors) requires."
+
+[diagnostics."ni.req.13"]
+requirement = 13
+profile = "core"
+section = "8.4"
+anchor = "84-requirements"
+severity = "blocking"
+summary = "Fail when a declared value is unsupplied, never treat a scaffolded placeholder as a supplied value, require `key` on every value kind but `inline` and reject it on that one, reject an `inline` value that neither a contribution references nor an action `uses`, and reject a `kind` declared in a table for the platform it does not belong to ([§5.2](#52-values), [§5.4](#54-how-a-requirement-is-satisfied), [§5.5](#55-value-kinds))."
+
+[diagnostics."ni.req.14"]
+requirement = 14
+profile = "core"
+section = "8.4"
+anchor = "84-requirements"
+severity = "blocking"
+summary = "Fail when an unconditional action is unacknowledged; record an unsatisfied conditional requirement without failing; take an acknowledgement as satisfying the requirement; and hold an acknowledged action unsatisfied while any value it `uses` is unsupplied ([§5.3](#53-actions), [§5.4](#54-how-a-requirement-is-satisfied))."
+
+[diagnostics."ni.req.15"]
+requirement = 15
+profile = "core"
+section = "8.4"
+anchor = "84-requirements"
+severity = "blocking"
+summary = "Never treat its own observation of the application's project as satisfaction of an action ([§5.4](#54-how-a-requirement-is-satisfied))."
+
+[diagnostics."ni.req.16"]
+requirement = 16
+profile = "core"
+section = "8.4"
+anchor = "84-requirements"
+severity = "blocking"
+summary = "Never invent the content of an application-owned artifact — an entitlement, a capability, a bundle file, a build target — on a producer's declaration alone. Placing a string the *application* supplied is exactly what [§5.5](#55-value-kinds)'s kinds are for and is not this ([§2.1](#21-design-principles)). Composition between distributions"
+
+[diagnostics."ni.req.17"]
+requirement = 17
+profile = "core"
+section = "8.4"
+anchor = "84-requirements"
+severity = "blocking"
+summary = "Fail when two values target the same `(kind, key)` with different content, naming both distributions, and coalesce them when the content is equal — comparing a supplied string against a typed contribution in the same key space by content *and* type ([§5.2](#52-values), [§6.8](#68-manifest-meta-data), [§7.4](#74-infoplist))."
+
+[diagnostics."ni.req.18"]
+requirement = 18
+profile = "core"
+section = "8.4"
+anchor = "84-requirements"
+severity = "blocking"
+summary = "Name the contributing distribution in every diagnostic it emits about declared material ([§2.1](#21-design-principles))."
+
+[diagnostics."ni.req.19"]
+requirement = 19
+profile = "core"
+section = "8.4"
+anchor = "84-requirements"
+severity = "blocking"
+summary = "Ignore entry-point groups for other major versions entirely, rather than attempting to read them ([§10](#10-versioning))."
+
+[diagnostics."ni.req.20"]
+requirement = 20
+profile = "core"
+section = "8.4"
+anchor = "84-requirements"
+severity = "blocking"
+summary = "Never modify a file the application owns unless the application asked it to, and never scaffold an action's acknowledgement other than commented out ([§2.3](#23-what-the-consumer-generates))."
+
+[diagnostics."ni.req.21"]
+requirement = 21
+profile = "core"
+section = "8.4"
+anchor = "84-requirements"
+severity = "blocking"
+summary = "Never execute, apply, or fetch anything named by `instructions` or `acceptance`; include both in the record's hashed inputs; and attribute both to the declaring distribution wherever it renders them, in the report and in every scaffolded block ([§5.6](#56-instructions-and-acceptance-criteria), [§9.3](#93-hashed-inputs))."
+
+[diagnostics."ni.req.22"]
+requirement = 22
+profile = "core"
+section = "8.4"
+anchor = "84-requirements"
+severity = "blocking"
+summary = "Reject two requirements in one platform table sharing an `id`; reject a `uses` entry naming no value the same sidecar declares for the same platform; and report two actions sharing a `slot` together, naming both distributions, without interpreting the slot ([§5](#5-requirements-on-the-application), [§5.3](#53-actions), [§5.7](#57-slots)). Generated project material"
+
+[diagnostics."ni.req.23"]
+requirement = 23
+profile = "android"
+section = "8.4"
+anchor = "84-requirements"
+severity = "blocking"
+summary = "Enforce every ownership rule, computing containment on dot-separated segments; derive a contributed file's namespace from its path relative to its source root and check it, its declared `package`, and their equality, case-sensitively; and fail on a collision naming the distributions responsible ([§6.1](#61-ownership), [§6.2](#62-source))."
+
+[diagnostics."ni.req.24"]
+requirement = 24
+profile = "core"
+section = "8.4"
+anchor = "84-requirements"
+severity = "blocking"
+summary = "Compile contributed source with the application's own toolchain and exclude it from any Python payload, on both platforms; and, where it compiles Java, force UTF-8 for `.java` rather than the platform default ([§6.2](#62-source), [§7.3](#73-source))."
+
+[diagnostics."ni.req.25"]
+requirement = 25
+profile = "android"
+section = "8.4"
+anchor = "84-requirements"
+severity = "blocking"
+summary = "Reject a Gradle dependency declaring both or neither of `coordinate` and `module`, reject a changing or unbounded version, reject a processor configuration, reject two entries in one sidecar naming one module unless they are identical, fail when two declarations of one module disagree on `configuration` naming both distributions, name every distribution whose declaration contributed to a resolution failure, never convert a declared version into a `strictly` constraint, and show requested against resolved where they differ ([§6.3](#63-gradle-dependencies))."
+
+[diagnostics."ni.req.26"]
+requirement = 26
+profile = "core"
+section = "8.4"
+anchor = "84-requirements"
+severity = "blocking"
+summary = "Lock whichever native graphs it resolves — Gradle, SwiftPM, or both, transitives included — resolve from the record thereafter, record a SHA-256 per Maven artifact and the declared checksum per Swift binary target, verify both on subsequent builds, and fail on a mismatch naming the artifact and the distribution. A single-platform consumer owes this for its own ecosystem's graph and nothing more ([§6.3](#63-gradle-dependencies), [§7.2](#72-swift-packages))."
+
+[diagnostics."ni.req.27"]
+requirement = 27
+profile = "android"
+section = "8.4"
+anchor = "84-requirements"
+severity = "blocking"
+summary = "Restrict a contributed repository to its declared groups or modules by exact match, never by prefix or pattern; reject a non-`https` URL; reject two whose scopes overlap at different URLs; never substitute an exclusivity mechanism for content filtering; report repositories with distinct prominence; reject a syntactically identifiable credential; fail when an authenticated repository has no credentials configured; merge two declarations of one `url` by unioning their scopes, taking any `credentials_required = true`, and keeping every `reason` attributed; and never persist a supplied credential anywhere ([§6.4](#64-maven-repositories))."
+
+[diagnostics."ni.req.28"]
+requirement = 28
+profile = "android"
+section = "8.4"
+anchor = "84-requirements"
+severity = "blocking"
+summary = "Merge permission attributes least-restrictively and report the merge; reject a producer-declared `required` on a feature and register every producer-declared feature `required = false`; and honor a suppression in the effective merged manifest, emitting a merger removal where a resolved dependency contributes the same permission ([§6.5](#65-permissions-and-features))."
+
+[diagnostics."ni.req.29"]
+requirement = 29
+profile = "android"
+section = "8.4"
+anchor = "84-requirements"
+severity = "blocking"
+summary = "Enforce component provenance and uniqueness, reject `foreground_service_type` on a non-service, fail when a component declaring `exported_required` has no application approval — never falling back to an unexported registration — and reject `view_links` or `intent_filters` in an invalid combination ([§6.6](#66-manifest-components))."
+
+[diagnostics."ni.req.30"]
+requirement = 30
+profile = "android"
+section = "8.4"
+anchor = "84-requirements"
+severity = "blocking"
+summary = "Validate `view_links` and generate their filters, including the action and the `DEFAULT` and `BROWSABLE` categories; write an attribute it does not recognize through, converting the snake-case key to the platform's attribute name by [§6.6](#66-manifest-components)'s rule and rejecting a key that rule does not cover or a value that is not a string; and show the link data and each `intent_filters` action in the record ([§6.6](#66-manifest-components))."
+
+[diagnostics."ni.req.31"]
+requirement = 31
+profile = "android"
+section = "8.4"
+anchor = "84-requirements"
+severity = "blocking"
+summary = "Validate shrinker keep patterns against owned namespaces by their wildcard-free literal prefix, reject a `from_dependency` keep whose pattern matches any class on the effective classpath originating outside that dependency's resolved artifacts, and apply keeps only when the application has enabled shrinking ([§6.7](#67-shrinker-keep-patterns))."
+
+[diagnostics."ni.req.32"]
+requirement = 32
+profile = "android"
+section = "8.4"
+anchor = "84-requirements"
+severity = "blocking"
+summary = "Merge contributed `meta_data` with [§5.2](#52-values)'s delivery as one key space, keeping and reporting the application's own entry where it sets the key; reject a `queries` entry declaring both or neither of `package` and `provider_authority`; and report every `queries` entry with its `reason` and its distribution ([§6.8](#68-manifest-meta-data), [§6.9](#69-package-visibility))."
+
+[diagnostics."ni.req.33"]
+requirement = 33
+profile = "ios"
+section = "8.4"
+anchor = "84-requirements"
+severity = "blocking"
+summary = "Reject two Swift packages sharing a `name`, a missing or empty `products`, a non-`https` `url`, a `branch` requirement, and a resolved graph containing a path or branch dependency anywhere in it; apply [§6.4](#64-maven-repositories)'s credential and same-`url` merge rules to a package declaring `credentials_required`; and make visible in the record that a self-declared package is not pinned by the distribution's own version ([§7.2](#72-swift-packages))."
+
+[diagnostics."ni.req.34"]
+requirement = 34
+profile = "ios"
+section = "8.4"
+anchor = "84-requirements"
+severity = "blocking"
+summary = "Reject `symbol_prefixes` ([§7.1](#71-symbol-prefixes)) and `accessed_api_types` ([§7.3](#73-source)) from a sidecar contributing no Swift source, and merge what `accessed_api_types` declares into the application's `PrivacyInfo.xcprivacy` in the order [§7.3](#73-source) fixes."
+
+[diagnostics."ni.req.35"]
+requirement = 35
+profile = "ios"
+section = "8.4"
+anchor = "84-requirements"
+severity = "blocking"
+summary = "Enforce [§7.4](#74-infoplist)'s TOML-to-plist mapping; fail on two distributions setting one key differently, and on one key claimed both as an array (`append`) and as a scalar — `values` or a value of kind `info_plist` alike; keep and report the application's own value; reject a capability, external-reach or consumer-managed key wherever it arrives, in those three channels alike; reject a usage-description key in `values`, and a `usage_description` whose `key` does not end in `UsageDescription` ([§5.5](#55-value-kinds)); validate SKAdNetwork identifiers; render `SKAdNetworkItems` only from `skadnetwork_identifiers`; and report contributed `LSApplicationQueriesSchemes` entries naming the distribution."
+
+[diagnostics."ni.req.36"]
+requirement = 36
+profile = "ios"
+section = "8.4"
+anchor = "84-requirements"
+severity = "blocking"
+summary = "Register declared Python modules against a Swift package the same sidecar declares, link every product that sidecar named for the package, reject a dotted or non-identifier `name`, fail on a duplicate module name, make each module importable from first use, and exclude `<name>.py` and `<name>.pyi` from the Python payload ([§7.5](#75-python-modules))."
+
+[diagnostics."ni.req.37"]
+requirement = 37
+profile = "ios"
+section = "8.4"
+anchor = "84-requirements"
+severity = "blocking"
+summary = "Link the application target so Objective-C categories in statically linked libraries are loaded when any distribution asks, reject `objc_categories = false`, and report it naming the distributions that asked ([§7.6](#76-objective-c-categories)). Recording, disclosure, attribution"
+
+[diagnostics."ni.req.38"]
+requirement = 38
+profile = "core"
+section = "8.4"
+anchor = "84-requirements"
+severity = "blocking"
+summary = "Compute the resolution, compare it against the last accepted record, report the delta, require explicit acceptance — including on the first build — and update the accepted resolution only on acceptance, while persisting the application's own answers when they are given and never requiring acceptance of those ([§9.1](#91-the-lifecycle))."
+
+[diagnostics."ni.req.39"]
+requirement = 39
+profile = "core"
+section = "8.4"
+anchor = "84-requirements"
+severity = "blocking"
+summary = "Report the distribution, how it entered the closure, and the delta, keeping repository contributions, artifact-sourced material, unmet against conditional requirements, and staged against remaining distinct, for one platform's build ([§9.2](#92-the-report))."
+
+[diagnostics."ni.req.40"]
+requirement = 40
+profile = "core"
+section = "8.4"
+anchor = "84-requirements"
+severity = "blocking"
+summary = "Record a SHA-256 per input file, keyed by normalized relative path, and write every digest this document requires as 64 lowercase hexadecimal characters, unprefixed and unabbreviated ([§9.3](#93-hashed-inputs))."
+
+[diagnostics."ni.req.41"]
+requirement = 41
+profile = "android"
+section = "8.4"
+anchor = "84-requirements"
+severity = "blocking"
+summary = "Record and report every permission, feature and component declared by resolved Android artifacts' own manifests, attributed to the artifact; fail on a resolved artifact's `required=\"true\"` feature until the application decides whether to keep or override it, resolving it automatically in neither direction and recording the decision; and report a resolved artifact's exported components with contribution-level prominence ([§9.4](#94-what-resolved-artifacts-bring-with-them))."
+
+[diagnostics."ni.req.42"]
+requirement = 42
+profile = "core"
+section = "8.4"
+anchor = "84-requirements"
+severity = "blocking"
+summary = "Never write an application-supplied credential or secret into the record, a report, or a diagnostic ([§9.5](#95-secrets-are-never-recorded))."
+
+[diagnostics."ni.req.43"]
+requirement = 43
+profile = "core"
+section = "8.4"
+anchor = "84-requirements"
+severity = "blocking"
+summary = "Make every row of [§9.6](#96-what-a-record-must-contain) recoverable from the record — every value and action with its state, and every application decision the integration as a whole carries: each permission suppression, export approval, required-feature decision and colliding-path choice, with what it affected and the date it was made."
+
+[diagnostics."ni.req.44"]
+requirement = 44
+profile = "android"
+section = "8.4"
+anchor = "84-requirements"
+severity = "blocking"
+summary = "Detect packaging collisions between the resolved artifacts of different distributions, resolve on its own authority only the packaging-metadata names [§9.7](#97-packaging-collisions) lists — never a file in a subdirectory of `META-INF/` — fail on any other colliding file the application has not chosen between, and record every collision against the distributions responsible ([§9.7](#97-packaging-collisions)). The bootstrap"
+
+[diagnostics."ni.req.45"]
+requirement = 45
+profile = "android"
+section = "8.4"
+anchor = "84-requirements"
+severity = "blocking"
+summary = "Make the Android activity its bootstrap generates an `androidx.activity.ComponentActivity` or a subclass ([§2.4](#24-obligations-on-the-consumers-bootstrap))."
+
+[diagnostics."ni.req.46"]
+requirement = 46
+profile = "ios"
+section = "8.4"
+anchor = "84-requirements"
+severity = "blocking"
+summary = "On iOS, provide a documented means for application code to observe a URL callback delivered to the bootstrap's `application(_:open:options:)`, rather than consuming it ([§2.4](#24-obligations-on-the-consumers-bootstrap))."
+
+[diagnostics."ni.adv.S1"]
+advisory = "S1"
+section = "4.4"
+anchor = "44-unknown-declarations-fail-closed"
+severity = "advisory"
+summary = "Warn about a top-level *table* it does not recognize at all"
+
+[diagnostics."ni.adv.S10"]
+advisory = "S10"
+section = "7.1"
+anchor = "71-symbol-prefixes"
+severity = "advisory"
+summary = "Attribute a duplicate-symbol error to the distribution whose declared prefix matches"
+
+[diagnostics."ni.adv.S11"]
+advisory = "S11"
+section = "9.4"
+anchor = "94-what-resolved-artifacts-bring-with-them"
+severity = "advisory"
+summary = "Report the fully merged Android manifest's delta, beyond the per-artifact declarations requirement 41 requires"
+
+[diagnostics."ni.adv.S12"]
+advisory = "S12"
+section = "9.4"
+anchor = "94-what-resolved-artifacts-bring-with-them"
+severity = "advisory"
+summary = "Report consumer ProGuard rules embedded in a resolved `.aar`"
+
+[diagnostics."ni.adv.S13"]
+advisory = "S13"
+section = "6.6"
+anchor = "66-manifest-components"
+severity = "advisory"
+summary = "Warn when a component declares `foreground_service_type` and the same sidecar contributes no `FOREGROUND_SERVICE_*` permission — except for a type the platform exempts from one, today `shortService`"
+
+[diagnostics."ni.adv.S14"]
+advisory = "S14"
+section = "9.7"
+anchor = "97-packaging-collisions"
+severity = "advisory"
+summary = "Report a packaging collision detected between resolved Swift packages, which version 1 does not specify detection for"
+
+[diagnostics."ni.adv.S15"]
+advisory = "S15"
+section = "7.5"
+anchor = "75-python-modules"
+severity = "advisory"
+summary = "Verify that a registered Python module's `init` symbol is present in the linked binary, and report its absence against the declaring distribution"
+
+[diagnostics."ni.adv.S2"]
+advisory = "S2"
+section = "4.4"
+anchor = "44-unknown-declarations-fail-closed"
+severity = "advisory"
+summary = "Say which values of a closed vocabulary it implements, so a producer can tell an unsupported declaration from a misspelled one"
+
+[diagnostics."ni.adv.S3"]
+advisory = "S3"
+section = "4.3"
+anchor = "43-contract-version"
+severity = "advisory"
+summary = "Report the contract it implements where a person can see it"
+
+[diagnostics."ni.adv.S4"]
+advisory = "S4"
+section = "2.3"
+anchor = "23-what-the-consumer-generates"
+severity = "advisory"
+summary = "Scaffold declared placeholders into the application's own configuration"
+
+[diagnostics."ni.adv.S5"]
+advisory = "S5"
+section = "6.1"
+anchor = "61-ownership"
+severity = "advisory"
+summary = "Warn on a single-label owned namespace"
+
+[diagnostics."ni.adv.S6"]
+advisory = "S6"
+section = "6.6"
+anchor = "66-manifest-components"
+severity = "advisory"
+summary = "Verify that a `from_dependency` component class exists in the resolved artifact"
+
+[diagnostics."ni.adv.S7"]
+advisory = "S7"
+section = "6.5"
+anchor = "65-permissions-and-features"
+severity = "advisory"
+summary = "Carry a permission's `reason` into the record and report"
+
+[diagnostics."ni.adv.S8"]
+advisory = "S8"
+section = "6.5"
+anchor = "65-permissions-and-features"
+severity = "advisory"
+summary = "Make an active permission suppression visible in standing diagnostics"
+
+[diagnostics."ni.adv.S9"]
+advisory = "S9"
+section = "6.4"
+anchor = "64-maven-repositories"
+severity = "advisory"
+summary = "Surface contributed repositories in standing diagnostics"
