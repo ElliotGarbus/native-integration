@@ -1,0 +1,1375 @@
+# The v1 declaration registry.
+#
+# One machine-readable source of truth for the contract-1 declaration
+# vocabulary, derived entirely from SPEC.md. Three generators read it:
+#
+#   tools/gen_appendix_b.py   → SPEC.md's Appendix B table
+#   tools/gen_schema.py       → schema/native-integration-v1.schema.json
+#   tools/gen_error_ids.py    → contract/diagnostics-v1.toml
+#
+# and tools/check_spec.py fails when any of the three would produce a diff
+# against what is committed. Without that check this file becomes a second
+# source of truth rather than the source of truth.
+#
+# WHAT BELONGS HERE: mechanical properties only — path, node shape, type,
+# category, platform, cardinality, closed vocabularies, required/optional,
+# merge semantics where SPEC.md states one, `since`, and the section anchor.
+# The `description` field carries Appendix B's own summary text, which is what
+# lets that table be generated rather than hand-maintained beside this file.
+#
+# WHAT DOES NOT: rationale. SPEC.md's `> **Note:**` and `> **Caution:**`
+# callouts explain why each rule is the way it is and are what make the
+# document reviewable. They stay in §§4–7, hand-written, and nothing here
+# touches them.
+#
+# Where this file and SPEC.md disagree, SPEC.md governs and this file is the
+# defect.
+
+[meta]
+contract = "1.0"
+spec = "SPEC.md"
+entry_point_group = "native_integration.v1"
+
+# Node shapes: `table` is a `[x]` header, at most once; `array_of_tables` is
+# `[[x]]`, repeatable; `open_table` is a table whose *key names* belong to the
+# platform rather than to this document; `field` is a leaf.
+#
+# Categories: `top_level`, `owns`, `requires`, `contributes` — §2.1's three,
+# plus the two keys that sit above them.
+#
+# `<platform>` in an id means the declaration is spelled identically under
+# `[android]` and `[ios]`. A concrete `android.` or `ios.` prefix means the
+# declaration belongs to that platform's table and nowhere else.
+
+
+# ---------------------------------------------------------------- Top level ---
+
+[declarations."contract"]
+node = "field"
+type = "string"
+category = "top_level"
+platform = "both"
+required = true
+pattern = '(0|[1-9][0-9]*)(\.(0|[1-9][0-9]*))?'
+since = "1.0"
+section = "4.3"
+anchor = "43-contract-version"
+description = '**Required.** Major of this document, optionally with a minor — `"1"` or `"1.1"`.'
+
+[declarations."platforms"]
+node = "field"
+type = "array"
+items = "enum"
+values = ["android", "ios"]
+closed = true
+min_items = 1
+category = "top_level"
+platform = "both"
+required = false
+since = "1.0"
+section = "4.5"
+anchor = "45-platform-support"
+description = "Optional. Where the distribution *functions*, not merely where it contributes; a build for an omitted platform fails."
+
+
+# ------------------------------------------------------------------- Floors ---
+
+[declarations."<platform>.requires"]
+node = "table"
+category = "requires"
+platform = "both"
+required = false
+since = "1.0"
+section = "5.1"
+anchor = "51-build-floors"
+heading = "`[<platform>.requires]` — floors"
+
+# A1: a floor's platform is normative, on §5.5's terms for a value `kind`. A
+# `deployment_target` inside `[android.requires]` is an unrecognized key in a
+# platform table and §4.4 rejects it.
+
+[declarations."android.requires.min_sdk"]
+node = "field"
+type = "integer"
+category = "requires"
+platform = "android"
+required = false
+merge = "maximum"
+since = "1.0"
+section = "5.1"
+anchor = "51-build-floors"
+description = "An Android floor, and a **TOML integer** — `\"24\"` and `24.0` are rejected. The build fails when the application is lower; the consumer never raises it"
+
+[declarations."android.requires.compile_sdk"]
+node = "field"
+type = "integer"
+category = "requires"
+platform = "android"
+required = false
+merge = "maximum"
+since = "1.0"
+section = "5.1"
+anchor = "51-build-floors"
+description = "An Android floor, on the same terms as `min_sdk`"
+
+[declarations."android.requires.target_sdk"]
+node = "field"
+type = "integer"
+category = "requires"
+platform = "android"
+required = false
+merge = "maximum"
+since = "1.0"
+section = "5.1"
+anchor = "51-build-floors"
+description = "An Android floor, on the same terms. It changes behavior app-wide, so declare it only when a behavior depends on it, and a consumer gives it the prominence a repository contribution gets"
+
+[declarations."android.requires.core_library_desugaring"]
+node = "field"
+type = "boolean"
+only_true = true
+category = "requires"
+platform = "android"
+required = false
+since = "1.0"
+section = "5.1"
+anchor = "51-build-floors"
+description = "Optional boolean, and only `true` is valid — a consumer rejects `false`. A floor on a boolean axis: the build fails when the application has not enabled desugaring"
+
+[declarations."ios.requires.deployment_target"]
+node = "field"
+type = "string"
+pattern = '[0-9]+(\.[0-9]+){0,2}'
+category = "requires"
+platform = "ios"
+required = false
+merge = "maximum"
+since = "1.0"
+section = "5.1"
+anchor = "51-build-floors"
+description = "iOS floor, on the same terms. One to three ASCII-decimal components, compared component-wise and numerically with absent components read as zero"
+
+
+# ------------------------------------------------------------------- Values ---
+
+[declarations."<platform>.requires.application_value"]
+node = "array_of_tables"
+category = "requires"
+platform = "both"
+required = false
+since = "1.0"
+section = "5.2"
+anchor = "52-values"
+description = "A string the application supplies and the consumer places"
+
+[declarations."<platform>.requires.application_value.id"]
+node = "field"
+type = "string"
+category = "requires"
+platform = "both"
+required = true
+unique_within = "platform_table_requirements"
+since = "1.0"
+section = "5.2"
+anchor = "52-values"
+description = "**Required.** A logical name, unique among the requirements in one platform table; identity is (distribution, platform, `id`)"
+
+[declarations."<platform>.requires.application_value.kind"]
+node = "field"
+type = "enum"
+values = ["manifest_meta_data", "manifest_placeholder", "info_plist", "usage_description", "inline"]
+closed = true
+category = "requires"
+platform = "both"
+required = true
+since = "1.0"
+section = "5.5"
+anchor = "55-value-kinds"
+description = "**Required.** Where the consumer writes it. A **closed** set — [§5.5](#55-value-kinds). `info_plist` may not name a usage-description, capability, external-reach or consumer-managed key; `usage_description` may name only a `*UsageDescription` one"
+
+  # §5.5's Platform column is normative: a kind is valid only in a table for
+  # the platform its row names.
+  [declarations."<platform>.requires.application_value.kind".value_platforms]
+  manifest_meta_data = "android"
+  manifest_placeholder = "android"
+  info_plist = "ios"
+  usage_description = "ios"
+  inline = "both"
+
+[declarations."<platform>.requires.application_value.key"]
+node = "field"
+type = "string"
+category = "requires"
+platform = "both"
+required = false
+required_when = "kind != 'inline'"
+forbidden_when = "kind == 'inline'"
+since = "1.0"
+section = "5.2"
+anchor = "52-values"
+description = "The platform key the value is written to. **Required** for every kind but `inline`, where it **MUST** be absent — an `inline` value is consumed by a contribution that references it or an action that `uses` it ([§5.5](#55-value-kinds))"
+
+[declarations."<platform>.requires.application_value.reason"]
+node = "field"
+type = "string"
+category = "requires"
+platform = "both"
+required = true
+since = "1.0"
+section = "5.2"
+anchor = "52-values"
+description = "**Required.** What the value is and where to obtain it"
+
+[declarations."<platform>.requires.application_value.placeholder"]
+node = "field"
+type = "string"
+category = "requires"
+platform = "both"
+required = false
+recommended = true
+since = "1.0"
+section = "5.2"
+anchor = "52-values"
+description = "**Recommended.** Text the consumer scaffolds; the build does not proceed while it stands"
+
+[declarations."<platform>.requires.application_value.conditional"]
+node = "field"
+type = "boolean"
+default = false
+category = "requires"
+platform = "both"
+required = false
+since = "1.0"
+section = "5.4"
+anchor = "54-how-a-requirement-is-satisfied"
+description = "Optional, default `false`. Unsatisfied and conditional is recorded, not failed"
+
+
+# ------------------------------------------------------------------ Actions ---
+
+[declarations."<platform>.requires.application_action"]
+node = "array_of_tables"
+category = "requires"
+platform = "both"
+required = false
+since = "1.0"
+section = "5.3"
+anchor = "53-actions"
+description = "An outcome the application must achieve"
+
+[declarations."<platform>.requires.application_action.id"]
+node = "field"
+type = "string"
+category = "requires"
+platform = "both"
+required = true
+unique_within = "platform_table_requirements"
+since = "1.0"
+section = "5.3"
+anchor = "53-actions"
+description = "**Required.** The join key; the application acknowledges by (distribution, `id`)"
+
+[declarations."<platform>.requires.application_action.summary"]
+node = "field"
+type = "string"
+category = "requires"
+platform = "both"
+required = true
+since = "1.0"
+section = "5.3"
+anchor = "53-actions"
+description = "**Required.** One line, imperative. What a report shows"
+
+[declarations."<platform>.requires.application_action.reason"]
+node = "field"
+type = "string"
+category = "requires"
+platform = "both"
+required = true
+since = "1.0"
+section = "5.3"
+anchor = "53-actions"
+description = "**Required.** Why it is needed, and what breaks without it"
+
+[declarations."<platform>.requires.application_action.instructions"]
+node = "field"
+type = "string"
+category = "requires"
+platform = "both"
+required = false
+hashed_input = true
+since = "1.0"
+section = "5.3"
+anchor = "53-actions"
+description = "Optional prose telling a reader how to do it. Never acted on by a consumer ([§5.6](#56-instructions-and-acceptance-criteria))"
+
+# A11: `acceptance` is an array of strings. §5.3's field table states no TOML
+# type for any action field; the type is read off its example and §5.6's "Each
+# item in `acceptance` is checked independently".
+[declarations."<platform>.requires.application_action.acceptance"]
+node = "field"
+type = "array"
+items = "string"
+category = "requires"
+platform = "both"
+required = false
+recommended = true
+hashed_input = true
+since = "1.0"
+section = "5.3"
+anchor = "53-actions"
+description = "**Recommended.** Statements of the **end state**, never of an operation"
+
+[declarations."<platform>.requires.application_action.uses"]
+node = "field"
+type = "array"
+items = "string"
+category = "requires"
+platform = "both"
+required = false
+resolves_to = "<platform>.requires.application_value.id"
+since = "1.0"
+section = "5.3"
+anchor = "53-actions"
+description = "Optional. Value `id`s in the same sidecar that this action consumes"
+
+[declarations."<platform>.requires.application_action.slot"]
+node = "field"
+type = "string"
+passthrough = true
+category = "requires"
+platform = "both"
+required = false
+merge = "report_together"
+since = "1.0"
+section = "5.7"
+anchor = "57-slots"
+description = "Optional. An opaque key naming a contended application-owned surface ([§5.7](#57-slots))"
+
+[declarations."<platform>.requires.application_action.conditional"]
+node = "field"
+type = "boolean"
+default = false
+category = "requires"
+platform = "both"
+required = false
+since = "1.0"
+section = "5.4"
+anchor = "54-how-a-requirement-is-satisfied"
+description = "Optional, default `false`"
+
+
+# -------------------------------------------------------------------- Owns ---
+
+[declarations."android.owns"]
+node = "table"
+category = "owns"
+platform = "android"
+required = false
+since = "1.0"
+section = "6.1"
+anchor = "61-ownership"
+
+[declarations."android.owns.java_namespaces"]
+node = "field"
+type = "array"
+items = "string"
+category = "owns"
+platform = "android"
+required = false
+required_when = "contributes java or kotlin source, producer-sourced components, or keep patterns"
+merge = "exclusive"
+since = "1.0"
+section = "6.1"
+anchor = "61-ownership"
+description = "Java namespaces this distribution claims exclusively; overlapping claims fail the build. Required when contributing Java/Kotlin, producer-sourced components, or keep patterns"
+
+
+# ---------------------------------------------------- Android contributions ---
+
+[declarations."android.contributes.src"]
+node = "table"
+category = "contributes"
+platform = "android"
+required = false
+since = "1.0"
+section = "6.2"
+anchor = "62-source"
+
+[declarations."android.contributes.src.java"]
+node = "field"
+type = "array"
+items = "string"
+category = "contributes"
+platform = "android"
+required = false
+since = "1.0"
+section = "6.2"
+anchor = "62-source"
+description = "Directories whose `.java` files the application's own toolchain compiles"
+
+[declarations."android.contributes.src.kotlin"]
+node = "field"
+type = "array"
+items = "string"
+category = "contributes"
+platform = "android"
+required = false
+since = "1.0"
+section = "6.2"
+anchor = "62-source"
+description = "Directories whose `.kt` files the application's own toolchain compiles"
+
+[declarations."android.contributes.gradle_dependencies"]
+node = "array_of_tables"
+category = "contributes"
+platform = "android"
+required = false
+exactly_one_of = ["coordinate", "module"]
+since = "1.0"
+section = "6.3"
+anchor = "63-gradle-dependencies"
+
+[declarations."android.contributes.gradle_dependencies.coordinate"]
+node = "field"
+type = "string"
+category = "contributes"
+platform = "android"
+required = false
+since = "1.0"
+section = "6.3"
+anchor = "63-gradle-dependencies"
+description = "`group:artifact:version`, exactly versioned. The version is visible in the sidecar, but it states no upper bound: Gradle may resolve past a major the producer never compiled against"
+
+[declarations."android.contributes.gradle_dependencies.module"]
+node = "field"
+type = "string"
+category = "contributes"
+platform = "android"
+required = false
+since = "1.0"
+section = "6.3"
+anchor = "63-gradle-dependencies"
+description = "`group:artifact`, paired with a bounded `version`. **Recommended** where the producer's own source compiles against the dependency, because `below` is the only way to say which major it cannot survive"
+
+[declarations."android.contributes.gradle_dependencies.version"]
+node = "field"
+type = "inline_table"
+table_keys = ["at_least", "below"]
+table_keys_required = ["at_least", "below"]
+table_value_type = "string"
+category = "contributes"
+platform = "android"
+required = false
+required_when = "module"
+forbidden_when = "coordinate"
+since = "1.0"
+section = "6.3"
+anchor = "63-gradle-dependencies"
+description = "**Required** with `module`, and **both** `at_least` (inclusive) and `below` (exclusive) are required within it. Open-ended and changing versions are invalid"
+
+[declarations."android.contributes.gradle_dependencies.configuration"]
+node = "field"
+type = "enum"
+values = ["implementation", "api", "compileOnly", "runtimeOnly"]
+closed = true
+default = "implementation"
+category = "contributes"
+platform = "android"
+required = false
+merge = "must_agree"
+since = "1.0"
+section = "6.3"
+anchor = "63-gradle-dependencies"
+description = "Optional; `implementation` (default), `api`, `compileOnly`, `runtimeOnly`. A **closed** set: processor configurations execute code at build time"
+
+[declarations."android.contributes.gradle_repositories"]
+node = "array_of_tables"
+category = "contributes"
+platform = "android"
+required = false
+at_least_one_of = ["groups", "modules"]
+identity = "url"
+since = "1.0"
+section = "6.4"
+anchor = "64-maven-repositories"
+
+[declarations."android.contributes.gradle_repositories.url"]
+node = "field"
+type = "string"
+scheme = "https"
+scheme_case_insensitive = true
+category = "contributes"
+platform = "android"
+required = true
+since = "1.0"
+section = "6.4"
+anchor = "64-maven-repositories"
+description = "A Maven repository to add to resolution, **`https` only** (scheme compared case-insensitively). The most powerful thing a sidecar can contribute"
+
+[declarations."android.contributes.gradle_repositories.reason"]
+node = "field"
+type = "string"
+category = "contributes"
+platform = "android"
+required = true
+merge = "keep_all_attributed"
+since = "1.0"
+section = "6.4"
+anchor = "64-maven-repositories"
+description = "**Required.** Why the artifacts are not on Maven Central, and — when authenticated — which credential is needed and where to get it"
+
+[declarations."android.contributes.gradle_repositories.groups"]
+node = "field"
+type = "array"
+items = "string"
+category = "contributes"
+platform = "android"
+required = false
+merge = "union"
+since = "1.0"
+section = "6.4"
+anchor = "64-maven-repositories"
+description = "**At least one of `groups`/`modules` required.** Bounds what the repository may serve, by **exact** match on a group ID — never a prefix, so `org.example` does not admit `org.example.tools`"
+
+[declarations."android.contributes.gradle_repositories.modules"]
+node = "field"
+type = "array"
+items = "string"
+category = "contributes"
+platform = "android"
+required = false
+merge = "union"
+since = "1.0"
+section = "6.4"
+anchor = "64-maven-repositories"
+description = "**At least one of `groups`/`modules` required.** Bounds the repository by **exact** match on a `group:artifact` pair"
+
+[declarations."android.contributes.gradle_repositories.credentials_required"]
+node = "field"
+type = "boolean"
+category = "contributes"
+platform = "android"
+required = false
+merge = "any_true"
+since = "1.0"
+section = "6.4"
+anchor = "64-maven-repositories"
+description = "Optional. Declares the repository authenticated. A sidecar **MUST NOT** contain the credential itself"
+
+[declarations."android.contributes.permissions"]
+node = "array_of_tables"
+category = "contributes"
+platform = "android"
+required = false
+merge = "union_widest"
+since = "1.0"
+section = "6.5"
+anchor = "65-permissions-and-features"
+
+[declarations."android.contributes.permissions.name"]
+node = "field"
+type = "string"
+passthrough = true
+category = "contributes"
+platform = "android"
+required = true
+since = "1.0"
+section = "6.5"
+anchor = "65-permissions-and-features"
+description = "The canonical manifest string — `android.permission.INTERNET`, never a shorthand"
+
+[declarations."android.contributes.permissions.reason"]
+node = "field"
+type = "string"
+category = "contributes"
+platform = "android"
+required = false
+recommended = true
+since = "1.0"
+section = "6.5"
+anchor = "65-permissions-and-features"
+description = "Recommended; carried into the record and report"
+
+[declarations."android.contributes.permissions.max_sdk_version"]
+node = "field"
+type = "integer"
+category = "contributes"
+platform = "android"
+required = false
+merge = "widest"
+since = "1.0"
+section = "6.5"
+anchor = "65-permissions-and-features"
+description = "Optional. `android:maxSdkVersion`. Minimization; where two distributions differ, the **widest** need wins and the merge is reported"
+
+[declarations."android.contributes.permissions.never_for_location"]
+node = "field"
+type = "boolean"
+category = "contributes"
+platform = "android"
+required = false
+merge = "all_must_assert"
+since = "1.0"
+section = "6.5"
+anchor = "65-permissions-and-features"
+description = "Optional. `android:usesPermissionFlags=\"neverForLocation\"`, and it holds only when **every** declaration of that permission asserts it"
+
+[declarations."android.contributes.features"]
+node = "array_of_tables"
+category = "contributes"
+platform = "android"
+required = false
+merge = "union"
+since = "1.0"
+section = "6.5"
+anchor = "65-permissions-and-features"
+
+[declarations."android.contributes.features.name"]
+node = "field"
+type = "string"
+passthrough = true
+category = "contributes"
+platform = "android"
+required = true
+since = "1.0"
+section = "6.5"
+anchor = "65-permissions-and-features"
+description = "Always registered `required=\"false\"`; only the application may promote a feature"
+
+[declarations."android.contributes.features.required"]
+node = "field"
+forbidden = true
+category = "contributes"
+platform = "android"
+since = "1.0"
+section = "6.5"
+anchor = "65-permissions-and-features"
+description = "**Not a field.** A producer **MUST NOT** declare it, and a consumer rejects it with a diagnostic naming this rule rather than the generic unknown-key one"
+
+[declarations."android.contributes.components"]
+node = "array_of_tables"
+category = "contributes"
+platform = "android"
+required = false
+merge = "unique_by_name"
+since = "1.0"
+section = "6.6"
+anchor = "66-manifest-components"
+
+[declarations."android.contributes.components.kind"]
+node = "field"
+type = "enum"
+values = ["service", "activity", "receiver"]
+closed = true
+category = "contributes"
+platform = "android"
+required = true
+since = "1.0"
+section = "6.6"
+anchor = "66-manifest-components"
+description = "`service`, `activity` or `receiver`. `provider` is deliberately absent: a provider runs before application code, which is the startup seam §11 defers"
+
+[declarations."android.contributes.components.name"]
+node = "field"
+type = "string"
+category = "contributes"
+platform = "android"
+required = true
+since = "1.0"
+section = "6.6"
+anchor = "66-manifest-components"
+description = "The class. Under an owned namespace unless `from_dependency` says otherwise"
+
+[declarations."android.contributes.components.from_dependency"]
+node = "field"
+type = "string"
+category = "contributes"
+platform = "android"
+required = false
+resolves_to = "android.contributes.gradle_dependencies"
+since = "1.0"
+section = "6.6"
+anchor = "66-manifest-components"
+description = "`group:artifact` of a dependency the same sidecar declares, which owns the class"
+
+[declarations."android.contributes.components.foreground_service_type"]
+node = "field"
+type = "string"
+passthrough = true
+category = "contributes"
+platform = "android"
+required = false
+valid_when = "kind == 'service'"
+since = "1.0"
+section = "6.6"
+anchor = "66-manifest-components"
+description = "Android's own value, on a `service` only. Mandatory on Android 14+ for a foreground service"
+
+[declarations."android.contributes.components.exported_required"]
+node = "field"
+type = "boolean"
+category = "contributes"
+platform = "android"
+required = false
+since = "1.0"
+section = "6.6"
+anchor = "66-manifest-components"
+description = "Requests export. The build fails without explicit application approval — it never falls back to unexported"
+
+[declarations."android.contributes.components.reason"]
+node = "field"
+type = "string"
+category = "contributes"
+platform = "android"
+required = false
+required_when = "exported_required"
+since = "1.0"
+section = "6.6"
+anchor = "66-manifest-components"
+description = "**Required when `exported_required` is present.** Why the component is useless unless reachable"
+
+[declarations."android.contributes.components.exported"]
+node = "field"
+forbidden = true
+category = "contributes"
+platform = "android"
+since = "1.0"
+section = "6.6"
+anchor = "66-manifest-components"
+description = "**Not a field.** Components are registered `android:exported=\"false\"` by default and a producer **MUST NOT** declare export directly; use `exported_required`"
+
+[declarations."android.contributes.components.view_links"]
+node = "array_of_tables"
+category = "contributes"
+platform = "android"
+required = false
+valid_when = "kind == 'activity' and exported_required"
+open_keys = true
+open_key_pattern = '[a-z][a-z0-9]*(_[a-z0-9]+)*'
+since = "1.0"
+section = "6.6"
+anchor = "66-manifest-components"
+description = "Generates the browser-return filter. Valid only on an exported activity; values are strings, literal or inline. The **attribute names are open** — the one place an unrecognized key is written through rather than rejected — and snake case converts to the platform's name mechanically ([§6.6](#66-manifest-components))"
+
+[declarations."android.contributes.components.view_links.scheme"]
+node = "field"
+type = "string_or_inline_reference"
+passthrough = true
+category = "contributes"
+platform = "android"
+required = true
+since = "1.0"
+section = "6.6"
+anchor = "66-manifest-components"
+description = "**Required.** The only `<data>` attribute a `view_links` entry must carry. `host`, `port`, `path`, `path_prefix`, `path_pattern`, `path_suffix`, `mime_type` and every other attribute the platform defines are equally declarable"
+
+[declarations."android.contributes.components.intent_filters"]
+node = "array_of_tables"
+category = "contributes"
+platform = "android"
+required = false
+valid_when = "not exported_required and no view_links"
+since = "1.0"
+section = "6.6"
+anchor = "66-manifest-components"
+
+[declarations."android.contributes.components.intent_filters.action"]
+node = "field"
+type = "string"
+passthrough = true
+category = "contributes"
+platform = "android"
+required = true
+since = "1.0"
+section = "6.6"
+anchor = "66-manifest-components"
+description = "One vendor-defined action, on a component that is neither exported nor carrying `view_links`. Exactly one per filter; no categories and no data element"
+
+[declarations."android.contributes.r8"]
+node = "table"
+category = "contributes"
+platform = "android"
+required = false
+since = "1.0"
+section = "6.7"
+anchor = "67-shrinker-keep-patterns"
+
+[declarations."android.contributes.r8.keep_classes"]
+node = "field"
+type = "array"
+items = "string"
+category = "contributes"
+platform = "android"
+required = false
+merge = "union"
+since = "1.0"
+section = "6.7"
+anchor = "67-shrinker-keep-patterns"
+description = "Class patterns the shrinker must keep; the consumer generates the `-keep` rules. Each must fall within an owned namespace, by its wildcard-free literal prefix"
+
+[declarations."android.contributes.r8.keep"]
+node = "array_of_tables"
+category = "contributes"
+platform = "android"
+required = false
+merge = "union"
+since = "1.0"
+section = "6.7"
+anchor = "67-shrinker-keep-patterns"
+
+[declarations."android.contributes.r8.keep.pattern"]
+node = "field"
+type = "string"
+category = "contributes"
+platform = "android"
+required = true
+since = "1.0"
+section = "6.7"
+anchor = "67-shrinker-keep-patterns"
+description = "**Required.** Keeps a *dependency's* classes instead of an owned namespace's, checked against what the resolved artifact actually contains"
+
+# A9: `from_dependency` is what makes this the second keep form, so it is
+# required. An entry without one would be a second spelling of `keep_classes`.
+[declarations."android.contributes.r8.keep.from_dependency"]
+node = "field"
+type = "string"
+category = "contributes"
+platform = "android"
+required = true
+resolves_to = "android.contributes.gradle_dependencies"
+since = "1.0"
+section = "6.7"
+anchor = "67-shrinker-keep-patterns"
+description = "**Required.** `group:artifact` of a dependency the same sidecar declares; the pattern is evaluated against the effective compilation classpath and rejected where it matches a class from outside that dependency"
+
+[declarations."android.contributes.meta_data"]
+node = "array_of_tables"
+category = "contributes"
+platform = "android"
+required = false
+merge = "coalesce_or_fail"
+since = "1.0"
+section = "6.8"
+anchor = "68-manifest-meta-data"
+
+[declarations."android.contributes.meta_data.key"]
+node = "field"
+type = "string"
+passthrough = true
+category = "contributes"
+platform = "android"
+required = true
+since = "1.0"
+section = "6.8"
+anchor = "68-manifest-meta-data"
+description = "The manifest entry's name, written exactly as the vendor code reads it. **Not** scoped by the declaring distribution, and it shares one key space with [§5.2](#52-values)'s `manifest_meta_data` delivery"
+
+[declarations."android.contributes.meta_data.value"]
+node = "field"
+type = ["string", "integer", "boolean"]
+category = "contributes"
+platform = "android"
+required = true
+since = "1.0"
+section = "6.8"
+anchor = "68-manifest-meta-data"
+description = "**Required.** A string, integer or boolean, mapped to `android:value` as the text verbatim, the digits, or `true`/`false`. Equality is by type as well as content, and the application's own entry wins"
+
+[declarations."android.contributes.meta_data.reason"]
+node = "field"
+type = "string"
+category = "contributes"
+platform = "android"
+required = true
+since = "1.0"
+section = "6.8"
+anchor = "68-manifest-meta-data"
+description = "**Required.** The key is global, its effect is invisible in Python, and the report is where an application sees what a transitive dependency turned on"
+
+[declarations."android.contributes.queries"]
+node = "array_of_tables"
+category = "contributes"
+platform = "android"
+required = false
+exactly_one_of = ["package", "provider_authority"]
+merge = "union"
+since = "1.0"
+section = "6.9"
+anchor = "69-package-visibility"
+
+[declarations."android.contributes.queries.package"]
+node = "field"
+type = "string"
+category = "contributes"
+platform = "android"
+required = false
+since = "1.0"
+section = "6.9"
+anchor = "69-package-visibility"
+description = "An application ID. **Exactly one** of `package` or `provider_authority` is required"
+
+[declarations."android.contributes.queries.provider_authority"]
+node = "field"
+type = "string"
+category = "contributes"
+platform = "android"
+required = false
+since = "1.0"
+section = "6.9"
+anchor = "69-package-visibility"
+description = "A content provider authority. **Exactly one** of `package` or `provider_authority` is required"
+
+[declarations."android.contributes.queries.reason"]
+node = "field"
+type = "string"
+category = "contributes"
+platform = "android"
+required = true
+since = "1.0"
+section = "6.9"
+anchor = "69-package-visibility"
+description = "**Required.** Package visibility for the producer's own code. No veto, because removing one breaks the producer silently"
+
+
+# -------------------------------------------------------- iOS contributions ---
+
+[declarations."ios.contributes.swift_packages"]
+node = "array_of_tables"
+category = "contributes"
+platform = "ios"
+required = false
+identity = "url"
+since = "1.0"
+section = "7.2"
+anchor = "72-swift-packages"
+
+[declarations."ios.contributes.swift_packages.name"]
+node = "field"
+type = "string"
+category = "contributes"
+platform = "ios"
+required = true
+unique_within = "sidecar"
+since = "1.0"
+section = "7.2"
+anchor = "72-swift-packages"
+description = "**Required.** Local handle, unique within the sidecar; [§7.5](#75-python-modules) refers to packages by it"
+
+[declarations."ios.contributes.swift_packages.url"]
+node = "field"
+type = "string"
+scheme = "https"
+scheme_case_insensitive = true
+category = "contributes"
+platform = "ios"
+required = true
+since = "1.0"
+section = "7.2"
+anchor = "72-swift-packages"
+description = "The package repository. **Required**, and **MUST** be `https`"
+
+[declarations."ios.contributes.swift_packages.products"]
+node = "field"
+type = "array"
+items = "string"
+min_items = 1
+category = "contributes"
+platform = "ios"
+required = true
+merge = "union"
+since = "1.0"
+section = "7.2"
+anchor = "72-swift-packages"
+description = "**Required**, non-empty. Which of the package's products the application target links"
+
+[declarations."ios.contributes.swift_packages.requirement"]
+node = "field"
+type = "inline_table"
+table_keys = ["exact", "from", "revision"]
+table_keys_exactly_one = true
+table_value_type = "string"
+closed = true
+category = "contributes"
+platform = "ios"
+required = true
+since = "1.0"
+section = "7.2"
+anchor = "72-swift-packages"
+description = "Exactly one of `{ exact }`, `{ from }`, `{ revision }`. `branch` is invalid"
+
+[declarations."ios.contributes.swift_packages.credentials_required"]
+node = "field"
+type = "boolean"
+category = "contributes"
+platform = "ios"
+required = false
+merge = "any_true"
+since = "1.0"
+section = "7.2"
+anchor = "72-swift-packages"
+description = "Optional. Declares the repository authenticated; [§6.4](#64-maven-repositories)'s credential rules apply unchanged"
+
+# A10: optional, accepted and unused where `credentials_required` is absent.
+# SPEC.md §7.2 states only the required half; Appendix B carries "unused
+# otherwise", and §7.2 now says so too.
+[declarations."ios.contributes.swift_packages.reason"]
+node = "field"
+type = "string"
+category = "contributes"
+platform = "ios"
+required = false
+required_when = "credentials_required"
+merge = "keep_all_attributed"
+since = "1.0"
+section = "7.2"
+anchor = "72-swift-packages"
+description = "**Required when `credentials_required` is set**, and unused otherwise: which credential is needed and where to obtain it"
+
+[declarations."ios.contributes.src"]
+node = "table"
+category = "contributes"
+platform = "ios"
+required = false
+since = "1.0"
+section = "7.3"
+anchor = "73-source"
+
+[declarations."ios.contributes.src.swift"]
+node = "field"
+type = "array"
+items = "string"
+category = "contributes"
+platform = "ios"
+required = false
+since = "1.0"
+section = "7.3"
+anchor = "73-source"
+description = "Directories of `.swift` staged into the application target. For small shims only"
+
+[declarations."ios.contributes.src.symbol_prefixes"]
+node = "field"
+type = "array"
+items = "string"
+category = "contributes"
+platform = "ios"
+required = false
+valid_when = "the sidecar contributes Swift source"
+since = "1.0"
+section = "7.1"
+anchor = "71-symbol-prefixes"
+description = "Prefixes the producer puts on its contributed Swift type names ([§7.1](#71-symbol-prefixes)). Guidance only; it does not cover file-scope functions or extension members, and it is invalid without contributed source"
+
+[declarations."ios.contributes.accessed_api_types"]
+node = "array_of_tables"
+category = "contributes"
+platform = "ios"
+required = false
+valid_when = "the sidecar contributes Swift source"
+merge = "union_dedup_by_type"
+since = "1.0"
+section = "7.3"
+anchor = "73-source"
+heading = "`[[ios.contributes.accessed_api_types]]`"
+heading_suffix = "— a sibling of `src`, not a child of it"
+
+[declarations."ios.contributes.accessed_api_types.type"]
+node = "field"
+type = "string"
+passthrough = true
+category = "contributes"
+platform = "ios"
+required = true
+since = "1.0"
+section = "7.3"
+anchor = "73-source"
+description = "**Required.** Apple's canonical string for a required-reason API category, written exactly as Apple defines it. Valid only in a sidecar that also contributes Swift source"
+
+[declarations."ios.contributes.accessed_api_types.reasons"]
+node = "field"
+type = "array"
+items = "string"
+passthrough = true
+category = "contributes"
+platform = "ios"
+required = true
+merge = "union_dedup"
+since = "1.0"
+section = "7.3"
+anchor = "73-source"
+description = "**Required.** Apple's canonical reason codes, merged into the application's `PrivacyInfo.xcprivacy` and de-duplicated per `type`"
+
+[declarations."ios.contributes.accessed_api_types.reason"]
+node = "field"
+type = "string"
+category = "contributes"
+platform = "ios"
+required = false
+recommended = true
+since = "1.0"
+section = "7.3"
+anchor = "73-source"
+description = "Recommended prose. Apple's codes are opaque by design, and the record is where an application reads what its dependencies claim"
+
+[declarations."ios.contributes.info_plist"]
+node = "table"
+category = "contributes"
+platform = "ios"
+required = false
+since = "1.0"
+section = "7.4"
+anchor = "74-infoplist"
+
+[declarations."ios.contributes.info_plist.values"]
+node = "open_table"
+open_keys = true
+value_type = "plist_scalar"
+category = "contributes"
+platform = "ios"
+required = false
+merge = "coalesce_or_fail"
+refuses = ["usage_description_suffix", "capability_keys", "consumer_managed_keys", "skadnetwork_items"]
+since = "1.0"
+section = "7.4"
+anchor = "74-infoplist"
+description = "Scalar keys set verbatim. Collisions fail; `*UsageDescription`, capability, external-reach and consumer-managed keys are rejected. A key occupies **one** mode across the effective set — scalar here or through an `info_plist` value ([§5.5](#55-value-kinds)), array under `append` — and claimed both ways it fails"
+
+[declarations."ios.contributes.info_plist.append"]
+node = "open_table"
+open_keys = true
+value_type = "plist_array"
+category = "contributes"
+platform = "ios"
+required = false
+merge = "union_ordered"
+refuses = ["capability_keys", "consumer_managed_keys", "skadnetwork_items"]
+since = "1.0"
+section = "7.4"
+anchor = "74-infoplist"
+description = "Array keys merged with the application's and other producers', de-duplicated in a deterministic order. Rejects the same capability, external-reach and consumer-managed keys `values` does, and claims the key as an array for the one-mode rule above"
+
+[declarations."ios.contributes.info_plist.skadnetwork_identifiers"]
+node = "field"
+type = "array"
+items = "string"
+pattern = '[a-z0-9]+\.skadnetwork'
+category = "contributes"
+platform = "ios"
+required = false
+merge = "union_ordered"
+since = "1.0"
+section = "7.4"
+anchor = "74-infoplist"
+description = "Ad network identifiers, lowercase and ending `.skadnetwork`. The consumer renders `SKAdNetworkItems` from them"
+
+[declarations."ios.contributes.python_modules"]
+node = "array_of_tables"
+category = "contributes"
+platform = "ios"
+required = false
+merge = "unique_by_name"
+since = "1.0"
+section = "7.5"
+anchor = "75-python-modules"
+
+[declarations."ios.contributes.python_modules.name"]
+node = "field"
+type = "string"
+pattern = '[A-Za-z_][A-Za-z0-9_]*'
+category = "contributes"
+platform = "ios"
+required = true
+since = "1.0"
+section = "7.5"
+anchor = "75-python-modules"
+description = "**Required.** The name Python imports. A single ASCII identifier, no dots"
+
+[declarations."ios.contributes.python_modules.swift_package"]
+node = "field"
+type = "string"
+category = "contributes"
+platform = "ios"
+required = true
+resolves_to = "ios.contributes.swift_packages.name"
+since = "1.0"
+section = "7.5"
+anchor = "75-python-modules"
+description = "**Required.** A package the same sidecar declares, which implements the module"
+
+[declarations."ios.contributes.python_modules.init"]
+node = "field"
+type = "string"
+pattern = '[A-Za-z_][A-Za-z0-9_]*'
+default_template = "PyInit_<name>"
+category = "contributes"
+platform = "ios"
+required = false
+since = "1.0"
+section = "7.5"
+anchor = "75-python-modules"
+description = "Optional initialization symbol; defaults to `PyInit_<name>`"
+
+[declarations."ios.contributes"]
+node = "table"
+category = "contributes"
+platform = "ios"
+required = false
+since = "1.0"
+section = "7.6"
+anchor = "76-objective-c-categories"
+
+[declarations."ios.contributes.objc_categories"]
+node = "field"
+type = "boolean"
+only_true = true
+category = "contributes"
+platform = "ios"
+required = false
+merge = "union"
+since = "1.0"
+section = "7.6"
+anchor = "76-objective-c-categories"
+description = "Optional boolean, and only `true` is valid — a consumer rejects `false`. The consumer links the application target so Objective-C categories in static libraries are loaded. Names the behavior, not the flag; no veto"
+
+
+# --------------------------------------------------------- Refusal registers ---
+#
+# Fixed string lists SPEC.md gives normative weight, which are not declaration
+# keys and so cannot be rows above. The schema generator reads them; §4.3's
+# under-declaration rule reads their `since`.
+
+[registers.capability_keys]
+section = "7.4"
+anchor = "74-infoplist"
+since = "1.0"
+closed = true
+members = [
+  "UIBackgroundModes",
+  "UIRequiredDeviceCapabilities",
+  "CFBundleURLTypes",
+  "NSUserActivityTypes",
+]
+
+# A5: closed at four. §5.5 spells the same set with "such as"; §7.4 enumerates
+# it, and a consumer-dependent set would let two consumers reject different
+# sidecars.
+[registers.consumer_managed_keys]
+section = "7.4"
+anchor = "74-infoplist"
+since = "1.0"
+closed = true
+members = [
+  "CFBundleIdentifier",
+  "CFBundleShortVersionString",
+  "CFBundleVersion",
+  "MinimumOSVersion",
+]
+
+[registers.reserved_namespaces]
+section = "6.1"
+anchor = "61-ownership"
+since = "1.0"
+closed = false
+extended_by = "any namespace the consumer's own bootstrap occupies"
+members = [
+  "org.kivy.android",
+  "org.libsdl.app",
+  "org.jnius",
+  "org.renpy.android",
+  "com.chaquo.python",
+  "org.beeware.android",
+]
+
+[registers.packaging_metadata_names]
+section = "9.7"
+anchor = "97-packaging-collisions"
+since = "1.0"
+closed = true
+directly_under = "META-INF/"
+members = ["MANIFEST.MF", "INDEX.LIST", "DEPENDENCIES"]
+suffixed_members = ["LICENSE", "LICENSE.txt", "LICENSE.md", "NOTICE", "NOTICE.txt", "NOTICE.md"]
+signature_patterns = ["*.SF", "*.DSA", "*.RSA", "*.EC"]
+
+
+# ------------------------------------------------------------- Constraints ---
+#
+# Rules between keys rather than properties of one, which is why they are not
+# rows above. The set of `rule` values is deliberately tiny and closed: each is
+# something a JSON Schema `if`/`then` can express, which is the boundary Phase 1
+# draws. Anything needing the dependency closure, the wheel's files, or another
+# sidecar is a semantic rule and belongs in code.
+
+[[constraints]]
+scope = "<platform>.requires.application_value"
+rule = "required_unless_equals"
+field = "key"
+other = "kind"
+value = "inline"
+section = "5.2"
+
+[[constraints]]
+scope = "<platform>.requires.application_value"
+rule = "forbidden_if_equals"
+field = "key"
+other = "kind"
+value = "inline"
+section = "5.5"
+
+[[constraints]]
+scope = "android.contributes.gradle_dependencies"
+rule = "required_if_present"
+field = "version"
+other = "module"
+section = "6.3"
+
+[[constraints]]
+scope = "android.contributes.gradle_dependencies"
+rule = "forbidden_if_present"
+field = "version"
+other = "coordinate"
+section = "6.3"
+
+[[constraints]]
+scope = "android.contributes.components"
+rule = "required_if_present"
+field = "reason"
+other = "exported_required"
+section = "6.6"
+
+[[constraints]]
+scope = "android.contributes.components"
+rule = "requires_equals"
+field = "foreground_service_type"
+other = "kind"
+value = "service"
+section = "6.6"
+
+[[constraints]]
+scope = "android.contributes.components"
+rule = "requires_equals"
+field = "view_links"
+other = "kind"
+value = "activity"
+section = "6.6"
+
+[[constraints]]
+scope = "android.contributes.components"
+rule = "requires_equals"
+field = "view_links"
+other = "exported_required"
+value = true
+section = "6.6"
+
+[[constraints]]
+scope = "android.contributes.components"
+rule = "forbidden_if_present"
+field = "intent_filters"
+other = "exported_required"
+section = "6.6"
+
+[[constraints]]
+scope = "android.contributes.components"
+rule = "forbidden_if_present"
+field = "intent_filters"
+other = "view_links"
+section = "6.6"
