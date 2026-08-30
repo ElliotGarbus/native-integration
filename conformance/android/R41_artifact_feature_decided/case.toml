@@ -22,6 +22,11 @@ outcome = "accept"
 diagnostics = []
 advisories  = []
 
-assertions  = []
+# Recording the decision is half of it. §9.4 makes the decision the gate on what
+# ships, and `optional` is what keeps the application on hardware the artifact
+# declared it needs -- so the assertion checks that the effective manifest
+# carries `android:required="false"`, rather than reading the record's own
+# statement of the decision as evidence that the decision was applied.
+assertions  = ["artifact_feature_decision_applied"]
 
 record = "android.record"

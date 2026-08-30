@@ -270,6 +270,8 @@ labelled so that nobody reads testimony as evidence.
 | `sidecar_excluded_from_payload` | 6 — the sidecar directory reaches no device payload | **verified** |
 | `contributed_source_excluded_from_payload` | 24 — the source the sidecars contribute, by name or by bytes; an application's own `.java` is not checked, because no requirement forbids it | **verified** |
 | `python_module_stubs_excluded` | 36 — `<name>.py` and `<name>.pyi` | **verified** |
+| `view_link_attributes_written_through` | 30 — every view-link attribute reaches the manifest, including one this document does not list | **verified** |
+| `artifact_feature_decision_applied` | 41 — the application's decision reaches the manifest, and not only the record | **verified** |
 | `no_producer_import` | 3 | attested |
 | `every_diagnostic_names_a_distribution` | 18 | attested, and largely superseded — `diagnostics` carries the names now, and the corpus checks them |
 | `instructions_attributed_to_producer` | 21 | attested |
@@ -281,10 +283,20 @@ labelled so that nobody reads testimony as evidence.
 | `activity_extends_component_activity` | 45 | attested |
 | `url_callback_observable` | 46 | attested |
 
-Closing the attested list means giving the harness something to look at — a
-generated project it can parse, not a boolean. That is a larger interface than
-this corpus should define on its own, and pretending otherwise would be the
-overstatement §8.5's note warns about.
+An assertion is verified by naming an output the harness can read. Two exist:
+`<outputs>/payload/`, the assembled Python payload, and `<outputs>/manifest.xml`,
+the effective merged manifest. They are deliberately few — the corpus should not
+specify a consumer's generated project, and each file it does read is a piece of
+interface this document defines on its own authority rather than §8's.
+
+Where a requirement is about what ends up in one of those two, the assertion is
+verified there. `view_link_attributes_written_through` and
+`artifact_feature_decision_applied` are both that case, and both are ones a
+record cannot show: R30's record carries `ssp_prefix` in the **sidecar's**
+spelling precisely so it does not depend on the conversion, and R41's record
+states the decision rather than its effect. Closing the rest of the list means
+reading more of a generated project than this corpus should define, and
+pretending otherwise would be the overstatement §8.5's note warns about.
 
 A consumer that cannot observe an assertion reports it **unverified** rather
 than passing it, and a run with any unverified case exits non-zero. The
@@ -392,8 +404,15 @@ stdout with one JSON object:
   of resolving; one that cannot reports every case needing one as **unverified**
   rather than failing it.
 - **The output directory** is what turns an assertion from a claim into a
-  check. A consumer writing its assembled Python payload to `<outputs>/payload/`
-  has the three verified assertions checked against those files.
+  check. Two paths in it are read:
+
+  | | |
+  | --- | --- |
+  | `<outputs>/payload/` | the assembled Python payload, as it would ship |
+  | `<outputs>/manifest.xml` | the effective merged manifest, for an Android case |
+
+  A consumer that writes neither reports every verified assertion as
+  **unverified**, which is non-zero — not a pass.
 
 The consumer under test supplies the command. Nothing here imports a consumer,
 and nothing here is a consumer.

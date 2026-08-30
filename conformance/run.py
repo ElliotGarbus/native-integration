@@ -28,8 +28,10 @@ disagrees with what it reported has contradicted itself, and that is a failure
 rather than something to resolve by preferring one of the two.
 
 **An assertion is verified here where it can be.** The consumer is handed an
-output directory and writes what it produced into it; the payload assertions are
-then checked against those files rather than taken on the consumer's word.
+output directory and writes what it produced into it -- the assembled payload
+under `payload/`, the effective merged manifest as `manifest.xml` -- and the
+assertions about those are checked against them rather than taken on the
+consumer's word.
 Assertions with no adapter are marked *attested* in `README.md` and remain the
 consumer's claim — labelled, so that nobody mistakes testimony for evidence.
 
@@ -57,6 +59,7 @@ import subprocess
 import sys
 import tempfile
 import tomllib
+import xml.etree.ElementTree as ElementTree
 from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
@@ -614,8 +617,8 @@ def run_consumer(command: list[str], case: Case, outputs: Path) -> tuple[int, di
     Two arguments: the case's `input/`, and an output directory to write what it
     produced into. The second is what lets an assertion be checked rather than
     believed — a consumer that writes its assembled payload to
-    `<outputs>/payload/` has the payload assertions verified against the files
-    themselves.
+    `<outputs>/payload/` and its effective manifest to `<outputs>/manifest.xml`
+    has the assertions about those verified against the files themselves.
     """
     outputs.mkdir(parents=True, exist_ok=True)
     # A consumer that hangs, or that cannot be launched at all, is a failed case
@@ -691,9 +694,17 @@ def malformed(reported: object) -> str | None:
     return None
 
 
-#: Assertions the harness verifies itself, against the payload a consumer wrote
-#: into its output directory. Everything else in README.md's table is *attested*
-#: — the consumer's own claim, which is evidence of intent and not of behaviour.
+#: Assertions the harness verifies itself, against what a consumer wrote into
+#: its output directory. Everything else in README.md's table is *attested* —
+#: the consumer's own claim, which is evidence of intent and not of behaviour.
+#:
+#: An adapter returns None where the assertion holds, a string naming the
+#: failure where it does not, and `Unverifiable` where the consumer produced
+#: nothing to look at. The third is not a pass: a numbered requirement went
+#: unchecked, and §8.5's note is that an obligation quietly skipped is how a
+#: conformance claim overstates itself.
+class Unverifiable(str):
+    """Nothing was produced to check this against."""
 
 
 def payload_files(outputs: Path) -> list[Path] | None:
@@ -701,6 +712,97 @@ def payload_files(outputs: Path) -> list[Path] | None:
     if not payload.is_dir():
         return None
     return [p for p in payload.rglob("*") if p.is_file()]
+
+
+ANDROID = "{http://schemas.android.com/apk/res/android}"
+
+
+def manifest_elements(outputs: Path) -> list[ElementTree.Element] | None:
+    """Every element of the effective manifest the consumer wrote, or None.
+
+    `<outputs>/manifest.xml` is the one piece of the generated project this
+    harness reads. Two numbered requirements are about what ends up in that
+    file and nothing else — §6.6's pass-through of an attribute the consumer
+    does not recognize, and §9.4's decision about a resolved artifact's required
+    feature — and a boolean from the consumer saying "yes, I did that" is
+    testimony about the very step in question.
+    """
+    document = outputs / "manifest.xml"
+    if not document.is_file():
+        return None
+    try:
+        return list(ElementTree.fromstring(document.read_text(encoding="utf-8")).iter())
+    except (ElementTree.ParseError, UnicodeDecodeError):
+        return []
+
+
+def camel(key: str) -> str:
+    """`ssp_prefix` is `android:sspPrefix`, which is §6.6's mechanical rule."""
+    head, *rest = key.split("_")
+    return head + "".join(part.title() for part in rest)
+
+
+def verify_view_links_written_through(case: Case, outputs: Path) -> str | None:
+    """Requirement 30, via §6.6: every view-link attribute reaches the manifest.
+
+    Including the ones this document does not list. §6.6 hands the names to
+    Android, which adds to them, so what is checked here is derived from the
+    sidecar rather than from any vocabulary of ours — a consumer that dropped
+    an attribute it did not recognize would leave a link that never matches,
+    and would otherwise pass by reporting the attribute in the record.
+
+    One element has to carry the whole link. Android matches a `<data>` tag's
+    attributes together, so a consumer that spread one link's `scheme`, `host`
+    and `sspPrefix` across three tags has written a different filter.
+    """
+    elements = manifest_elements(outputs)
+    if elements is None:
+        return Unverifiable("the consumer wrote no manifest.xml to inspect")
+    for sidecar in case.input_directory.glob("*/*/_native/native.toml"):
+        document = tomllib.loads(sidecar.read_text(encoding="utf-8"))
+        components = document.get("android", {}).get("contributes", {}).get(
+            "components", []
+        )
+        for component in components:
+            for link in component.get("view_links", []):
+                wanted = {f"{ANDROID}{camel(k)}": str(v) for k, v in link.items()}
+                if not any(
+                    wanted.items() <= element.attrib.items() for element in elements
+                ):
+                    stated = " ".join(f"{k}={v}" for k, v in sorted(link.items()))
+                    return f"no element of manifest.xml carries the view link {stated}"
+    return None
+
+
+def verify_feature_decision_applied(case: Case, outputs: Path) -> str | None:
+    """Requirement 41, via §9.4: the application's decision reaches the manifest.
+
+    §9.4 makes the decision the gate, and both answers change what ships —
+    `optional` is what keeps the application on hardware the artifact declared
+    it needs. A consumer that recorded the decision and merged the artifact's
+    own `required="true"` anyway has recorded an intention it did not carry out,
+    which is exactly the shape §9.4's note warns about.
+    """
+    elements = manifest_elements(outputs)
+    if elements is None:
+        return Unverifiable("the consumer wrote no manifest.xml to inspect")
+    application = tomllib.loads(
+        (case.input_directory / "application.toml").read_text(encoding="utf-8")
+    )
+    decided = application.get("answers", {}).get("artifact_features", {})
+    for name, answer in decided.items():
+        required = "true" if answer.get("keep") == "required" else "false"
+        if not any(
+            element.tag == "uses-feature"
+            and element.get(f"{ANDROID}name") == name
+            and element.get(f"{ANDROID}required") == required
+            for element in elements
+        ):
+            return (
+                f"manifest.xml has no <uses-feature> for {name} with "
+                f'android:required="{required}", which the application decided'
+            )
+    return None
 
 
 def verify_sidecar_excluded(case: Case, files: list[Path]) -> str | None:
@@ -769,10 +871,24 @@ def verify_module_stubs_excluded(case: Case, files: list[Path]) -> str | None:
     return None if not offenders else f"the payload carries {offenders[0].name}"
 
 
+def against_payload(adapter):
+    """Adapt a payload check to the `(case, outputs)` an adapter is called with."""
+
+    def verify(case: Case, outputs: Path) -> str | None:
+        files = payload_files(outputs)
+        if files is None:
+            return Unverifiable("the consumer wrote no payload to inspect")
+        return adapter(case, files)
+
+    return verify
+
+
 VERIFIED_ASSERTIONS = {
-    "sidecar_excluded_from_payload": verify_sidecar_excluded,
-    "contributed_source_excluded_from_payload": verify_source_excluded,
-    "python_module_stubs_excluded": verify_module_stubs_excluded,
+    "sidecar_excluded_from_payload": against_payload(verify_sidecar_excluded),
+    "contributed_source_excluded_from_payload": against_payload(verify_source_excluded),
+    "python_module_stubs_excluded": against_payload(verify_module_stubs_excluded),
+    "view_link_attributes_written_through": verify_view_links_written_through,
+    "artifact_feature_decision_applied": verify_feature_decision_applied,
 }
 
 
@@ -837,23 +953,19 @@ def check(case: Case, exit_code: int, reported: dict, outputs: Path) -> Result:
 
     # Axis 3 — postconditions.
     vouched = reported.get("assertions", {})
-    files = payload_files(outputs)
     for assertion in case.spec.get("assertions", []):
         state = vouched.get(assertion)
         adapter = VERIFIED_ASSERTIONS.get(assertion)
         if adapter is not None:
-            if files is None:
-                unverified.append(
-                    f"assertion {assertion}: the consumer wrote no payload to inspect"
-                )
-                continue
-            failure = adapter(case, files)
-            if failure:
+            failure = adapter(case, outputs)
+            if isinstance(failure, Unverifiable):
+                unverified.append(f"assertion {assertion}: {failure}")
+            elif failure:
                 problems.append(f"assertion {assertion}: {failure}")
             elif state is False:
                 problems.append(
-                    f"assertion {assertion}: the consumer reports it unmet, and the "
-                    "payload it wrote satisfies it"
+                    f"assertion {assertion}: the consumer reports it unmet, and what "
+                    "it wrote satisfies it"
                 )
             continue
         if state is True:

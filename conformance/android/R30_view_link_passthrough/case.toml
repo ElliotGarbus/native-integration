@@ -22,6 +22,11 @@ outcome = "accept"
 
 diagnostics = []
 advisories  = []
-assertions  = []
+# The record carries `ssp_prefix` in the sidecar's own spelling, which is what
+# keeps the record independent of the conversion -- so the record alone cannot
+# show the conversion happened. The assertion is what does: `run.py` reads the
+# effective manifest the consumer wrote and looks for one element carrying the
+# whole link, `android:sspPrefix` included.
+assertions  = ["view_link_attributes_written_through"]
 
 record = "android.record"

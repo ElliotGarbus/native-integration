@@ -1467,6 +1467,14 @@ check("the schema refuses what SPEC.md refuses, for the stated reason", problems
 sys.path.insert(0, str(ROOT / "conformance"))
 import run as conformance_run  # noqa: E402
 
+DOCUMENTED_ASSERTIONS = set(
+    re.findall(
+        r"^\| `([a-z_]+)`",
+        (ROOT / "conformance" / "README.md").read_text(encoding="utf-8"),
+        re.M,
+    )
+)
+
 problems = []
 
 # The fact table is TOML, where a sub-table header swallows every key after it.
@@ -1524,6 +1532,13 @@ for path in sorted((ROOT / "conformance").glob("*/*/case.toml")):
     # §8.1 assigns each numbered requirement to exactly one profile, and the
     # generated diagnostics carry that assignment. A case filed elsewhere would
     # be handed to a consumer that never owed the requirement.
+    # An assertion is a name README.md's table defines. A misspelt one is not
+    # a failure anywhere: no consumer reports it, so the case goes unverified
+    # for a reason that has nothing to do with the consumer.
+    for assertion in case.get("assertions", []):
+        if assertion not in DOCUMENTED_ASSERTIONS:
+            problems.append(f"{where}: asserts {assertion!r}, which README.md's table does not name")
+
     identifier = f"ni.req.{case.get('requirement')}"
     if identifier in DIAGNOSTICS:
         owner = DIAGNOSTICS[identifier]["profile"]
