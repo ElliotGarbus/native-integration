@@ -25,16 +25,40 @@
 #              depending on another operand's value. `required_if` and
 #              `forbidden_if` name a key (a placeholder or a keyed operand) and
 #              either `values` or `not_values`
+#   formats    operand names whose value takes a normalized form, beyond the
+#              names `run.py` applies everywhere (contract, date, distribution,
+#              max-sdk, path)
 #   section    the SPEC.md section the fact records
 #
 # A keyed operand appears at most once in a fact. A fact matching no template,
 # or carrying a key no template allows, is invalid — `run.py` rejects the record
 # rather than ignoring the line, on §4.4's reasoning one level up.
 
+# Normalized forms, borrowed from SPEC.md rather than invented here. `date` and
+# `path` are checked in code because a pattern cannot reject 2026-02-30 or a
+# `..` segment.
+[formats]
+# §4.3's exact contract grammar.
+contract = "(0|[1-9][0-9]*)(\\.(0|[1-9][0-9]*))?"
+# §1's normalized distribution name — PEP 503, lowercased, runs collapsed.
+distribution = "[a-z0-9]+(-[a-z0-9]+)*"
+# §5.2 and §5.3's requirement ids, and §7.5's module names.
+identifier = "[A-Za-z_][A-Za-z0-9_]*"
+# §6.3's `group:artifact:version`.
+coordinate = "[^:\\s]+:[^:\\s]+:[^:\\s]+"
+# §6.3's `group:artifact`.
+module = "[^:\\s]+:[^:\\s]+"
+# §6.4 and §7.2 — `https` only, and no user-info.
+url = "[Hh][Tt][Tt][Pp][Ss]://[^/@]+(/.*)?"
+# §7.4's ad network identifiers.
+skadnetwork = "[a-z0-9]+\\.skadnetwork"
+# §7.2 records the resolved revision, which is a git object name.
+revision = "[0-9a-f]{7,40}"
+
 # ------------------------------------------------------------------- build ---
 
 [facts."build.contract"]
-template = "build contract <version>"
+template = "build contract <contract>"
 section = "4.3"
 
 [facts."build.platform"]
@@ -147,6 +171,8 @@ optional = ["resolved"]
 section = "6.3"
 [facts."dist.contributes.gradle-dependency".values]
 configuration = ["implementation", "api", "compileOnly", "runtimeOnly"]
+[facts."dist.contributes.gradle-dependency".formats]
+module = "module"
 
 [facts."dist.contributes.gradle-repository"]
 template = "dist <distribution> contributes gradle-repository <url>"
@@ -156,6 +182,8 @@ lists = ["groups", "modules"]
 section = "6.4"
 [facts."dist.contributes.gradle-repository".values]
 authenticated = ["true", "false"]
+[facts."dist.contributes.gradle-repository".formats]
+url = "url"
 
 [facts."dist.contributes.permission"]
 template = "dist <distribution> contributes permission <name>"
@@ -281,11 +309,15 @@ section = "7.4"
 [facts."dist.contributes.skadnetwork"]
 template = "dist <distribution> contributes skadnetwork <identifier>"
 section = "7.4"
+[facts."dist.contributes.skadnetwork".formats]
+identifier = "skadnetwork"
 
 [facts."dist.contributes.python-module"]
 template = "dist <distribution> contributes python-module <name>"
 required = ["init", "swift-package"]
 section = "7.5"
+[facts."dist.contributes.python-module".formats]
+name = "identifier"
 
 [facts."dist.contributes.objc-categories"]
 template = "dist <distribution> contributes objc-categories"
@@ -300,6 +332,8 @@ optional = ["transitive"]
 section = "6.3"
 [facts."dist.artifact".values]
 transitive = ["true"]
+[facts."dist.artifact".formats]
+coordinate = "coordinate"
 
 [facts."dist.package"]
 template = "dist <distribution> package <url>"
@@ -308,6 +342,9 @@ optional = ["requested", "transitive"]
 section = "7.2"
 [facts."dist.package".values]
 transitive = ["true"]
+[facts."dist.package".formats]
+url = "url"
+revision = "revision"
 
 [facts."dist.binary-target"]
 template = "dist <distribution> binary-target <name>"

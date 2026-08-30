@@ -131,10 +131,26 @@ advisory — which is why it is a separate axis rather than a third disposition.
 | `activity_extends_component_activity` | 45 |
 | `url_callback_observable` | 46 |
 
-A consumer that cannot observe an assertion reports it **unsupported** rather
-than passing it. An assertion silently skipped is how a conformance claim
-overstates itself — the failure [§8.5](../SPEC.md#85-advisory-obligations)'s
-note already names for advisory obligations.
+A consumer that cannot observe an assertion reports it **unverified** rather
+than passing it, and a run with any unverified case exits non-zero. The
+assertion belongs to a *numbered* requirement, so failing to observe one means
+conformance was not demonstrated — not that the consumer is conforming. An
+assertion silently skipped is how a conformance claim overstates itself, which
+is the failure [§8.5](../SPEC.md#85-advisory-obligations)'s note names.
+
+### Unverified and unsupported are opposite things
+
+| Status | Meaning | Exit |
+| --- | --- | --- |
+| **unverified** | the consumer cannot observe an assertion, so a numbered requirement went unchecked | non-zero |
+| **unsupported** | the consumer does not claim an advisory the case names | 0 |
+
+The distinction is [§8.5](../SPEC.md#85-advisory-obligations)'s. An advisory is
+reported and never blocking, so declining one is a conforming consumer
+exercising a choice the specification gives it, and a suite that failed the run
+over it would be inventing an obligation. A numbered requirement is not
+optional, and a suite that reported green having checked nothing would be worse
+than one that failed.
 
 ### Advisories never fail a case
 

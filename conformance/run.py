@@ -19,8 +19,19 @@ Three axes are checked, per `conformance/README.md`:
 * `diagnostics` — the finding IDs the consumer reported;
 * `assertions`  — postconditions on what the consumer produced.
 
-Exit status is 0 when every case passed, 1 when any failed. An assertion the
-consumer says it cannot observe is reported **unsupported** and does not pass.
+Two things short of a pass are reported differently, because they mean opposite
+things:
+
+* **unverified** — the consumer cannot observe an assertion, so a *numbered*
+  requirement went unchecked. Conformance was not demonstrated, and the run
+  exits non-zero. §8.5's note names the failure: an obligation quietly skipped
+  is how a conformance claim overstates itself.
+* **unsupported** — the consumer does not claim an advisory the case names.
+  §8.5 makes an advisory reported and never blocking, so this is a conforming
+  consumer declining an optional obligation, and the run still exits 0.
+
+Exit status is 0 when every case passed or was unsupported, and 1 when any
+failed or went unverified.
 """
 
 from __future__ import annotations
@@ -32,12 +43,16 @@ import subprocess
 import sys
 import tomllib
 from dataclasses import dataclass, field
+from datetime import date
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 PROFILES = ("core", "android", "ios")
 
-PASS, FAIL, UNSUPPORTED = "pass", "fail", "unsupported"
+PASS, FAIL = "pass", "fail"
+#: A numbered requirement the consumer could not be checked on, and an advisory
+#: it declines. The first is a gap in the evidence; the second is not.
+UNVERIFIED, UNSUPPORTED = "unverified", "unsupported"
 
 
 @dataclass
@@ -90,6 +105,41 @@ FACTS = tomllib.loads((ROOT / "record-facts.toml").read_text(encoding="utf-8"))[
 DIGEST = re.compile(r"[0-9a-f]{64}")
 DIGEST_KEYS = ("sha256", "checksum")
 
+FORMATS = tomllib.loads((ROOT / "record-facts.toml").read_text(encoding="utf-8"))["formats"]
+
+
+def well_formed(kind: str, value: str) -> str | None:
+    """Whether `value` is in the normalized form `kind` names, or why not.
+
+    §2 of record-format.md borrows every one of these from SPEC.md rather than
+    inventing any — a distribution name is §1's normalized form, a date is
+    §9.6's RFC 3339 full-date, a path is §9.3's forward-slash relative form.
+    Left unchecked they are documentation; two consumers that normalize
+    differently produce records that never compare.
+    """
+    if kind == "date":
+        # A pattern accepts 2026-02-30. The calendar does not.
+        try:
+            year, month, day = (int(part) for part in value.split("-"))
+            date(year, month, day)
+        except (ValueError, TypeError):
+            return "is not an RFC 3339 full-date"
+        if value != f"{year:04d}-{month:02d}-{day:02d}":
+            return "is not an RFC 3339 full-date"
+        return None
+    if kind == "path":
+        if value.startswith("/") or "\\" in value:
+            return "is not a relative forward-slash path"
+        if any(part in ("", ".", "..") for part in value.split("/")):
+            return "is not a normalized relative path"
+        return None
+    if kind == "integer":
+        return None if re.fullmatch(r"0|-?[1-9][0-9]*", value) else "is not an integer"
+    pattern = FORMATS.get(kind)
+    if pattern and not re.fullmatch(pattern, value):
+        return f"is not a well-formed {kind}"
+    return None
+
 
 def read_record(raw: bytes) -> tuple[list[str], list[str]]:
     """The file rules of record-format.md §1, checked rather than assumed.
@@ -129,6 +179,17 @@ ESCAPES = {'"': '"', "\\": "\\", "n": "\n", "t": "\t", "r": "\r"}
 NEEDS_UNICODE_ESCAPE = frozenset(
     {chr(c) for c in range(0x20)} - {"\n", "\t", "\r"} | {chr(0x7F)}
 )
+
+
+#: Operand names whose normalized form is the same wherever they appear. A
+#: fact may add or override with its own `formats` table.
+FORMAT_BY_NAME = {
+    "contract": "contract",
+    "date": "date",
+    "distribution": "distribution",
+    "max-sdk": "integer",
+    "path": "path",
+}
 
 
 class LexError(Exception):
@@ -354,6 +415,14 @@ def validate_fact(line: str) -> list[str]:
                     f"{key} is not 64 lowercase hexadecimal characters, "
                     f"which §9.3 requires: {line}"
                 )
+
+    formats = dict(FORMAT_BY_NAME)
+    formats.update(spec.get("formats", {}))
+    for operand, kind in formats.items():
+        for value in bound.get(operand, []):
+            problem = well_formed(kind, value)
+            if problem:
+                problems.append(f"`{operand}` {problem}: {line}")
     return problems
 
 
@@ -456,21 +525,26 @@ def run_consumer(command: list[str], case: Case) -> tuple[int, dict]:
     completed = subprocess.run(
         [*command, str(case.directory / "input")],
         capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
         timeout=300,
     )
+    # Strictly, not `errors="replace"`. Replacing turns invalid UTF-8 into
+    # U+FFFD before the JSON is parsed, so a consumer could ship bytes this
+    # interface says are UTF-8 and never hear about it — most easily in a field
+    # nothing reads.
     try:
-        return completed.returncode, json.loads(completed.stdout or "{}")
+        stdout = completed.stdout.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        return completed.returncode, {"_malformed": f"stdout is not valid UTF-8: {exc}"}
+    try:
+        return completed.returncode, json.loads(stdout or "{}")
     except json.JSONDecodeError:
-        return completed.returncode, {
-            "_malformed": completed.stdout[:400] or completed.stderr[:400]
-        }
+        fallback = completed.stderr.decode("utf-8", errors="replace")
+        return completed.returncode, {"_malformed": (stdout or fallback)[:400]}
 
 
 def check(case: Case, exit_code: int, reported: dict) -> Result:
     problems: list[str] = []
+    unverified: list[str] = []
     unsupported: list[str] = []
 
     if "_malformed" in reported:
@@ -503,7 +577,7 @@ def check(case: Case, exit_code: int, reported: dict) -> Result:
         if state is True:
             continue
         if state is None:
-            unsupported.append(f"assertion {assertion}: the consumer cannot observe it")
+            unverified.append(f"assertion {assertion}: the consumer cannot observe it")
         else:
             problems.append(f"assertion {assertion}: the consumer reports it unmet")
 
@@ -529,7 +603,9 @@ def check(case: Case, exit_code: int, reported: dict) -> Result:
         )
 
     if problems:
-        return Result(case, FAIL, problems + unsupported)
+        return Result(case, FAIL, problems + unverified + unsupported)
+    if unverified:
+        return Result(case, UNVERIFIED, unverified + unsupported)
     if unsupported:
         return Result(case, UNSUPPORTED, unsupported)
     return Result(case, PASS)
@@ -566,12 +642,16 @@ def main() -> int:
             print(f"             {line}")
 
     failed = [r for r in results if r.status == FAIL]
+    unverified = [r for r in results if r.status == UNVERIFIED]
     unsupported = [r for r in results if r.status == UNSUPPORTED]
+    passed = len(results) - len(failed) - len(unverified) - len(unsupported)
     print(
-        f"\n{len(results) - len(failed) - len(unsupported)} passed, "
-        f"{len(failed)} failed, {len(unsupported)} unsupported"
+        f"\n{passed} passed, {len(failed)} failed, "
+        f"{len(unverified)} unverified, {len(unsupported)} unsupported"
     )
-    return 1 if failed else 0
+    # An unverified case is a requirement nobody checked, which is not a green
+    # run. An unsupported one is an advisory declined, which §8.5 says is.
+    return 1 if failed or unverified else 0
 
 
 if __name__ == "__main__":
