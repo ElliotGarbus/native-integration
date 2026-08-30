@@ -10,7 +10,9 @@
 # the wrong package produces a build that succeeds and an `ImportError` on
 # device.
 #
-# Not schema-detectable: uniqueness across array entries is not a shape.
+# Not schema-detectable: uniqueness across array entries is not a shape. The
+# registry names the check even so — `unique_within = "sidecar"` on `name` — so
+# a consumer has a precise id to cite alongside the requirement.
 requirement = 33
 profile     = "ios"
 section     = "7.2"
@@ -18,6 +20,7 @@ section     = "7.2"
 outcome = "blocking"
 
 diagnostics = [
+  { id = "ni.decl.ios.contributes.swift_packages.name.duplicate", distributions = ["pytwice"] },
   { id = "ni.req.33", distributions = ["pytwice"] },
 ]
 advisories  = []

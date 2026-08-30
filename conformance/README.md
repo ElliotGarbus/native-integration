@@ -245,6 +245,34 @@ assertions = []
 | `record` | the `expected/` file to compare against, when the case has one |
 | `ignore_digests` | the case is not about hashing, so `input` digests compare loosely — in content only, never in syntax |
 
+### Which ids a case expects
+
+`run.py` compares the id set exactly: a diagnostic the case does not list fails
+it, just as a missing one does. So the set has to be derivable rather than
+guessed at, and one rule fixes it:
+
+> A finding carries the most specific id
+> [`contract/v1.toml`](../contract/v1.toml) defines for the check that failed,
+> **and** the `ni.req.<n>` of the requirement it discharges. Where the registry
+> defines no id for that check, the requirement id stands alone.
+
+The registry defines an id where the rule is a property of a declaration — a
+`forbidden` key, a `unique_within` uniqueness, a closed vocabulary, a refusal
+register — or a `[[constraints]]` row between two keys. Those become
+`ni.decl.…` and `ni.constraint.…`, and a consumer can enumerate them from the
+registry without reading this corpus.
+
+It defines none where the rule needs something no single sidecar holds: the
+dependency closure, the application's answers, the wheel's own files, the
+resolved graph. `core/R12_floor_unmet` cites `ni.req.12` alone because a floor
+is unmet only against a configuration, and
+`core/R07_contract_major_mismatch` cites `ni.req.7` alone because `"2"` is a
+well-formed contract value and only the consumer's own version makes it wrong.
+
+The pairing is what makes a failure retrievable: the requirement id says which
+obligation went unmet, the precise id says which rule, and an author repairing a
+sidecar wants the second.
+
 An unsatisfied conditional requirement is neither blocking nor advisory
 ([§8.2](../SPEC.md#82-dispositions-and-what-recording-is-not)), and says so on
 the axes rather than in a disposition:
