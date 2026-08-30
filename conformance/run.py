@@ -507,6 +507,39 @@ def drop_unclaimed_advisories(lines: list[str], claimed: set[str]) -> list[str]:
     return out
 
 
+def elide_consumer_choice(lines: list[str]) -> list[str]:
+    """Drop *which* artifact a consumer's own packaging-metadata rule chose.
+
+    §9.7 lets a consumer resolve a packaging-metadata collision itself, "by a
+    rule that does not depend on resolution order", and fixes no rule. Two
+    conforming consumers may therefore choose different artifacts for the same
+    `META-INF/LICENSE`, and a fixture that pinned `chosen` would fail one of
+    them for exercising a choice the section gives it.
+
+    What §9.6 requires recorded is the row -- the path, the artifacts, the
+    distributions, the date and that the consumer decided -- so that is what is
+    compared. A collision the **application** chose (`decided=application`) is
+    not touched: there the answer is the application's, joined by path, and
+    getting it wrong means shipping the copy the application refused.
+    """
+    out = []
+    for line in lines:
+        try:
+            positional, _keyed, raw = lex(line)
+        except LexError:
+            out.append(line)
+            continue
+        consumer_chose = (
+            positional[:2] == ["decision", "collision"] and raw.get("decided") == "consumer"
+        )
+        operands = [
+            f"{key}=<consumer rule>" if consumer_chose and key == "chosen" else f"{key}={raw[key]}"
+            for key in sorted(raw)
+        ]
+        out.append(" ".join(positional + operands))
+    return out
+
+
 def elide_digests(lines: list[str]) -> list[str]:
     """Drop digest *content*, never digest syntax.
 
@@ -564,6 +597,7 @@ def compare_records(
 
     want = drop_unclaimed_advisories(want, advisories)
     got = drop_unclaimed_advisories(got, advisories)
+    want, got = elide_consumer_choice(want), elide_consumer_choice(got)
     if ignore_digests:
         want, got = elide_digests(want), elide_digests(got)
 

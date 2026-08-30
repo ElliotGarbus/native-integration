@@ -1,0 +1,4 @@
+contract = "1"
+
+[[android.contributes.gradle_dependencies]]
+coordinate = "com.metrics:sdk:1.4.0"

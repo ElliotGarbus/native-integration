@@ -1,0 +1,27 @@
+# `files` is the packaged content §9.7's detection reads. Three paths collide,
+# and every one of them is on §9.7's closed list: directly under `META-INF/`,
+# with a name the list gives — `LICENSE-EPL` by the `-*` suffix rule, and
+# `MANIFEST.MF` which is not a licence file at all. `classes.jar` is each
+# artifact's own and collides with nothing.
+
+[[artifact]]
+coordinate = "com.graphs:sdk:3.1.0"
+sha256 = "0d3e4f9a17c2b85e6dd0341fbb9a72c5e08d41a6f3c7b2905ea18d43f6c07b21"
+declared_by = "pygraphs"
+files = [
+  "META-INF/LICENSE",
+  "META-INF/LICENSE-EPL",
+  "META-INF/MANIFEST.MF",
+  "graphs-classes.jar",
+]
+
+[[artifact]]
+coordinate = "com.metrics:sdk:1.4.0"
+sha256 = "5b81c0f2d7a3946e18bb52c07f9d3a6418e2c5b09fa471d38c62e0ab7451f9d0"
+declared_by = "pymetrics"
+files = [
+  "META-INF/LICENSE",
+  "META-INF/LICENSE-EPL",
+  "META-INF/MANIFEST.MF",
+  "metrics-classes.jar",
+]

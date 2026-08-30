@@ -347,12 +347,18 @@ now has a case** — core, Android and iOS — and the core cases are exercised 
 both platforms, so `core + android` and `core + ios` are each a claim the corpus
 can actually check.
 
-Three accept cases sit beside them so the corpus is not only negatives:
+Four accept cases sit beside them so the corpus is not only negatives:
 `core/R01_dependency_closure` compares a record,
-`android/S07_permission_reason` exercises the advisory axis, and
-`android/R41_artifact_feature_decided` is the other side of requirement 41 —
-the application decided, so the build proceeds and §9.4's attribution has to
-appear in the record.
+`android/S07_permission_reason` exercises the advisory axis, and two are the
+other side of a blocking case, which is the only way that case discriminates:
+
+- `android/R41_artifact_feature_decided` — the application decided, so the build
+  proceeds and §9.4's attribution has to appear in the record;
+- `android/R44_metadata_collision_resolved` — the collisions are packaging
+  metadata only, so §9.7's first row applies and the consumer resolves them
+  itself. Without it, a consumer that failed on *every* colliding path would
+  pass `R44_packaging_collision` with the right outcome and the right id while
+  getting the section backwards.
 
 ## Running it
 

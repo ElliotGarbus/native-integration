@@ -1,0 +1,6 @@
+[build]
+min_sdk = 26
+compile_sdk = 35
+
+# The application answers nothing. §9.7's first row is the consumer's own
+# authority, and needing an answer here is what would make the row useless.

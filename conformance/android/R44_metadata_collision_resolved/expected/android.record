@@ -1,0 +1,17 @@
+build contract 1.0
+build platform android
+decision collision META-INF/LICENSE artifacts=com.graphs:sdk:3.1.0,com.metrics:sdk:1.4.0 chosen=com.graphs:sdk:3.1.0 date=2026-08-24 decided=consumer distributions=pygraphs,pymetrics
+decision collision META-INF/LICENSE-EPL artifacts=com.graphs:sdk:3.1.0,com.metrics:sdk:1.4.0 chosen=com.graphs:sdk:3.1.0 date=2026-08-24 decided=consumer distributions=pygraphs,pymetrics
+decision collision META-INF/MANIFEST.MF artifacts=com.graphs:sdk:3.1.0,com.metrics:sdk:1.4.0 chosen=com.graphs:sdk:3.1.0 date=2026-08-24 decided=consumer distributions=pygraphs,pymetrics
+dist pygraphs artifact com.graphs:sdk:3.1.0 sha256=0d3e4f9a17c2b85e6dd0341fbb9a72c5e08d41a6f3c7b2905ea18d43f6c07b21
+dist pygraphs contract 1
+dist pygraphs contributes gradle-dependency com.graphs:sdk configuration=implementation requested=exact:3.1.0 resolved=3.1.0
+dist pygraphs input native.toml sha256=58e570d9905622789115677a10d500f049ce7990eaae55adf9b3a883e3bf4973
+dist pygraphs origin direct
+dist pygraphs version 2.3.0
+dist pymetrics artifact com.metrics:sdk:1.4.0 sha256=5b81c0f2d7a3946e18bb52c07f9d3a6418e2c5b09fa471d38c62e0ab7451f9d0
+dist pymetrics contract 1
+dist pymetrics contributes gradle-dependency com.metrics:sdk configuration=implementation requested=exact:1.4.0 resolved=1.4.0
+dist pymetrics input native.toml sha256=2bd633b98c7a874671eba093f7c3322e39cfc07c85fd7280b91aea861dea4c67
+dist pymetrics origin direct
+dist pymetrics version 1.1.0

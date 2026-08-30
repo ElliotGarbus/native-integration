@@ -1,0 +1,13 @@
+platform = "android"
+
+[[distribution]]
+name = "pygraphs"
+version = "2.3.0"
+origin = "direct"
+entry_point = "pygraphs._native"
+
+[[distribution]]
+name = "pymetrics"
+version = "1.1.0"
+origin = "direct"
+entry_point = "pymetrics._native"

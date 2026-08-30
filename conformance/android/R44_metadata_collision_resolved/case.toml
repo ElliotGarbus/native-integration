@@ -1,0 +1,33 @@
+# §8.4 requirement 44, via §9.7, and the half `R44_packaging_collision` cannot
+# show: the collisions here are **only** packaging metadata, so the build is
+# accepted.
+#
+# The two cases exist as a pair on purpose. A consumer that failed on every
+# colliding path would pass the blocking one — same outcome, same id — while
+# getting §9.7's first row exactly backwards, and §9.7 puts real weight on that
+# row: `META-INF/LICENSE` collides "from almost any pair of libraries", so a
+# consumer that blocked on it would refuse most real closures. Only the pair
+# distinguishes the two rows.
+#
+# Every colliding path here is on §9.7's closed list, including one that tests
+# the `-*` suffix (`LICENSE-EPL`) and one that is not a licence file at all
+# (`MANIFEST.MF`). Nothing collides in a `META-INF/` subdirectory, and no native
+# library collides — those are `R44_packaging_collision`.
+#
+# What the record has to carry is §9.6's row: the packaged path, the artifacts
+# that collided, the distributions responsible, the artifact chosen, and the
+# date. **Which** artifact won is not fixed here, because §9.7 leaves the rule
+# to the consumer and requires only that it not depend on resolution order; the
+# harness elides `chosen` where the decision says `decided=consumer`. See
+# conformance/record-format.md.
+requirement = 44
+profile     = "android"
+section     = "9.7"
+
+outcome = "accept"
+
+diagnostics = []
+advisories  = []
+assertions  = []
+
+record = "android.record"

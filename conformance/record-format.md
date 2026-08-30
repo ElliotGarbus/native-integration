@@ -365,3 +365,21 @@ also a test of file hashing. It does not relax the **syntax**: every `sha256`
 and `checksum` is 64 lowercase hexadecimal characters
 ([§9.3](../SPEC.md#93-hashed-inputs)) whatever the case sets, and `run.py`
 rejects a record that abbreviates one before any comparison happens.
+
+## 7. What a fixture cannot pin
+
+One operand is elided from both sides of every comparison, always:
+`chosen` on a `decision collision` line that says `decided=consumer`.
+
+[§9.7](../SPEC.md#97-packaging-collisions) lets a consumer resolve a
+packaging-metadata collision itself, "by a rule that does not depend on
+resolution order", and fixes no rule. Two conforming consumers may therefore
+keep different copies of `META-INF/LICENSE`, and a fixture that pinned the
+winner would fail one of them for making a choice the section hands it. What
+[§9.6](../SPEC.md#96-what-a-record-must-contain) requires recorded is the row —
+the path, the artifacts that collided, the distributions responsible, the date,
+and that the consumer decided — so that is what is compared.
+
+`decided=application` is compared in full. There the answer is the
+application's, joined by the packaged path, and choosing differently means
+shipping the copy the application refused.
