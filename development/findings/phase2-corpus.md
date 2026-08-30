@@ -86,22 +86,25 @@ collisions (the `files` list on an artifact is there for it), and §6.7's check
 that a `from_dependency` keep matches no class from outside that dependency.
 None is fixtured yet; all three are now expressible.
 
-### 3. §7.4's refusal registers have no declaration-level diagnostic id
+### 3. §7.4's refusal registers had no diagnostic id — CLOSED
 
-`ios/R35_usage_description_contributed` and `ios/R35_capability_key_contributed`
-both name `ni.req.35`, the requirement-level id, because no finer one exists.
-
-`gen_error_ids.py` derives declaration ids from a registry entry's own
-properties, and `refuses` is not among them — an `open_table` gets the container
+`gen_error_ids.py` derived declaration ids from a registry entry's own
+properties, and `refuses` was not among them — an `open_table` gets the container
 checks, which are `exactly_one_of` and `at_least_one_of`, so
-`ios.contributes.info_plist.values` produces no ids at all. The generator is
-consistent; the property list is short by one.
+`ios.contributes.info_plist.values` produced no ids at all. Both iOS cases named
+`ni.req.35`, a requirement spanning eleven clauses, which is precisely what
+`explain` exists to avoid.
 
-This matters for Phase 4 rather than here: `explain` is meant to turn a failure
-into one retrievable paragraph, and `ni.req.35` resolves to a requirement
-covering eleven separate clauses. **Not fixed in this phase** — it is a
-one-property change to a Phase 1 generator, and doing it inside the fixture work
-would put a registry change in a commit about fixtures.
+**Closed.** A refusal register is a rule of its own rather than a property of the
+key it refuses, so each gets its own id — seven of them, `values` and `append`
+across the four registers each refuses. The section and anchor come from the
+register where `contract/v1.toml` defines one, and from the declaration
+otherwise; the summaries sit beside `DECLARATION_CHECKS`' in the generator,
+which is where that kind of text already lives.
+
+Both iOS cases now cite the precise id alongside `ni.req.35`:
+`…info_plist.values.refuses.usage-description-suffix` and
+`…info_plist.append.refuses.capability-keys`. 231 ids became 238.
 
 ## A note on the placeholder case
 

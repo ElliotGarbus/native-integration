@@ -966,6 +966,55 @@ anchor = "44-unknown-declarations-fail-closed"
 severity = "blocking"
 summary = "`ios.contributes.info_plist` carries a key this specification does not define"
 
+[diagnostics."ni.decl.ios.contributes.info_plist.values.refuses.usage-description-suffix"]
+declaration = "ios.contributes.info_plist.values"
+section = "7.4"
+anchor = "74-infoplist"
+severity = "blocking"
+summary = "a key under `ios.contributes.info_plist.values` ends in `UsageDescription` — user-facing text that App Store review reads, which the application supplies through §5.2's `usage_description` kind"
+
+[diagnostics."ni.decl.ios.contributes.info_plist.values.refuses.capability-keys"]
+declaration = "ios.contributes.info_plist.values"
+section = "7.4"
+anchor = "74-infoplist"
+severity = "blocking"
+summary = "a key under `ios.contributes.info_plist.values` is a capability or external-reach key: setting it would change what the application may do, who may install it, or what may reach it from outside, so it is stated as an action instead"
+
+[diagnostics."ni.decl.ios.contributes.info_plist.values.refuses.consumer-managed-keys"]
+declaration = "ios.contributes.info_plist.values"
+section = "7.4"
+anchor = "74-infoplist"
+severity = "blocking"
+summary = "a key under `ios.contributes.info_plist.values` is an identity or version key the consumer derives from the application's own project settings"
+
+[diagnostics."ni.decl.ios.contributes.info_plist.values.refuses.skadnetwork-items"]
+declaration = "ios.contributes.info_plist.values"
+section = "7.4"
+anchor = "74-infoplist"
+severity = "blocking"
+summary = "`SKAdNetworkItems` is offered under `ios.contributes.info_plist.values`, and the consumer renders it from `skadnetwork_identifiers` instead"
+
+[diagnostics."ni.decl.ios.contributes.info_plist.append.refuses.capability-keys"]
+declaration = "ios.contributes.info_plist.append"
+section = "7.4"
+anchor = "74-infoplist"
+severity = "blocking"
+summary = "a key under `ios.contributes.info_plist.append` is a capability or external-reach key: setting it would change what the application may do, who may install it, or what may reach it from outside, so it is stated as an action instead"
+
+[diagnostics."ni.decl.ios.contributes.info_plist.append.refuses.consumer-managed-keys"]
+declaration = "ios.contributes.info_plist.append"
+section = "7.4"
+anchor = "74-infoplist"
+severity = "blocking"
+summary = "a key under `ios.contributes.info_plist.append` is an identity or version key the consumer derives from the application's own project settings"
+
+[diagnostics."ni.decl.ios.contributes.info_plist.append.refuses.skadnetwork-items"]
+declaration = "ios.contributes.info_plist.append"
+section = "7.4"
+anchor = "74-infoplist"
+severity = "blocking"
+summary = "`SKAdNetworkItems` is offered under `ios.contributes.info_plist.append`, and the consumer renders it from `skadnetwork_identifiers` instead"
+
 [diagnostics."ni.decl.ios.contributes.info_plist.skadnetwork_identifiers.type"]
 declaration = "ios.contributes.info_plist.skadnetwork_identifiers"
 section = "7.4"

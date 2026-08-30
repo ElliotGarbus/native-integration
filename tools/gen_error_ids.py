@@ -68,12 +68,37 @@ CONTAINER_CHECKS: tuple[tuple[str, str, str], ...] = (
     ("at_least_one_of", "at-least-one-of", "`{id}` declares neither of {choices}"),
 )
 
+
 def toml_literal(value: object) -> str:
     """Render a constraint's comparison value the way a sidecar spells it."""
     if isinstance(value, bool):
         return "true" if value else "false"
     return str(value)
 
+
+#: What each refusal register refuses, and why the key is not the producer's to
+#: set. Written here for the same reason DECLARATION_CHECKS' summaries are: the
+#: registry carries the members, and this carries what citing one means.
+REFUSALS = {
+    "usage_description_suffix": (
+        "a key under `{id}` ends in `UsageDescription` — user-facing text that App "
+        "Store review reads, which the application supplies through §5.2's "
+        "`usage_description` kind"
+    ),
+    "capability_keys": (
+        "a key under `{id}` is a capability or external-reach key: setting it would "
+        "change what the application may do, who may install it, or what may reach "
+        "it from outside, so it is stated as an action instead"
+    ),
+    "consumer_managed_keys": (
+        "a key under `{id}` is an identity or version key the consumer derives from "
+        "the application's own project settings"
+    ),
+    "skadnetwork_items": (
+        "`SKAdNetworkItems` is offered under `{id}`, and the consumer renders it "
+        "from `skadnetwork_identifiers` instead"
+    ),
+}
 
 CONSTRAINT_SUMMARY = {
     "required_unless_equals": "`{field}` is required unless `{other}` is `{value}`",
@@ -225,6 +250,22 @@ def build() -> str:
                     scope=str(entry.get("unique_within", "")).replace("_", " "),
                 ),
             )
+        # A refusal register is a rule of its own, not a property of the key it
+        # refuses, so each gets its own id. Without this an `open_table` yields
+        # no ids at all — its keys are the platform's — and a consumer refusing
+        # `UIBackgroundModes` has nothing to cite but the requirement, which
+        # spans eleven clauses and is exactly what `explain` exists to avoid.
+        for register in entry.get("refuses", []):
+            source = registry["registers"].get(register, entry)
+            emit(
+                f"ni.decl.{declaration_id}.refuses.{register.replace('_', '-')}",
+                declaration=declaration_id,
+                section=source["section"],
+                anchor=source["anchor"],
+                severity=BLOCKING,
+                summary=REFUSALS[register].format(id=declaration_id),
+            )
+
         if entry["node"] not in ("table", "array_of_tables"):
             continue
         if entry.get("open_keys"):

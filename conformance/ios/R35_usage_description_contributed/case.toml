@@ -16,7 +16,10 @@ section     = "7.4"
 
 outcome = "blocking"
 
-diagnostics = ["ni.req.35"]
+diagnostics = [
+  "ni.decl.ios.contributes.info_plist.values.refuses.usage-description-suffix",
+  "ni.req.35",
+]
 advisories  = []
 
 assertions  = ["no_invented_value"]
