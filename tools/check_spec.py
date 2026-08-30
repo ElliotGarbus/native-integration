@@ -1571,6 +1571,25 @@ for path in sorted((ROOT / "conformance").glob("*/*/case.toml")):
             "builds, so it needs input/android/ and input/ios/"
         )
 
+    # An `expected/` file the harness never opens looks like coverage and is
+    # not. `record` overrides the per-platform default for *every* platform the
+    # case runs for, so naming one on a core case strands the other platform's
+    # record and compares that run against the wrong bytes.
+    expected = path.parent / "expected"
+    if expected.is_dir():
+        named = case.get("record")
+        if named and not (expected / named).exists():
+            problems.append(f"{where}: names expected/{named}, which does not exist")
+        read = {
+            expected / (named or f"{platform}.record")
+            for platform in conformance_run.PROFILE_PLATFORMS.get(path.parent.parent.name, ())
+        }
+        for stranded in sorted(p.name for p in expected.glob("*.record") if p not in read):
+            problems.append(
+                f"{where}: expected/{stranded} is never read — the case compares "
+                "every platform it runs for against something else"
+            )
+
     for root in roots:
         origin = f"{where}[{root.name}]" if root.name in ("android", "ios") else str(where)
         for required in ("closure.toml", "application.toml"):

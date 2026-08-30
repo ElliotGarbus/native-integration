@@ -78,6 +78,11 @@ cases alone would report green over eleven requirements and establish nothing,
 which is the overstatement [§8.5](../SPEC.md#85-advisory-obligations)'s note
 names.
 
+A core case is therefore compared against `expected/<platform>.record`, one per
+platform. Naming a `record` in `case.toml` overrides that for **every** platform
+the case runs for, so a core case names one only where a single record is right
+for all of them.
+
 `expected/` holds the conformance record where the case has one. A blocking case
 has no resolution to record, so it carries `diagnostics.txt` instead — a
 human-readable note saying what the diagnostic has to convey, authored from the

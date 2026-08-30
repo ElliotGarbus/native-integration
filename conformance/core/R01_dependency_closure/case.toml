@@ -22,4 +22,5 @@ assertions = [
   "contributed_source_excluded_from_payload",
 ]
 
-record = "android.record"
+# No `record` key: a core case is compared against `expected/<platform>.record`,
+# which is the only form that can differ per platform, and this one does.
