@@ -27,7 +27,10 @@
 #              either `values` or `not_values`
 #   formats    operand names whose value takes a normalized form, beyond the
 #              names `run.py` applies everywhere (contract, date, distribution,
-#              max-sdk, path)
+#              max-sdk, path, via, withdrew, distributions)
+#   typed_value
+#              an operand whose form is chosen by another operand's value —
+#              §6.8's and §7.4's `value`, which `type` decides
 #   section    the SPEC.md section the fact records
 #
 # A keyed operand appears at most once in a fact. A fact matching no template,
@@ -54,6 +57,17 @@ url = "[Hh][Tt][Tt][Pp][Ss]://[^/@]+(/.*)?"
 skadnetwork = "[a-z0-9]+\\.skadnetwork"
 # §7.2 records the resolved revision, which is a git object name.
 revision = "[0-9a-f]{7,40}"
+# §6.3's two dependency forms, each spelled one way. An exact `coordinate` is a
+# single-version request; a `module` carries a bounded range, and both bounds
+# are required within it, so both appear.
+gradle-request = "exact:[^:]+|range:[^:]+:[^:]+"
+# §7.2's three requirement forms, and `branch` is not one of them.
+swift-request = "(exact|from):[^:]+|revision:[0-9a-f]{7,40}"
+# Canonical numeric rendering. Without one, `1`, `+1`, `01` and `1_000` are four
+# spellings of one TOML integer and two records of one integration differ.
+integer = "0|-?[1-9][0-9]*"
+float = "-?(0|[1-9][0-9]*)\\.[0-9]+"
+boolean = "true|false"
 
 # ------------------------------------------------------------------- build ---
 
@@ -169,10 +183,11 @@ template = "dist <distribution> contributes gradle-dependency <module>"
 required = ["configuration", "requested"]
 optional = ["resolved"]
 section = "6.3"
-[facts."dist.contributes.gradle-dependency".values]
-configuration = ["implementation", "api", "compileOnly", "runtimeOnly"]
 [facts."dist.contributes.gradle-dependency".formats]
 module = "module"
+requested = "gradle-request"
+[facts."dist.contributes.gradle-dependency".values]
+configuration = ["implementation", "api", "compileOnly", "runtimeOnly"]
 
 [facts."dist.contributes.gradle-repository"]
 template = "dist <distribution> contributes gradle-repository <url>"
@@ -249,6 +264,14 @@ required = ["type", "value"]
 section = "6.8"
 [facts."dist.contributes.meta-data".values]
 type = ["string", "integer", "boolean"]
+# §6.8: `value` is a string, integer or boolean, and equality is by type as
+# well as content — so the rendering of each has to be fixed.
+[facts."dist.contributes.meta-data".typed_value]
+key = "type"
+operand = "value"
+[facts."dist.contributes.meta-data".typed_value.formats]
+integer = "integer"
+boolean = "boolean"
 
 [facts."dist.contributes.query"]
 template = "dist <distribution> contributes query <target>"
@@ -260,6 +283,9 @@ kind = ["package", "provider-authority"]
 [facts."dist.contributes.swift-package"]
 template = "dist <distribution> contributes swift-package <name>"
 required = ["products", "requirement", "url"]
+[facts."dist.contributes.swift-package".formats]
+requirement = "swift-request"
+url = "url"
 optional = ["credentials-required", "reason"]
 lists = ["products"]
 section = "7.2"
@@ -292,6 +318,14 @@ required = ["type", "value"]
 section = "7.4"
 [facts."dist.contributes.plist-value".values]
 type = ["string", "integer", "float", "boolean"]
+# §7.4's TOML-to-plist mapping, with each rendering fixed.
+[facts."dist.contributes.plist-value".typed_value]
+key = "type"
+operand = "value"
+[facts."dist.contributes.plist-value".typed_value.formats]
+integer = "integer"
+float = "float"
+boolean = "boolean"
 
 # §7.4's one-mode rule: a key is claimed as array-valued by being declared under
 # `append`, and the claim stands even where the declared array is empty. The
@@ -318,6 +352,8 @@ required = ["init", "swift-package"]
 section = "7.5"
 [facts."dist.contributes.python-module".formats]
 name = "identifier"
+init = "identifier"
+swift-package = "identifier"
 
 [facts."dist.contributes.objc-categories"]
 template = "dist <distribution> contributes objc-categories"
@@ -345,6 +381,7 @@ transitive = ["true"]
 [facts."dist.package".formats]
 url = "url"
 revision = "revision"
+requested = "swift-request"
 
 [facts."dist.binary-target"]
 template = "dist <distribution> binary-target <name>"
@@ -356,6 +393,8 @@ section = "7.2"
 [facts."dist.artifact-declares.permission"]
 template = "dist <distribution> artifact-declares <coordinate> permission <name>"
 section = "9.4"
+[facts."dist.artifact-declares.permission".formats]
+coordinate = "coordinate"
 
 [facts."dist.artifact-declares.feature"]
 template = "dist <distribution> artifact-declares <coordinate> feature <name>"
@@ -363,6 +402,8 @@ required = ["required"]
 section = "9.4"
 [facts."dist.artifact-declares.feature".values]
 required = ["true", "false"]
+[facts."dist.artifact-declares.feature".formats]
+coordinate = "coordinate"
 
 [facts."dist.artifact-declares.component"]
 template = "dist <distribution> artifact-declares <coordinate> component <class>"
@@ -370,6 +411,8 @@ required = ["exported"]
 section = "9.4"
 [facts."dist.artifact-declares.component".values]
 exported = ["true", "false"]
+[facts."dist.artifact-declares.component".formats]
+coordinate = "coordinate"
 
 # --------------------------------------- the application's own decisions ---
 #
@@ -403,6 +446,8 @@ required = ["artifact", "date", "distribution", "keep"]
 section = "9.4"
 [facts."decision.artifact-feature".values]
 keep = ["required", "optional"]
+[facts."decision.artifact-feature".formats]
+artifact = "coordinate"
 
 [facts."decision.collision"]
 template = "decision collision <path>"
@@ -411,6 +456,9 @@ lists = ["artifacts", "distributions"]
 section = "9.7"
 [facts."decision.collision".values]
 decided = ["application", "consumer"]
+[facts."decision.collision".formats]
+artifacts = "coordinate"
+chosen = "coordinate"
 
 # §9.5: that a repository or package needs a credential is a fact about the
 # integration; the credential is not, and never appears.
@@ -420,3 +468,5 @@ required = ["kind"]
 section = "9.5"
 [facts."decision.credential-required".values]
 kind = ["repository", "package"]
+[facts."decision.credential-required".formats]
+url = "url"

@@ -189,7 +189,7 @@ that a set difference over these lines *is* the delta a reviewer reads.
 
 ```
 dist map-sdk contributes source java/com/example/maps/MapBridge.java
-dist map-sdk contributes gradle-dependency com.example.maps:android configuration=implementation requested=4.1.0 resolved=4.1.0
+dist map-sdk contributes gradle-dependency com.example.maps:android configuration=implementation requested=exact:4.1.0 resolved=4.1.0
 dist map-sdk contributes gradle-repository https://maven.example.com/releases authenticated=true groups=com.example.maps reason="Hosts the maps SDK, which is not on Maven Central"
 dist map-sdk contributes permission android.permission.INTERNET reason="Map tile delivery"
 dist map-sdk contributes permission android.permission.ACCESS_FINE_LOCATION max-sdk=30 never-for-location=false
@@ -235,6 +235,29 @@ de-duplicated union comparable — and `plist-array-key` states the key's mode
 separately, because an empty `append` declaration still claims that key as
 array-valued for [§7.4](../SPEC.md#74-infoplist)'s one-mode rule and would
 otherwise vanish from the record entirely.
+
+**A request is spelled one way.** [§6.3](../SPEC.md#63-gradle-dependencies)
+gives a dependency two forms and [§7.2](../SPEC.md#72-swift-packages) gives a
+package three. A record that wrote them freely would let two consumers describe
+one declaration differently, so each has a single encoding:
+
+| Declared | Recorded |
+| --- | --- |
+| `coordinate = "g:a:4.1.0"` | `requested=exact:4.1.0` |
+| `version = { at_least = "5.6.1", below = "6.0.0" }` | `requested=range:5.6.1:6.0.0` |
+| `requirement = { exact = "1.2.3" }` | `requirement=exact:1.2.3` |
+| `requirement = { from = "1.2.0" }` | `requirement=from:1.2.0` |
+| `requirement = { revision = "8a1f0c9e" }` | `requirement=revision:8a1f0c9e` |
+
+Both bounds appear in the `range` form because §6.3 requires both within
+`version`. `branch` has no spelling here, because §7.2 excludes it there.
+
+**Numbers are rendered one way too.** A `value` whose `type` is `integer` is
+canonical decimal — `0`, or an optional sign and no leading zero — and a `float`
+carries a fractional part and no exponent. Without that, `1`, `+1`, `01` and
+`1_000` are four spellings of one TOML integer, and
+[§6.8](../SPEC.md#68-manifest-meta-data)'s equality "by type as well as content"
+has nothing to compare.
 
 **The resolved native graph** ([§6.3](../SPEC.md#63-gradle-dependencies),
 [§7.2](../SPEC.md#72-swift-packages))

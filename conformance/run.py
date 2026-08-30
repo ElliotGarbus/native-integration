@@ -128,7 +128,9 @@ def well_formed(kind: str, value: str) -> str | None:
             return "is not an RFC 3339 full-date"
         return None
     if kind == "path":
-        if value.startswith("/") or "\\" in value:
+        # A drive letter is absolute too, and `C:/x` slips past a leading-slash
+        # test while naming a location no wheel can contain.
+        if value.startswith("/") or "\\" in value or re.match(r"[A-Za-z]:", value):
             return "is not a relative forward-slash path"
         if any(part in ("", ".", "..") for part in value.split("/")):
             return "is not a normalized relative path"
@@ -187,8 +189,11 @@ FORMAT_BY_NAME = {
     "contract": "contract",
     "date": "date",
     "distribution": "distribution",
+    "distributions": "distribution",
     "max-sdk": "integer",
     "path": "path",
+    "via": "distribution",
+    "withdrew": "distribution",
 }
 
 
@@ -418,6 +423,12 @@ def validate_fact(line: str) -> list[str]:
 
     formats = dict(FORMAT_BY_NAME)
     formats.update(spec.get("formats", {}))
+    # §6.8's and §7.4's `value`, whose form its own `type` operand chooses.
+    typed = spec.get("typed_value")
+    if typed:
+        chosen = bound.get(typed["key"], [])
+        if chosen and chosen[0] in typed["formats"]:
+            formats[typed["operand"]] = typed["formats"][chosen[0]]
     for operand, kind in formats.items():
         for value in bound.get(operand, []):
             problem = well_formed(kind, value)
@@ -542,13 +553,41 @@ def run_consumer(command: list[str], case: Case) -> tuple[int, dict]:
         return completed.returncode, {"_malformed": (stdout or fallback)[:400]}
 
 
+def malformed(reported: object) -> str | None:
+    """Whether the consumer's answer has the shape this interface documents.
+
+    A response is untrusted input like any other. Reaching into it and letting
+    an AttributeError escape would turn a consumer's bad output into a crash of
+    the harness, where it belongs as a failed case naming what was wrong.
+    """
+    if not isinstance(reported, dict):
+        return "the answer is not a JSON object"
+    if not isinstance(reported.get("outcome", ""), str):
+        return "`outcome` is not a string"
+    for key in ("diagnostics", "advisories"):
+        value = reported.get(key, [])
+        if not isinstance(value, list) or any(not isinstance(v, str) for v in value):
+            return f"`{key}` is not an array of strings"
+    assertions = reported.get("assertions", {})
+    if not isinstance(assertions, dict) or any(
+        not isinstance(v, bool) for v in assertions.values()
+    ):
+        return "`assertions` is not an object of booleans"
+    if not isinstance(reported.get("record", ""), str):
+        return "`record` is not a string"
+    return None
+
+
 def check(case: Case, exit_code: int, reported: dict) -> Result:
     problems: list[str] = []
     unverified: list[str] = []
     unsupported: list[str] = []
 
-    if "_malformed" in reported:
+    if isinstance(reported, dict) and "_malformed" in reported:
         return Result(case, FAIL, [f"the consumer did not answer in JSON: {reported['_malformed']}"])
+    problem = malformed(reported)
+    if problem:
+        return Result(case, FAIL, [f"the consumer's answer is malformed: {problem}"])
 
     # Axis 1 — the build's fate.
     actual_outcome = reported.get("outcome", "blocking" if exit_code else "accept")
