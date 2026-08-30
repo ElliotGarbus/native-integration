@@ -66,10 +66,17 @@ core/R12_floor_unmet/
 FAIL   core/R12_floor_unmet [ios]   (requirement 12)
 ```
 
-The platform profiles you select are what decides. `--profile core --profile ios`
-runs the core cases for iOS only; naming no platform profile runs both and says
-that this is a development run rather than a claim. An Android or iOS case ships
-a single flat `input/`, since it has only one platform to begin with.
+The platform profiles you select are what decides. `--profile ios` runs the core
+cases for iOS only; naming no platform profile runs both and says that this is a
+development run rather than a claim. An Android or iOS case ships a single flat
+`input/`, since it has only one platform to begin with.
+
+**A platform profile brings the core with it.** Conformance is the core plus at
+least one platform profile, so `--profile android` runs both and `--profile
+core --profile android` is the same selection said twice. A run of the platform
+cases alone would report green over eleven requirements and establish nothing,
+which is the overstatement [§8.5](../SPEC.md#85-advisory-obligations)'s note
+names.
 
 `expected/` holds the conformance record where the case has one. A blocking case
 has no resolution to record, so it carries `diagnostics.txt` instead — a
@@ -352,6 +359,9 @@ appear in the record.
 ```
 python3 conformance/run.py --profile android -- mytool build --conformance-record
 ```
+
+That is a whole `core + android` claim: 30 cases, the 15 core ones run against
+an Android closure. Add `--profile ios` for a consumer that builds both.
 
 `run.py` invokes the consumer once per case with **two** arguments: the case's
 `input/`, and an output directory to write what it produced into. It answers on

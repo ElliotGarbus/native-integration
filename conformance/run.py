@@ -3,6 +3,10 @@
 
     python3 conformance/run.py --profile android -- mytool build --conformance-record
 
+A platform profile brings the core with it, because §8.1 makes conformance "the
+core plus at least one platform profile" — that line is a whole `core + android`
+claim, and the core cases in it run against an Android closure.
+
 For each case in the profile this invokes the consumer once, with the case's
 `input/` directory as the application's resolved dependency closure, and
 compares what came back against what the case says the specification requires.
@@ -817,11 +821,23 @@ def main() -> int:
     parser.add_argument("command", nargs=argparse.REMAINDER)
     args = parser.parse_args()
 
-    # §8.1: conformance is "the core plus at least one platform profile". The
-    # platform profiles selected are what the consumer builds, and the core
+    # §8.1: conformance is "the core plus at least one platform profile", so a
+    # platform profile brings the core with it. `--profile android` alone would
+    # otherwise report a green run over eleven requirements and call it
+    # conformance, which is precisely the overstatement §8.5's note names.
+    #
+    # The platform profiles selected are what the consumer builds, and the core
     # cases are exercised for exactly those — a core case run only against
-    # Android would leave an `core + ios` claim resting on nothing.
+    # Android would leave a `core + ios` claim resting on nothing.
     platforms = {p for p in args.profile if p in ("android", "ios")}
+    selected = [p for p in PROFILES if p in set(args.profile)]
+    if platforms and "core" not in selected:
+        print(
+            "note: the core profile runs too, because §8.1 makes conformance the"
+            "\n      core plus at least one platform profile. A platform profile"
+            " alone is not a claim.\n"
+        )
+        selected.insert(0, "core")
     if not platforms:
         print(
             "note: no platform profile selected, so the core cases run for both."
@@ -829,9 +845,7 @@ def main() -> int:
             " profile, so this is a development run rather than a claim.\n"
         )
         platforms = {"android", "ios"}
-    cases = [
-        case for profile in args.profile for case in load_cases(profile, platforms)
-    ]
+    cases = [case for profile in selected for case in load_cases(profile, platforms)]
     if not cases:
         print("no cases found for the selected profile(s)")
         return 1
