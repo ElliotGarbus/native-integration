@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import subprocess
 import sys
 import tomllib
@@ -84,36 +85,159 @@ def load_cases(profile: str) -> list[Case]:
     return cases
 
 
-def parse_record(text: str) -> list[str]:
-    return [line for line in text.replace("\r\n", "\n").split("\n") if line]
+FACTS = tomllib.loads((ROOT / "record-facts.toml").read_text(encoding="utf-8"))["facts"]
+
+DIGEST = re.compile(r"[0-9a-f]{64}")
+DIGEST_KEYS = ("sha256", "checksum")
 
 
-def compare_records(expected: str, actual: str, *, ignore_digests: bool) -> list[str]:
-    """The whole comparison: two sorted sets of facts, diffed."""
+def read_record(raw: bytes) -> tuple[list[str], list[str]]:
+    """The file rules of record-format.md §1, checked rather than assumed.
 
-    def normalize(lines: list[str]) -> list[str]:
-        if not ignore_digests:
-            return lines
-        out = []
-        for line in lines:
-            parts = [
-                p.split("=", 1)[0] + "=<digest>"
-                if p.split("=", 1)[0] in ("sha256", "checksum")
-                else p
-                for p in line.split(" ")
-            ]
-            out.append(" ".join(parts))
-        return out
+    A harness that silently repaired CRLF, blank lines or a missing final
+    newline would let two consumers disagree about the bytes while agreeing
+    about the facts — which is the one thing a byte-comparable format exists to
+    prevent.
+    """
+    problems: list[str] = []
+    if raw.startswith(b"\xef\xbb\xbf"):
+        problems.append("the record starts with a BOM")
+        raw = raw[3:]
+    try:
+        text = raw.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        return [], [f"the record is not valid UTF-8: {exc}"]
+    if "\r" in text:
+        problems.append("the record contains a carriage return; lines end with a bare newline")
+    if text and not text.endswith("\n"):
+        problems.append("the record has no final newline")
+    lines = text.split("\n")
+    if lines and lines[-1] == "":
+        lines.pop()
+    for index, line in enumerate(lines, start=1):
+        if not line.strip():
+            problems.append(f"line {index} is blank; the file is facts and nothing else")
+    return lines, problems
 
-    want = normalize(parse_record(expected))
-    got = normalize(parse_record(actual))
+
+def tokenize(line: str) -> tuple[list[str], dict[str, str], str | None]:
+    """Split a fact into its positional tokens and its keyed operands."""
+    positional: list[str] = []
+    keyed: dict[str, str] = {}
+    rest = line
+    while rest:
+        if rest.startswith(" "):
+            return positional, keyed, "a fact has one space between operands"
+        token, _, rest = rest.partition(" ")
+        # A quoted value may contain spaces; re-join until the quote closes.
+        if "=" in token and token.split("=", 1)[1].startswith('"'):
+            key, value = token.split("=", 1)
+            while not (len(value) > 1 and value.endswith('"') and not value.endswith('\\"')):
+                if not rest:
+                    return positional, keyed, "a quoted value is never closed"
+                more, _, rest = rest.partition(" ")
+                value = f"{value} {more}"
+            if key in keyed:
+                return positional, keyed, f"`{key}` appears more than once"
+            keyed[key] = value
+            continue
+        if "=" in token:
+            key, value = token.split("=", 1)
+            if key in keyed:
+                return positional, keyed, f"`{key}` appears more than once"
+            keyed[key] = value
+            continue
+        if keyed:
+            return positional, keyed, "a positional operand follows a keyed one"
+        positional.append(token)
+    return positional, keyed, None
+
+
+def match_template(positional: list[str]) -> tuple[str, dict] | None:
+    """The one fact type whose literal tokens these positionals satisfy."""
+    for name, spec in FACTS.items():
+        tokens = spec["template"].split(" ")
+        if len(tokens) != len(positional):
+            continue
+        if all(
+            want.startswith("<") or want == got
+            for want, got in zip(tokens, positional)
+        ):
+            return name, spec
+    return None
+
+
+def validate_fact(line: str) -> list[str]:
+    positional, keyed, problem = tokenize(line)
+    if problem:
+        return [f"{problem}: {line}"]
+    matched = match_template(positional)
+    if matched is None:
+        return [f"no fact type in record-facts.toml has this form: {line}"]
+    name, spec = matched
+
+    problems = []
+    allowed = set(spec.get("required", [])) | set(spec.get("optional", []))
+    for key in sorted(set(keyed) - allowed):
+        if not spec.get("open_keys"):
+            problems.append(f"{name} does not take `{key}`: {line}")
+    for key in sorted(set(spec.get("required", [])) - set(keyed)):
+        problems.append(f"{name} requires `{key}`: {line}")
+    for key, allowed_values in spec.get("values", {}).items():
+        if key in keyed and keyed[key] not in allowed_values:
+            problems.append(
+                f"{name} takes {key}={'|'.join(allowed_values)}, not {keyed[key]}: {line}"
+            )
+    for key in DIGEST_KEYS:
+        if key in keyed and not DIGEST.fullmatch(keyed[key]):
+            problems.append(
+                f"{key} is not 64 lowercase hexadecimal characters, which §9.3 requires: {line}"
+            )
+    return problems
+
+
+def elide_digests(lines: list[str]) -> list[str]:
+    """Drop digest *content*, never digest syntax.
+
+    `ignore_digests` exists so that a case about namespace collision is not also
+    a test of file hashing. It is not a licence to emit `sha256=garbage`, so the
+    syntax is validated in `validate_fact` before anything is elided here.
+    """
+    out = []
+    for line in lines:
+        out.append(
+            " ".join(
+                f"{token.split('=', 1)[0]}=<digest>"
+                if token.split("=", 1)[0] in DIGEST_KEYS and "=" in token
+                else token
+                for token in line.split(" ")
+            )
+        )
+    return out
+
+
+def compare_records(expected: bytes, actual: bytes, *, ignore_digests: bool) -> list[str]:
+    """The whole comparison: two sorted sets of valid facts, diffed."""
+    want, problems = read_record(expected)
+    if problems:
+        return [f"the case's own expected record is malformed: {p}" for p in problems]
+    got, problems = read_record(actual)
+    if problems:
+        return problems
+
+    for line in got:
+        problems.extend(validate_fact(line))
+    if problems:
+        return problems
 
     if got != sorted(got):
-        return ["the record is not in sorted order, which §1 of record-format.md requires"]
+        return ["the record is not in sorted order, which record-format.md §1 requires"]
     if len(set(got)) != len(got):
         return ["the record repeats a fact; each is stated exactly once"]
 
-    problems = []
+    if ignore_digests:
+        want, got = elide_digests(want), elide_digests(got)
+
     for line in sorted(set(want) - set(got)):
         problems.append(f"missing: {line}")
     for line in sorted(set(got) - set(want)):
@@ -132,6 +256,8 @@ def run_consumer(command: list[str], case: Case) -> tuple[int, dict]:
         [*command, str(case.directory / "input")],
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         timeout=300,
     )
     try:
@@ -181,8 +307,8 @@ def check(case: Case, exit_code: int, reported: dict) -> Result:
     if expected_record is not None:
         problems.extend(
             compare_records(
-                expected_record.read_text(encoding="utf-8"),
-                reported.get("record", ""),
+                expected_record.read_bytes(),
+                reported.get("record", "").encode("utf-8"),
                 ignore_digests=bool(case.spec.get("ignore_digests")),
             )
         )

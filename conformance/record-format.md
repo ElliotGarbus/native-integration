@@ -43,24 +43,40 @@ is what [run.py](run.py) does.
 
 ## 2. Lexical rules
 
-```
-fact      = verb SP operand *( SP operand )
-operand   = bare / key "=" value
-key       = 1*( lowercase / digit / "-" )
-value     = bare / quoted / list
-bare      = 1*( ALPHA / DIGIT / "." / "_" / "-" / ":" / "/" / "@" / "+" / "~" / "*" )
-quoted    = DQUOTE *( qchar ) DQUOTE
-qchar     = %x20-21 / %x23-5B / %x5D-10FFFF / "\" ( DQUOTE / "\" / "n" )
-list      = value *( "," value )
+```abnf
+fact       = verb SP operand *( SP operand )
+operand    = positional / keyed
+positional = scalar
+keyed      = key "=" value
+key        = 1*( %x61-7A / DIGIT / "-" )
+value      = scalar / list
+list       = scalar 2*( "," scalar )
+scalar     = bare / quoted
+bare       = 1*( ALPHA / DIGIT / "." / "_" / "-" / ":" / "/" / "@" / "+" / "~" / "*" )
+quoted     = DQUOTE *qchar DQUOTE
+qchar      = %x20-21 / %x23-5B / %x5D-10FFFF / escape
+escape     = "\" ( DQUOTE / "\" / "n" / "t" / "r" / "u" 4HEXDIG )
 ```
 
-- A value that is not `bare` **is** quoted. A value that is `bare` is **never**
-  quoted — one spelling per value, or the sort is not deterministic.
-- `\n` inside a quoted value is a line feed. No other escape exists; a tab, a
-  carriage return, or any other control character is written `\n`-free and
-  literal is not permitted, so prose is normalized to `\n` line breaks first.
-- List members are sorted bytewise and de-duplicated.
-- Keyed operands within one fact are sorted bytewise by key.
+- Every **positional** operand precedes every **keyed** one.
+- A keyed operand appears **at most once** in a fact. Repeating one is invalid,
+  not a second value.
+- A value that can be written `bare` **is** written bare; one that cannot **is**
+  quoted. One spelling per value, or the sort is not deterministic.
+- A **one-member list is a scalar**. `list` therefore takes two or more members,
+  which is what keeps it distinguishable. A reader expecting a list treats a
+  scalar as a list of one.
+- There is **no empty list**. Where a list would be empty the keyed operand is
+  omitted, and where its absence would lose a claim the claim gets a fact of its
+  own — `plist-array-key` is the case that needed one.
+- List members are sorted bytewise and de-duplicated. Keyed operands within one
+  fact are sorted bytewise by key.
+
+**Escaping is JSON's**, so that any string a TOML sidecar can hold has exactly
+one serialization here. `\n`, `\t`, `\r`, `\"` and `\\` are literal; every other
+character below `%x20`, and `%x7F`, is written `\uXXXX` with lowercase hex
+digits. Nothing is dropped and nothing is folded — a `reason` §6.4 requires to be
+kept and attributed is kept exactly.
 
 ### Normalization, before anything is written
 
@@ -78,8 +94,19 @@ iOS half of an application lives in its own file.
 
 ## 3. Facts
 
-Three verbs. The set is closed: a consumer emitting a verb this file does not
-define has emitted a record `run.py` will refuse.
+**[`record-facts.toml`](record-facts.toml) is the authoritative list**, and
+[run.py](run.py) enforces exactly what is in it. Each entry gives a fact's
+template, its required and optional keyed operands, and any closed vocabulary
+they take. A fact matching no template, or carrying a key its template does not
+allow, makes the record invalid — the line is rejected, never ignored, on
+[§4.4](../SPEC.md#44-unknown-declarations-fail-closed)'s reasoning one level up.
+
+The examples below are illustrations of forms defined there. They are not the
+definition: a format whose only specification is its examples is one two
+implementers can satisfy differently, which is the failure this file exists to
+prevent.
+
+Three verbs, and the set is closed.
 
 ### 3.1 `build`
 
@@ -104,18 +131,18 @@ contributes is one line.
 dist map-sdk version 4.1.0
 dist map-sdk contract 1
 dist map-sdk origin direct
-dist analytics-shim origin via=some-ui-lib
+dist analytics-shim origin transitive via=some-ui-lib
 ```
 
-`origin` is `direct`, or `via=` naming the producer's immediate dependents,
-sorted. Where several paths exist a consumer reports at least the immediate
-dependents, and what it reports is deterministic across runs.
+`origin` is `direct` or `transitive`; `via` names the producer's immediate
+dependents, sorted. Where several paths exist a consumer reports at least the
+immediate dependents, and what it reports is deterministic across runs.
 
 **Inputs** ([§9.3](../SPEC.md#93-hashed-inputs))
 
 ```
-dist map-sdk input java/com/example/maps/MapBridge.java sha256=9f2c…df92
-dist map-sdk input native.toml sha256=71ff…f28c
+dist map-sdk input java/com/example/maps/MapBridge.java sha256=9f2c17b40ae83d6512cc0947fa2b81d35e07c6a94b1f28d0e35ba7c61804df92
+dist map-sdk input native.toml sha256=71ff3ac8250b91e7d4a6c03fb8215de9074c1a6b39f52840cbe7d1904a63f28c
 ```
 
 **Ownership** ([§6.1](../SPEC.md#61-ownership))
@@ -154,8 +181,8 @@ dist map-sdk contributes gradle-repository https://maven.example.com/releases au
 dist map-sdk contributes permission android.permission.INTERNET reason="Map tile delivery"
 dist map-sdk contributes permission android.permission.ACCESS_FINE_LOCATION max-sdk=30 never-for-location=false
 dist map-sdk contributes feature android.hardware.location.gps required=false
-dist map-sdk contributes component org.example.maps.RedirectActivity kind=activity exported=true
-dist map-sdk contributes component com.vendor.sdk.Receiver kind=receiver exported=false from-dependency=com.vendor:sdk
+dist map-sdk contributes component org.example.maps.RedirectActivity kind=activity exported-required=true
+dist map-sdk contributes component com.vendor.sdk.Receiver kind=receiver from-dependency=com.vendor:sdk
 dist map-sdk contributes view-link org.example.maps.RedirectActivity host=oauth2redirect path-prefix=/callback scheme=myapp-oauth
 dist map-sdk contributes intent-filter org.example.maps.Messaging action=com.google.firebase.MESSAGING_EVENT
 dist map-sdk contributes keep org.example.maps.**
@@ -168,26 +195,40 @@ dist pycharting contributes symbol-prefix PyChart
 dist pycharting contributes accessed-api NSPrivacyAccessedAPICategoryUserDefaults reasons=CA92.1
 dist pycharting contributes plist-value CADisableMinimumFrameDurationOnPhone type=boolean value=true
 dist pycharting contributes plist-append LSApplicationQueriesSchemes value=examplescheme
+dist pycharting contributes plist-array-key LSApplicationQueriesSchemes
 dist pycharting contributes skadnetwork su67r6k2v3.skadnetwork
 dist pycharting contributes python-module web_views init=PyInit_WebViews swift-package=PyWebViews
 dist pycharting contributes objc-categories
 ```
 
+**A component records what the producer requested, never what the application
+answered.** [§9.1](../SPEC.md#91-the-lifecycle) splits the record in two: the
+accepted resolution is producer-originated and **gated**, while an export
+approval is one of the application's own answers and is explicitly *not*. So the
+contribution carries `exported-required`, and whether it was approved lives in a
+`decision approve-export` fact and nowhere else. Recording the outcome here
+would make an application answer read as a changed resolution and trip a gate
+§9.1 says must not apply to it.
+
 A `view-link`'s `<data>` attributes are written in the sidecar's snake-case
 spelling, not the platform's, so that a record does not depend on
 [§6.6](../SPEC.md#66-manifest-components)'s conversion having been performed.
+
 `plist-append` emits one fact per array member, which is what makes a
-de-duplicated union comparable.
+de-duplicated union comparable — and `plist-array-key` states the key's mode
+separately, because an empty `append` declaration still claims that key as
+array-valued for [§7.4](../SPEC.md#74-infoplist)'s one-mode rule and would
+otherwise vanish from the record entirely.
 
 **The resolved native graph** ([§6.3](../SPEC.md#63-gradle-dependencies),
 [§7.2](../SPEC.md#72-swift-packages))
 
 ```
-dist map-sdk artifact com.example.maps:android:4.1.0 sha256=0d3e…7b21
-dist map-sdk artifact com.squareup.okhttp3:okhttp:4.12.0 sha256=5b81…f9d0 transitive=true
-dist pycharting package https://github.com/example/charting requested=from:2.4.0 revision=8a1f…e15b version=2.4.0
-dist pycharting package https://github.com/example/charting-core revision=b73c…de77 transitive=true version=1.2.0
-dist pycharting binary-target ChartingRenderer.xcframework checksum=e11d…fa14
+dist map-sdk artifact com.example.maps:android:4.1.0 sha256=0d3e4f9a17c2b85e6dd0341fbb9a72c5e08d41a6f3c7b2905ea18d43f6c07b21
+dist map-sdk artifact com.squareup.okhttp3:okhttp:4.12.0 sha256=5b81c0f2d7a3946e18bb52c07f9d3a6418e2c5b09fa471d38c62e0ab7451f9d0 transitive=true
+dist pycharting package https://github.com/example/charting requested=from:2.4.0 revision=8a1f0c9e4b2d7f36a05c1e8b9d4427fa3c60e15b version=2.4.0
+dist pycharting package https://github.com/example/charting-core revision=b73c2ad91e604f8ab5d0c7e21f9836540ac1de77 transitive=true version=1.2.0
+dist pycharting binary-target ChartingRenderer.xcframework checksum=e11d5b0c93a726f4180dc35ba9f27e64108c3d95b2af7016e5c48d3b9207fa14
 ```
 
 **What resolved artifacts brought with them**
@@ -211,18 +252,18 @@ integration-wide, so they carry no `dist` subject — each names the distributio
 it affected instead.
 
 ```
-decision approve-export org.example.maps.RedirectActivity date=2026-08-24 distribution=map-sdk
+decision approve-export org.example.maps.RedirectActivity date=2026-08-24 distribution=map-sdk state=approved
+decision approve-export org.example.maps.PendingActivity distribution=map-sdk state=pending
 decision artifact-feature android.hardware.location.gps artifact=com.example.maps:android:4.1.0 date=2026-08-24 distribution=map-sdk keep=optional
 decision collision lib/arm64-v8a/libc++_shared.so artifacts=com.example.maps:android:4.1.0,com.vendor:sdk:2.0.0 chosen=com.example.maps:android:4.1.0 date=2026-08-24 decided=application distributions=analytics-shim,map-sdk
-decision credential-required package=https://git.example.com/vendor/vendorkit
-decision credential-required repository=https://maven.example.com/releases
+decision credential-required https://git.example.com/vendor/vendorkit kind=package
+decision credential-required https://maven.example.com/releases kind=repository
 decision suppress-permission android.permission.ACCESS_FINE_LOCATION date=2026-08-24 withdrew=analytics-shim,map-sdk
 ```
 
-`approve-export` is emitted for a component still **pending** too, as
-`state=pending` with no `date` — [§9.6](../SPEC.md#96-what-a-record-must-contain)
-requires "the approval's absence where a component is still pending" to be
-recoverable.
+A component still awaiting approval is `state=pending` with no `date`, which is
+how [§9.6](../SPEC.md#96-what-a-record-must-contain)'s "the approval's absence
+where a component is still pending" stays recoverable.
 
 **No credential value ever appears.** A `credential-required` fact states that a
 repository or package needs one; that is a fact about the integration, and the
@@ -271,8 +312,11 @@ to be recoverable, and the file is its own sorted order.
 ## 6. Digests in a fixture
 
 A fixture's `input` digests are the SHA-256 of the bytes in its own `input/`
-directory, so they are real and a consumer computes the same ones. Where a
-fixture does not exercise hashing, `run.py` accepts the digest placeholder form
-`sha256=<any 64 hex>` only when the case sets `ignore_digests = true`, which
-exists so that a case about, say, namespace collision is not also a test of file
-hashing.
+directory, so they are real and a consumer computes the same ones.
+
+Where a fixture is not about hashing, `ignore_digests = true` makes `run.py`
+compare digest **content** loosely — so a case about namespace collision is not
+also a test of file hashing. It does not relax the **syntax**: every `sha256`
+and `checksum` is 64 lowercase hexadecimal characters
+([§9.3](../SPEC.md#93-hashed-inputs)) whatever the case sets, and `run.py`
+rejects a record that abbreviates one before any comparison happens.

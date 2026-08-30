@@ -807,6 +807,9 @@ import gen_error_ids  # noqa: E402
 import gen_schema  # noqa: E402
 
 REGISTRY = tomllib.loads((ROOT / "contract" / "v1.toml").read_text(encoding="utf-8"))
+DIAGNOSTICS = tomllib.loads(
+    (ROOT / "contract" / "diagnostics-v1.toml").read_text(encoding="utf-8")
+)["diagnostics"]
 
 problems = []
 if gen_appendix_b.rewritten(NEW, gen_appendix_b.build(REGISTRY["declarations"])) != NEW:
@@ -1455,6 +1458,46 @@ try:
 except ImportError:  # pragma: no cover
     problems.append("jsonschema is not installed, so the negative cases were not exercised")
 check("the schema refuses what SPEC.md refuses, for the stated reason", problems)
+
+# --- 20. the conformance corpus obeys its own record format ------------------
+# `conformance/record-facts.toml` is the authoritative fact list, and a format
+# whose only specification is its examples is one two implementers can satisfy
+# differently. So both are held to it: every fixture's expected record, and
+# every example in the document that explains it.
+sys.path.insert(0, str(ROOT / "conformance"))
+import run as conformance_run  # noqa: E402
+
+problems = []
+for record in sorted((ROOT / "conformance").glob("*/*/expected/*.record")):
+    where = record.relative_to(ROOT)
+    lines, malformed = conformance_run.read_record(record.read_bytes())
+    problems.extend(f"{where}: {problem}" for problem in malformed)
+    if lines != sorted(lines):
+        problems.append(f"{where}: the file is not in sorted order")
+    if len(set(lines)) != len(lines):
+        problems.append(f"{where}: a fact is stated twice")
+    for line in lines:
+        problems.extend(f"{where}: {problem}" for problem in conformance_run.validate_fact(line))
+
+format_doc = (ROOT / "conformance" / "record-format.md").read_text(encoding="utf-8")
+for block in re.findall(r"```\n(.*?)```", format_doc, re.S):
+    for line in block.split("\n"):
+        if line and line.split(" ")[0] in ("build", "dist", "decision"):
+            problems.extend(
+                f"record-format.md: {problem}" for problem in conformance_run.validate_fact(line)
+            )
+
+for path in sorted((ROOT / "conformance").glob("*/*/case.toml")):
+    case = tomllib.loads(path.read_text(encoding="utf-8"))
+    where = path.relative_to(ROOT)
+    if case.get("outcome") not in ("accept", "blocking"):
+        problems.append(f"{where}: outcome is {case.get('outcome')!r}, not accept or blocking")
+    if case.get("profile") != path.parent.parent.name:
+        problems.append(f"{where}: profile {case.get('profile')!r} is not its directory")
+    for identifier in case.get("diagnostics", []) + case.get("advisories", []):
+        if identifier not in DIAGNOSTICS:
+            problems.append(f"{where}: expects {identifier}, which no generator emits")
+check("the conformance corpus obeys its own record format", problems)
 
 
 print()

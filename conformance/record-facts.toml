@@ -1,0 +1,318 @@
+# Every fact form a conformance record may contain.
+#
+# This file is the authoritative definition; `record-format.md` explains the
+# shape and the reasoning, and `run.py` enforces exactly what is written here.
+# Keeping the list machine-readable is what stops the format being specified by
+# its examples — two implementers reading only a grammar and a worked record can
+# produce different files while breaking no stated rule.
+#
+# Each entry is one fact type:
+#
+#   template   the fact's leading tokens. A bare word is a literal that must
+#              appear; a <name> is one positional operand.
+#   required   keyed operands that MUST appear
+#   optional   keyed operands that MAY appear
+#   open_keys  the keyed operands are the platform's vocabulary, not this
+#              document's, so unlisted keys are permitted (view-links only)
+#   values     for a keyed operand with a closed vocabulary
+#   section    the SPEC.md section the fact records
+#
+# A keyed operand appears at most once in a fact. A fact matching no template,
+# or carrying a key no template allows, is invalid — `run.py` rejects the record
+# rather than ignoring the line, on §4.4's reasoning one level up.
+
+# ------------------------------------------------------------------- build ---
+
+[facts."build.contract"]
+template = "build contract <version>"
+section = "4.3"
+
+[facts."build.platform"]
+template = "build platform <platform>"
+section = "9.2"
+[facts."build.platform".values]
+platform = ["android", "ios"]
+
+# -------------------------------------------------------- identity, inputs ---
+
+[facts."dist.version"]
+template = "dist <distribution> version <version>"
+section = "9.6"
+
+[facts."dist.contract"]
+template = "dist <distribution> contract <contract>"
+section = "4.3"
+
+# §3.2: how the producer entered the closure. `via` names the producer's
+# immediate dependents, sorted; a direct dependency has none.
+[facts."dist.origin"]
+template = "dist <distribution> origin <kind>"
+optional = ["via"]
+section = "3.2"
+[facts."dist.origin".values]
+kind = ["direct", "transitive"]
+
+[facts."dist.input"]
+template = "dist <distribution> input <path>"
+required = ["sha256"]
+section = "9.3"
+
+[facts."dist.owns"]
+template = "dist <distribution> owns java-namespace <namespace>"
+section = "6.1"
+
+# ------------------------------------------------------------ requirements ---
+
+[facts."dist.floor"]
+template = "dist <distribution> floor <key>"
+required = ["declared", "state"]
+optional = ["configured"]
+section = "5.1"
+[facts."dist.floor".values]
+state = ["met", "unmet"]
+
+# `key` is absent exactly when the kind is `inline` (§5.2). `date` and `version`
+# appear on a dismissal and nowhere else (§9.6).
+[facts."dist.value"]
+template = "dist <distribution> value <id>"
+required = ["kind", "state"]
+optional = ["key", "conditional", "date", "version"]
+section = "5.2"
+[facts."dist.value".values]
+kind = ["manifest_meta_data", "manifest_placeholder", "info_plist", "usage_description", "inline"]
+state = ["supplied", "unresolved", "dismissed"]
+conditional = ["true"]
+
+# `date` and `version` appear on an acknowledgement or a dismissal (§9.6).
+[facts."dist.action"]
+template = "dist <distribution> action <id>"
+required = ["state"]
+optional = ["conditional", "slot", "uses", "date", "version"]
+section = "5.3"
+[facts."dist.action".values]
+state = ["acknowledged", "unresolved", "dismissed"]
+conditional = ["true"]
+
+# ----------------------------------------------------------- contributions ---
+
+[facts."dist.contributes.source"]
+template = "dist <distribution> contributes source <path>"
+section = "6.2"
+
+[facts."dist.contributes.gradle-dependency"]
+template = "dist <distribution> contributes gradle-dependency <module>"
+required = ["configuration", "requested"]
+optional = ["resolved"]
+section = "6.3"
+[facts."dist.contributes.gradle-dependency".values]
+configuration = ["implementation", "api", "compileOnly", "runtimeOnly"]
+
+[facts."dist.contributes.gradle-repository"]
+template = "dist <distribution> contributes gradle-repository <url>"
+required = ["authenticated", "reason"]
+optional = ["groups", "modules"]
+section = "6.4"
+[facts."dist.contributes.gradle-repository".values]
+authenticated = ["true", "false"]
+
+[facts."dist.contributes.permission"]
+template = "dist <distribution> contributes permission <name>"
+optional = ["reason", "max-sdk", "never-for-location"]
+section = "6.5"
+[facts."dist.contributes.permission".values]
+never-for-location = ["true", "false"]
+
+# §6.5: every producer-declared feature is registered `required = false`.
+[facts."dist.contributes.feature"]
+template = "dist <distribution> contributes feature <name>"
+required = ["required"]
+section = "6.5"
+[facts."dist.contributes.feature".values]
+required = ["false"]
+
+# §9.1 separates what a producer originates from what the application answers.
+# A component records the producer's *request* — `exported-required` — and never
+# the approval, which is a `decision approve-export` fact. Recording the outcome
+# here would make an application answer look like a changed resolution and trip
+# the acceptance gate §9.1 deliberately does not apply to answers.
+[facts."dist.contributes.component"]
+template = "dist <distribution> contributes component <class>"
+required = ["kind"]
+optional = ["exported-required", "from-dependency", "foreground-service-type"]
+section = "6.6"
+[facts."dist.contributes.component".values]
+kind = ["service", "activity", "receiver"]
+exported-required = ["true"]
+
+# §6.6's `<data>` attribute names are Android's and Android adds to them, so the
+# keys here are open — the one place in this format where they are. They are
+# written in the sidecar's snake-case spelling, not the platform's, so a record
+# does not depend on the conversion having been performed.
+[facts."dist.contributes.view-link"]
+template = "dist <distribution> contributes view-link <class>"
+required = ["scheme"]
+open_keys = true
+section = "6.6"
+
+[facts."dist.contributes.intent-filter"]
+template = "dist <distribution> contributes intent-filter <class>"
+required = ["action"]
+section = "6.6"
+
+[facts."dist.contributes.keep"]
+template = "dist <distribution> contributes keep <pattern>"
+optional = ["from-dependency"]
+section = "6.7"
+
+[facts."dist.contributes.meta-data"]
+template = "dist <distribution> contributes meta-data <key>"
+required = ["type", "value"]
+section = "6.8"
+[facts."dist.contributes.meta-data".values]
+type = ["string", "integer", "boolean"]
+
+[facts."dist.contributes.query"]
+template = "dist <distribution> contributes query <target>"
+required = ["kind", "reason"]
+section = "6.9"
+[facts."dist.contributes.query".values]
+kind = ["package", "provider-authority"]
+
+[facts."dist.contributes.swift-package"]
+template = "dist <distribution> contributes swift-package <name>"
+required = ["products", "requirement", "url"]
+optional = ["credentials-required"]
+section = "7.2"
+[facts."dist.contributes.swift-package".values]
+credentials-required = ["true"]
+
+[facts."dist.contributes.swift-source"]
+template = "dist <distribution> contributes swift-source <path>"
+section = "7.3"
+
+[facts."dist.contributes.symbol-prefix"]
+template = "dist <distribution> contributes symbol-prefix <prefix>"
+section = "7.1"
+
+[facts."dist.contributes.accessed-api"]
+template = "dist <distribution> contributes accessed-api <type>"
+required = ["reasons"]
+section = "7.3"
+
+[facts."dist.contributes.plist-value"]
+template = "dist <distribution> contributes plist-value <key>"
+required = ["type", "value"]
+section = "7.4"
+[facts."dist.contributes.plist-value".values]
+type = ["string", "integer", "float", "boolean", "array"]
+
+# §7.4's one-mode rule: a key is claimed as array-valued by being declared under
+# `append`, and the claim stands even where the declared array is empty. The
+# claim is its own fact for exactly that reason — the members below would emit
+# nothing for an empty declaration and the claim would vanish.
+[facts."dist.contributes.plist-array-key"]
+template = "dist <distribution> contributes plist-array-key <key>"
+section = "7.4"
+
+[facts."dist.contributes.plist-append"]
+template = "dist <distribution> contributes plist-append <key>"
+required = ["value"]
+section = "7.4"
+
+[facts."dist.contributes.skadnetwork"]
+template = "dist <distribution> contributes skadnetwork <identifier>"
+section = "7.4"
+
+[facts."dist.contributes.python-module"]
+template = "dist <distribution> contributes python-module <name>"
+required = ["init", "swift-package"]
+section = "7.5"
+
+[facts."dist.contributes.objc-categories"]
+template = "dist <distribution> contributes objc-categories"
+section = "7.6"
+
+# ---------------------------------------------------- the resolved graph ---
+
+[facts."dist.artifact"]
+template = "dist <distribution> artifact <coordinate>"
+required = ["sha256"]
+optional = ["transitive"]
+section = "6.3"
+[facts."dist.artifact".values]
+transitive = ["true"]
+
+[facts."dist.package"]
+template = "dist <distribution> package <url>"
+required = ["revision", "version"]
+optional = ["requested", "transitive"]
+section = "7.2"
+[facts."dist.package".values]
+transitive = ["true"]
+
+[facts."dist.binary-target"]
+template = "dist <distribution> binary-target <name>"
+required = ["checksum"]
+section = "7.2"
+
+# ------------------------------ what resolved artifacts brought with them ---
+
+[facts."dist.artifact-declares.permission"]
+template = "dist <distribution> artifact-declares <coordinate> permission <name>"
+section = "9.4"
+
+[facts."dist.artifact-declares.feature"]
+template = "dist <distribution> artifact-declares <coordinate> feature <name>"
+required = ["required"]
+section = "9.4"
+[facts."dist.artifact-declares.feature".values]
+required = ["true", "false"]
+
+[facts."dist.artifact-declares.component"]
+template = "dist <distribution> artifact-declares <coordinate> component <class>"
+required = ["exported"]
+section = "9.4"
+[facts."dist.artifact-declares.component".values]
+exported = ["true", "false"]
+
+# --------------------------------------- the application's own decisions ---
+#
+# §2.2's answers joined by something other than (distribution, id). These are
+# integration-wide, so they carry no `dist` subject and name the distributions
+# they affected instead. §9.1 records them as they change and never gates them.
+
+[facts."decision.approve-export"]
+template = "decision approve-export <class>"
+required = ["distribution", "state"]
+optional = ["date"]
+section = "9.6"
+[facts."decision.approve-export".values]
+state = ["approved", "pending"]
+
+[facts."decision.suppress-permission"]
+template = "decision suppress-permission <name>"
+required = ["date", "withdrew"]
+section = "6.5"
+
+[facts."decision.artifact-feature"]
+template = "decision artifact-feature <name>"
+required = ["artifact", "date", "distribution", "keep"]
+section = "9.4"
+[facts."decision.artifact-feature".values]
+keep = ["required", "optional"]
+
+[facts."decision.collision"]
+template = "decision collision <path>"
+required = ["artifacts", "chosen", "date", "decided", "distributions"]
+section = "9.7"
+[facts."decision.collision".values]
+decided = ["application", "consumer"]
+
+# §9.5: that a repository or package needs a credential is a fact about the
+# integration; the credential is not, and never appears.
+[facts."decision.credential-required"]
+template = "decision credential-required <url>"
+required = ["kind"]
+section = "9.5"
+[facts."decision.credential-required".values]
+kind = ["repository", "package"]
