@@ -124,6 +124,12 @@ BARE = re.compile(r"[A-Za-z0-9._:/@+~*-]+")
 KEY = re.compile(r"[a-z0-9_-]+")
 ESCAPES = {'"': '"', "\\": "\\", "n": "\n", "t": "\t", "r": "\r"}
 
+#: The characters `\uXXXX` exists for: those with no literal form and no short
+#: escape of their own.
+NEEDS_UNICODE_ESCAPE = frozenset(
+    {chr(c) for c in range(0x20)} - {"\n", "\t", "\r"} | {chr(0x7F)}
+)
+
 
 class LexError(Exception):
     pass
@@ -136,6 +142,8 @@ def scan_scalar(line: str, i: int) -> tuple[str, str, int]:
     claim is that one value has one spelling, and a lexer that accepted two
     would let two consumers emit files that differ in bytes and agree in facts.
     """
+    if i >= len(line):
+        raise LexError("a value is missing where one is required")
     if line[i] == '"':
         out: list[str] = []
         j = i + 1
@@ -160,7 +168,16 @@ def scan_scalar(line: str, i: int) -> tuple[str, str, int]:
                         raise LexError(
                             f"`\\u{digits}` is not four lowercase hexadecimal digits"
                         )
-                    out.append(chr(int(digits, 16)))
+                    point = chr(int(digits, 16))
+                    # `\uXXXX` is for the characters that have no other
+                    # representation. A printable character written this way,
+                    # or a control that has a short escape, would give one
+                    # value two spellings and defeat the byte comparison.
+                    if point not in NEEDS_UNICODE_ESCAPE:
+                        raise LexError(
+                            f"`\\u{digits}` is written literally, or with its short escape"
+                        )
+                    out.append(point)
                     j += 6
                     continue
                 raise LexError(f"`\\{marker}` is not an escape this format defines")
@@ -197,6 +214,8 @@ def scan_value(line: str, i: int) -> tuple[list[str], str, int]:
         raws.append(raw)
         if i < len(line) and line[i] == ",":
             i += 1
+            if i >= len(line) or line[i] in ", ":
+                raise LexError("a list has a value between every pair of commas")
             continue
         break
     if len(members) > 1:
@@ -289,7 +308,19 @@ def validate_fact(line: str) -> list[str]:
     bound.update(keyed)
 
     allowed = set(spec.get("required", [])) | set(spec.get("optional", []))
-    if not spec.get("open_keys"):
+    if spec.get("open_keys"):
+        # §6.6 fixes the shape of a `<data>` attribute name even though the set
+        # is open: the conversion to an `android:` attribute is defined only
+        # for that shape, so a key outside it names nothing a consumer can
+        # write.
+        shape = re.compile(spec["open_key_pattern"])
+        for key in sorted(set(keyed) - allowed):
+            if not shape.fullmatch(key):
+                problems.append(
+                    f"{name} takes keys matching `{spec['open_key_pattern']}`, "
+                    f"and `{key}` does not: {line}"
+                )
+    else:
         for key in sorted(set(keyed) - allowed):
             problems.append(f"{name} does not take `{key}`: {line}")
     for key in sorted(set(spec.get("required", [])) - set(keyed)):
@@ -326,6 +357,34 @@ def validate_fact(line: str) -> list[str]:
     return problems
 
 
+def drop_unclaimed_advisories(lines: list[str], claimed: set[str]) -> list[str]:
+    """Remove operands an advisory obligation governs, unless the case claims it.
+
+    §6.5's permission `reason` is RECOMMENDED and carrying it into the record is
+    advisory S7. A fixed expected record cannot hold it unconditionally without
+    failing every consumer that does not implement S7 — and §8.5 is explicit
+    that an advisory is reported, never blocking. So the operand is compared
+    only in a case that asks for the advisory, and is dropped from both sides
+    everywhere else.
+    """
+    out = []
+    for line in lines:
+        try:
+            positional, _keyed, raw = lex(line)
+        except LexError:
+            out.append(line)
+            continue
+        matched = match_template(positional)
+        governed = {} if matched is None else matched[1].get("advisory_operands", {})
+        operands = [
+            f"{key}={raw[key]}"
+            for key in sorted(raw)
+            if governed.get(key) is None or governed[key] in claimed
+        ]
+        out.append(" ".join(positional + operands))
+    return out
+
+
 def elide_digests(lines: list[str]) -> list[str]:
     """Drop digest *content*, never digest syntax.
 
@@ -354,7 +413,9 @@ def elide_digests(lines: list[str]) -> list[str]:
     return out
 
 
-def compare_records(expected: bytes, actual: bytes, *, ignore_digests: bool) -> list[str]:
+def compare_records(
+    expected: bytes, actual: bytes, *, ignore_digests: bool, advisories: set[str]
+) -> list[str]:
     """The whole comparison: two sorted sets of valid facts, diffed."""
     want, problems = read_record(expected)
     if problems:
@@ -373,6 +434,8 @@ def compare_records(expected: bytes, actual: bytes, *, ignore_digests: bool) -> 
     if len(set(got)) != len(got):
         return ["the record repeats a fact; each is stated exactly once"]
 
+    want = drop_unclaimed_advisories(want, advisories)
+    got = drop_unclaimed_advisories(got, advisories)
     if ignore_digests:
         want, got = elide_digests(want), elide_digests(got)
 
@@ -423,7 +486,10 @@ def check(case: Case, exit_code: int, reported: dict) -> Result:
         want = set(case.spec.get(key, []))
         got = set(reported.get(key, []))
         for missing in sorted(want - got):
-            problems.append(f"{key}: expected {missing}, not reported")
+            if key == "advisories":
+                unsupported.append(f"advisory {missing}: the consumer does not claim it")
+            else:
+                problems.append(f"{key}: expected {missing}, not reported")
         if key == "diagnostics":
             # An unexpected advisory is a consumer being more helpful than the
             # case asked for; an unexpected blocking diagnostic is not.
@@ -448,6 +514,17 @@ def check(case: Case, exit_code: int, reported: dict) -> Result:
                 expected_record.read_bytes(),
                 reported.get("record", "").encode("utf-8"),
                 ignore_digests=bool(case.spec.get("ignore_digests")),
+                # The advisories the consumer actually claims, not the ones
+                # the case names. An advisory operand is compared only against
+                # a consumer that says it implements the obligation; §8.5 makes
+                # an advisory reported and never blocking, so a consumer that
+                # does not claim it leaves the case unsupported rather than
+                # failing it on a record difference the advisory caused.
+                advisories={
+                    identifier.rsplit(".", 1)[-1]
+                    for identifier in set(case.spec.get("advisories", []))
+                    & set(reported.get("advisories", []))
+                },
             )
         )
 

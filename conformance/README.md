@@ -71,7 +71,7 @@ S1–S4 are core, S5–S9 and S11–S13 Android, S10, S14 and S15 iOS.
 
 ## `case.toml`
 
-Two axes, deliberately. [§8.2](../SPEC.md#82-dispositions-and-what-recording-is-not)
+Three axes, deliberately. [§8.2](../SPEC.md#82-dispositions-and-what-recording-is-not)
 classifies **findings**; a numbered requirement that defines no finding is a
 conformance obligation, checked by inspecting what the consumer produced. One
 field cannot carry both, and collapsing them would invent a disposition the
@@ -100,7 +100,7 @@ assertions = []
 | `advisories` | advisory IDs expected. Reported, never blocking ([§8.5](../SPEC.md#85-advisory-obligations)) |
 | `assertions` | named postconditions on what the consumer produced — the record, the payload, the generated project |
 | `record` | the `expected/` file to compare against, when the case has one |
-| `ignore_digests` | the case is not about hashing, so `input` digests compare loosely |
+| `ignore_digests` | the case is not about hashing, so `input` digests compare loosely — in content only, never in syntax |
 
 An unsatisfied conditional requirement is neither blocking nor advisory
 ([§8.2](../SPEC.md#82-dispositions-and-what-recording-is-not)), and says so on
@@ -135,6 +135,24 @@ A consumer that cannot observe an assertion reports it **unsupported** rather
 than passing it. An assertion silently skipped is how a conformance claim
 overstates itself — the failure [§8.5](../SPEC.md#85-advisory-obligations)'s
 note already names for advisory obligations.
+
+### Advisories never fail a case
+
+[§8.5](../SPEC.md#85-advisory-obligations) makes an advisory obligation
+reported and never blocking, so a consumer that does not implement one is still
+conforming. A case that names an advisory therefore reports **unsupported**
+against such a consumer rather than failing it, and the run still exits 0.
+
+That has a consequence for the record. Some operands exist only because an
+advisory asks for them — a permission's `reason` is
+[§6.5](../SPEC.md#65-permissions-and-features)'s RECOMMENDED field, carried into
+the record by [S7](../SPEC.md#85-advisory-obligations). A fixed expected record
+cannot hold one unconditionally without failing every consumer that declines the
+advisory. So `record-facts.toml` marks those operands, and `run.py` compares one
+**only against a consumer that claims the advisory governing it** — dropping it
+from both sides otherwise. `android/S07_permission_reason` is the worked case:
+a consumer implementing S7 passes it, one that does not is unsupported, and both
+pass every case that does not name S7.
 
 ## Running it
 

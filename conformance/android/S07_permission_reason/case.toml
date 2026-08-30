@@ -1,0 +1,20 @@
+# §8.5 advisory S7: a consumer SHOULD carry a permission's `reason` into the
+# record and the report.
+#
+# This is the advisory axis, and it is the reason that axis exists. §6.5 makes
+# the `reason` RECOMMENDED, so a consumer that omits it is still conforming —
+# §8.5 says an advisory is reported and never blocks. A case that claims S7
+# therefore reports **unsupported**, not failed, against a consumer that does
+# not implement it, and the `reason` operand is compared only here.
+requirement = "S7"
+profile     = "android"
+section     = "6.5"
+
+outcome = "accept"
+
+diagnostics = []
+advisories  = ["ni.adv.S7"]
+
+assertions = []
+
+record = "android.record"

@@ -13,7 +13,11 @@
 #   required   keyed operands that MUST appear
 #   optional   keyed operands that MAY appear
 #   open_keys  the keyed operands are the platform's vocabulary, not this
-#              document's, so unlisted keys are permitted (view-links only)
+#              document's, so unlisted keys are permitted (view-links only).
+#              `open_key_pattern` fixes their shape even so
+#   advisory_operands
+#              operands an advisory obligation governs. Compared only in a case
+#              that claims that advisory, and dropped from both sides otherwise
 #   lists      keyed operands that may carry a comma-separated list. Every
 #              other operand is scalar; a positional operand always is
 #   values     a closed vocabulary, for a keyed operand or a placeholder
@@ -157,6 +161,11 @@ authenticated = ["true", "false"]
 template = "dist <distribution> contributes permission <name>"
 optional = ["reason", "max-sdk", "never-for-location"]
 section = "6.5"
+# §6.5 makes a permission `reason` RECOMMENDED, and carrying it into the record
+# is advisory S7 rather than a requirement — so it is compared only where a case
+# asks for S7.
+[facts."dist.contributes.permission".advisory_operands]
+reason = "S7"
 [facts."dist.contributes.permission".values]
 never-for-location = ["true", "false"]
 
@@ -193,6 +202,7 @@ exported-required = ["true"]
 template = "dist <distribution> contributes view-link <class>"
 required = ["scheme"]
 open_keys = true
+open_key_pattern = "[a-z][a-z0-9]*(_[a-z0-9]+)*"
 section = "6.6"
 
 [facts."dist.contributes.intent-filter"]

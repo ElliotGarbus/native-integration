@@ -1,0 +1,5 @@
+contract = "1"
+
+[[android.contributes.permissions]]
+name = "android.permission.INTERNET"
+reason = "Telemetry delivery"
