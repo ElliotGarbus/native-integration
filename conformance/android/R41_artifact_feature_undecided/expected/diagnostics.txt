@@ -1,0 +1,5 @@
+# Authored from §9.4's first exception. The artifact and the distribution that
+# pulled it in are both named, which is what makes the finding actionable — the
+# application chose neither.
+ni.req.41  pymaps  com.example.maps:android:4.1.0 declares android.hardware.location.gps
+           required="true", and the application has not decided whether to keep it

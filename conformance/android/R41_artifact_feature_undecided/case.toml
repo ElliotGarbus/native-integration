@@ -1,0 +1,29 @@
+# §8.4 requirement 41, via §9.4: a resolved artifact declaring
+# `<uses-feature required="true">` MUST NOT silently make hardware mandatory. A
+# consumer MUST report it, naming the artifact and the distribution that pulled
+# it in, and MUST **fail until the application decides** — keep it required, or
+# override it to `required="false"`.
+#
+# Category 1, and the sharpest version of the harm `R28` covers. There the
+# producer promoted a feature in its own sidecar, where §6.5 refuses it outright.
+# Here it arrives inside a compiled artifact that AGP merges, and §9.4 opens by
+# admitting this convention cannot restrict what a resolved artifact contains —
+# only surface it. So the gate is the application's decision, and a consumer
+# that resolves it automatically defeats the one control there is.
+#
+# §9.4's note is explicit that **either** automatic answer causes harm: leaving
+# it required silently shrinks device reach, and overriding it to false ships
+# onto hardware where the SDK cannot work. Neither is the consumer's call.
+#
+# The application answers nothing here. Nothing in the sidecar mentions the
+# feature; nothing the application wrote does either.
+requirement = 41
+profile     = "android"
+section     = "9.4"
+
+outcome = "blocking"
+
+diagnostics = ["ni.req.41"]
+advisories  = []
+
+assertions  = []

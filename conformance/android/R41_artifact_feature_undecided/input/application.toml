@@ -1,0 +1,6 @@
+[build]
+min_sdk = 26
+compile_sdk = 35
+
+# No `[answers.artifact_features]`. §9.4: the build fails until the application
+# decides, and the consumer resolves it in neither direction.

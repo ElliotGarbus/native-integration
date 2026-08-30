@@ -1,0 +1,9 @@
+[build]
+min_sdk = 26
+compile_sdk = 35
+
+# §2.2's row "Decide a resolved artifact's required feature", joined by the
+# feature `name`. §9.6 requires the date the decision was made.
+[answers.artifact_features."android.hardware.location.gps"]
+keep = "optional"
+date = "2026-08-24"

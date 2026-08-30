@@ -1,0 +1,27 @@
+# The other side of requirement 41, and the only case in the corpus that
+# exercises §9.4's record facts at all.
+#
+# The application has decided — override to `required="false"` — so the build
+# proceeds, and §9.4 requires the decision to be recorded. §9.6 requires the
+# record to carry the feature name, the artifact that declared it, the
+# distribution that pulled that artifact in, which way the application decided,
+# and the date.
+#
+# The record also carries what §9.4 requires reported for every resolved
+# artifact: its own permissions, features and components, attributed to the
+# **artifact** rather than to the sidecar that named the coordinate. That
+# attribution is the whole point of the section — an application author who
+# chose a Python package, not the Maven artifact underneath it, sees what it
+# brought.
+requirement = 41
+profile     = "android"
+section     = "9.4"
+
+outcome = "accept"
+
+diagnostics = []
+advisories  = []
+
+assertions  = []
+
+record = "android.record"

@@ -1,0 +1,11 @@
+contract = "1"
+
+[android.requires]
+min_sdk = 24
+
+# The sidecar declares only a coordinate. Everything §9.4 is about arrives
+# inside what that coordinate resolves to, which the sidecar never mentions and
+# the application never chose.
+[[android.contributes.gradle_dependencies]]
+module = "com.example.maps:android"
+version = { at_least = "4.0.0", below = "5.0.0" }

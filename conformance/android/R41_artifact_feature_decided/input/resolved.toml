@@ -1,0 +1,39 @@
+# What the consumer's own resolver would have returned for this closure.
+#
+# §9.4's obligations are about what a resolved artifact **declares**, not about
+# resolution itself, so a fixture that shipped real `.aar` files would be
+# testing Gradle rather than the consumer. This states the answer instead. See
+# conformance/README.md — a consumer under test is handed this and skips its own
+# resolution for the case.
+#
+# Nothing here is normative. It is the corpus standing in for a resolver.
+
+[[artifact]]
+coordinate = "com.example.maps:android:4.1.0"
+sha256 = "0d3e4f9a17c2b85e6dd0341fbb9a72c5e08d41a6f3c7b2905ea18d43f6c07b21"
+declared_by = "pymaps"
+
+  # §9.4: every <uses-permission>, <uses-feature> and component declared by the
+  # manifests of the resolved artifacts themselves.
+  [[artifact.permission]]
+  name = "com.example.permission.MAPS_ID"
+
+  # The category-1 half. §9.4: a resolved artifact declaring
+  # `required="true"` MUST NOT silently make hardware mandatory.
+  [[artifact.feature]]
+  name = "android.hardware.location.gps"
+  required = true
+
+  # §9.4's second exception: reported with the prominence a contributed export
+  # gets, though it needs no approval — nothing here can gate what AGP merges
+  # out of a compiled artifact.
+  [[artifact.component]]
+  name = "com.example.maps.PublicActivity"
+  kind = "activity"
+  exported = true
+
+[[artifact]]
+coordinate = "com.squareup.okhttp3:okhttp:4.12.0"
+sha256 = "5b81c0f2d7a3946e18bb52c07f9d3a6418e2c5b09fa471d38c62e0ab7451f9d0"
+declared_by = "pymaps"
+transitive = true

@@ -1521,6 +1521,26 @@ for path in sorted((ROOT / "conformance").glob("*/*/case.toml")):
     shipped = {s.parents[2].name.replace("_", "-") for s in sidecars}
     for orphan in sorted(shipped - declared):
         problems.append(f"{where}: {orphan} ships a sidecar and closure.toml does not name it")
+
+    # `resolved.toml` stands in for a resolver, so every artifact it states has
+    # to be attributable — §9.4's whole point is naming the distribution that
+    # pulled a thing in, and a fixture that could not would be testing nothing.
+    resolution = path.parent / "input" / "resolved.toml"
+    if resolution.exists():
+        stated = tomllib.loads(resolution.read_text(encoding="utf-8"))
+        for entry in stated.get("artifact", []) + stated.get("package", []):
+            subject = entry.get("coordinate") or entry.get("url", "?")
+            if entry.get("declared_by") not in declared:
+                problems.append(
+                    f"{where}: resolved.toml attributes {subject} to "
+                    f"{entry.get('declared_by')!r}, which the closure does not name"
+                )
+            for digest in (entry.get("sha256"), entry.get("checksum")):
+                if digest is not None and not re.fullmatch(r"[0-9a-f]{64}", digest):
+                    problems.append(f"{where}: {subject} has a digest §9.3 does not admit")
+            for feature in entry.get("feature", []):
+                if not isinstance(feature.get("required"), bool):
+                    problems.append(f"{where}: {subject} declares a feature with no `required`")
 check("the conformance corpus obeys its own record format", problems)
 
 

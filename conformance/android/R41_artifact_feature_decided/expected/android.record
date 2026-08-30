@@ -1,0 +1,14 @@
+build contract 1.0
+build platform android
+decision artifact-feature android.hardware.location.gps artifact=com.example.maps:android:4.1.0 date=2026-08-24 distribution=pymaps keep=optional
+dist pymaps artifact com.example.maps:android:4.1.0 sha256=0d3e4f9a17c2b85e6dd0341fbb9a72c5e08d41a6f3c7b2905ea18d43f6c07b21
+dist pymaps artifact com.squareup.okhttp3:okhttp:4.12.0 sha256=5b81c0f2d7a3946e18bb52c07f9d3a6418e2c5b09fa471d38c62e0ab7451f9d0 transitive=true
+dist pymaps artifact-declares com.example.maps:android:4.1.0 component com.example.maps.PublicActivity exported=true
+dist pymaps artifact-declares com.example.maps:android:4.1.0 feature android.hardware.location.gps required=true
+dist pymaps artifact-declares com.example.maps:android:4.1.0 permission com.example.permission.MAPS_ID
+dist pymaps contract 1
+dist pymaps contributes gradle-dependency com.example.maps:android configuration=implementation requested=range:4.0.0:5.0.0 resolved=4.1.0
+dist pymaps floor min_sdk configured=26 declared=24 state=met
+dist pymaps input native.toml sha256=bf48c8e428925b0a37cc5cc7075dfd3ac6be688ceb351f2ede63aa4f2119c763
+dist pymaps origin direct
+dist pymaps version 1.0.0

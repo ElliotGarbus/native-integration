@@ -57,6 +57,7 @@ for without resolving it.
 input/
   closure.toml        the resolved dependency closure for the target platform
   application.toml    the application's own configuration and answers
+  resolved.toml       optional — what the consumer's resolver would have returned
   <distribution>/     one tree per distribution, as installed
     <package>/_native/native.toml
 ```
@@ -72,6 +73,60 @@ requirement 1.
 must offer and deliberately not its syntax, so a consumer under test adapts this
 into whatever it actually reads. The corpus cannot mandate a spelling the
 specification refuses to.
+
+#### `resolved.toml`
+
+[§9.4](../SPEC.md#94-what-resolved-artifacts-bring-with-them) binds a consumer to
+what a **resolved artifact** declares — permissions, features and components in
+an `.aar`'s own manifest, and a `required="true"` feature it must fail on until
+the application decides. [§6.3](../SPEC.md#63-gradle-dependencies) and
+[§7.2](../SPEC.md#72-swift-packages) bind it to the locked graph, and
+[§9.7](../SPEC.md#97-packaging-collisions) to files colliding between artifacts.
+
+None of that is expressible by shipping sidecars. A corpus carrying real `.aar`
+files would be testing Gradle rather than the consumer, and could not run
+offline. So a case that needs resolution states its **result**:
+
+```toml
+[[artifact]]
+coordinate = "com.example.maps:android:4.1.0"
+sha256 = "0d3e…"
+declared_by = "pymaps"        # the distribution whose sidecar named it
+transitive = false            # optional, default false
+files = []                    # optional, for §9.7's collisions
+
+  [[artifact.permission]]
+  name = "com.example.permission.MAPS_ID"
+
+  [[artifact.feature]]
+  name = "android.hardware.location.gps"
+  required = true
+
+  [[artifact.component]]
+  name = "com.example.maps.PublicActivity"
+  kind = "activity"
+  exported = true
+
+[[package]]                   # the iOS counterpart, §7.2
+url = "https://github.com/example/charting"
+version = "2.4.0"
+revision = "8a1f0c9e4b2d7f36a05c1e8b9d4427fa3c60e15b"
+declared_by = "pycharting"
+
+  [[package.binary_target]]
+  name = "ChartingRenderer.xcframework"
+  checksum = "e11d…"
+```
+
+**A consumer under test takes this in place of resolving.** That is one more
+demand the corpus makes of a consumer's testability, alongside emitting a
+conformance record — and it is the same kind of demand: a way to be driven
+without its usual inputs. A consumer that cannot be told the answer cannot be
+run against §9.4 at all, and reports those cases **unverified**.
+
+Nothing in `resolved.toml` is normative. It is the corpus standing in for a
+resolver, and the digests in it are the fixture's own — no bytes exist for them
+to be computed from.
 
 Profiles follow [§8.1](../SPEC.md#81-conformance-is-per-platform). Advisory
 obligations carry no profile there, so each sits with the section it enforces:
@@ -195,10 +250,14 @@ is **dangerous** rather than merely wrong.
 | `android/R29_export_without_approval` | 29 | exports without approval, or registers unexported and ships a broken app |
 | `ios/R35_usage_description_contributed` | 35 | puts a producer's privacy claim in front of App Store review as the application's |
 | `ios/R35_capability_key_contributed` | 35 | grants a capability that then does not work, with no task stated |
+| `android/R41_artifact_feature_undecided` | 41 | lets an artifact make hardware mandatory without the application choosing |
 
-Two accept cases sit beside them so the corpus is not only negatives:
-`core/R01_dependency_closure` compares a record, and
-`android/S07_permission_reason` exercises the advisory axis.
+Three accept cases sit beside them so the corpus is not only negatives:
+`core/R01_dependency_closure` compares a record,
+`android/S07_permission_reason` exercises the advisory axis, and
+`android/R41_artifact_feature_decided` is the other side of requirement 41 —
+the application decided, so the build proceeds and §9.4's attribution has to
+appear in the record.
 
 ## Running it
 

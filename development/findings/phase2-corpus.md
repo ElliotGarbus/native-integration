@@ -7,8 +7,9 @@ test run does not say.
 
 ## What is covered
 
-Eight negatives, one per item on the brief's category-1 list, plus two accept
-cases so the corpus is not only negatives.
+Nine negatives — one per item on the brief's category-1 list, plus requirement
+41 once `resolved.toml` made it expressible — and three accept cases so the
+corpus is not only negatives.
 
 | Case | Req | Also caught by the Phase 1 schema? |
 | --- | --- | --- |
@@ -20,17 +21,18 @@ cases so the corpus is not only negatives.
 | `android/R29_export_without_approval` | 29 | no — needs the application's answers |
 | `ios/R35_usage_description_contributed` | 35 | **yes** — a refused key name |
 | `ios/R35_capability_key_contributed` | 35 | **yes** — a refused key name |
+| `android/R41_artifact_feature_undecided` | 41 | no — needs the resolved graph |
 
-Three of eight are structural, and Phase 1's schema already refuses them. That
+Three of nine are structural, and Phase 1's schema already refuses them. That
 split is worth keeping visible: it says the schema is carrying about a third of
-the dangerous cases, and the other five are exactly the ones needing the
-dependency closure, the application's answers, or the wheel's own files — which
-is the boundary Phase 1 drew and Phase 3 inherits.
+the dangerous cases, and the other six are exactly the ones needing the
+dependency closure, the application's answers, the wheel's own files, or the
+resolved graph — which is the boundary Phase 1 drew and Phase 3 inherits.
 
 Verified by running the corpus against two stubs: a conforming one passes all
-ten, and one that accepts every negative fails all eight and exits 1.
+twelve, and one that accepts every negative fails all nine and exits 1.
 
-## Three gaps, none of them papered over
+## Three gaps — one closed here, two standing
 
 ### 1. §4.1's symlink clause has no portable fixture
 
@@ -50,7 +52,7 @@ case where the platform cannot. That is a change to the input layout, which the
 gate on the record format was explicitly about not making casually, so it is
 recorded rather than done.
 
-### 2. Requirement 41 needs resolved artifacts, which `input/` cannot express
+### 2. Requirement 41 needs resolved artifacts — CLOSED, by `resolved.toml`
 
 §9.4's exception is squarely category 1: a resolved artifact declaring
 `<uses-feature required="true">` **MUST NOT** silently make hardware mandatory,
@@ -58,17 +60,31 @@ and a consumer must fail until the application decides. It is the same harm as
 `android/R28_feature_required_promotion` arriving by the path §9.4 exists to
 surface.
 
-It cannot be fixtured today. `input/` describes distributions and their
-sidecars; requirement 41 needs a resolved `.aar` with its own
-`AndroidManifest.xml`, which means either shipping binary artifacts in the
-corpus or defining a fixture form for "what resolution would have returned".
+`input/` described distributions and their sidecars, and requirement 41 needs a
+resolved `.aar` with its own `AndroidManifest.xml` — which meant either shipping
+binary artifacts in the corpus, or defining a fixture form for what resolution
+would have returned.
 
-**What would close it:** a `resolved.toml` per case, stating the artifacts a
-consumer's resolver would have produced and what each declares. That is
-inventing an input the specification does not describe, so it needs deciding
-rather than assuming — and it also decides whether the corpus can ever test
-§6.3's locking, §9.7's packaging collisions, or §6.7's classpath check, all of
-which have the same shape.
+**Closed, by the second.** `input/resolved.toml` states what a consumer's resolver would have
+returned — artifacts with their digests, what each one's own manifest declares,
+and the Swift-package counterpart with its binary-target checksums. Two cases
+follow: `android/R41_artifact_feature_undecided`, the category-1 negative, and
+`android/R41_artifact_feature_decided`, which is the only case exercising §9.4's
+record facts at all.
+
+Two consequences worth stating, because neither is free.
+
+**It asks something more of a consumer.** A consumer under test must accept a
+stated resolution in place of resolving, which is a second testability demand
+after emitting a conformance record. Both are the same kind of demand — a way to
+be driven without its usual inputs — and a consumer that cannot be told the
+answer reports these cases unverified rather than passing them.
+
+**It unblocks three more requirement families**, which is most of why it was
+worth doing: §6.3's locked graph and per-artifact SHA-256, §9.7's packaging
+collisions (the `files` list on an artifact is there for it), and §6.7's check
+that a `from_dependency` keep matches no class from outside that dependency.
+None is fixtured yet; all three are now expressible.
 
 ### 3. §7.4's refusal registers have no declaration-level diagnostic id
 
