@@ -145,6 +145,78 @@ much larger interface than a conformance corpus should define on its own — and
 claiming verification the harness does not perform would be exactly the
 overstatement §8.5's note warns about. Better a table that says which is which.
 
+## A second review, and what a passing case was worth
+
+A later round found seven more, all valid. Three are worth setting down, because
+each is the same failure in a different place: **a case can pass for a reason
+that has nothing to do with the requirement it names.**
+
+- **`R44_packaging_collision` could not tell §9.7's two rows apart.** It mixed a
+  native library, a `META-INF/` subdirectory entry and `META-INF/LICENSE`, and
+  expected blocking. A consumer that blocked on *every* colliding path — getting
+  the first row backwards, and so refusing most real closures, since
+  `META-INF/LICENSE` collides "from almost any pair of libraries" — produced the
+  expected outcome and the expected id. It passed. `R44_metadata_collision_resolved`
+  is the other half: metadata-only collisions, accepted, with §9.6's collision
+  row in the record. Written as a 30-line consumer implementing exactly the naive
+  rule, that consumer now passes the first case and fails the second.
+- **`R36_python_module_registered` asserted an exclusion with nothing to
+  exclude.** The distribution shipped no `web_views.py` and no `web_views.pyi`,
+  so the payload check held vacuously against a consumer that implements no
+  exclusion at all. Both files are now in the fixture, at the top level where
+  `sys.path` would find them.
+- **`R30` and `R41_artifact_feature_decided` checked the record, which is not
+  the obligation.** R30's record carries `ssp_prefix` in the sidecar's own
+  spelling — deliberately, so the record does not depend on the conversion, and
+  therefore cannot show the conversion happened. R41's record states the
+  application's decision, not that the decision was applied. Both passed a
+  consumer that recorded its intention and did nothing.
+
+The fix for the third is the one that moved the boundary above: the harness now
+reads **one** more thing a consumer produces, the effective merged manifest at
+`<outputs>/manifest.xml`, and two adapters check it — every view-link attribute
+on a single element, and a `<uses-feature>` carrying the decision. Both derive
+what they look for from the fixture rather than from a vocabulary of ours, which
+is what keeps §6.6's open attribute set open. That is still far short of parsing
+a generated project, and the rest of the table stays attested.
+
+Also fixed: `--profile android` ran the eleven Android requirements *without the
+core*, so the documented invocation reported green over a selection §8.1 does
+not admit as a claim. A platform profile now brings the core with it. And
+requirement 24's check rejected every `.java`, `.kt` and `.swift` in the payload
+— including an application's own, which no requirement forbids — where it should
+reject the files the sidecars contribute; it now derives them, by name and by
+bytes.
+
+### What actually establishes that a fixture discriminates
+
+Every case in this corpus has been run against stubs, which pass by
+construction: that is evidence about the harness, not about the fixtures. The
+useful test is the opposite one — break exactly one thing and see exactly one
+case fail.
+
+| what was broken | result |
+| --- | --- |
+| nothing | 54 passed |
+| drop `ssp_prefix` from the manifest | R30 alone |
+| spread one view link across two `<data>` tags | R30 alone |
+| merge the artifact's `required="true"` anyway | R41-decided alone |
+| ship `web_views.py` | R36 alone |
+| ship contributed source | R01, both platforms |
+| ship the **application's** own `.java` | still green, which is the point |
+| ship the sidecar | R01, both platforms |
+| choose the other artifact for `META-INF/LICENSE` | still green — §9.7 leaves the rule to the consumer, and `run.py` elides `chosen` where a decision says `decided=consumer` |
+| block on every collision | R44-metadata alone, R44-packaging still passing |
+
+Three of those rows were green before this round, for the wrong reason.
+
+**And the harness no longer crashes on a consumer that misbehaves.** A command
+that cannot be launched, one that never returns, and a record carrying a lone
+surrogate — which JSON accepts and UTF-8 cannot hold — each raised out of
+`run.py` and abandoned every case after the offending one. A suite whose purpose
+is to report on consumers that misbehave cannot treat misbehaviour as its own
+bug.
+
 ## Core cases run for both platforms
 
 The review round that found the harness defects ended with a correction worth
