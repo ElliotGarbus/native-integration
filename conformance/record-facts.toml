@@ -14,7 +14,11 @@
 #   optional   keyed operands that MAY appear
 #   open_keys  the keyed operands are the platform's vocabulary, not this
 #              document's, so unlisted keys are permitted (view-links only)
-#   values     for a keyed operand with a closed vocabulary
+#   values     a closed vocabulary, for a keyed operand or a placeholder
+#   rules      conditional operand rules — a field required or forbidden
+#              depending on another operand's value. `required_if` and
+#              `forbidden_if` name a key (a placeholder or a keyed operand) and
+#              either `values` or `not_values`
 #   section    the SPEC.md section the fact records
 #
 # A keyed operand appears at most once in a fact. A fact matching no template,
@@ -51,6 +55,10 @@ optional = ["via"]
 section = "3.2"
 [facts."dist.origin".values]
 kind = ["direct", "transitive"]
+[[facts."dist.origin".rules]]
+field = "via"
+required_if = { key = "kind", values = ["transitive"] }
+forbidden_if = { key = "kind", values = ["direct"] }
 
 [facts."dist.input"]
 template = "dist <distribution> input <path>"
@@ -82,6 +90,20 @@ section = "5.2"
 kind = ["manifest_meta_data", "manifest_placeholder", "info_plist", "usage_description", "inline"]
 state = ["supplied", "unresolved", "dismissed"]
 conditional = ["true"]
+# §5.2: `key` is required for every kind but `inline`, where it MUST be absent.
+[[facts."dist.value".rules]]
+field = "key"
+required_if = { key = "kind", not_values = ["inline"] }
+forbidden_if = { key = "kind", values = ["inline"] }
+# §9.6: a dismissal carries the version it was made against and the date.
+[[facts."dist.value".rules]]
+field = "date"
+required_if = { key = "state", values = ["dismissed"] }
+forbidden_if = { key = "state", values = ["supplied", "unresolved"] }
+[[facts."dist.value".rules]]
+field = "version"
+required_if = { key = "state", values = ["dismissed"] }
+forbidden_if = { key = "state", values = ["supplied", "unresolved"] }
 
 # `date` and `version` appear on an acknowledgement or a dismissal (§9.6).
 [facts."dist.action"]
@@ -92,6 +114,17 @@ section = "5.3"
 [facts."dist.action".values]
 state = ["acknowledged", "unresolved", "dismissed"]
 conditional = ["true"]
+# §9.6: an acknowledgement or a dismissal carries the distribution version it
+# was made against and the date it was made; an unresolved requirement has
+# neither, because nothing has been claimed yet.
+[[facts."dist.action".rules]]
+field = "date"
+required_if = { key = "state", values = ["acknowledged", "dismissed"] }
+forbidden_if = { key = "state", values = ["unresolved"] }
+[[facts."dist.action".rules]]
+field = "version"
+required_if = { key = "state", values = ["acknowledged", "dismissed"] }
+forbidden_if = { key = "state", values = ["unresolved"] }
 
 # ----------------------------------------------------------- contributions ---
 
@@ -146,8 +179,11 @@ exported-required = ["true"]
 
 # §6.6's `<data>` attribute names are Android's and Android adds to them, so the
 # keys here are open — the one place in this format where they are. They are
-# written in the sidecar's snake-case spelling, not the platform's, so a record
-# does not depend on the conversion having been performed.
+# written in the **sidecar's spelling, verbatim**, which is snake_case: a record
+# must not depend on §6.6's conversion to an `android:` attribute name having
+# been performed, and re-spelling them here would be performing half of it. This
+# is why the `key` production admits `_` at all; every key this document names
+# itself is kebab-case.
 [facts."dist.contributes.view-link"]
 template = "dist <distribution> contributes view-link <class>"
 required = ["scheme"]
@@ -181,10 +217,16 @@ kind = ["package", "provider-authority"]
 [facts."dist.contributes.swift-package"]
 template = "dist <distribution> contributes swift-package <name>"
 required = ["products", "requirement", "url"]
-optional = ["credentials-required"]
+optional = ["credentials-required", "reason"]
 section = "7.2"
 [facts."dist.contributes.swift-package".values]
 credentials-required = ["true"]
+# §7.2: `reason` is REQUIRED where the package declares `credentials-required`,
+# and OPTIONAL otherwise — where §6.4's merge rule still keeps every one of them
+# attributed to the distribution that wrote it.
+[[facts."dist.contributes.swift-package".rules]]
+field = "reason"
+required_if = { key = "credentials-required", values = ["true"] }
 
 [facts."dist.contributes.swift-source"]
 template = "dist <distribution> contributes swift-source <path>"
@@ -288,6 +330,12 @@ optional = ["date"]
 section = "9.6"
 [facts."decision.approve-export".values]
 state = ["approved", "pending"]
+# §9.6: a decision carries the date it was made. A pending component records
+# the approval's *absence*, so there is no date to carry.
+[[facts."decision.approve-export".rules]]
+field = "date"
+required_if = { key = "state", values = ["approved"] }
+forbidden_if = { key = "state", values = ["pending"] }
 
 [facts."decision.suppress-permission"]
 template = "decision suppress-permission <name>"

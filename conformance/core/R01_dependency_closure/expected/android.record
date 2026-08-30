@@ -3,11 +3,11 @@ build platform android
 dist examplytics contract 1
 dist examplytics contributes permission android.permission.INTERNET reason="Event delivery"
 dist examplytics contributes source java/org/example/analytics/Bridge.java
-dist examplytics floor compile_sdk declared=35 configured=35 state=met
-dist examplytics floor min_sdk declared=24 configured=26 state=met
+dist examplytics floor compile_sdk configured=35 declared=35 state=met
+dist examplytics floor min_sdk configured=26 declared=24 state=met
 dist examplytics input java/org/example/analytics/Bridge.java sha256=22ea0ee0c3006cac66f6d0240d32ac4c3dc6828179de7084d34c6ba3adce2836
 dist examplytics input native.toml sha256=3de10e32e5acdc2e46c4a3b55a1263a3a0547188407fb799d39df73e5e2b0a5a
 dist examplytics origin direct
 dist examplytics owns java-namespace org.example.analytics
-dist examplytics value analytics_key kind=manifest_meta_data key=com.example.analytics.API_KEY state=supplied
+dist examplytics value analytics_key key=com.example.analytics.API_KEY kind=manifest_meta_data state=supplied
 dist examplytics version 1.0.0

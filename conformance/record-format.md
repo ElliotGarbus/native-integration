@@ -155,13 +155,13 @@ dist map-sdk owns java-namespace org.example.maps
 [§5.4](../SPEC.md#54-how-a-requirement-is-satisfied))
 
 ```
-dist map-sdk floor min_sdk declared=24 configured=26 state=met
-dist map-sdk value maps_api_key kind=manifest_meta_data key=com.example.maps.API_KEY state=supplied
-dist map-sdk value maps_optional kind=inline conditional=true state=dismissed date=2026-08-24 version=4.1.0
-dist map-sdk action map_deep_links state=acknowledged date=2026-08-24 version=4.1.0
+dist map-sdk floor min_sdk configured=26 declared=24 state=met
+dist map-sdk value maps_api_key key=com.example.maps.API_KEY kind=manifest_meta_data state=supplied
+dist map-sdk value maps_optional conditional=true date=2026-08-24 kind=inline state=dismissed version=4.1.0
+dist map-sdk action map_deep_links date=2026-08-24 state=acknowledged version=4.1.0
 dist map-sdk action map_offline_cache conditional=true state=unresolved
-dist map-sdk action airship_nse slot=com.apple.usernotifications.service conditional=true state=unresolved
-dist map-sdk action app_group_entitlement uses=app_group_id state=unresolved
+dist map-sdk action airship_nse conditional=true slot=com.apple.usernotifications.service state=unresolved
+dist map-sdk action app_group_entitlement state=unresolved uses=app_group_id
 ```
 
 `state` is one of `met` / `unmet` (floors), or `supplied` / `unresolved` /
@@ -181,14 +181,14 @@ dist map-sdk contributes gradle-repository https://maven.example.com/releases au
 dist map-sdk contributes permission android.permission.INTERNET reason="Map tile delivery"
 dist map-sdk contributes permission android.permission.ACCESS_FINE_LOCATION max-sdk=30 never-for-location=false
 dist map-sdk contributes feature android.hardware.location.gps required=false
-dist map-sdk contributes component org.example.maps.RedirectActivity kind=activity exported-required=true
-dist map-sdk contributes component com.vendor.sdk.Receiver kind=receiver from-dependency=com.vendor:sdk
-dist map-sdk contributes view-link org.example.maps.RedirectActivity host=oauth2redirect path-prefix=/callback scheme=myapp-oauth
+dist map-sdk contributes component org.example.maps.RedirectActivity exported-required=true kind=activity
+dist map-sdk contributes component com.vendor.sdk.Receiver from-dependency=com.vendor:sdk kind=receiver
+dist map-sdk contributes view-link org.example.maps.RedirectActivity host=oauth2redirect path_prefix=/callback scheme=myapp-oauth
 dist map-sdk contributes intent-filter org.example.maps.Messaging action=com.google.firebase.MESSAGING_EVENT
 dist map-sdk contributes keep org.example.maps.**
 dist map-sdk contributes keep okhttp3.** from-dependency=com.squareup.okhttp3:okhttp
 dist map-sdk contributes meta-data com.example.maps.MODE type=string value=fast
-dist map-sdk contributes query package=com.google.android.apps.healthdata reason="Availability check"
+dist map-sdk contributes query com.google.android.apps.healthdata kind=package reason="Availability check"
 dist pycharting contributes swift-package Charting products=Charting requirement=from:2.4.0 url=https://github.com/example/charting
 dist pycharting contributes swift-source swift/Shim.swift
 dist pycharting contributes symbol-prefix PyChart
@@ -210,9 +210,12 @@ contribution carries `exported-required`, and whether it was approved lives in a
 would make an application answer read as a changed resolution and trip a gate
 §9.1 says must not apply to it.
 
-A `view-link`'s `<data>` attributes are written in the sidecar's snake-case
-spelling, not the platform's, so that a record does not depend on
-[§6.6](../SPEC.md#66-manifest-components)'s conversion having been performed.
+A `view-link`'s `<data>` attributes are written in the **sidecar's spelling,
+verbatim** — `path_prefix`, not `pathPrefix` and not `path-prefix`. A record must
+not depend on [§6.6](../SPEC.md#66-manifest-components)'s conversion to an
+`android:` attribute name having been performed, and re-spelling them here would
+be performing half of it. They are the one place `key` admits `_`; every key
+this format names itself is kebab-case.
 
 `plist-append` emits one fact per array member, which is what makes a
 de-duplicated union comparable — and `plist-array-key` states the key's mode
@@ -296,13 +299,13 @@ build platform android
 dist examplytics contract 1
 dist examplytics contributes permission android.permission.INTERNET reason="Event delivery"
 dist examplytics contributes source java/org/example/analytics/Bridge.java
-dist examplytics floor compile_sdk declared=35 configured=35 state=met
-dist examplytics floor min_sdk declared=24 configured=26 state=met
+dist examplytics floor compile_sdk configured=35 declared=35 state=met
+dist examplytics floor min_sdk configured=26 declared=24 state=met
 dist examplytics input java/org/example/analytics/Bridge.java sha256=22ea0ee0c3006cac66f6d0240d32ac4c3dc6828179de7084d34c6ba3adce2836
 dist examplytics input native.toml sha256=3de10e32e5acdc2e46c4a3b55a1263a3a0547188407fb799d39df73e5e2b0a5a
 dist examplytics origin direct
 dist examplytics owns java-namespace org.example.analytics
-dist examplytics value analytics_key kind=manifest_meta_data key=com.example.analytics.API_KEY state=supplied
+dist examplytics value analytics_key key=com.example.analytics.API_KEY kind=manifest_meta_data state=supplied
 dist examplytics version 1.0.0
 ```
 

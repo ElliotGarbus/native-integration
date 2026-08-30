@@ -120,79 +120,190 @@ def read_record(raw: bytes) -> tuple[list[str], list[str]]:
     return lines, problems
 
 
-def tokenize(line: str) -> tuple[list[str], dict[str, str], str | None]:
-    """Split a fact into its positional tokens and its keyed operands."""
+BARE = re.compile(r"[A-Za-z0-9._:/@+~*-]+")
+KEY = re.compile(r"[a-z0-9_-]+")
+ESCAPES = {'"': '"', "\\": "\\", "n": "\n", "t": "\t", "r": "\r"}
+
+
+class LexError(Exception):
+    pass
+
+
+def scan_scalar(line: str, i: int) -> tuple[str, str, int]:
+    """One scalar from `line` at `i`. Returns (decoded, raw, next index).
+
+    Canonicalization is checked here rather than after the fact: the format's
+    claim is that one value has one spelling, and a lexer that accepted two
+    would let two consumers emit files that differ in bytes and agree in facts.
+    """
+    if line[i] == '"':
+        out: list[str] = []
+        j = i + 1
+        while True:
+            if j >= len(line):
+                raise LexError("a quoted value is never closed")
+            char = line[j]
+            if char == '"':
+                j += 1
+                break
+            if char == "\\":
+                if j + 1 >= len(line):
+                    raise LexError("a quoted value ends inside an escape")
+                marker = line[j + 1]
+                if marker in ESCAPES:
+                    out.append(ESCAPES[marker])
+                    j += 2
+                    continue
+                if marker == "u":
+                    digits = line[j + 2 : j + 6]
+                    if len(digits) != 4 or any(d not in "0123456789abcdef" for d in digits):
+                        raise LexError(
+                            f"`\\u{digits}` is not four lowercase hexadecimal digits"
+                        )
+                    out.append(chr(int(digits, 16)))
+                    j += 6
+                    continue
+                raise LexError(f"`\\{marker}` is not an escape this format defines")
+            if ord(char) < 0x20 or ord(char) == 0x7F:
+                raise LexError("a control character is written as an escape, never literally")
+            out.append(char)
+            j += 1
+        decoded = "".join(out)
+        if decoded and BARE.fullmatch(decoded):
+            raise LexError(f'`{decoded}` is bare, so it is never quoted')
+        return decoded, line[i:j], j
+
+    match = BARE.match(line, i)
+    if not match:
+        raise LexError(f"`{line[i]}` begins no value this format defines")
+    return match.group(0), match.group(0), match.end()
+
+
+def scan_value(line: str, i: int) -> tuple[list[str], int]:
+    """A scalar, or a list of two or more of them."""
+    members: list[str] = []
+    while True:
+        decoded, _, i = scan_scalar(line, i)
+        members.append(decoded)
+        if i < len(line) and line[i] == ",":
+            i += 1
+            continue
+        break
+    if len(members) > 1:
+        if members != sorted(members):
+            raise LexError("a list is sorted bytewise")
+        if len(set(members)) != len(members):
+            raise LexError("a list is de-duplicated")
+    return members, i
+
+
+def lex(line: str) -> tuple[list[str], dict[str, list[str]]]:
+    """A fact as its positional operands and its keyed ones."""
     positional: list[str] = []
-    keyed: dict[str, str] = {}
-    rest = line
-    while rest:
-        if rest.startswith(" "):
-            return positional, keyed, "a fact has one space between operands"
-        token, _, rest = rest.partition(" ")
-        # A quoted value may contain spaces; re-join until the quote closes.
-        if "=" in token and token.split("=", 1)[1].startswith('"'):
-            key, value = token.split("=", 1)
-            while not (len(value) > 1 and value.endswith('"') and not value.endswith('\\"')):
-                if not rest:
-                    return positional, keyed, "a quoted value is never closed"
-                more, _, rest = rest.partition(" ")
-                value = f"{value} {more}"
+    keyed: dict[str, list[str]] = {}
+    order: list[str] = []
+    i = 0
+    while i < len(line):
+        if line[i] == " ":
+            raise LexError("operands are separated by exactly one space")
+        key_match = KEY.match(line, i)
+        if key_match and line[key_match.end() : key_match.end() + 1] == "=":
+            key = key_match.group(0)
             if key in keyed:
-                return positional, keyed, f"`{key}` appears more than once"
-            keyed[key] = value
-            continue
-        if "=" in token:
-            key, value = token.split("=", 1)
-            if key in keyed:
-                return positional, keyed, f"`{key}` appears more than once"
-            keyed[key] = value
-            continue
-        if keyed:
-            return positional, keyed, "a positional operand follows a keyed one"
-        positional.append(token)
-    return positional, keyed, None
+                raise LexError(f"`{key}` appears more than once")
+            values, i = scan_value(line, key_match.end() + 1)
+            keyed[key] = values
+            order.append(key)
+        else:
+            if keyed:
+                raise LexError("a positional operand follows a keyed one")
+            decoded, _, i = scan_scalar(line, i)
+            positional.append(decoded)
+        if i < len(line):
+            if line[i] != " ":
+                raise LexError("operands are separated by exactly one space")
+            i += 1
+            if i >= len(line):
+                raise LexError("the fact ends in a space")
+    if order != sorted(order):
+        raise LexError("keyed operands are sorted bytewise by key")
+    return positional, keyed
 
 
-def match_template(positional: list[str]) -> tuple[str, dict] | None:
-    """The one fact type whose literal tokens these positionals satisfy."""
+def match_template(positional: list[str]) -> tuple[str, dict, dict[str, str]] | None:
+    """The fact type these positionals satisfy, and its placeholder bindings."""
     for name, spec in FACTS.items():
         tokens = spec["template"].split(" ")
         if len(tokens) != len(positional):
             continue
-        if all(
-            want.startswith("<") or want == got
-            for want, got in zip(tokens, positional)
-        ):
-            return name, spec
+        bindings = {}
+        for want, got in zip(tokens, positional):
+            if want.startswith("<"):
+                bindings[want.strip("<>")] = got
+            elif want != got:
+                break
+        else:
+            return name, spec, bindings
     return None
 
 
+def satisfied(condition: dict, bound: dict[str, list[str]]) -> bool:
+    """Whether a conditional rule's `if` half holds for this fact."""
+    present = bound.get(condition["key"])
+    if present is None:
+        return False
+    if "values" in condition:
+        return any(v in condition["values"] for v in present)
+    if "not_values" in condition:
+        return all(v not in condition["not_values"] for v in present)
+    return True
+
+
 def validate_fact(line: str) -> list[str]:
-    positional, keyed, problem = tokenize(line)
-    if problem:
+    try:
+        positional, keyed = lex(line)
+    except LexError as problem:
         return [f"{problem}: {line}"]
+
     matched = match_template(positional)
     if matched is None:
         return [f"no fact type in record-facts.toml has this form: {line}"]
-    name, spec = matched
+    name, spec, bindings = matched
 
-    problems = []
+    problems: list[str] = []
+    # Placeholder bindings and keyed operands share one namespace, so a
+    # conditional rule may test either.
+    bound: dict[str, list[str]] = {k: [v] for k, v in bindings.items()}
+    bound.update(keyed)
+
     allowed = set(spec.get("required", [])) | set(spec.get("optional", []))
-    for key in sorted(set(keyed) - allowed):
-        if not spec.get("open_keys"):
+    if not spec.get("open_keys"):
+        for key in sorted(set(keyed) - allowed):
             problems.append(f"{name} does not take `{key}`: {line}")
     for key in sorted(set(spec.get("required", [])) - set(keyed)):
         problems.append(f"{name} requires `{key}`: {line}")
+
     for key, allowed_values in spec.get("values", {}).items():
-        if key in keyed and keyed[key] not in allowed_values:
-            problems.append(
-                f"{name} takes {key}={'|'.join(allowed_values)}, not {keyed[key]}: {line}"
-            )
+        for value in bound.get(key, []):
+            if value not in allowed_values:
+                problems.append(
+                    f"{name} takes {key}={'|'.join(allowed_values)}, not {value}: {line}"
+                )
+
+    for rule in spec.get("rules", []):
+        field = rule["field"]
+        if "required_if" in rule and satisfied(rule["required_if"], bound) and field not in keyed:
+            problems.append(f"{name} requires `{field}` here: {line}")
+        if "forbidden_if" in rule and satisfied(rule["forbidden_if"], bound) and field in keyed:
+            problems.append(f"{name} does not take `{field}` here: {line}")
+
     for key in DIGEST_KEYS:
-        if key in keyed and not DIGEST.fullmatch(keyed[key]):
-            problems.append(
-                f"{key} is not 64 lowercase hexadecimal characters, which §9.3 requires: {line}"
-            )
+        for value in keyed.get(key, []):
+            if not DIGEST.fullmatch(value):
+                problems.append(
+                    f"{key} is not 64 lowercase hexadecimal characters, "
+                    f"which §9.3 requires: {line}"
+                )
     return problems
 
 

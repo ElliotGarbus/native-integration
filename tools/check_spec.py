@@ -1480,7 +1480,10 @@ for record in sorted((ROOT / "conformance").glob("*/*/expected/*.record")):
         problems.extend(f"{where}: {problem}" for problem in conformance_run.validate_fact(line))
 
 format_doc = (ROOT / "conformance" / "record-format.md").read_text(encoding="utf-8")
-for block in re.findall(r"```\n(.*?)```", format_doc, re.S):
+# The language tag matters: `r"```\n(.*?)```"` skips a tagged fence as an
+# opener, then pairs its closing fence with the next opening one — so alternate
+# blocks go unchecked, which is how an invalid `query` example survived.
+for block in re.findall(r"```[a-z]*\n(.*?)```", format_doc, re.S):
     for line in block.split("\n"):
         if line and line.split(" ")[0] in ("build", "dist", "decision"):
             problems.extend(
