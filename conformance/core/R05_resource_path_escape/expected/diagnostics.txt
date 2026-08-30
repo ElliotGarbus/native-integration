@@ -1,0 +1,6 @@
+# Authored from §4.1, not from any implementation's output. A consumer's wording
+# is its own; what requirement 18 fixes is that the distribution is named.
+#
+# Not read by run.py — the case asserts the diagnostic ID and the outcome. This
+# file records what the diagnostic has to convey.
+ni.req.5  pyescape  `../../../outside` escapes the sidecar directory

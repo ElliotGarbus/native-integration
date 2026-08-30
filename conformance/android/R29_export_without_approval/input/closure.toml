@@ -1,0 +1,7 @@
+platform = "android"
+
+[[distribution]]
+name = "pyoauth"
+version = "1.4.0"
+origin = "transitive"
+entry_point = "pyoauth._native"

@@ -1,0 +1,9 @@
+contract = "1"
+
+# §6.1 rule 4: an owned namespace under a reserved prefix is rejected. This one
+# is a toolchain bootstrap namespace, and the class below is its entry point.
+[android.owns]
+java_namespaces = ["org.kivy.android"]
+
+[android.contributes.src]
+java = ["java"]

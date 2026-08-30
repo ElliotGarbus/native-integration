@@ -1,0 +1,8 @@
+contract = "1"
+
+[[android.requires.application_value]]
+id = "analytics_key"
+kind = "manifest_meta_data"
+key = "com.example.analytics.API_KEY"
+reason = "Your project key, from the vendor console"
+placeholder = "<TODO: your Examplytics project key>"

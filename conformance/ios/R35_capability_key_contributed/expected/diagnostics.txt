@@ -1,0 +1,3 @@
+# Authored from §7.4's capability-key table, which names `UIBackgroundModes` as
+# granting the application background execution.
+ni.req.35  pypush  `UIBackgroundModes` grants a capability a producer may not contribute

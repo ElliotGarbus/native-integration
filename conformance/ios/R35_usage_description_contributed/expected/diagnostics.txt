@@ -1,0 +1,2 @@
+# Authored from §7.4's "Usage descriptions are not contributable" clause.
+ni.req.35  pycamera  `NSCameraUsageDescription` is user-facing text a producer may not contribute

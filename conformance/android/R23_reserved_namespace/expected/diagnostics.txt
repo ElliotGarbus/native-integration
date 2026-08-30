@@ -1,0 +1,2 @@
+# Authored from §6.1 rule 4 and its reserved-prefix list.
+ni.req.23  pysquatter  `org.kivy.android` is a reserved bootstrap namespace

@@ -1,0 +1,28 @@
+# §8.4 requirement 28, via §6.5: `required` is not a field of a feature entry. A
+# producer MUST NOT declare it, and a consumer MUST reject it "with a diagnostic
+# naming this rule — not the generic unknown-key message", treat every
+# producer-declared feature as `required = false`, and never promote one on a
+# producer's declaration alone.
+#
+# Category 1. §6.5's note states the harm: whether an application *requires*
+# Bluetooth or merely uses it when present is a property of the application, and
+# a producer promoting a feature silently removes the application from every
+# device lacking that hardware. The application does not find out from a build
+# failure; it finds out from its install base.
+#
+# Two diagnostics, because §6.5 asks for a specific one. The declaration-level
+# id is the rule-naming diagnostic; a consumer reporting only the generic
+# unknown-key message has not met the clause.
+requirement = 28
+profile     = "android"
+section     = "6.5"
+
+outcome = "blocking"
+
+diagnostics = [
+  "ni.decl.android.contributes.features.required.forbidden",
+  "ni.req.28",
+]
+advisories  = []
+
+assertions  = []

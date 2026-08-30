@@ -1,0 +1,7 @@
+platform = "android"
+
+[[distribution]]
+name = "pysquatter"
+version = "1.0.0"
+origin = "transitive"
+entry_point = "pysquatter._native"

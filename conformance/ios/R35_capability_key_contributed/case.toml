@@ -1,0 +1,24 @@
+# §8.4 requirement 35, via §7.4: a consumer MUST reject a capability or
+# external-reach key "in `values` and in `append` alike", naming the
+# distribution and directing the producer to state an action.
+#
+# Category 1. §7.4 names three things that put a key on that list — a producer's
+# entry changes what the application may do, who may install it, or what may
+# reach it from outside. `UIBackgroundModes` is the first: it grants background
+# execution. And §5.5's note names the failure mode precisely — the key lands in
+# the plist, the background mode does not actually work, because the entitlement
+# and the App Store declaration behind it were never part of the transaction.
+# A false-complete state is worse than a stated task.
+#
+# Declared through `append` deliberately: §7.4 states the refusal for both
+# modes, and `values` is the half a consumer is likelier to have implemented.
+requirement = 35
+profile     = "ios"
+section     = "7.4"
+
+outcome = "blocking"
+
+diagnostics = ["ni.req.35"]
+advisories  = []
+
+assertions  = ["no_invented_value"]

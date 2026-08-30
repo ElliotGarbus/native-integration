@@ -1,0 +1,8 @@
+[build]
+min_sdk = 26
+compile_sdk = 35
+
+# The scaffold, unedited. §5.4: satisfied when the application has supplied a
+# non-empty string **that is not the placeholder**.
+[answers.values]
+"pyanalytics.analytics_key" = "<TODO: your Examplytics project key>"

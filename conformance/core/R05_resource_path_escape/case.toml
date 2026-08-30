@@ -1,0 +1,25 @@
+# §8.4 requirement 5, via §4.1: every path a sidecar declares is interpreted
+# relative to `native.toml` and MUST NOT escape its directory, checked after
+# normalization and symlink resolution.
+#
+# Category 1. A consumer that resolves this root and stages what it finds
+# compiles whatever happens to sit outside the sidecar — in a wheel, anything
+# else the distribution ships; in an editable or path install, anything else on
+# the machine. The declaration reaches past the boundary the whole convention
+# is bounded by.
+#
+# `..` is the plain form. §4.1 also rejects a *symlinked* resource, which this
+# corpus cannot yet carry: git stores a symlink as a mode bit that a checkout
+# without symlink support silently turns into a regular file holding the target
+# path, so the fixture would test something different on different machines.
+# Recorded in development/findings/phase2-corpus.md rather than faked.
+requirement = 5
+profile     = "core"
+section     = "4.1"
+
+outcome = "blocking"
+
+diagnostics = ["ni.req.5"]
+advisories  = []
+
+assertions  = ["no_producer_import"]

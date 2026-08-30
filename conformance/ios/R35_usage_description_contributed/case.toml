@@ -1,0 +1,22 @@
+# §8.4 requirement 35, via §7.4: "Usage descriptions are not contributable." A
+# consumer MUST reject any `values` key whose name ends in `UsageDescription`,
+# naming the distribution and directing the producer to §5.2's
+# `usage_description` kind.
+#
+# Category 1 — this is a producer writing user-facing text. §7.4 says what the
+# text is: shown to the user, localized, read by App Store review, and a claim
+# about what *the application* does with the data. A consumer that writes a
+# producer's sentence into the plist has the application making a privacy claim
+# it never wrote, to a reviewer who will hold it to it.
+#
+# The suffix is the whole test, which is what makes this checkable at all.
+requirement = 35
+profile     = "ios"
+section     = "7.4"
+
+outcome = "blocking"
+
+diagnostics = ["ni.req.35"]
+advisories  = []
+
+assertions  = ["no_invented_value"]

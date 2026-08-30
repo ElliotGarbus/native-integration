@@ -40,8 +40,16 @@ conformance/
     <Rnn>_<slug>/
       case.toml             what this case asserts
       input/                the sidecars, and the application's answers
-      expected/             the conformance record, or the diagnostics
+      expected/             the conformance record, and a diagnostics note
 ```
+
+`expected/` holds the conformance record where the case has one. A blocking case
+has no resolution to record, so it carries `diagnostics.txt` instead — a
+human-readable note saying what the diagnostic has to convey, authored from the
+specification like everything else here. **`run.py` does not read it**: the case
+asserts the diagnostic *id* and the outcome, because §8 fixes neither a consumer's
+wording nor its format. The note is there so a reader can see what the id stands
+for without resolving it.
 
 ### `input/`
 
@@ -127,6 +135,8 @@ advisory — which is why it is a separate axis rather than a third disposition.
 | `every_diagnostic_names_a_distribution` | 18 |
 | `instructions_attributed_to_producer` | 21 |
 | `no_credential_in_record` | 42 |
+| `no_invented_value` | 16 — nothing application-owned was originated from a producer's declaration |
+| `no_unexported_fallback` | 29 — an unapproved `exported_required` component was not registered unexported instead |
 | `record_contains` / `record_omits` | 43, and any row of [§9.6](../SPEC.md#96-what-a-record-must-contain) |
 | `activity_extends_component_activity` | 45 |
 | `url_callback_observable` | 46 |
@@ -169,6 +179,26 @@ advisory. So `record-facts.toml` marks those operands, and `run.py` compares one
 from both sides otherwise. `android/S07_permission_reason` is the worked case:
 a consumer implementing S7 passes it, one that does not is unsupported, and both
 pass every case that does not name S7.
+
+## What is here
+
+Category 1 first, per the work brief: the cases where a non-conforming consumer
+is **dangerous** rather than merely wrong.
+
+| Case | Requirement | What a wrong consumer does |
+| --- | --- | --- |
+| `core/R05_resource_path_escape` | 5 | stages files from outside the sidecar directory |
+| `core/R13_placeholder_not_an_answer` | 13 | takes the producer's own placeholder as the application's answer |
+| `android/R23_owned_namespace_collision` | 23 | lets one distribution's class silently replace another's |
+| `android/R23_reserved_namespace` | 23 | lets a package replace the toolchain's entry point |
+| `android/R28_feature_required_promotion` | 28 | removes the application from every device lacking the hardware |
+| `android/R29_export_without_approval` | 29 | exports without approval, or registers unexported and ships a broken app |
+| `ios/R35_usage_description_contributed` | 35 | puts a producer's privacy claim in front of App Store review as the application's |
+| `ios/R35_capability_key_contributed` | 35 | grants a capability that then does not work, with no task stated |
+
+Two accept cases sit beside them so the corpus is not only negatives:
+`core/R01_dependency_closure` compares a record, and
+`android/S07_permission_reason` exercises the advisory axis.
 
 ## Running it
 

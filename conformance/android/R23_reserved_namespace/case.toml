@@ -1,0 +1,22 @@
+# §8.4 requirement 23, via §6.1 rule 4: an owned namespace under a reserved
+# prefix is rejected.
+#
+# Category 1, and §6.1's own note says why: a distribution shipping
+# `org/kivy/android/PythonActivity.java` silently replaces the application's
+# entry point. The reserved list is consumer-independent so that one toolchain's
+# runtime cannot be clobbered because a different toolchain built the
+# application — which means a consumer that only defends its *own* bootstrap
+# namespace is non-conforming even though its own builds look fine.
+#
+# `org.kivy.android` is on §6.1's list. Containment is computed on dot-separated
+# segments, so this is an exact occupation and not a prefix accident.
+requirement = 23
+profile     = "android"
+section     = "6.1"
+
+outcome = "blocking"
+
+diagnostics = ["ni.req.23"]
+advisories  = []
+
+assertions  = []

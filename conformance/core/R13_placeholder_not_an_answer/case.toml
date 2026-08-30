@@ -1,0 +1,23 @@
+# §8.4 requirement 13, via §5.2 and §5.4: a value is satisfied when the
+# application "has supplied a non-empty string that is not the placeholder", and
+# a consumer MUST NOT treat a scaffolded placeholder as a supplied value.
+#
+# Category 1 — this is the producer answering its own requirement. The
+# placeholder is the *producer's* text, scaffolded by the consumer; taking it as
+# an answer means the application never supplied the value and the build
+# proceeded anyway. §2.3 is explicit that scaffolding is a command the author
+# runs, not a side effect, and §5.4 that only the author's own string satisfies.
+#
+# The application here has answered — with the placeholder, verbatim, which is
+# what an author who ran the scaffold and did not edit it leaves behind. That is
+# the case a consumer comparing "is the key present?" gets wrong.
+requirement = 13
+profile     = "core"
+section     = "5.4"
+
+outcome = "blocking"
+
+diagnostics = ["ni.req.13"]
+advisories  = []
+
+assertions  = ["no_invented_value"]

@@ -1500,6 +1500,27 @@ for path in sorted((ROOT / "conformance").glob("*/*/case.toml")):
     for identifier in case.get("diagnostics", []) + case.get("advisories", []):
         if identifier not in DIAGNOSTICS:
             problems.append(f"{where}: expects {identifier}, which no generator emits")
+
+    # Structural hygiene. A case missing its closure is a case the harness will
+    # hand a consumer with nothing to read, and it would pass silently.
+    for required in ("closure.toml", "application.toml"):
+        if not (path.parent / "input" / required).exists():
+            problems.append(f"{where}: input/ has no {required}")
+    sidecars = list((path.parent / "input").glob("*/*/_native/native.toml"))
+    if not sidecars:
+        problems.append(f"{where}: input/ carries no sidecar")
+    for sidecar in sidecars:
+        try:
+            tomllib.loads(sidecar.read_text(encoding="utf-8"))
+        except tomllib.TOMLDecodeError as exc:
+            problems.append(f"{where}: {sidecar.name} does not parse: {exc}")
+    closure = tomllib.loads((path.parent / "input" / "closure.toml").read_text(encoding="utf-8"))
+    if closure.get("platform") not in ("android", "ios"):
+        problems.append(f"{where}: closure.toml names no platform this document defines")
+    declared = {d["name"] for d in closure.get("distribution", [])}
+    shipped = {s.parents[2].name.replace("_", "-") for s in sidecars}
+    for orphan in sorted(shipped - declared):
+        problems.append(f"{where}: {orphan} ships a sidecar and closure.toml does not name it")
 check("the conformance corpus obeys its own record format", problems)
 
 

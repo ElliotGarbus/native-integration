@@ -1,0 +1,9 @@
+contract = "1"
+
+[android.owns]
+java_namespaces = ["org.pyescape"]
+
+# The source root climbs out of the sidecar directory. §4.1: a path MUST NOT
+# escape, checked after normalization.
+[android.contributes.src]
+java = ["../../../outside"]

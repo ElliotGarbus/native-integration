@@ -1,0 +1,12 @@
+contract = "1"
+
+[[android.contributes.permissions]]
+name = "android.permission.BLUETOOTH_SCAN"
+reason = "Discovering nearby devices"
+
+# §6.5: `required` is not a field here. Only the application may promote a
+# feature; a producer declaring it removes the application from devices without
+# the hardware.
+[[android.contributes.features]]
+name = "android.hardware.bluetooth_le"
+required = true

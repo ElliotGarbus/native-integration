@@ -1,0 +1,24 @@
+# §8.4 requirement 29, via §6.6: a consumer MUST NOT register a component as
+# exported without explicit application approval, MUST report the pending
+# requirement naming the distribution and the `reason`, and where approval is
+# absent MUST fail — "It MUST NOT fall back to registering the component
+# unexported."
+#
+# Category 1, and it is the case with two wrong answers rather than one. A
+# consumer that exports without approval gives every other app on the device a
+# reachable surface the application never agreed to. A consumer that quietly
+# registers it unexported instead builds an application that compiles, installs,
+# and does not work — §6.6 says the producer has already declared the component
+# useless unless reachable.
+#
+# The application answers nothing here, which is the state a first build is in.
+requirement = 29
+profile     = "android"
+section     = "6.6"
+
+outcome = "blocking"
+
+diagnostics = ["ni.req.29"]
+advisories  = []
+
+assertions  = ["no_unexported_fallback"]

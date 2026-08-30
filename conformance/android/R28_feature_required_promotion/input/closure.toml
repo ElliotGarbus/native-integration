@@ -1,0 +1,7 @@
+platform = "android"
+
+[[distribution]]
+name = "pybluetooth"
+version = "3.1.0"
+origin = "transitive"
+entry_point = "pybluetooth._native"

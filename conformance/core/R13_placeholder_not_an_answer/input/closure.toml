@@ -1,0 +1,7 @@
+platform = "android"
+
+[[distribution]]
+name = "pyanalytics"
+version = "2.0.0"
+origin = "direct"
+entry_point = "pyanalytics._native"

@@ -1,0 +1,2 @@
+# Authored from §5.4's satisfaction table, not from any implementation's output.
+ni.req.13  pyanalytics  `analytics_key` is still the placeholder, so it is unsupplied

@@ -1,0 +1,7 @@
+platform = "ios"
+
+[[distribution]]
+name = "pypush"
+version = "2.2.0"
+origin = "transitive"
+entry_point = "pypush._native"

@@ -1,0 +1,4 @@
+# Authored from §6.6's export clause. The `reason` is carried because §6.6 and
+# requirement 11 both require an unmet requirement to be reported with it.
+ni.req.29  pyoauth  `org.pyoauth.RedirectActivity` requests export and the application has not approved it
+           reason: Receives the OAuth redirect from the browser

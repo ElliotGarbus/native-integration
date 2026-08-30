@@ -1,0 +1,15 @@
+contract = "1"
+
+[android.owns]
+java_namespaces = ["org.pyoauth"]
+
+[android.contributes.src]
+java = ["java"]
+
+# §6.6: `exported_required` is a *request*. Without the application's approval
+# the build fails; it does not fall back to an unexported registration.
+[[android.contributes.components]]
+kind = "activity"
+name = "org.pyoauth.RedirectActivity"
+exported_required = true
+reason = "Receives the OAuth redirect from the browser"

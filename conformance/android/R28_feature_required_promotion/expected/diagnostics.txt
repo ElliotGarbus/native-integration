@@ -1,0 +1,3 @@
+# Authored from §6.5's "Features are never required" clause, which asks for a
+# diagnostic naming that rule rather than the generic unknown-key message.
+ni.decl.android.contributes.features.required.forbidden  pybluetooth  `required` is not a field of a feature entry

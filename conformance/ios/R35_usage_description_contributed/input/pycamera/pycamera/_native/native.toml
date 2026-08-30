@@ -1,0 +1,8 @@
+contract = "1"
+platforms = ["ios"]
+
+# §7.4: a `values` key ending in `UsageDescription` is rejected. This text is
+# the application's to write — §5.2's `usage_description` kind is the channel,
+# and it makes the application supply the sentence.
+[ios.contributes.info_plist.values]
+NSCameraUsageDescription = "This app uses the camera."

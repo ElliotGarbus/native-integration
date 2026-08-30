@@ -1,0 +1,8 @@
+contract = "1"
+platforms = ["ios"]
+
+# §7.4: a capability key is refused in `values` and in `append` alike. Granting
+# the application background execution is not the producer's to do; §5.3's
+# action is the channel, and the application acknowledges it.
+[ios.contributes.info_plist.append]
+UIBackgroundModes = ["remote-notification"]
