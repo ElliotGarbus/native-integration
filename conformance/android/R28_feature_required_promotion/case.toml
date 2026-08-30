@@ -20,8 +20,8 @@ section     = "6.5"
 outcome = "blocking"
 
 diagnostics = [
-  "ni.decl.android.contributes.features.required.forbidden",
-  "ni.req.28",
+  { id = "ni.decl.android.contributes.features.required.forbidden", distributions = ["pybluetooth"] },
+  { id = "ni.req.28", distributions = ["pybluetooth"] },
 ]
 advisories  = []
 

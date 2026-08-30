@@ -1500,6 +1500,9 @@ for path in sorted((ROOT / "conformance").glob("*/*/case.toml")):
     # §8.1 assigns each numbered requirement to exactly one profile, and the
     # generated diagnostics carry that assignment. A case filed elsewhere would
     # be handed to a consumer that never owed the requirement.
+    closure = tomllib.loads((path.parent / "input" / "closure.toml").read_text(encoding="utf-8"))
+    declared = {d["name"] for d in closure.get("distribution", [])}
+
     identifier = f"ni.req.{case.get('requirement')}"
     if identifier in DIAGNOSTICS:
         owner = DIAGNOSTICS[identifier]["profile"]
@@ -1508,9 +1511,19 @@ for path in sorted((ROOT / "conformance").glob("*/*/case.toml")):
                 f"{where}: requirement {case['requirement']} is §8.1's {owner} profile, "
                 f"not {case.get('profile')!r}"
             )
-    for identifier in case.get("diagnostics", []) + case.get("advisories", []):
-        if identifier not in DIAGNOSTICS:
-            problems.append(f"{where}: expects {identifier}, which no generator emits")
+    for finding in case.get("diagnostics", []) + case.get("advisories", []):
+        if finding["id"] not in DIAGNOSTICS:
+            problems.append(f"{where}: expects {finding['id']}, which no generator emits")
+        # Requirement 18: every diagnostic names the contributing distribution,
+        # so a case that expects one has to say which — otherwise the corpus
+        # checks the id and leaves the attribution to a self-attested boolean.
+        if not finding.get("distributions"):
+            problems.append(f"{where}: {finding['id']} names no distribution")
+        for named in finding.get("distributions", []):
+            if named not in declared:
+                problems.append(
+                    f"{where}: {finding['id']} names {named}, which the closure does not"
+                )
 
     # Structural hygiene. A case missing its closure is a case the harness will
     # hand a consumer with nothing to read, and it would pass silently.
@@ -1525,10 +1538,8 @@ for path in sorted((ROOT / "conformance").glob("*/*/case.toml")):
             tomllib.loads(sidecar.read_text(encoding="utf-8"))
         except tomllib.TOMLDecodeError as exc:
             problems.append(f"{where}: {sidecar.name} does not parse: {exc}")
-    closure = tomllib.loads((path.parent / "input" / "closure.toml").read_text(encoding="utf-8"))
     if closure.get("platform") not in ("android", "ios"):
         problems.append(f"{where}: closure.toml names no platform this document defines")
-    declared = {d["name"] for d in closure.get("distribution", [])}
     shipped = {s.parents[2].name.replace("_", "-") for s in sidecars}
     for orphan in sorted(shipped - declared):
         problems.append(f"{where}: {orphan} ships a sidecar and closure.toml does not name it")

@@ -18,7 +18,9 @@ section     = "6.6"
 
 outcome = "blocking"
 
-diagnostics = ["ni.req.29"]
+diagnostics = [
+  { id = "ni.req.29", distributions = ["pyoauth"] },
+]
 advisories  = []
 
 assertions  = ["no_unexported_fallback"]

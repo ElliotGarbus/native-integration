@@ -114,6 +114,37 @@ no veto, so the only control the application has is seeing which dependency
 caused its binary to grow — and a consumer that applied the link setting and
 recorded nothing has met half the requirement while looking correct.
 
+## What the harness verifies, and what it only records
+
+A review round after the fixtures were written pointed at the harness rather
+than the corpus, and was right on every count. Four of the findings were
+protocol defects and are fixed; one is a boundary worth stating rather than
+papering over.
+
+**Fixed.** Diagnostics now carry the distributions they name, so requirement 18
+is checked rather than left to a self-attested boolean — a consumer naming the
+wrong distribution fails, and `check_spec.py` holds every case to naming
+distributions its own closure declares. `capabilities.injected_resolution` lets
+a consumer that cannot be told a resolution report those cases **unverified**,
+which the README described and nothing implemented. The reported `outcome` is
+now the single authority, with a contradicting exit status a failure in its own
+right rather than a tie to break. And `ignore_digests` reaches **input** hashes
+only — it was eliding Maven artifact and Swift binary-target checksums too,
+which are the integrity §6.3 and §7.2 require a consumer to verify, so a
+resolved-graph case could have had the behaviour it tests suppressed.
+
+**The boundary.** An assertion was pure testimony: it passed because the
+consumer returned `true`. Three of them now are not — the consumer writes its
+assembled payload to an output directory and the harness inspects the files, so
+`sidecar_excluded_from_payload`, `contributed_source_excluded_from_payload` and
+`python_module_stubs_excluded` are checked against evidence.
+
+The rest stay attested, and README.md labels them so. Closing that list means
+giving the harness a generated Android or Xcode project it can parse, which is a
+much larger interface than a conformance corpus should define on its own — and
+claiming verification the harness does not perform would be exactly the
+overstatement §8.5's note warns about. Better a table that says which is which.
+
 ## Three gaps — one closed here, two standing
 
 ### 1. §4.1's symlink clause has no portable fixture

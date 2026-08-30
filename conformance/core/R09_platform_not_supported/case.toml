@@ -17,6 +17,8 @@ section     = "4.5"
 
 outcome = "blocking"
 
-diagnostics = ["ni.req.9"]
+diagnostics = [
+  { id = "ni.req.9", distributions = ["pyr09"] },
+]
 advisories  = []
 assertions  = []

@@ -19,8 +19,8 @@ section     = "7.4"
 outcome = "blocking"
 
 diagnostics = [
-  "ni.decl.ios.contributes.info_plist.append.refuses.capability-keys",
-  "ni.req.35",
+  { id = "ni.decl.ios.contributes.info_plist.append.refuses.capability-keys", distributions = ["pypush"] },
+  { id = "ni.req.35", distributions = ["pypush"] },
 ]
 advisories  = []
 

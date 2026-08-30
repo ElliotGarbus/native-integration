@@ -16,8 +16,18 @@ which is the failure `README.md` opens by naming.
 Three axes are checked, per `conformance/README.md`:
 
 * `outcome`     — accept or blocking, the build's fate;
-* `diagnostics` — the finding IDs the consumer reported;
+* `diagnostics` — the findings, each with the distributions it names;
 * `assertions`  — postconditions on what the consumer produced.
+
+**The JSON is the only authority on the outcome.** A consumer whose exit status
+disagrees with what it reported has contradicted itself, and that is a failure
+rather than something to resolve by preferring one of the two.
+
+**An assertion is verified here where it can be.** The consumer is handed an
+output directory and writes what it produced into it; the payload assertions are
+then checked against those files rather than taken on the consumer's word.
+Assertions with no adapter are marked *attested* in `README.md` and remain the
+consumer's claim — labelled, so that nobody mistakes testimony for evidence.
 
 Two things short of a pass are reported differently, because they mean opposite
 things:
@@ -41,6 +51,7 @@ import json
 import re
 import subprocess
 import sys
+import tempfile
 import tomllib
 from dataclasses import dataclass, field
 from datetime import date
@@ -477,6 +488,11 @@ def elide_digests(lines: list[str]) -> list[str]:
     quote a digest would be rewritten — and two different reasons quoting two
     different digests would then compare equal, which is the opposite of what
     this is for.
+
+    It reaches **input** hashes only. A Maven artifact's SHA-256 and a Swift
+    binary target's checksum are the integrity §6.3 and §7.2 require a consumer
+    to verify, and eliding those would suppress the behaviour a resolved-graph
+    case exists to test.
     """
     out = []
     for line in lines:
@@ -485,8 +501,9 @@ def elide_digests(lines: list[str]) -> list[str]:
         except LexError:
             out.append(line)  # invalid, and already reported as such
             continue
+        elidable = len(positional) > 2 and positional[2] == "input"
         operands = [
-            f"{key}=<digest>" if key in DIGEST_KEYS else f"{key}={raw[key]}"
+            f"{key}=<digest>" if elidable and key in DIGEST_KEYS else f"{key}={raw[key]}"
             for key in sorted(raw)
         ]
         out.append(" ".join(positional + operands))
@@ -526,15 +543,18 @@ def compare_records(
     return problems
 
 
-def run_consumer(command: list[str], case: Case) -> tuple[int, dict]:
+def run_consumer(command: list[str], case: Case, outputs: Path) -> tuple[int, dict]:
     """Invoke the consumer for one case, and read what it reported.
 
-    The consumer is handed the case directory and is expected to answer on
-    stdout as JSON: its outcome, the diagnostic IDs it raised, the assertions it
-    can vouch for, and its conformance record.
+    Two arguments: the case's `input/`, and an output directory to write what it
+    produced into. The second is what lets an assertion be checked rather than
+    believed — a consumer that writes its assembled payload to
+    `<outputs>/payload/` has the payload assertions verified against the files
+    themselves.
     """
+    outputs.mkdir(parents=True, exist_ok=True)
     completed = subprocess.run(
-        [*command, str(case.directory / "input")],
+        [*command, str(case.directory / "input"), str(outputs)],
         capture_output=True,
         timeout=300,
     )
@@ -553,6 +573,10 @@ def run_consumer(command: list[str], case: Case) -> tuple[int, dict]:
         return completed.returncode, {"_malformed": (stdout or fallback)[:400]}
 
 
+def diagnostic_ids(entries: object) -> set[str]:
+    return {entry["id"] for entry in entries}  # type: ignore[index]
+
+
 def malformed(reported: object) -> str | None:
     """Whether the consumer's answer has the shape this interface documents.
 
@@ -566,8 +590,23 @@ def malformed(reported: object) -> str | None:
         return "`outcome` is not a string"
     for key in ("diagnostics", "advisories"):
         value = reported.get(key, [])
-        if not isinstance(value, list) or any(not isinstance(v, str) for v in value):
-            return f"`{key}` is not an array of strings"
+        if not isinstance(value, list):
+            return f"`{key}` is not an array"
+        for entry in value:
+            if not isinstance(entry, dict):
+                return f"`{key}` holds something that is not a finding object"
+            if not isinstance(entry.get("id"), str):
+                return f"a {key[:-1]} has no `id`"
+            named = entry.get("distributions", [])
+            if not isinstance(named, list) or any(not isinstance(d, str) for d in named):
+                return f"`{entry.get('id')}` has no array of distributions"
+    capabilities = reported.get("capabilities", {})
+    if not isinstance(capabilities, dict) or any(
+        not isinstance(v, bool) for v in capabilities.values()
+    ):
+        return "`capabilities` is not an object of booleans"
+    if not isinstance(reported.get("outputs", ""), str):
+        return "`outputs` is not a string"
     assertions = reported.get("assertions", {})
     if not isinstance(assertions, dict) or any(
         not isinstance(v, bool) for v in assertions.values()
@@ -578,7 +617,56 @@ def malformed(reported: object) -> str | None:
     return None
 
 
-def check(case: Case, exit_code: int, reported: dict) -> Result:
+#: Assertions the harness verifies itself, against the payload a consumer wrote
+#: into its output directory. Everything else in README.md's table is *attested*
+#: — the consumer's own claim, which is evidence of intent and not of behaviour.
+PAYLOAD_SOURCE_SUFFIXES = (".java", ".kt", ".swift")
+
+
+def payload_files(outputs: Path) -> list[Path] | None:
+    payload = outputs / "payload"
+    if not payload.is_dir():
+        return None
+    return [p for p in payload.rglob("*") if p.is_file()]
+
+
+def verify_sidecar_excluded(case: Case, files: list[Path]) -> str | None:
+    """§4.1 requirement 6: the sidecar directory reaches no device payload."""
+    offenders = [
+        f for f in files if f.name == "native.toml" or "_native" in f.parts
+    ]
+    return None if not offenders else f"the payload carries {offenders[0].name}"
+
+
+def verify_source_excluded(case: Case, files: list[Path]) -> str | None:
+    """Requirement 24: contributed source is compiled, never shipped."""
+    offenders = [f for f in files if f.suffix in PAYLOAD_SOURCE_SUFFIXES]
+    return None if not offenders else f"the payload carries {offenders[0].name}"
+
+
+def verify_module_stubs_excluded(case: Case, files: list[Path]) -> str | None:
+    """§7.5: `<name>.py` and `<name>.pyi` are excluded for every registered module."""
+    registered = set()
+    for sidecar in (case.directory / "input").glob("*/*/_native/native.toml"):
+        document = tomllib.loads(sidecar.read_text(encoding="utf-8"))
+        for module in document.get("ios", {}).get("contributes", {}).get(
+            "python_modules", []
+        ):
+            registered.add(module["name"])
+    offenders = [
+        f for f in files if f.stem in registered and f.suffix in (".py", ".pyi")
+    ]
+    return None if not offenders else f"the payload carries {offenders[0].name}"
+
+
+VERIFIED_ASSERTIONS = {
+    "sidecar_excluded_from_payload": verify_sidecar_excluded,
+    "contributed_source_excluded_from_payload": verify_source_excluded,
+    "python_module_stubs_excluded": verify_module_stubs_excluded,
+}
+
+
+def check(case: Case, exit_code: int, reported: dict, outputs: Path) -> Result:
     problems: list[str] = []
     unverified: list[str] = []
     unsupported: list[str] = []
@@ -589,30 +677,75 @@ def check(case: Case, exit_code: int, reported: dict) -> Result:
     if problem:
         return Result(case, FAIL, [f"the consumer's answer is malformed: {problem}"])
 
-    # Axis 1 — the build's fate.
-    actual_outcome = reported.get("outcome", "blocking" if exit_code else "accept")
-    if actual_outcome != case.outcome:
+    # Axis 1 — the build's fate. The JSON says; the exit status must agree.
+    actual_outcome = reported.get("outcome", "")
+    if actual_outcome not in ("accept", "blocking"):
+        problems.append(f"outcome: {actual_outcome!r} is neither accept nor blocking")
+    elif actual_outcome != case.outcome:
         problems.append(f"outcome: expected {case.outcome}, got {actual_outcome}")
+    elif (exit_code != 0) != (actual_outcome == "blocking"):
+        problems.append(
+            f"the consumer reported {actual_outcome} and exited {exit_code}, "
+            "which contradicts it"
+        )
+
+    # A case needing a stated resolution cannot be run against a consumer that
+    # cannot be told one. README.md says so; this is where it takes effect.
+    if (case.directory / "input" / "resolved.toml").exists() and not reported.get(
+        "capabilities", {}
+    ).get("injected_resolution", False):
+        return Result(
+            case,
+            UNVERIFIED,
+            ["the consumer cannot accept a stated resolution, which this case needs"],
+        )
 
     # Axis 2 — findings.
     for key in ("diagnostics", "advisories"):
-        want = set(case.spec.get(key, []))
-        got = set(reported.get(key, []))
-        for missing in sorted(want - got):
+        expected = {entry["id"]: set(entry.get("distributions", [])) for entry in case.spec.get(key, [])}
+        actual = {entry["id"]: set(entry.get("distributions", [])) for entry in reported.get(key, [])}
+        for missing in sorted(set(expected) - set(actual)):
             if key == "advisories":
                 unsupported.append(f"advisory {missing}: the consumer does not claim it")
             else:
                 problems.append(f"{key}: expected {missing}, not reported")
+        # Requirement 18: every diagnostic about declared material names the
+        # contributing distribution. Naming the wrong one, or none, is the
+        # failure that requirement exists to prevent — a finding nobody can act
+        # on — so the corpus checks the names and not only the ids.
+        for identifier, want in sorted(expected.items()):
+            if identifier in actual and want and actual[identifier] != want:
+                problems.append(
+                    f"{identifier} names {sorted(actual[identifier]) or 'no distribution'}, "
+                    f"and this case requires {sorted(want)}"
+                )
         if key == "diagnostics":
             # An unexpected advisory is a consumer being more helpful than the
             # case asked for; an unexpected blocking diagnostic is not.
-            for extra in sorted(got - want):
+            for extra in sorted(set(actual) - set(expected)):
                 problems.append(f"{key}: reported {extra}, which this case does not expect")
 
     # Axis 3 — postconditions.
     vouched = reported.get("assertions", {})
+    files = payload_files(outputs)
     for assertion in case.spec.get("assertions", []):
         state = vouched.get(assertion)
+        adapter = VERIFIED_ASSERTIONS.get(assertion)
+        if adapter is not None:
+            if files is None:
+                unverified.append(
+                    f"assertion {assertion}: the consumer wrote no payload to inspect"
+                )
+                continue
+            failure = adapter(case, files)
+            if failure:
+                problems.append(f"assertion {assertion}: {failure}")
+            elif state is False:
+                problems.append(
+                    f"assertion {assertion}: the consumer reports it unmet, and the "
+                    "payload it wrote satisfies it"
+                )
+            continue
         if state is True:
             continue
         if state is None:
@@ -635,8 +768,8 @@ def check(case: Case, exit_code: int, reported: dict) -> Result:
                 # failing it on a record difference the advisory caused.
                 advisories={
                     identifier.rsplit(".", 1)[-1]
-                    for identifier in set(case.spec.get("advisories", []))
-                    & set(reported.get("advisories", []))
+                    for identifier in diagnostic_ids(case.spec.get("advisories", []))
+                    & diagnostic_ids(reported.get("advisories", []))
                 },
             )
         )
@@ -672,7 +805,11 @@ def main() -> int:
     if not command:
         parser.error("a consumer command is required: … -- mytool build …")
 
-    results = [check(case, *run_consumer(command, case)) for case in cases]
+    results = []
+    with tempfile.TemporaryDirectory(prefix="native-integration-conformance-") as workspace:
+        for case in cases:
+            outputs = Path(workspace) / case.profile / case.name
+            results.append(check(case, *run_consumer(command, case, outputs), outputs))
 
     for result in results:
         print(f"{result.status.upper():12} {result.case.profile}/{result.case.name}"

@@ -17,6 +17,8 @@ section     = "6.8"
 
 outcome = "blocking"
 
-diagnostics = ["ni.req.32"]
+diagnostics = [
+  { id = "ni.req.32", distributions = ["pyalpha", "pybeta"] },
+]
 advisories  = []
 assertions  = []

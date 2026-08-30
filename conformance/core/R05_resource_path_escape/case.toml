@@ -19,7 +19,9 @@ section     = "4.1"
 
 outcome = "blocking"
 
-diagnostics = ["ni.req.5"]
+diagnostics = [
+  { id = "ni.req.5", distributions = ["pyescape"] },
+]
 advisories  = []
 
 assertions  = ["no_producer_import"]

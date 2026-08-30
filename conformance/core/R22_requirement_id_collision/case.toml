@@ -14,8 +14,8 @@ section     = "5.2"
 outcome = "blocking"
 
 diagnostics = [
-  "ni.decl.<platform>.requires.application_value.id.duplicate",
-  "ni.req.22",
+  { id = "ni.decl.<platform>.requires.application_value.id.duplicate", distributions = ["pyr22"] },
+  { id = "ni.req.22", distributions = ["pyr22"] },
 ]
 advisories  = []
 assertions  = []

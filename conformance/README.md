@@ -191,8 +191,10 @@ section     = "6.1"        # what it enforces, for `explain`
 # Axis 1 — what happens to the build.
 outcome = "blocking"       # accept | blocking
 
-# Axis 2 — findings expected while exercising it.
-diagnostics = ["ni.req.23"]
+# Axis 2 — findings expected, and the distributions each must name.
+diagnostics = [
+  { id = "ni.req.23", distributions = ["pyalpha", "pybeta"] },
+]
 advisories  = []
 
 # Axis 3 — observable postconditions, for obligations with no finding.
@@ -202,8 +204,8 @@ assertions = []
 | Field | Meaning |
 | --- | --- |
 | `outcome` | `blocking` — the build **MUST NOT** proceed. `accept` — it proceeds |
-| `diagnostics` | diagnostic IDs ([`contract/diagnostics-v1.toml`](../contract/diagnostics-v1.toml)) the consumer must report. Every one names the distribution responsible ([§8.4](../SPEC.md#84-requirements) requirement 18) |
-| `advisories` | advisory IDs expected. Reported, never blocking ([§8.5](../SPEC.md#85-advisory-obligations)) |
+| `diagnostics` | findings the consumer must report — an id from [`contract/diagnostics-v1.toml`](../contract/diagnostics-v1.toml) and **the distributions it names**. Requirement 18 makes attribution part of the obligation, so the corpus checks it rather than taking a consumer's word |
+| `advisories` | the same shape. Reported, never blocking ([§8.5](../SPEC.md#85-advisory-obligations)) |
 | `assertions` | named postconditions on what the consumer produced — the record, the payload, the generated project |
 | `record` | the `expected/` file to compare against, when the case has one |
 | `ignore_digests` | the case is not about hashing, so `input` digests compare loosely — in content only, never in syntax |
@@ -224,21 +226,30 @@ An assertion names something observable about the consumer's own output. It is
 not a diagnostic, and it may accompany an accepted build, a blocked one, or an
 advisory — which is why it is a separate axis rather than a third disposition.
 
-| Assertion | Requirement |
-| --- | --- |
-| `no_producer_import` | 3 — no producing distribution is imported, ever |
-| `sidecar_excluded_from_payload` | 6 — the sidecar directory reaches no device payload |
-| `contributed_source_excluded_from_payload` | 24 |
-| `python_module_stubs_excluded` | 36 — `<name>.py` and `<name>.pyi` |
-| `every_diagnostic_names_a_distribution` | 18 |
-| `instructions_attributed_to_producer` | 21 |
-| `no_credential_in_record` | 42 |
-| `no_invented_value` | 16 — nothing application-owned was originated from a producer's declaration |
-| `no_unexported_fallback` | 29 — an unapproved `exported_required` component was not registered unexported instead |
-| `objc_categories_linked` | 37 — the application target links so categories in static libraries load |
-| `record_contains` / `record_omits` | 43, and any row of [§9.6](../SPEC.md#96-what-a-record-must-contain) |
-| `activity_extends_component_activity` | 45 |
-| `url_callback_observable` | 46 |
+**Verified** assertions are checked by the harness against what the consumer
+wrote to its output directory. **Attested** ones are the consumer's own claim,
+labelled so that nobody reads testimony as evidence.
+
+| Assertion | Requirement | |
+| --- | --- | --- |
+| `sidecar_excluded_from_payload` | 6 — the sidecar directory reaches no device payload | **verified** |
+| `contributed_source_excluded_from_payload` | 24 | **verified** |
+| `python_module_stubs_excluded` | 36 — `<name>.py` and `<name>.pyi` | **verified** |
+| `no_producer_import` | 3 | attested |
+| `every_diagnostic_names_a_distribution` | 18 | attested, and largely superseded — `diagnostics` carries the names now, and the corpus checks them |
+| `instructions_attributed_to_producer` | 21 | attested |
+| `no_credential_in_record` | 42 | attested |
+| `no_invented_value` | 16 | attested |
+| `no_unexported_fallback` | 29 | attested |
+| `objc_categories_linked` | 37 | attested |
+| `record_contains` / `record_omits` | 43, and any row of [§9.6](../SPEC.md#96-what-a-record-must-contain) | attested |
+| `activity_extends_component_activity` | 45 | attested |
+| `url_callback_observable` | 46 | attested |
+
+Closing the attested list means giving the harness something to look at — a
+generated project it can parse, not a boolean. That is a larger interface than
+this corpus should define on its own, and pretending otherwise would be the
+overstatement §8.5's note warns about.
 
 A consumer that cannot observe an assertion reports it **unverified** rather
 than passing it, and a run with any unverified case exits non-zero. The
@@ -312,9 +323,31 @@ appear in the record.
 python3 conformance/run.py --profile android -- mytool build --conformance-record
 ```
 
-`run.py` invokes the consumer once per case, with the case's `input/` as the
-application's dependency closure, and compares what comes back. It reports
-pass, fail or unsupported per case, and exits non-zero on any fail.
+`run.py` invokes the consumer once per case with **two** arguments: the case's
+`input/`, and an output directory to write what it produced into. It answers on
+stdout with one JSON object:
+
+```json
+{
+  "outcome": "blocking",
+  "diagnostics": [{ "id": "ni.req.23", "distributions": ["pyalpha", "pybeta"] }],
+  "advisories": [],
+  "assertions": { "no_producer_import": true },
+  "capabilities": { "injected_resolution": true },
+  "record": "build contract 1.0…"
+}
+```
+
+- **`outcome` is the only authority.** A consumer reporting `blocking` and
+  exiting 0, or `accept` and exiting non-zero, has contradicted itself — a
+  failure, rather than something to resolve by preferring one of the two.
+- **`capabilities`** says what the consumer can be driven to do.
+  `injected_resolution` is whether it accepts a stated `resolved.toml` in place
+  of resolving; one that cannot reports every case needing one as **unverified**
+  rather than failing it.
+- **The output directory** is what turns an assertion from a claim into a
+  check. A consumer writing its assembled Python payload to `<outputs>/payload/`
+  has the three verified assertions checked against those files.
 
 The consumer under test supplies the command. Nothing here imports a consumer,
 and nothing here is a consumer.

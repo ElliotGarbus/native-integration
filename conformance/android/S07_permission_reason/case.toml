@@ -13,7 +13,9 @@ section     = "6.5"
 outcome = "accept"
 
 diagnostics = []
-advisories  = ["ni.adv.S7"]
+advisories = [
+  { id = "ni.adv.S7", distributions = ["pyreason"] },
+]
 
 assertions = []
 

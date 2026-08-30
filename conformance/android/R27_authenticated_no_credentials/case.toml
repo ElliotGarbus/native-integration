@@ -15,6 +15,8 @@ section     = "6.4"
 
 outcome = "blocking"
 
-diagnostics = ["ni.req.27"]
+diagnostics = [
+  { id = "ni.req.27", distributions = ["pymapbox"] },
+]
 advisories  = []
 assertions  = []
