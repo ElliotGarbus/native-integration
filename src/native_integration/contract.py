@@ -13,14 +13,21 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-_CONTRACT = re.compile(r"\A(\d+)(?:\.(\d+))?\Z")
+from . import registry
 
-#: The specification revision this library implements.
-SPEC_MAJOR = 1
-SPEC_MINOR = 0
+_REGISTRY = registry.load()
+
+#: The form a `contract` value takes, as `contract/v1.toml` fixes it rather than
+#: as this module remembers it. The registry's pattern refuses a leading zero;
+#: a second regex here would be free to disagree, and eventually would.
+_CONTRACT = re.compile(rf"\A(?:{_REGISTRY.declaration('contract')['pattern']})\Z")
+_PARTS = re.compile(r"\A(\d+)(?:\.(\d+))?\Z")
+
+#: The specification revision this library implements, from `[meta]`.
+SPEC_MAJOR, SPEC_MINOR = (int(part) for part in _REGISTRY.contract.split("."))
 
 #: The entry-point group, which carries the major version (§10).
-ENTRY_POINT_GROUP = f"native_integration.v{SPEC_MAJOR}"
+ENTRY_POINT_GROUP = _REGISTRY.entry_point_group
 
 
 @dataclass(frozen=True, order=True)
@@ -35,11 +42,13 @@ class ContractVersion:
         """Parse ``"1"`` or ``"1.1"``. Raises :class:`ValueError` otherwise."""
         if not isinstance(text, str):
             raise ValueError("contract must be a string")
-        match = _CONTRACT.match(text.strip())
-        if not match:
+        stripped = text.strip()
+        if not _CONTRACT.match(stripped):
             raise ValueError(
                 f"contract {text!r} is not a major, optionally with a minor — e.g. \"1\" or \"1.1\""
             )
+        match = _PARTS.match(stripped)
+        assert match is not None  # the registry's pattern admits nothing else
         return cls(int(match.group(1)), int(match.group(2) or 0))
 
     def __str__(self) -> str:
