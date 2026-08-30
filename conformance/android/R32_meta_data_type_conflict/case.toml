@@ -1,0 +1,22 @@
+# §8.4 requirement 32, via §6.8: a contributed `meta_data` entry and a §5.2
+# `manifest_meta_data` delivery are "the same manifest entry, so both merge
+# together" — and "Equality is by type as well as content: `1` and `"1"` are
+# different declarations of one key and MUST fail, **even though
+# `android:value` would render them the same way**."
+#
+# The clause exists for the consumer that compares the rendered manifest text.
+# Both declarations produce `android:value="1"`, so a consumer merging after
+# rendering sees agreement and coalesces — and the two producers who disagreed
+# about the type of a vendor flag both believe they won. §6.8 puts the
+# comparison before rendering for exactly that reason.
+#
+# One key, two distributions, one integer and one string.
+requirement = 32
+profile     = "android"
+section     = "6.8"
+
+outcome = "blocking"
+
+diagnostics = ["ni.req.32"]
+advisories  = []
+assertions  = []

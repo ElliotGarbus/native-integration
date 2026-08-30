@@ -1,0 +1,15 @@
+# `classes` is what §6.7's check reads: a listing of archive contents, not a
+# parser. The stray class is `com.vendor.extras.Helper`, shipped by an artifact
+# the keep does not name.
+
+[[artifact]]
+coordinate = "com.vendor:sdk:2.0.0"
+sha256 = "0d3e4f9a17c2b85e6dd0341fbb9a72c5e08d41a6f3c7b2905ea18d43f6c07b21"
+declared_by = "pyr31b"
+classes = ["com.vendor.sdk.Client", "com.vendor.sdk.internal.Codec"]
+
+[[artifact]]
+coordinate = "com.other:extras:1.0.0"
+sha256 = "5b81c0f2d7a3946e18bb52c07f9d3a6418e2c5b09fa471d38c62e0ab7451f9d0"
+declared_by = "pyr31b"
+classes = ["com.other.extras.Util", "com.vendor.extras.Helper"]

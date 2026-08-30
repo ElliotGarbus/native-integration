@@ -1,0 +1,8 @@
+[build]
+min_sdk = 26
+compile_sdk = 35
+
+# §5.2 values are always strings. §6.8: an application-supplied value coalesces
+# with a contribution only where that contribution is a string of equal content.
+[answers.values]
+"pybeta.vendor_mode" = "1"

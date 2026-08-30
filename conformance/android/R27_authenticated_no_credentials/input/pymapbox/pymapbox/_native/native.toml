@@ -1,0 +1,7 @@
+contract = "1"
+
+[[android.contributes.gradle_repositories]]
+url = "https://api.example.com/downloads/v2/releases/maven"
+reason = 'Not published to Maven Central. Access needs a downloads token scoped DOWNLOADS:READ, used as the password with username example.'
+groups = ["com.example.maps"]
+credentials_required = true

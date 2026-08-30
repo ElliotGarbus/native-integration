@@ -1,0 +1,20 @@
+# §8.4 requirement 27, via §6.4: "A consumer MUST report an authenticated
+# repository as a requirement and MUST fail when no credentials are configured,
+# naming the distribution, rather than attempting resolution and surfacing a
+# bare `401`."
+#
+# The clause is about *which* failure the author sees. A bare 401 names a host.
+# It does not name the Python distribution that added the repository, the
+# credential needed, or where to get one — all of which the sidecar's `reason`
+# carries, and none of which reaches a build log through Gradle's transport
+# layer. For a transitive dependency the author has never heard of, that is the
+# difference between a fix and an investigation.
+requirement = 27
+profile     = "android"
+section     = "6.4"
+
+outcome = "blocking"
+
+diagnostics = ["ni.req.27"]
+advisories  = []
+assertions  = []

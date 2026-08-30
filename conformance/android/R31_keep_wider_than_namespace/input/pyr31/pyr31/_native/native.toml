@@ -1,0 +1,11 @@
+contract = "1"
+
+[android.owns]
+java_namespaces = ["org.example.mypkg"]
+
+[android.contributes.src]
+java = ["java"]
+
+# Literal prefix `org.example` — wider than the claim above (§6.7).
+[android.contributes.r8]
+keep_classes = ["org.example.**"]

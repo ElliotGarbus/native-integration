@@ -1,0 +1,28 @@
+# §8.4 requirement 44, via §9.7: a consumer detects a collision across the
+# artifacts of the effective set, MAY resolve **only** the packaging-metadata
+# names §9.7 lists — "never a file in a subdirectory of `META-INF/`" — and MUST
+# fail on any other colliding file the application has not chosen between,
+# naming the path and **both declaring distributions**.
+#
+# Two collisions here, and the second is the one §9.7 says matters.
+# `lib/arm64-v8a/libc++_shared.so` is a native library, which §9.7 puts in the
+# second row explicitly. `META-INF/services/com.vendor.Provider` is under
+# `META-INF/` but in a subdirectory, which the closed list does not cover: "a
+# service-loader registration is code by any useful definition — dropping one
+# copy silently removes an implementation the losing library registered, and the
+# failure is a `ServiceConfigurationError` or a feature that simply never
+# activates."
+#
+# `META-INF/LICENSE` collides too, and is on the list — a consumer may resolve
+# that one itself by a rule that does not depend on resolution order, and must
+# record what it did. It is here so the case distinguishes the two rows rather
+# than failing on everything under `META-INF/`.
+requirement = 44
+profile     = "android"
+section     = "9.7"
+
+outcome = "blocking"
+
+diagnostics = ["ni.req.44"]
+advisories  = []
+assertions  = []

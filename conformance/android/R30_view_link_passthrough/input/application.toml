@@ -1,0 +1,9 @@
+[build]
+min_sdk = 26
+compile_sdk = 35
+
+# §6.6: an exported component needs explicit approval, so the case supplies one
+# — otherwise this would block for a reason it is not about.
+[answers.exported_components."org.pyr30.RedirectActivity"]
+approved = true
+date = "2026-08-24"

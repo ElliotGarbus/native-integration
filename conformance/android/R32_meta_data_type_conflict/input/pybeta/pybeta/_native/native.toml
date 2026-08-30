@@ -1,0 +1,9 @@
+contract = "1"
+
+# The same manifest key, delivered as a §5.2 value — always a string.
+[[android.requires.application_value]]
+id = "vendor_mode"
+kind = "manifest_meta_data"
+key = "com.vendor.MODE"
+reason = "The vendor SDK compatibility mode your account is provisioned for"
+placeholder = "<TODO: your vendor mode>"

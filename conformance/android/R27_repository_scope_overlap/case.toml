@@ -1,0 +1,22 @@
+# §8.4 requirement 27, via §6.4: "Two contributed repositories whose scopes
+# intersect MUST fail, naming both distributions and the contested coordinates,
+# unless they declare the same `url`."
+#
+# §6.4 opens by calling a repository "the most powerful thing a sidecar can
+# contribute" and its rules "the strictest in this document", because an
+# unconstrained one is a dependency-confusion vector reachable through any
+# transitive dependency. Two repositories both claiming `com.vendor` means a
+# coordinate under that group can be served by either, and which one wins is a
+# resolution-order accident — which is precisely the substitution dependency
+# confusion is.
+#
+# Each sidecar is valid alone; the contest exists only in the combination.
+requirement = 27
+profile     = "android"
+section     = "6.4"
+
+outcome = "blocking"
+
+diagnostics = ["ni.req.27"]
+advisories  = []
+assertions  = []

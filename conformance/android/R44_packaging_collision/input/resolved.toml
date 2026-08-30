@@ -1,0 +1,23 @@
+# `files` is the packaged content §9.7's detection reads. Both artifacts carry
+# the same three paths; only one of the three is a name a consumer may resolve
+# on its own authority.
+
+[[artifact]]
+coordinate = "com.alpha:sdk:1.0.0"
+sha256 = "0d3e4f9a17c2b85e6dd0341fbb9a72c5e08d41a6f3c7b2905ea18d43f6c07b21"
+declared_by = "pyalpha"
+files = [
+  "META-INF/LICENSE",
+  "META-INF/services/com.vendor.Provider",
+  "lib/arm64-v8a/libc++_shared.so",
+]
+
+[[artifact]]
+coordinate = "com.beta:sdk:2.0.0"
+sha256 = "5b81c0f2d7a3946e18bb52c07f9d3a6418e2c5b09fa471d38c62e0ab7451f9d0"
+declared_by = "pybeta"
+files = [
+  "META-INF/LICENSE",
+  "META-INF/services/com.vendor.Provider",
+  "lib/arm64-v8a/libc++_shared.so",
+]

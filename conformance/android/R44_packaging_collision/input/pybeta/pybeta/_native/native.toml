@@ -1,0 +1,4 @@
+contract = "1"
+
+[[android.contributes.gradle_dependencies]]
+coordinate = "com.beta:sdk:2.0.0"

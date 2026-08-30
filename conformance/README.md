@@ -122,7 +122,8 @@ coordinate = "com.example.maps:android:4.1.0"
 sha256 = "0d3e…"
 declared_by = "pymaps"        # the distribution whose sidecar named it
 transitive = false            # optional, default false
-files = []                    # optional, for §9.7's collisions
+files = []                    # optional, the packaged paths §9.7 collides on
+classes = []                  # optional, the classes §6.7 checks a keep against
 
   [[artifact.permission]]
   name = "com.example.permission.MAPS_ID"
@@ -146,6 +147,11 @@ declared_by = "pycharting"
   name = "ChartingRenderer.xcframework"
   checksum = "e11d…"
 ```
+
+`files` and `classes` are listings of archive contents, which is exactly what
+[§9.7](../SPEC.md#97-packaging-collisions) and
+[§6.7](../SPEC.md#67-shrinker-keep-patterns) ask a consumer to read — §6.7 says
+so in as many words: "a listing of archive contents, not a parser".
 
 **A consumer under test takes this in place of resolving.** That is one more
 demand the corpus makes of a consumer's testability, alongside emitting a
@@ -280,6 +286,9 @@ is **dangerous** rather than merely wrong.
 | `ios/R35_usage_description_contributed` | 35 | puts a producer's privacy claim in front of App Store review as the application's |
 | `ios/R35_capability_key_contributed` | 35 | grants a capability that then does not work, with no task stated |
 | `android/R41_artifact_feature_undecided` | 41 | lets an artifact make hardware mandatory without the application choosing |
+
+Beyond category 1, every blocking requirement in §8.1's **core** and **Android**
+rows now has a case. The remaining work is the iOS profile — 33, 34, 36, 37.
 
 Three accept cases sit beside them so the corpus is not only negatives:
 `core/R01_dependency_closure` compares a record,

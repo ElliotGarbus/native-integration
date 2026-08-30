@@ -1,0 +1,13 @@
+contract = "1"
+
+[[android.contributes.gradle_dependencies]]
+coordinate = "com.vendor:sdk:2.0.0"
+
+[[android.contributes.gradle_dependencies]]
+coordinate = "com.other:extras:1.0.0"
+
+# Attributed to com.vendor:sdk — but com.other:extras also ships classes under
+# `com.vendor.` (§6.7).
+[[android.contributes.r8.keep]]
+pattern = "com.vendor.**"
+from_dependency = "com.vendor:sdk"

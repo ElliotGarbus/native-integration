@@ -1,0 +1,7 @@
+contract = "1"
+
+# An integer. `android:value` renders it "1".
+[[android.contributes.meta_data]]
+key = "com.vendor.MODE"
+value = 1
+reason = "Selects the vendor SDK's compatibility mode"

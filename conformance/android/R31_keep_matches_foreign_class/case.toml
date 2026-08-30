@@ -1,0 +1,24 @@
+# §8.4 requirement 31, via §6.7: a consumer MUST evaluate a `from_dependency`
+# keep "against the **effective compilation classpath** and reject the entry
+# when any class it matches originates outside that dependency's resolved
+# artifacts — a listing of archive contents, not a parser — naming the
+# distribution, the pattern, and the artifact the stray class came from."
+#
+# §6.7 explains why the check is against the classpath rather than the Maven
+# group: `com.squareup.okhttp3:okhttp` ships classes under `okhttp3.*`, so
+# checking the group would reject a legitimate pattern. And it covers the whole
+# classpath because the generated `-keep` rule applies everywhere in the
+# program, not only inside the named dependency.
+#
+# Here `com.vendor.**` is attributed to the vendor SDK, and a *different*
+# artifact also ships classes under it. The keep would preserve another
+# dependency's classes under cover of a declaration naming this one.
+requirement = 31
+profile     = "android"
+section     = "6.7"
+
+outcome = "blocking"
+
+diagnostics = ["ni.req.31"]
+advisories  = []
+assertions  = []

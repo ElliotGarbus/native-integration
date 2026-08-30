@@ -1,0 +1,12 @@
+build contract 1.0
+build platform android
+decision approve-export org.pyr30.RedirectActivity date=2026-08-24 distribution=pyr30 state=approved
+dist pyr30 contract 1
+dist pyr30 contributes component org.pyr30.RedirectActivity exported-required=true kind=activity
+dist pyr30 contributes source java/org/pyr30/RedirectActivity.java
+dist pyr30 contributes view-link org.pyr30.RedirectActivity host=callback scheme=myapp-oauth ssp_prefix=/oauth
+dist pyr30 input java/org/pyr30/RedirectActivity.java sha256=f2d05425e7c4671d9c1c0f5b01e4acc0022dd9f61777a32fa272689e80c5fe4c
+dist pyr30 input native.toml sha256=baca7432326be3cc26401f5af82071161b1769411d1a5bb47180451d6d97644f
+dist pyr30 origin direct
+dist pyr30 owns java-namespace org.pyr30
+dist pyr30 version 1.0.0

@@ -1,0 +1,23 @@
+# §8.4 requirement 31, via §6.7: a consumer computes a keep pattern's **literal
+# prefix** — the longest run of leading dot-separated segments containing no
+# wildcard — and MUST reject a `keep_classes` pattern whose literal prefix an
+# owned namespace does not contain.
+#
+# §6.7's own table has this exact row: `org.example.**` has literal prefix
+# `org.example`, which is *wider than the claim* `org.example.mypkg`. The keep
+# rule the consumer generates applies to the whole program, so a pattern
+# broader than the namespace keeps classes the distribution never owned — other
+# producers', or the application's — and silently defeats shrinking for them.
+#
+# §6.7 also notes the truncation is deliberate: stopping at the first wildcard
+# segment rather than reasoning about what `org.example.my*` can match is what
+# keeps this identical between two consumers.
+requirement = 31
+profile     = "android"
+section     = "6.7"
+
+outcome = "blocking"
+
+diagnostics = ["ni.req.31"]
+advisories  = []
+assertions  = []

@@ -1,0 +1,8 @@
+contract = "1"
+
+# Both bound themselves to `com.vendor`, at different URLs. §6.4: the scopes
+# intersect, so the build fails naming both and the contested coordinates.
+[[android.contributes.gradle_repositories]]
+url = "https://maven.beta.example/releases"
+reason = "Hosts com.vendor artifacts, which are not on Maven Central"
+groups = ["com.vendor"]

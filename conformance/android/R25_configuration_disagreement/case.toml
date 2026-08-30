@@ -1,0 +1,23 @@
+# §8.4 requirement 25, via §6.3: "Where two distributions declare the same
+# `group:artifact` with different `configuration` values, a consumer MUST fail,
+# naming both distributions and the module."
+#
+# §6.3 calls this the conservative rule and says why the obvious merge is wrong:
+# `api` and `implementation` differ only in what they expose downstream, so a
+# widest-wins merge would be defensible — and would silently put a dependency on
+# the **application's** compile classpath because some transitive producer asked
+# for `api`. The application then compiles against a library nobody chose to
+# expose to it, and keeps compiling until the day that producer changes its mind.
+#
+# Not schema-detectable: each sidecar is valid on its own. Only a consumer
+# holding both sees the disagreement, and only it knows which Python
+# distributions to name — Gradle sees one module.
+requirement = 25
+profile     = "android"
+section     = "6.3"
+
+outcome = "blocking"
+
+diagnostics = ["ni.req.25"]
+advisories  = []
+assertions  = []

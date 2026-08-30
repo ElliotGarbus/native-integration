@@ -1,0 +1,27 @@
+# §8.4 requirement 30, via §6.6 and §4.4: a consumer "writes an attribute it
+# does not recognize through, converting the snake-case key to the platform's
+# attribute name" — the **one** exception to §4.4's fail-closed rule.
+#
+# The only accept case among the Android negatives, and deliberately so: here
+# the dangerous consumer is the one that is *too strict*. §6.6 gives the reason —
+# the names belong to Android, which adds to them, and `ssp`, `ssp_prefix` and
+# `path_advanced_pattern` all postdate the attributes §6.6 lists. A consumer
+# that rejected an attribute it did not know would make a producer wait for
+# every consumer to catch up, while the contract minor it declared says nothing
+# is new.
+#
+# `ssp_prefix` is exactly that case. It is not in §6.6's list, it converts
+# mechanically to `android:sspPrefix`, and the record has to carry it in the
+# **sidecar's** spelling so the record does not depend on the conversion having
+# happened.
+requirement = 30
+profile     = "android"
+section     = "6.6"
+
+outcome = "accept"
+
+diagnostics = []
+advisories  = []
+assertions  = []
+
+record = "android.record"

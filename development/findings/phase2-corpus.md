@@ -30,7 +30,7 @@ dependency closure, the application's answers, the wheel's own files, or the
 resolved graph — which is the boundary Phase 1 drew and Phase 3 inherits.
 
 Verified by running the corpus against two stubs: a conforming one passes all
-twenty-four, and one that accepts every negative fails all twenty-one and exits
+thirty-two, and one that accepts every negative fails all twenty-eight and exits
 1.
 
 ## The core profile
@@ -67,6 +67,30 @@ is 1.0, so no declaration exists whose `since` a sidecar could under-declare.
 This is not a gap to close; it is a fixture that becomes writable the day a
 minor adds its first key, and the registry's `since` field is what will make it
 mechanical. Worth recording so the absence is not read later as an oversight.
+
+## The Android profile
+
+Every blocking requirement in §8.1's Android row now has a case: 23, 25, 27, 28,
+29, 30, 31, 32, 41, 44, plus advisory S7. Two needed `resolved.toml` to grow a
+`classes` listing alongside `files` — §6.7 asks a consumer to read "a listing of
+archive contents, not a parser", and that is what both are.
+
+Three are worth singling out, for the reason the core ones were:
+
+- **`R30_view_link_passthrough` is the only accept case among them, and the
+  dangerous consumer is the one that is *too strict*.** §4.4's single exception
+  says an unrecognized `<data>` attribute is written through; a consumer that
+  failed closed on `ssp_prefix` would make every producer wait for every
+  consumer to learn an attribute Android already shipped. It is the one place in
+  the corpus where rejecting is the wrong answer.
+- **`R32_meta_data_type_conflict` fails a consumer that compares rendered
+  output.** Both declarations produce `android:value="1"`; §6.8 makes equality
+  "by type as well as content" precisely so the integer and the string do not
+  coalesce. A consumer merging after rendering sees agreement.
+- **`R25` and `R27_repository_scope_overlap` are valid sidecars individually.**
+  Neither can be caught by a schema or by reading one file; the conflict exists
+  only in the combination, and only the consumer knows which Python
+  distributions to name — Gradle sees one module and one repository.
 
 ## Three gaps — one closed here, two standing
 

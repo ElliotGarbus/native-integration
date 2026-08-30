@@ -1,0 +1,20 @@
+contract = "1"
+
+[android.owns]
+java_namespaces = ["org.pyr30"]
+
+[android.contributes.src]
+java = ["java"]
+
+[[android.contributes.components]]
+kind = "activity"
+name = "org.pyr30.RedirectActivity"
+exported_required = true
+reason = "Receives the OAuth redirect from the browser"
+
+  # `ssp_prefix` is Android's, and postdates §6.6's list. §4.4's one exception:
+  # written through, not rejected.
+  [[android.contributes.components.view_links]]
+  scheme = "myapp-oauth"
+  host = "callback"
+  ssp_prefix = "/oauth"
