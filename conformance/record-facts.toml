@@ -283,12 +283,12 @@ kind = ["package", "provider-authority"]
 [facts."dist.contributes.swift-package"]
 template = "dist <distribution> contributes swift-package <name>"
 required = ["products", "requirement", "url"]
-[facts."dist.contributes.swift-package".formats]
-requirement = "swift-request"
-url = "url"
 optional = ["credentials-required", "reason"]
 lists = ["products"]
 section = "7.2"
+[facts."dist.contributes.swift-package".formats]
+requirement = "swift-request"
+url = "url"
 [facts."dist.contributes.swift-package".values]
 credentials-required = ["true"]
 # §7.2: `reason` is REQUIRED where the package declares `credentials-required`,

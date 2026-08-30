@@ -1468,6 +1468,30 @@ sys.path.insert(0, str(ROOT / "conformance"))
 import run as conformance_run  # noqa: E402
 
 problems = []
+
+# The fact table is TOML, where a sub-table header swallows every key after it.
+# `optional`, `lists` and `section` written below `[facts."x".formats]` become
+# formats — silently, and the fact then rejects the very operands it meant to
+# allow. So each table's keys are held to the set this file defines, and each
+# sub-table may only key operands the fact actually has.
+FACT_KEYS = {
+    "template", "required", "optional", "lists", "section", "values", "formats",
+    "rules", "typed_value", "advisory_operands", "open_keys", "open_key_pattern",
+}
+for name, fact in conformance_run.FACTS.items():
+    for stray in sorted(set(fact) - FACT_KEYS):
+        problems.append(f"record-facts.toml: {name} has a key {stray!r} nothing reads")
+    if fact.get("open_keys"):
+        continue  # view-links key the platform's vocabulary, not this document's
+    operands = set(re.findall(r"<([a-z-]+)>", fact["template"]))
+    operands |= set(fact.get("required", [])) | set(fact.get("optional", []))
+    for sub in ("values", "formats"):
+        for key in sorted(set(fact.get(sub, {})) - operands):
+            problems.append(
+                f"record-facts.toml: {name}.{sub} keys {key!r}, which is not an "
+                "operand of the fact — a misnested key reads as one of these"
+            )
+
 for record in sorted((ROOT / "conformance").glob("*/*/expected/*.record")):
     where = record.relative_to(ROOT)
     lines, malformed = conformance_run.read_record(record.read_bytes())
