@@ -1,0 +1,22 @@
+# §8.4 requirement 36, via §7.5: "Two distributions registering the same `name`
+# MUST fail, naming both."
+#
+# `name` is the name Python imports, and the registration is what makes
+# `import name` succeed at all — the package is linked into the application
+# binary rather than loaded from a `.so`, so the ordinary import machinery never
+# sees it. Two registrations for one name means one of two extension modules is
+# reachable and the other is not, decided by registration order, with both
+# producers believing theirs is installed.
+#
+# §7.5's stated failure mode for the neighbouring rule applies here too: the
+# build succeeds and the failure is an `ImportError` on device — or worse, a
+# successful import of the wrong module.
+requirement = 36
+profile     = "ios"
+section     = "7.5"
+
+outcome = "blocking"
+
+diagnostics = ["ni.req.36"]
+advisories  = []
+assertions  = []

@@ -30,7 +30,7 @@ dependency closure, the application's answers, the wheel's own files, or the
 resolved graph — which is the boundary Phase 1 drew and Phase 3 inherits.
 
 Verified by running the corpus against two stubs: a conforming one passes all
-thirty-two, and one that accepts every negative fails all twenty-eight and exits
+thirty-eight, and one that accepts every negative fails all thirty-two and exits
 1.
 
 ## The core profile
@@ -91,6 +91,28 @@ Three are worth singling out, for the reason the core ones were:
   Neither can be caught by a schema or by reading one file; the conflict exists
   only in the combination, and only the consumer knows which Python
   distributions to name — Gradle sees one module and one repository.
+
+## The iOS profile, and coverage
+
+Requirements 33, 34, 36 and 37 complete §8.1's third row. **Every blocking
+requirement in all three profiles now has a case** — twenty-six of them,
+verified by parsing §8.4 for the clauses that say *fail* or *reject* and
+checking each against the corpus rather than asserting it. `check_spec.py` also
+holds each case to §8.1's own profile assignment now, so a case cannot sit in a
+directory whose consumers never owed the requirement.
+
+Two of the four needed `resolved.toml` again, and for the reason §7.2 gives
+directly: its strongest check is on the **resolved graph** rather than on the
+declaration. `R33_path_dependency_in_graph` ships a clean sidecar — an `exact`
+requirement on an `https` URL — whose transitive dependency points at a local
+checkout. A consumer validating only what the sidecar says passes it, and the
+package resolves for whoever published it and for nobody else.
+
+`R37_objc_categories_union` is the quiet one worth keeping. Two distributions,
+one asking; the record must name the one that asked and not the other. §7.6 has
+no veto, so the only control the application has is seeing which dependency
+caused its binary to grow — and a consumer that applied the link setting and
+recorded nothing has met half the requirement while looking correct.
 
 ## Three gaps — one closed here, two standing
 

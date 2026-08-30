@@ -1,0 +1,6 @@
+contract = "1"
+platforms = ["ios"]
+
+# §7.6 names the effect, not the flag. One producer asking is enough.
+[ios.contributes]
+objc_categories = true

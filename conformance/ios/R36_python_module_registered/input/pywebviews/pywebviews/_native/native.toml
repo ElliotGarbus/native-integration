@@ -1,0 +1,15 @@
+contract = "1"
+platforms = ["ios"]
+
+[[ios.contributes.swift_packages]]
+name = "PyWebViews"
+url = "https://github.com/example/pywebviews"
+requirement = { exact = "1.0.0" }
+products = ["PyWebViews"]
+
+# §7.5: the three names need not agree. The package is PyWebViews, the Swift
+# type is WebViews, and Python imports `web_views`.
+[[ios.contributes.python_modules]]
+name = "web_views"
+swift_package = "PyWebViews"
+init = "PyInit_WebViews"

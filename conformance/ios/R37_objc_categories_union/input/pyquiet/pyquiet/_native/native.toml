@@ -1,0 +1,6 @@
+contract = "1"
+platforms = ["ios"]
+
+# Asks for nothing of the sort. The record must name pyasks and not this one.
+[ios.requires]
+deployment_target = "15.0"

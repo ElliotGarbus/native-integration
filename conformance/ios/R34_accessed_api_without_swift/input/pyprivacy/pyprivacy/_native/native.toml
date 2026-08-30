@@ -1,0 +1,15 @@
+contract = "1"
+platforms = ["ios"]
+
+# The package carries its own PrivacyInfo.xcprivacy (§7.3), and this sidecar
+# contributes no Swift source at all.
+[[ios.contributes.swift_packages]]
+name = "Vendor"
+url = "https://github.com/example/vendor"
+requirement = { from = "1.0.0" }
+products = ["Vendor"]
+
+[[ios.contributes.accessed_api_types]]
+type = "NSPrivacyAccessedAPICategoryUserDefaults"
+reasons = ["CA92.1"]
+reason = "Caches the last selected region"

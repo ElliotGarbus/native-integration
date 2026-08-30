@@ -1,0 +1,14 @@
+contract = "1"
+platforms = ["ios"]
+
+[[ios.contributes.swift_packages]]
+name = "BetaKit"
+url = "https://github.com/example/betakit"
+requirement = { exact = "1.0.0" }
+products = ["BetaKit"]
+
+# Both register `sensors`. §7.5: two distributions registering one name fail,
+# naming both.
+[[ios.contributes.python_modules]]
+name = "sensors"
+swift_package = "BetaKit"

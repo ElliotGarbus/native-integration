@@ -1,0 +1,23 @@
+# §8.4 requirement 33, via §7.2: "A consumer MUST reject a resolved graph
+# containing a path dependency **anywhere in it**, naming the distribution that
+# declared the top-level package and the offending transitive package."
+#
+# §7.2 calls this "the case this actually catches". A path dependency "points at
+# a location on one machine's filesystem, which will not exist on anyone else's,
+# and SwiftPM has no rule against declaring one" — so the build works for
+# whoever published the package and for nobody else, and the record cannot pin
+# what it cannot name.
+#
+# The sidecar is clean: an `exact` requirement on an `https` URL. What is wrong
+# is two levels down, in a package that package depends on, which is why §7.2
+# puts the check on the **resolved graph** rather than on the declaration. A
+# consumer validating only what the sidecar says passes this.
+requirement = 33
+profile     = "ios"
+section     = "7.2"
+
+outcome = "blocking"
+
+diagnostics = ["ni.req.33"]
+advisories  = []
+assertions  = []

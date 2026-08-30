@@ -1,0 +1,12 @@
+build contract 1.0
+build platform ios
+dist pyasks contract 1
+dist pyasks contributes objc-categories
+dist pyasks input native.toml sha256=de210ab6c653d360a712f88075186c0f58d40523b845f9e32c962cacc159c230
+dist pyasks origin direct
+dist pyasks version 1.0.0
+dist pyquiet contract 1
+dist pyquiet floor deployment_target configured=16.0 declared=15.0 state=met
+dist pyquiet input native.toml sha256=091948c692e54f53c16d0dc7497e4d9a3b130421ea6282383c94a05df165a392
+dist pyquiet origin direct
+dist pyquiet version 1.0.0

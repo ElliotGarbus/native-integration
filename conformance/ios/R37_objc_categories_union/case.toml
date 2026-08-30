@@ -1,0 +1,28 @@
+# §8.4 requirement 37, via §7.6: a consumer links the application target so that
+# Objective-C categories in statically linked libraries are loaded "when any
+# distribution asks", and "MUST report it in the record, naming the
+# distributions that asked".
+#
+# Two distributions, one asking. §7.6 makes this a union — "one producer asking
+# is enough" — and there is deliberately **no veto**, on §6.9's reasoning:
+# withholding it does not reduce what the application may do, it makes the
+# producer's code fail at runtime "with a message pointing nowhere". §7.6's note
+# names that message: `unrecognized selector sent to instance`, with nothing in
+# it identifying the library, let alone the Python distribution that brought it.
+#
+# The attribution is why the record row exists. Loading every category also
+# loads the classes carrying them, so the binary grows — and the application is
+# entitled to see which dependency caused that. A consumer that applied the
+# setting and recorded nothing has met half the requirement.
+requirement = 37
+profile     = "ios"
+section     = "7.6"
+
+outcome = "accept"
+
+diagnostics = []
+advisories  = []
+
+assertions  = ["objc_categories_linked"]
+
+record = "ios.record"

@@ -1,0 +1,25 @@
+# §8.4 requirement 34, via §7.3: `accessed_api_types` "is valid **only** where
+# the same sidecar contributes Swift under `[ios.contributes.src]`. A consumer
+# MUST reject it otherwise, naming the distribution and directing the producer
+# to §7.2".
+#
+# §7.3 explains what the table is for: contributed Swift compiles into the
+# application's target, so by Apple's rule it *is* application code, and nothing
+# reports code with no target of its own. A Swift **package** carries its own
+# `PrivacyInfo.xcprivacy`, which Apple's tooling reads automatically — so a
+# declaration here from a sidecar that ships no raw source is either describing
+# a package that already declares for itself, or describing nothing.
+#
+# The harm is a false record rather than a broken build. §7.3's Caution: nothing
+# can verify this declaration, an omission surfaces as an App Store rejection
+# weeks later, and "recording the claim is what makes the omission attributable
+# after the fact". A claim attached to no source is not attributable to anything.
+requirement = 34
+profile     = "ios"
+section     = "7.3"
+
+outcome = "blocking"
+
+diagnostics = ["ni.req.34"]
+advisories  = []
+assertions  = []

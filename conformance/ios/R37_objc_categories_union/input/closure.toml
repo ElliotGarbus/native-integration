@@ -1,0 +1,13 @@
+platform = "ios"
+
+[[distribution]]
+name = "pyasks"
+version = "1.0.0"
+origin = "direct"
+entry_point = "pyasks._native"
+
+[[distribution]]
+name = "pyquiet"
+version = "1.0.0"
+origin = "direct"
+entry_point = "pyquiet._native"

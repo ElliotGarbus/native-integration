@@ -142,11 +142,19 @@ url = "https://github.com/example/charting"
 version = "2.4.0"
 revision = "8a1f0c9e4b2d7f36a05c1e8b9d4427fa3c60e15b"
 declared_by = "pycharting"
+path = "/Users/…"             # optional — an unpinnable graph, §7.2
+branch = "main"               # optional — likewise
 
   [[package.binary_target]]
   name = "ChartingRenderer.xcframework"
   checksum = "e11d…"
 ```
+
+`path` and `branch` exist because [§7.2](../SPEC.md#72-swift-packages) puts its
+strongest check on the **resolved graph** rather than on the declaration: a path
+or branch dependency anywhere in it is rejected, however cleanly the sidecar
+that pulled it in is written. Neither is expressible any other way, since the
+offending package is one a producer never named.
 
 `files` and `classes` are listings of archive contents, which is exactly what
 [§9.7](../SPEC.md#97-packaging-collisions) and
@@ -227,6 +235,7 @@ advisory — which is why it is a separate axis rather than a third disposition.
 | `no_credential_in_record` | 42 |
 | `no_invented_value` | 16 — nothing application-owned was originated from a producer's declaration |
 | `no_unexported_fallback` | 29 — an unapproved `exported_required` component was not registered unexported instead |
+| `objc_categories_linked` | 37 — the application target links so categories in static libraries load |
 | `record_contains` / `record_omits` | 43, and any row of [§9.6](../SPEC.md#96-what-a-record-must-contain) |
 | `activity_extends_component_activity` | 45 |
 | `url_callback_observable` | 46 |
@@ -287,8 +296,8 @@ is **dangerous** rather than merely wrong.
 | `ios/R35_capability_key_contributed` | 35 | grants a capability that then does not work, with no task stated |
 | `android/R41_artifact_feature_undecided` | 41 | lets an artifact make hardware mandatory without the application choosing |
 
-Beyond category 1, every blocking requirement in §8.1's **core** and **Android**
-rows now has a case. The remaining work is the iOS profile — 33, 34, 36, 37.
+Beyond category 1, **every blocking requirement in all three of §8.1's profiles
+now has a case** — core, Android and iOS.
 
 Three accept cases sit beside them so the corpus is not only negatives:
 `core/R01_dependency_closure` compares a record,

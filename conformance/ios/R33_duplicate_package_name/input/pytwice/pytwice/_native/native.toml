@@ -1,0 +1,16 @@
+contract = "1"
+platforms = ["ios"]
+
+[[ios.contributes.swift_packages]]
+name = "Vendor"
+url = "https://github.com/example/vendor-a"
+requirement = { exact = "1.0.0" }
+products = ["VendorA"]
+
+# The same handle, a different repository. §7.2: invalid even when the URLs
+# differ, because §7.5 refers to packages by this name.
+[[ios.contributes.swift_packages]]
+name = "Vendor"
+url = "https://github.com/example/vendor-b"
+requirement = { exact = "2.0.0" }
+products = ["VendorB"]

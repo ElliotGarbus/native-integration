@@ -1,0 +1,9 @@
+build contract 1.0
+build platform ios
+dist pywebviews contract 1
+dist pywebviews contributes python-module web_views init=PyInit_WebViews swift-package=PyWebViews
+dist pywebviews contributes swift-package PyWebViews products=PyWebViews requirement=exact:1.0.0 url=https://github.com/example/pywebviews
+dist pywebviews input native.toml sha256=b34fd195f62c207ac34148774b2b776fc7d6c6a4535cb780a9b07d71a6eff88c
+dist pywebviews origin direct
+dist pywebviews package https://github.com/example/pywebviews requested=exact:1.0.0 revision=8a1f0c9e4b2d7f36a05c1e8b9d4427fa3c60e15b version=1.0.0
+dist pywebviews version 1.0.0

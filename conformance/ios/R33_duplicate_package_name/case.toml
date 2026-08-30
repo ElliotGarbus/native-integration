@@ -1,0 +1,22 @@
+# §8.4 requirement 33, via §7.2: `name` is a local handle, "**unique within the
+# sidecar**. §7.5 refers to packages by it, so two entries sharing a `name` are
+# invalid even when their URLs differ; a consumer MUST reject that, naming the
+# distribution."
+#
+# The handle is the only thing binding a registered Python module to the code
+# behind it (§7.5). Two packages answering to one handle means
+# `swift_package = "Vendor"` resolves to whichever entry a consumer happens to
+# look at first — and §7.5's whole purpose is that a module registered against
+# the wrong package produces a build that succeeds and an `ImportError` on
+# device.
+#
+# Not schema-detectable: uniqueness across array entries is not a shape.
+requirement = 33
+profile     = "ios"
+section     = "7.2"
+
+outcome = "blocking"
+
+diagnostics = ["ni.req.33"]
+advisories  = []
+assertions  = []

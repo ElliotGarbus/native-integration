@@ -1,0 +1,28 @@
+# The other side of requirement 36, and the half a record can show.
+#
+# §7.5 makes a consumer register the module, link **every** product the
+# declaring sidecar named for that package — "rather than only those some other
+# sidecar also asked for" — and exclude `<name>.py` and `<name>.pyi` from the
+# Python payload.
+#
+# The stub exclusion is the interesting obligation, and §7.5 says why: producers
+# ship stubs of the same name for type checking off device, and "a `.py` stub
+# would otherwise sit on `sys.path` as a silent fallback: a registration that
+# failed or was skipped would surface not as `ImportError` but as an application
+# that imports successfully and does nothing". The `.pyi` goes with it because
+# its presence invites the `.py` back.
+#
+# So a consumer that ships the stubs turns the one failure that would have been
+# loud into silence.
+requirement = 36
+profile     = "ios"
+section     = "7.5"
+
+outcome = "accept"
+
+diagnostics = []
+advisories  = []
+
+assertions  = ["python_module_stubs_excluded"]
+
+record = "ios.record"

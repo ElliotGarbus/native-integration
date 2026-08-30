@@ -1497,6 +1497,17 @@ for path in sorted((ROOT / "conformance").glob("*/*/case.toml")):
         problems.append(f"{where}: outcome is {case.get('outcome')!r}, not accept or blocking")
     if case.get("profile") != path.parent.parent.name:
         problems.append(f"{where}: profile {case.get('profile')!r} is not its directory")
+    # §8.1 assigns each numbered requirement to exactly one profile, and the
+    # generated diagnostics carry that assignment. A case filed elsewhere would
+    # be handed to a consumer that never owed the requirement.
+    identifier = f"ni.req.{case.get('requirement')}"
+    if identifier in DIAGNOSTICS:
+        owner = DIAGNOSTICS[identifier]["profile"]
+        if owner != case.get("profile"):
+            problems.append(
+                f"{where}: requirement {case['requirement']} is §8.1's {owner} profile, "
+                f"not {case.get('profile')!r}"
+            )
     for identifier in case.get("diagnostics", []) + case.get("advisories", []):
         if identifier not in DIAGNOSTICS:
             problems.append(f"{where}: expects {identifier}, which no generator emits")

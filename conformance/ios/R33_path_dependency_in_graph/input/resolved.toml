@@ -1,0 +1,15 @@
+# The top-level package is pinned exactly. Its own Package.swift depends on a
+# local checkout — which is what §7.2 rejects, and which only the resolved graph
+# reveals.
+
+[[package]]
+url = "https://github.com/example/vendorkit"
+version = "3.1.0"
+revision = "8a1f0c9e4b2d7f36a05c1e8b9d4427fa3c60e15b"
+declared_by = "pyvendor"
+
+[[package]]
+url = "https://github.com/example/vendorkit-core"
+declared_by = "pyvendor"
+transitive = true
+path = "/Users/somebody/dev/vendorkit-core"

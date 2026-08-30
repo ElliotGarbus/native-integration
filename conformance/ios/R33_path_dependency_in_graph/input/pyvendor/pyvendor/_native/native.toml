@@ -1,0 +1,8 @@
+contract = "1"
+platforms = ["ios"]
+
+[[ios.contributes.swift_packages]]
+name = "VendorKit"
+url = "https://github.com/example/vendorkit"
+requirement = { exact = "3.1.0" }
+products = ["VendorKit"]
