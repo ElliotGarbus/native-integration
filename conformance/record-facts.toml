@@ -14,6 +14,8 @@
 #   optional   keyed operands that MAY appear
 #   open_keys  the keyed operands are the platform's vocabulary, not this
 #              document's, so unlisted keys are permitted (view-links only)
+#   lists      keyed operands that may carry a comma-separated list. Every
+#              other operand is scalar; a positional operand always is
 #   values     a closed vocabulary, for a keyed operand or a placeholder
 #   rules      conditional operand rules — a field required or forbidden
 #              depending on another operand's value. `required_if` and
@@ -52,6 +54,7 @@ section = "4.3"
 [facts."dist.origin"]
 template = "dist <distribution> origin <kind>"
 optional = ["via"]
+lists = ["via"]
 section = "3.2"
 [facts."dist.origin".values]
 kind = ["direct", "transitive"]
@@ -110,6 +113,7 @@ forbidden_if = { key = "state", values = ["supplied", "unresolved"] }
 template = "dist <distribution> action <id>"
 required = ["state"]
 optional = ["conditional", "slot", "uses", "date", "version"]
+lists = ["uses"]
 section = "5.3"
 [facts."dist.action".values]
 state = ["acknowledged", "unresolved", "dismissed"]
@@ -144,6 +148,7 @@ configuration = ["implementation", "api", "compileOnly", "runtimeOnly"]
 template = "dist <distribution> contributes gradle-repository <url>"
 required = ["authenticated", "reason"]
 optional = ["groups", "modules"]
+lists = ["groups", "modules"]
 section = "6.4"
 [facts."dist.contributes.gradle-repository".values]
 authenticated = ["true", "false"]
@@ -218,6 +223,7 @@ kind = ["package", "provider-authority"]
 template = "dist <distribution> contributes swift-package <name>"
 required = ["products", "requirement", "url"]
 optional = ["credentials-required", "reason"]
+lists = ["products"]
 section = "7.2"
 [facts."dist.contributes.swift-package".values]
 credentials-required = ["true"]
@@ -239,6 +245,7 @@ section = "7.1"
 [facts."dist.contributes.accessed-api"]
 template = "dist <distribution> contributes accessed-api <type>"
 required = ["reasons"]
+lists = ["reasons"]
 section = "7.3"
 
 [facts."dist.contributes.plist-value"]
@@ -246,7 +253,7 @@ template = "dist <distribution> contributes plist-value <key>"
 required = ["type", "value"]
 section = "7.4"
 [facts."dist.contributes.plist-value".values]
-type = ["string", "integer", "float", "boolean", "array"]
+type = ["string", "integer", "float", "boolean"]
 
 # §7.4's one-mode rule: a key is claimed as array-valued by being declared under
 # `append`, and the claim stands even where the declared array is empty. The
@@ -340,6 +347,7 @@ forbidden_if = { key = "state", values = ["pending"] }
 [facts."decision.suppress-permission"]
 template = "decision suppress-permission <name>"
 required = ["date", "withdrew"]
+lists = ["withdrew"]
 section = "6.5"
 
 [facts."decision.artifact-feature"]
@@ -352,6 +360,7 @@ keep = ["required", "optional"]
 [facts."decision.collision"]
 template = "decision collision <path>"
 required = ["artifacts", "chosen", "date", "decided", "distributions"]
+lists = ["artifacts", "distributions"]
 section = "9.7"
 [facts."decision.collision".values]
 decided = ["application", "consumer"]

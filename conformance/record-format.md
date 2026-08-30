@@ -48,17 +48,27 @@ fact       = verb SP operand *( SP operand )
 operand    = positional / keyed
 positional = scalar
 keyed      = key "=" value
-key        = 1*( %x61-7A / DIGIT / "-" )
+key        = dockey / openkey
+dockey     = 1*( %x61-7A / DIGIT / "-" )
+openkey    = 1*( %x61-7A / DIGIT / "-" / "_" )
 value      = scalar / list
-list       = scalar 2*( "," scalar )
+list       = scalar 1*( "," scalar )
 scalar     = bare / quoted
 bare       = 1*( ALPHA / DIGIT / "." / "_" / "-" / ":" / "/" / "@" / "+" / "~" / "*" )
 quoted     = DQUOTE *qchar DQUOTE
-qchar      = %x20-21 / %x23-5B / %x5D-10FFFF / escape
-escape     = "\" ( DQUOTE / "\" / "n" / "t" / "r" / "u" 4HEXDIG )
+qchar      = %x20-21 / %x23-5B / %x5D-7E / %x80-10FFFF / escape
+escape     = "\" ( DQUOTE / "\" / "n" / "t" / "r" / "u" 4LOWHEX )
+LOWHEX     = DIGIT / %x61-66
 ```
 
-- Every **positional** operand precedes every **keyed** one.
+- Every **positional** operand precedes every **keyed** one, and a positional
+  operand is always a scalar.
+- A keyed operand is **scalar unless its fact says otherwise**.
+  [`record-facts.toml`](record-facts.toml) names the operands that may carry a
+  list — `via`, `uses`, `groups`, `modules`, `products`, `reasons`, `withdrew`,
+  `artifacts`, `distributions` — and a list anywhere else is invalid.
+- `dockey` is every key this format names itself; `openkey` is a `view-link`
+  attribute, which is the sidecar's own spelling and so may contain `_`.
 - A keyed operand appears **at most once** in a fact. Repeating one is invalid,
   not a second value.
 - A value that can be written `bare` **is** written bare; one that cannot **is**
@@ -69,8 +79,11 @@ escape     = "\" ( DQUOTE / "\" / "n" / "t" / "r" / "u" 4HEXDIG )
 - There is **no empty list**. Where a list would be empty the keyed operand is
   omitted, and where its absence would lose a claim the claim gets a fact of its
   own — `plist-array-key` is the case that needed one.
-- List members are sorted bytewise and de-duplicated. Keyed operands within one
-  fact are sorted bytewise by key.
+- List members are sorted bytewise **over their serialized form**, and
+  de-duplicated. Keyed operands within one fact are sorted bytewise by key.
+  Serialized rather than decoded, because the file's own ordering is over
+  serialized lines and the two disagree wherever an escape is involved: `"a b"`
+  sorts before `"a\nb"` as written and after it once decoded.
 
 **Escaping is JSON's**, so that any string a TOML sidecar can hold has exactly
 one serialization here. `\n`, `\t`, `\r`, `\"` and `\\` are literal; every other
@@ -281,11 +294,17 @@ credential is not ([§9.5](../SPEC.md#95-secrets-are-never-recorded)).
 | Anything the consumer generated | The manifest, the Gradle files, the Xcode project. Those are the consumer's, and two conforming consumers differ |
 | Timestamps other than a decision's date | A record diffed between runs must not change because time passed |
 
-A `reason` **is** included where [§6.4](../SPEC.md#64-maven-repositories),
-[§6.5](../SPEC.md#65-permissions-and-features) and
-[§6.9](../SPEC.md#69-package-visibility) require it to be kept and attributed —
-those are the three places the specification makes prose part of the record
-rather than part of the report.
+A `reason` **is** included, on two different footings.
+[§6.4](../SPEC.md#64-maven-repositories) and
+[§6.9](../SPEC.md#69-package-visibility) **require** one to be kept and
+attributed — a repository's, and a `queries` entry's — and
+[§7.2](../SPEC.md#72-swift-packages) imports §6.4's rule for a package.
+[§6.5](../SPEC.md#65-permissions-and-features)'s permission `reason` is
+**RECOMMENDED**, and carrying it into the record is advisory
+[S7](../SPEC.md#85-advisory-obligations) rather than a requirement. This format
+carries it so that a consumer claiming S7 can be checked on it; a consumer that
+does not claim S7 omits the operand, which is why it is optional on the fact
+rather than required.
 
 ## 5. Worked example
 

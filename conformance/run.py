@@ -179,28 +179,39 @@ def scan_scalar(line: str, i: int) -> tuple[str, str, int]:
     return match.group(0), match.group(0), match.end()
 
 
-def scan_value(line: str, i: int) -> tuple[list[str], int]:
-    """A scalar, or a list of two or more of them."""
+def scan_value(line: str, i: int) -> tuple[list[str], str, int]:
+    """A scalar, or a list of two or more. Returns (decoded members, raw, next).
+
+    Members are ordered by their **serialized** bytes, not their decoded ones.
+    The two disagree wherever an escape is involved — `"a b"` sorts before
+    `"a\\nb"` written out, and after it decoded — and the file's own ordering is
+    over serialized lines, so a member ordering defined any other way would put
+    the two sorts in conflict.
+    """
     members: list[str] = []
+    raws: list[str] = []
+    start = i
     while True:
-        decoded, _, i = scan_scalar(line, i)
+        decoded, raw, i = scan_scalar(line, i)
         members.append(decoded)
+        raws.append(raw)
         if i < len(line) and line[i] == ",":
             i += 1
             continue
         break
     if len(members) > 1:
-        if members != sorted(members):
-            raise LexError("a list is sorted bytewise")
-        if len(set(members)) != len(members):
+        if raws != sorted(raws):
+            raise LexError("a list is sorted bytewise over its serialized members")
+        if len(set(raws)) != len(raws):
             raise LexError("a list is de-duplicated")
-    return members, i
+    return members, line[start:i], i
 
 
-def lex(line: str) -> tuple[list[str], dict[str, list[str]]]:
-    """A fact as its positional operands and its keyed ones."""
+def lex(line: str) -> tuple[list[str], dict[str, list[str]], dict[str, str]]:
+    """A fact as its positional operands, its keyed ones, and their raw text."""
     positional: list[str] = []
     keyed: dict[str, list[str]] = {}
+    raw: dict[str, str] = {}
     order: list[str] = []
     i = 0
     while i < len(line):
@@ -211,8 +222,9 @@ def lex(line: str) -> tuple[list[str], dict[str, list[str]]]:
             key = key_match.group(0)
             if key in keyed:
                 raise LexError(f"`{key}` appears more than once")
-            values, i = scan_value(line, key_match.end() + 1)
+            values, spelling, i = scan_value(line, key_match.end() + 1)
             keyed[key] = values
+            raw[key] = spelling
             order.append(key)
         else:
             if keyed:
@@ -227,7 +239,7 @@ def lex(line: str) -> tuple[list[str], dict[str, list[str]]]:
                 raise LexError("the fact ends in a space")
     if order != sorted(order):
         raise LexError("keyed operands are sorted bytewise by key")
-    return positional, keyed
+    return positional, keyed, raw
 
 
 def match_template(positional: list[str]) -> tuple[str, dict, dict[str, str]] | None:
@@ -261,7 +273,7 @@ def satisfied(condition: dict, bound: dict[str, list[str]]) -> bool:
 
 def validate_fact(line: str) -> list[str]:
     try:
-        positional, keyed = lex(line)
+        positional, keyed, _raw = lex(line)
     except LexError as problem:
         return [f"{problem}: {line}"]
 
@@ -282,6 +294,13 @@ def validate_fact(line: str) -> list[str]:
             problems.append(f"{name} does not take `{key}`: {line}")
     for key in sorted(set(spec.get("required", [])) - set(keyed)):
         problems.append(f"{name} requires `{key}`: {line}")
+
+    # A keyed operand is scalar unless the fact says otherwise. Without this,
+    # `kind=activity,service` and `sha256=<a>,<b>` are well-formed facts.
+    lists = set(spec.get("lists", []))
+    for key in sorted(set(keyed) - lists):
+        if len(keyed[key]) > 1:
+            problems.append(f"{name} takes one value for `{key}`, not a list: {line}")
 
     for key, allowed_values in spec.get("values", {}).items():
         for value in bound.get(key, []):
@@ -313,17 +332,25 @@ def elide_digests(lines: list[str]) -> list[str]:
     `ignore_digests` exists so that a case about namespace collision is not also
     a test of file hashing. It is not a licence to emit `sha256=garbage`, so the
     syntax is validated in `validate_fact` before anything is elided here.
+
+    Eliding goes through the lexer rather than over the raw text. Splitting on
+    spaces would reach inside a quoted value, so a `reason` that happens to
+    quote a digest would be rewritten — and two different reasons quoting two
+    different digests would then compare equal, which is the opposite of what
+    this is for.
     """
     out = []
     for line in lines:
-        out.append(
-            " ".join(
-                f"{token.split('=', 1)[0]}=<digest>"
-                if token.split("=", 1)[0] in DIGEST_KEYS and "=" in token
-                else token
-                for token in line.split(" ")
-            )
-        )
+        try:
+            positional, _keyed, raw = lex(line)
+        except LexError:
+            out.append(line)  # invalid, and already reported as such
+            continue
+        operands = [
+            f"{key}=<digest>" if key in DIGEST_KEYS else f"{key}={raw[key]}"
+            for key in sorted(raw)
+        ]
+        out.append(" ".join(positional + operands))
     return out
 
 
