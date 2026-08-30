@@ -1,0 +1,4 @@
+contract = "2"
+
+[android.requires]
+min_sdk = 24

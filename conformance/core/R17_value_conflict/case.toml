@@ -1,0 +1,21 @@
+# §8.4 requirement 17, via §5.2: two values targeting the same `(kind, key)`
+# coalesce when the supplied content is equal, and where it differs "the
+# consumer MUST fail, naming **both** distributions".
+#
+# One manifest entry, two producers, two different strings. There is no
+# order-independent winner — whichever the consumer writes, the other producer's
+# SDK reads a key configured for someone else — and a consumer that took the
+# last one silently would produce a build whose behaviour depended on closure
+# ordering.
+#
+# Naming both distributions is the part worth testing. Only the consumer knows
+# which Python packages asked for the key; the manifest shows one entry.
+requirement = 17
+profile     = "core"
+section     = "5.2"
+
+outcome = "blocking"
+
+diagnostics = ["ni.req.17"]
+advisories  = []
+assertions  = []

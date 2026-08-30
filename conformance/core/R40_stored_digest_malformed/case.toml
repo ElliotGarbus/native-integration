@@ -1,0 +1,28 @@
+# §8.4 requirement 40, via §9.3: every digest is "64 lowercase hexadecimal
+# characters, unprefixed and never abbreviated", and a consumer "MUST write that
+# form and MUST reject a stored digest that is not it, **rather than comparing
+# loosely**".
+#
+# Comparing loosely is the whole point of the clause. §9.3: the algorithm is
+# already fixed, so a `sha256:` prefix carries nothing, and "an abbreviation
+# carries less than it appears to, since two records elided to different lengths
+# cannot be compared at all". A consumer that accepted a twelve-character digest
+# and matched on the prefix would report agreement between two records that
+# never agreed.
+#
+# The accepted record here carries an abbreviated digest. The resolution's is
+# well-formed and its prefix matches — so a loose comparison passes, and that is
+# the answer the requirement forbids.
+requirement = 40
+profile     = "core"
+section     = "9.3"
+
+outcome = "blocking"
+
+diagnostics = ["ni.req.40"]
+advisories  = []
+assertions  = []
+
+# The point of the case: this input is malformed, and the consumer must say so
+# rather than compare loosely. Corpus hygiene skips it for that reason.
+malformed_inputs = ["accepted.record"]

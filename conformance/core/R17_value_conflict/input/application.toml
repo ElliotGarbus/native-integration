@@ -1,0 +1,9 @@
+[build]
+min_sdk = 26
+compile_sdk = 35
+
+# Two answers, one manifest key. §5.2: equality is byte equality of the supplied
+# string, so these differ and the consumer fails naming both distributions.
+[answers.values]
+"pyalpha.vendor_key" = "alpha-key-0001"
+"pybeta.vendor_key" = "beta-key-0002"

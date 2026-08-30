@@ -1,0 +1,9 @@
+contract = "1"
+
+[android.owns]
+java_namespaces = ["org.pyr04"]
+
+# The directory does not exist in this distribution. §3.2: fail naming the
+# distribution, rather than skipping it.
+[android.contributes.src]
+java = ["java"]

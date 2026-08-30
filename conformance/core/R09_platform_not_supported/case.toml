@@ -1,0 +1,22 @@
+# §8.4 requirement 9, via §4.5: a consumer building for a platform `platforms`
+# does not list MUST fail, naming the distribution **and how it entered the
+# dependency closure**.
+#
+# §4.5's note is the case: a platform-specific framework's Python wrapper
+# installs fine on the wrong platform, because its own content is pure Python
+# and nothing in the wheel objects. The build succeeds; the failure appears at
+# import, or never — a facade whose unimplemented branch is `pass` runs and does
+# nothing. §4.4 cannot catch it, because there is no key to reject.
+#
+# The provenance half matters as much as the failure. This distribution is
+# transitive; the application author has never heard of it, and a diagnostic
+# that named only the package would send them looking.
+requirement = 9
+profile     = "core"
+section     = "4.5"
+
+outcome = "blocking"
+
+diagnostics = ["ni.req.9"]
+advisories  = []
+assertions  = []

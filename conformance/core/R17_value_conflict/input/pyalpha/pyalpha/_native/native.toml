@@ -1,0 +1,10 @@
+contract = "1"
+
+# Both target the same (kind, key). §5.2 coalesces equal content and fails
+# differing content.
+[[android.requires.application_value]]
+id = "vendor_key"
+kind = "manifest_meta_data"
+key = "com.vendor.API_KEY"
+reason = "Your vendor API key, from the pyalpha console"
+placeholder = "<TODO: your vendor API key>"

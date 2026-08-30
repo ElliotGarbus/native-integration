@@ -1,0 +1,14 @@
+contract = "1"
+
+[[android.requires.application_value]]
+id = "app_group_id"
+kind = "inline"
+conditional = true
+reason = "The App Group identifier this SDK shares data through"
+placeholder = "group.<TODO: your bundle id>.example"
+
+[[android.requires.application_action]]
+id = "app_group_entitlement"
+summary = "Enable App Groups and add the identifier above to the entitlement"
+reason = "The container is shared through the entitlement."
+uses = ["app_group_id"]

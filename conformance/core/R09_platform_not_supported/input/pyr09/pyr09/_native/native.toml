@@ -1,0 +1,7 @@
+contract = "1"
+# This distribution does not function on Android at all — a stronger claim than
+# "contributes nothing there" (§4.5).
+platforms = ["ios"]
+
+[ios.requires]
+deployment_target = "15.0"

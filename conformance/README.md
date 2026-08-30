@@ -58,6 +58,7 @@ input/
   closure.toml        the resolved dependency closure for the target platform
   application.toml    the application's own configuration and answers
   resolved.toml       optional — what the consumer's resolver would have returned
+  accepted.record     optional — the last accepted integration record (§9.1)
   <distribution>/     one tree per distribution, as installed
     <package>/_native/native.toml
 ```
@@ -73,6 +74,34 @@ requirement 1.
 must offer and deliberately not its syntax, so a consumer under test adapts this
 into whatever it actually reads. The corpus cannot mandate a spelling the
 specification refuses to.
+
+#### `accepted.record`
+
+[§9.1](../SPEC.md#91-the-lifecycle) makes a consumer compare its resolution
+against **the last accepted record**, report the delta, and refuse to build
+through a change the application has not accepted. Requirements 26, 38 and 40
+all turn on that comparison, and none can be exercised in a single run without
+a prior state to compare against.
+
+`input/accepted.record` is that state, in
+[the same canonical form](record-format.md) a consumer emits — so the corpus
+needs no second format, and a consumer that can emit a record can read one.
+
+A case whose point is that the stored record is *wrong* says so:
+
+```toml
+malformed_inputs = ["accepted.record"]
+```
+
+Corpus hygiene then skips validating it, and validates every other one. Without
+that, `core/R40_stored_digest_malformed` could not ship the abbreviated digest
+its requirement is about.
+
+#### `closure.toml`, and a distribution with two entry points
+
+§3.4 makes a distribution declaring more than one entry in the group invalid, so
+a closure entry may spell `entry_points` as a list in place of `entry_point`.
+Only `core/R02_multiple_entry_points` does.
 
 #### `resolved.toml`
 

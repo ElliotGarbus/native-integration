@@ -30,7 +30,43 @@ dependency closure, the application's answers, the wheel's own files, or the
 resolved graph — which is the boundary Phase 1 drew and Phase 3 inherits.
 
 Verified by running the corpus against two stubs: a conforming one passes all
-twelve, and one that accepts every negative fails all nine and exits 1.
+twenty-four, and one that accepts every negative fails all twenty-one and exits
+1.
+
+## The core profile
+
+Every blocking requirement in §8.1's core row now has a fixture: 2, 4, 5, 7, 8,
+9, 12, 13, 14, 17, 22, 26, 38, 40. Requirement 1 is the accept case the corpus
+opened with.
+
+Three of them needed a prior state, because §9.1's comparison cannot be
+exercised in a single run: `input/accepted.record` carries the last accepted
+record in the same canonical form a consumer emits, so the corpus needs no
+second format and a consumer that can write one can read one.
+
+Two are worth singling out for the same reason `R13` was — the input is not
+malformed, and a plausible consumer gets them wrong:
+
+- **`R14_action_held_by_unsupplied_value`.** The action *is* acknowledged. It
+  stays unsatisfied because the value it `uses` is a placeholder, and that value
+  is `conditional`, so on its own it never fails the build. §5.3 adds the rule
+  precisely so an unconditional action cannot pass on an input that never
+  arrived. A consumer checking "acknowledged?" ships.
+- **`R40_stored_digest_malformed`.** The stored digest's *prefix matches*. A
+  consumer comparing loosely reports agreement between two records that never
+  agreed, which is what §9.3's "never abbreviated" exists to prevent.
+
+### One clause in requirement 7 cannot be fixtured, and will not be until 1.1
+
+§4.3's **under-declaration** rule — a sidecar using a key, table, or
+closed-vocabulary value introduced in a revision later than the contract it
+names — has no fixture, and cannot have one. Every entry in `contract/v1.toml`
+is 1.0, so no declaration exists whose `since` a sidecar could under-declare.
+`R07_contract_major_mismatch` covers the half that is testable today.
+
+This is not a gap to close; it is a fixture that becomes writable the day a
+minor adds its first key, and the registry's `since` field is what will make it
+mechanical. Worth recording so the absence is not read later as an oversight.
 
 ## Three gaps — one closed here, two standing
 

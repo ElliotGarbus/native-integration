@@ -1,0 +1,20 @@
+# §8.4 requirement 14, via §5.3: "An acknowledgement does not satisfy an action
+# while a value it `uses` is unsupplied." A consumer MUST treat such an action
+# as unsatisfied — failing the build where the action is unconditional — and
+# MUST report the action beside the value holding it open, naming both `id`s.
+#
+# The subtle half of the requirement, and the one a consumer that checks
+# "acknowledged?" gets wrong. §5.3 spells out why it exists: the value here is
+# **conditional**, so on its own it never fails the build, and without this rule
+# an unconditional action could be acknowledged and pass while the input it
+# depends on never arrived. The application has acknowledged the work; the
+# identifier the work needs is still a placeholder.
+requirement = 14
+profile     = "core"
+section     = "5.3"
+
+outcome = "blocking"
+
+diagnostics = ["ni.req.14"]
+advisories  = []
+assertions  = []

@@ -1,0 +1,20 @@
+# §8.4 requirement 7, via §4.3: a consumer implementing contract X.Y MUST reject
+# a sidecar declaring a different major, with a message naming the distribution
+# and the contract the sidecar needs, and "MUST NOT parse such a sidecar
+# partially".
+#
+# Partial parsing is the danger. A version-2 sidecar's keys mean whatever
+# version 2 says they mean; reading the ones a version-1 consumer recognizes and
+# ignoring the rest produces a build from a document nobody wrote.
+#
+# Not schema-detectable: `"2"` is a well-formed contract value. What makes it
+# wrong is the consumer's own version, which no schema knows.
+requirement = 7
+profile     = "core"
+section     = "4.3"
+
+outcome = "blocking"
+
+diagnostics = ["ni.req.7"]
+advisories  = []
+assertions  = []

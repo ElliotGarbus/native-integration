@@ -1,0 +1,7 @@
+[build]
+min_sdk = 26
+compile_sdk = 35
+
+# Acknowledged — but `app_group_id` is unsupplied, so §5.3 holds the action open.
+[answers.acknowledged]
+"pyr14" = ["app_group_entitlement"]

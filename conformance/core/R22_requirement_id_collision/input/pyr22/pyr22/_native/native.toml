@@ -1,0 +1,15 @@
+contract = "1"
+
+[[android.requires.application_value]]
+id = "deep_link"
+kind = "manifest_meta_data"
+key = "com.vendor.DEEP_LINK"
+reason = "The deep-link host you registered"
+placeholder = "<TODO: your deep-link host>"
+
+# The same `id`, on the same platform, as an action. §5: unique across values
+# and actions alike.
+[[android.requires.application_action]]
+id = "deep_link"
+summary = "Register your link domain as a verified App Link"
+reason = "android:autoVerify needs an assetlinks.json on your own domain."

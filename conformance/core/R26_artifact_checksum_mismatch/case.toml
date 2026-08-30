@@ -1,0 +1,23 @@
+# §8.4 requirement 26, via §6.3: a consumer records a SHA-256 per resolved
+# artifact "over the artifact's bytes as downloaded", verifies each one on
+# subsequent builds, and MUST **fail on a mismatch**, naming the artifact and
+# the distribution that declared it.
+#
+# §6.3 says why a version is not enough: "A repository can serve different bytes
+# under one version, and a moved tag resolves elsewhere." The checksum is what
+# makes the reproducibility claim literally true, and a consumer that records it
+# and never compares has a lockfile that documents a guarantee it does not
+# enforce — which is worse than not claiming one.
+#
+# The accepted record and the resolution disagree about the bytes behind
+# `com.example.maps:android:4.1.0`. Nothing else differs, and the version is the
+# same, which is exactly the case a version comparison misses.
+requirement = 26
+profile     = "core"
+section     = "6.3"
+
+outcome = "blocking"
+
+diagnostics = ["ni.req.26"]
+advisories  = []
+assertions  = []

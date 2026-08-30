@@ -1,0 +1,24 @@
+# §8.4 requirement 38, via §9.1: a consumer computes the resolution, compares it
+# against the last accepted record, reports the delta, and **requires explicit
+# acceptance** — the build MUST NOT proceed through a change the application has
+# not accepted.
+#
+# §2.1 calls this the largest obligation in the document that is not about
+# reading a sidecar, and states the harm plainly: without it the record is a
+# lockfile and nothing more, and "a transitive dependency's new permission lands
+# in the shipped application with a line in a report nobody had to read".
+#
+# That is this fixture exactly. The resolution now carries
+# `com.example.permission.MAPS_ID`, arriving from the resolved artifact's own
+# manifest — no sidecar declares it and no application chose it. The accepted
+# record does not have it. What is mandated is narrow: some deliberate act
+# stands between a new native surface and a build.
+requirement = 38
+profile     = "core"
+section     = "9.1"
+
+outcome = "blocking"
+
+diagnostics = ["ni.req.38"]
+advisories  = []
+assertions  = []

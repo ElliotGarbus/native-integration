@@ -1,0 +1,18 @@
+# §8.4 requirement 8, via §4.4: an unrecognized top-level key that is **not a
+# table** MUST be rejected, naming the distribution and the key.
+#
+# §4.4's own Caution names this exact fixture. A future platform arrives as a
+# table, so nothing legitimate has the other shape, and the key likeliest to be
+# misspelled is `platforms`. A consumer that only warned would discard the one
+# claim §4.5 exists to carry — silently — which is the failure §4.5 was added to
+# prevent. The distribution here says it does not function on Android at all,
+# and a warning would let the Android build proceed.
+requirement = 8
+profile     = "core"
+section     = "4.4"
+
+outcome = "blocking"
+
+diagnostics = ["ni.req.8"]
+advisories  = []
+assertions  = []

@@ -1,0 +1,8 @@
+contract = "1"
+
+[[android.contributes.gradle_dependencies]]
+module = "com.example.maps:android"
+version = { at_least = "4.0.0", below = "5.0.0" }
+
+[[android.contributes.permissions]]
+name = "android.permission.INTERNET"

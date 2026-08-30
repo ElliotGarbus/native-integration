@@ -1,0 +1,21 @@
+# §8.4 requirement 22, via §5: "An `id` is unique within one platform table,
+# across values and actions alike." A value and an action MUST NOT share one on
+# a platform, and a consumer MUST reject the sidecar naming the distribution and
+# the `id`.
+#
+# §5 gives the reason: the application answers both by `(distribution, id)`, so
+# a shared name has no unambiguous answer. A consumer that accepted it would
+# have to decide whether `pyr22.deep_link` means the supplied string or the
+# acknowledgement, and two consumers would decide differently.
+requirement = 22
+profile     = "core"
+section     = "5.2"
+
+outcome = "blocking"
+
+diagnostics = [
+  "ni.decl.<platform>.requires.application_value.id.duplicate",
+  "ni.req.22",
+]
+advisories  = []
+assertions  = []

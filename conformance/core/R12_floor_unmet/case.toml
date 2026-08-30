@@ -1,0 +1,21 @@
+# §8.4 requirement 12, via §5.1: a consumer MUST fail when the application's
+# configured value is below a declared floor, **reporting the declared and the
+# configured values**, and MUST NOT raise the application's configuration to
+# satisfy one.
+#
+# Raising it is the dangerous answer, and §5.1 forbids it in as many words. A
+# `min_sdk` the application did not choose changes which devices the application
+# installs on; a `target_sdk` changes behavior across the whole application, in
+# code that has nothing to do with the producer's package.
+#
+# A floor carries no `reason` (§5.1), which is why the report has to carry the
+# two numbers instead — they are the whole of what a reader needs.
+requirement = 12
+profile     = "core"
+section     = "5.1"
+
+outcome = "blocking"
+
+diagnostics = ["ni.req.12"]
+advisories  = []
+assertions  = []

@@ -1,0 +1,19 @@
+# §8.4 requirement 4, via §3.2: a consumer reads every referenced resource
+# through the distribution's file-resource interface, and "when a distribution's
+# resources cannot be materialized or read, the consumer MUST fail, naming the
+# distribution, rather than skipping it".
+#
+# Skipping is the failure worth naming. A source root that is not there is
+# indistinguishable, to a consumer that shrugs, from a source root containing
+# nothing — and the second is legitimate. The build then succeeds having
+# compiled none of the glue the package needs, and the failure appears at first
+# use as a missing class.
+requirement = 4
+profile     = "core"
+section     = "3.2"
+
+outcome = "blocking"
+
+diagnostics = ["ni.req.4"]
+advisories  = []
+assertions  = []

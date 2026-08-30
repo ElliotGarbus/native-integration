@@ -1522,6 +1522,19 @@ for path in sorted((ROOT / "conformance").glob("*/*/case.toml")):
     for orphan in sorted(shipped - declared):
         problems.append(f"{where}: {orphan} ships a sidecar and closure.toml does not name it")
 
+    # `accepted.record` is a prior state in the same canonical form, so it is
+    # held to the same rules — except where the case's whole point is that the
+    # stored record is wrong, which it has to say.
+    prior = path.parent / "input" / "accepted.record"
+    if prior.exists() and "accepted.record" not in case.get("malformed_inputs", []):
+        lines, malformed = conformance_run.read_record(prior.read_bytes())
+        problems.extend(f"{where}: accepted.record {problem}" for problem in malformed)
+        for line in lines:
+            problems.extend(
+                f"{where}: accepted.record {problem}"
+                for problem in conformance_run.validate_fact(line)
+            )
+
     # `resolved.toml` stands in for a resolver, so every artifact it states has
     # to be attributable — §9.4's whole point is naming the distribution that
     # pulled a thing in, and a fixture that could not would be testing nothing.

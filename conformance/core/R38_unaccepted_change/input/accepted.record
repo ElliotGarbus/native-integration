@@ -1,0 +1,9 @@
+build contract 1.0
+build platform android
+dist pyr38 artifact com.example.maps:android:4.1.0 sha256=0d3e4f9a17c2b85e6dd0341fbb9a72c5e08d41a6f3c7b2905ea18d43f6c07b21
+dist pyr38 contract 1
+dist pyr38 contributes gradle-dependency com.example.maps:android configuration=implementation requested=range:4.0.0:5.0.0 resolved=4.1.0
+dist pyr38 contributes permission android.permission.INTERNET
+dist pyr38 input native.toml sha256=b3fe9c263a542b5a872b8216103d56204848baac2b0c3a89b40d4cccae770d7f
+dist pyr38 origin direct
+dist pyr38 version 1.0.0

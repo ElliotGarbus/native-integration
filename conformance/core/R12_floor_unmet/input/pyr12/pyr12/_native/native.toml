@@ -1,0 +1,5 @@
+contract = "1"
+
+[android.requires]
+# The application is configured for 26.
+min_sdk = 31

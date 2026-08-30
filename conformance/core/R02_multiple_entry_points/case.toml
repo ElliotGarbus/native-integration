@@ -1,0 +1,17 @@
+# §8.4 requirement 2, via §3.4: a distribution declaring more than one entry in
+# the group is invalid. A consumer MUST fail, naming it, and "MUST NOT select
+# one or merge them".
+#
+# The two wrong answers are the reason the clause is explicit. Selecting one is
+# arbitrary — nothing orders entry points — so two consumers pick differently
+# and the same wheel yields two builds. Merging them invents a sidecar neither
+# directory contains.
+requirement = 2
+profile     = "core"
+section     = "3.4"
+
+outcome = "blocking"
+
+diagnostics = ["ni.req.2"]
+advisories  = []
+assertions  = []
