@@ -1,0 +1,15 @@
+contract = "1"
+
+[ios.requires]
+deployment_target = "15.0"
+
+[[ios.requires.application_value]]
+id = "analytics_key"
+kind = "info_plist"
+key = "ExamplyticsAPIKey"
+reason = "Your project key, from the vendor console"
+placeholder = "<TODO: your Examplytics project key>"
+
+[ios.contributes.src]
+swift = ["swift"]
+symbol_prefixes = ["Examplytics"]

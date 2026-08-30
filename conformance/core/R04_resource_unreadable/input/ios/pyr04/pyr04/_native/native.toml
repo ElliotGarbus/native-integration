@@ -1,0 +1,6 @@
+contract = "1"
+
+# The directory does not exist in this distribution. §3.2: fail naming the
+# distribution, rather than skipping it.
+[ios.contributes.src]
+swift = ["swift"]

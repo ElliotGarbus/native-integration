@@ -1500,9 +1500,6 @@ for path in sorted((ROOT / "conformance").glob("*/*/case.toml")):
     # §8.1 assigns each numbered requirement to exactly one profile, and the
     # generated diagnostics carry that assignment. A case filed elsewhere would
     # be handed to a consumer that never owed the requirement.
-    closure = tomllib.loads((path.parent / "input" / "closure.toml").read_text(encoding="utf-8"))
-    declared = {d["name"] for d in closure.get("distribution", [])}
-
     identifier = f"ni.req.{case.get('requirement')}"
     if identifier in DIAGNOSTICS:
         owner = DIAGNOSTICS[identifier]["profile"]
@@ -1517,65 +1514,99 @@ for path in sorted((ROOT / "conformance").glob("*/*/case.toml")):
         # Requirement 18: every diagnostic names the contributing distribution,
         # so a case that expects one has to say which — otherwise the corpus
         # checks the id and leaves the attribution to a self-attested boolean.
+        # That the names exist in the closure is checked per platform below.
         if not finding.get("distributions"):
             problems.append(f"{where}: {finding['id']} names no distribution")
-        for named in finding.get("distributions", []):
-            if named not in declared:
+
+    # Structural hygiene, per platform. A core case ships one input tree per
+    # platform, because §8.1 makes it bind a consumer whichever it builds; a
+    # platform profile's case ships one. A case missing its closure is a case
+    # the harness hands a consumer with nothing to read, and it would pass.
+    roots = sorted(d for d in (path.parent / "input").iterdir() if d.is_dir()
+                   and d.name in ("android", "ios"))
+    if not roots:
+        roots = [path.parent / "input"]
+    if case.get("profile") == "core" and {d.name for d in roots} != {"android", "ios"}:
+        problems.append(
+            f"{where}: a core case is exercised for every platform a consumer "
+            "builds, so it needs input/android/ and input/ios/"
+        )
+
+    for root in roots:
+        origin = f"{where}[{root.name}]" if root.name in ("android", "ios") else str(where)
+        for required in ("closure.toml", "application.toml"):
+            if not (root / required).exists():
+                problems.append(f"{origin}: input/ has no {required}")
+                break
+        else:
+            closure = tomllib.loads((root / "closure.toml").read_text(encoding="utf-8"))
+            declared = {d["name"] for d in closure.get("distribution", [])}
+            if closure.get("platform") not in ("android", "ios"):
+                problems.append(f"{origin}: closure.toml names no platform this document defines")
+            if root.name in ("android", "ios") and closure.get("platform") != root.name:
                 problems.append(
-                    f"{where}: {finding['id']} names {named}, which the closure does not"
+                    f"{origin}: closure.toml is for {closure.get('platform')!r}, "
+                    f"and sits in {root.name}/"
                 )
 
-    # Structural hygiene. A case missing its closure is a case the harness will
-    # hand a consumer with nothing to read, and it would pass silently.
-    for required in ("closure.toml", "application.toml"):
-        if not (path.parent / "input" / required).exists():
-            problems.append(f"{where}: input/ has no {required}")
-    sidecars = list((path.parent / "input").glob("*/*/_native/native.toml"))
-    if not sidecars:
-        problems.append(f"{where}: input/ carries no sidecar")
-    for sidecar in sidecars:
-        try:
-            tomllib.loads(sidecar.read_text(encoding="utf-8"))
-        except tomllib.TOMLDecodeError as exc:
-            problems.append(f"{where}: {sidecar.name} does not parse: {exc}")
-    if closure.get("platform") not in ("android", "ios"):
-        problems.append(f"{where}: closure.toml names no platform this document defines")
-    shipped = {s.parents[2].name.replace("_", "-") for s in sidecars}
-    for orphan in sorted(shipped - declared):
-        problems.append(f"{where}: {orphan} ships a sidecar and closure.toml does not name it")
-
-    # `accepted.record` is a prior state in the same canonical form, so it is
-    # held to the same rules — except where the case's whole point is that the
-    # stored record is wrong, which it has to say.
-    prior = path.parent / "input" / "accepted.record"
-    if prior.exists() and "accepted.record" not in case.get("malformed_inputs", []):
-        lines, malformed = conformance_run.read_record(prior.read_bytes())
-        problems.extend(f"{where}: accepted.record {problem}" for problem in malformed)
-        for line in lines:
-            problems.extend(
-                f"{where}: accepted.record {problem}"
-                for problem in conformance_run.validate_fact(line)
-            )
-
-    # `resolved.toml` stands in for a resolver, so every artifact it states has
-    # to be attributable — §9.4's whole point is naming the distribution that
-    # pulled a thing in, and a fixture that could not would be testing nothing.
-    resolution = path.parent / "input" / "resolved.toml"
-    if resolution.exists():
-        stated = tomllib.loads(resolution.read_text(encoding="utf-8"))
-        for entry in stated.get("artifact", []) + stated.get("package", []):
-            subject = entry.get("coordinate") or entry.get("url", "?")
-            if entry.get("declared_by") not in declared:
+            sidecars = list(root.glob("*/*/_native/native.toml"))
+            if not sidecars:
+                problems.append(f"{origin}: input/ carries no sidecar")
+            for sidecar in sidecars:
+                try:
+                    tomllib.loads(sidecar.read_text(encoding="utf-8"))
+                except tomllib.TOMLDecodeError as exc:
+                    problems.append(f"{origin}: {sidecar.name} does not parse: {exc}")
+            shipped = {s.parents[2].name.replace("_", "-") for s in sidecars}
+            for orphan in sorted(shipped - declared):
                 problems.append(
-                    f"{where}: resolved.toml attributes {subject} to "
-                    f"{entry.get('declared_by')!r}, which the closure does not name"
+                    f"{origin}: {orphan} ships a sidecar and closure.toml does not name it"
                 )
-            for digest in (entry.get("sha256"), entry.get("checksum")):
-                if digest is not None and not re.fullmatch(r"[0-9a-f]{64}", digest):
-                    problems.append(f"{where}: {subject} has a digest §9.3 does not admit")
-            for feature in entry.get("feature", []):
-                if not isinstance(feature.get("required"), bool):
-                    problems.append(f"{where}: {subject} declares a feature with no `required`")
+            for finding in case.get("diagnostics", []) + case.get("advisories", []):
+                for named in finding.get("distributions", []):
+                    if named not in declared:
+                        problems.append(
+                            f"{origin}: {finding['id']} names {named}, which the closure does not"
+                        )
+
+        # `accepted.record` is a prior state in the same canonical form, so it
+        # is held to the same rules — except where the case's whole point is
+        # that the stored record is wrong, which it has to say.
+        prior = root / "accepted.record"
+        if prior.exists() and "accepted.record" not in case.get("malformed_inputs", []):
+            lines, malformed = conformance_run.read_record(prior.read_bytes())
+            problems.extend(f"{origin}: accepted.record {problem}" for problem in malformed)
+            for line in lines:
+                problems.extend(
+                    f"{origin}: accepted.record {problem}"
+                    for problem in conformance_run.validate_fact(line)
+                )
+
+        # `resolved.toml` stands in for a resolver, so every artifact it states
+        # has to be attributable — §9.4's whole point is naming the distribution
+        # that pulled a thing in.
+        resolution = root / "resolved.toml"
+        if resolution.exists():
+            stated = tomllib.loads(resolution.read_text(encoding="utf-8"))
+            for entry in stated.get("artifact", []) + stated.get("package", []):
+                subject = entry.get("coordinate") or entry.get("url", "?")
+                if entry.get("declared_by") not in declared:
+                    problems.append(
+                        f"{origin}: resolved.toml attributes {subject} to "
+                        f"{entry.get('declared_by')!r}, which the closure does not name"
+                    )
+                for digest in (entry.get("sha256"), entry.get("checksum")):
+                    if digest is not None and not re.fullmatch(r"[0-9a-f]{64}", digest):
+                        problems.append(f"{origin}: {subject} has a digest §9.3 does not admit")
+                for target in entry.get("binary_target", []):
+                    if not re.fullmatch(r"[0-9a-f]{64}", target.get("checksum", "")):
+                        problems.append(
+                            f"{origin}: {target.get('name')} has a checksum §9.3 does not admit"
+                        )
+                for feature in entry.get("feature", []):
+                    if not isinstance(feature.get("required"), bool):
+                        problems.append(f"{origin}: {subject} declares a feature with no `required`")
+
 check("the conformance corpus obeys its own record format", problems)
 
 

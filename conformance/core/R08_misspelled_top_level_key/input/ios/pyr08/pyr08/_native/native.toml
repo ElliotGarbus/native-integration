@@ -1,0 +1,8 @@
+contract = "1"
+
+# `platforms`, misspelled. §4.4: a top-level key that is not a table is
+# rejected, precisely so this cannot pass as a warning.
+platfroms = ["android"]
+
+[ios.requires]
+deployment_target = "15.0"

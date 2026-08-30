@@ -1,0 +1,7 @@
+contract = "1"
+
+[[ios.contributes.swift_packages]]
+name = "Charting"
+url = "https://github.com/example/charting"
+requirement = { from = "2.4.0" }
+products = ["Charting"]

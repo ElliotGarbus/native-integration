@@ -1,0 +1,7 @@
+[build]
+deployment_target = "16.0"
+
+# Two answers, one Info.plist key (§5.2).
+[answers.values]
+"pyalpha.vendor_key" = "alpha-key-0001"
+"pybeta.vendor_key" = "beta-key-0002"

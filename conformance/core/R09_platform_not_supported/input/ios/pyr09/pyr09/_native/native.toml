@@ -1,0 +1,6 @@
+contract = "1"
+# The mirror of the Android half: this distribution does not function on iOS.
+platforms = ["android"]
+
+[android.requires]
+min_sdk = 24

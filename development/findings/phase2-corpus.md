@@ -145,6 +145,32 @@ much larger interface than a conformance corpus should define on its own — and
 claiming verification the harness does not perform would be exactly the
 overstatement §8.5's note warns about. Better a table that says which is which.
 
+## Core cases run for both platforms
+
+The review round that found the harness defects ended with a correction worth
+more than any of them: every core case shipped an Android closure, so
+`core + ios` — a conformance claim §8.1 explicitly allows — rested on nothing.
+Fifteen cases, all Android.
+
+Each core case now ships `input/android/` and `input/ios/`, and `run.py` expands
+it once per selected **platform** profile. The platform profiles chosen are what
+decides, so `core + ios` runs twenty-three cases and none of them Android;
+`core + android` runs thirty; all three run fifty-three. Naming no platform
+profile runs both and says that this is a development run rather than a claim.
+
+Writing the iOS halves was not mechanical, which is the interesting part. Three
+cases are genuinely platform-neutral — the contract gate, the entry-point rule,
+the misspelled top-level key — and their two inputs differ only in which empty
+platform table they carry. The other twelve had to be *re-expressed*: a floor
+becomes `deployment_target`, a value's `kind` becomes `info_plist`, and the
+three record-comparison cases move from a Maven artifact's SHA-256 to a Swift
+binary target's checksum, which is §7.2's counterpart to §6.3's and the only
+place iOS pins bytes at all.
+
+That last one is worth noting for Phase 3: requirements 26, 38 and 40 are core,
+but what they bind a consumer to differs entirely by platform, and a reader that
+implements the Android half has not implemented them.
+
 ## Three gaps — one closed here, two standing
 
 ### 1. §4.1's symlink clause has no portable fixture

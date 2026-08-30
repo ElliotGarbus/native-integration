@@ -66,12 +66,26 @@ PASS, FAIL = "pass", "fail"
 UNVERIFIED, UNSUPPORTED = "unverified", "unsupported"
 
 
+#: Which platforms a profile's cases are exercised for. §8.1 makes conformance
+#: "the core plus at least one platform profile", so a **core** case binds a
+#: consumer whichever platform it builds — and a corpus that ran core only
+#: against Android could not establish iOS conformance at all.
+PROFILE_PLATFORMS = {"core": ("android", "ios"), "android": ("android",), "ios": ("ios",)}
+
+
 @dataclass
 class Case:
     name: str
     profile: str
+    platform: str
     directory: Path
     spec: dict
+
+    @property
+    def label(self) -> str:
+        return f"{self.profile}/{self.name}" + (
+            f" [{self.platform}]" if len(PROFILE_PLATFORMS[self.profile]) > 1 else ""
+        )
 
     @property
     def requirement(self) -> str:
@@ -82,12 +96,20 @@ class Case:
         return self.spec.get("outcome", "accept")
 
     @property
+    def input_directory(self) -> Path:
+        """The case's input for this platform, or its single platform-free one."""
+        per_platform = self.directory / "input" / self.platform
+        return per_platform if per_platform.is_dir() else self.directory / "input"
+
+    @property
     def expected_record(self) -> Path | None:
         named = self.spec.get("record")
-        if named:
-            return self.directory / "expected" / named
-        default = self.directory / "expected" / f"{self.spec.get('platform', self.profile)}.record"
-        return default if default.exists() else None
+        candidate = (
+            self.directory / "expected" / named
+            if named
+            else self.directory / "expected" / f"{self.platform}.record"
+        )
+        return candidate if candidate.exists() else None
 
 
 @dataclass
@@ -97,17 +119,22 @@ class Result:
     detail: list[str] = field(default_factory=list)
 
 
-def load_cases(profile: str) -> list[Case]:
+def load_cases(profile: str, platforms: set[str]) -> list[Case]:
     cases: list[Case] = []
     for path in sorted((ROOT / profile).glob("*/case.toml")):
-        cases.append(
-            Case(
-                name=path.parent.name,
-                profile=profile,
-                directory=path.parent,
-                spec=tomllib.loads(path.read_text(encoding="utf-8")),
+        spec = tomllib.loads(path.read_text(encoding="utf-8"))
+        for platform in PROFILE_PLATFORMS[profile]:
+            if platform not in platforms:
+                continue
+            cases.append(
+                Case(
+                    name=path.parent.name,
+                    profile=profile,
+                    platform=platform,
+                    directory=path.parent,
+                    spec=spec,
+                )
             )
-        )
     return cases
 
 
@@ -554,7 +581,7 @@ def run_consumer(command: list[str], case: Case, outputs: Path) -> tuple[int, di
     """
     outputs.mkdir(parents=True, exist_ok=True)
     completed = subprocess.run(
-        [*command, str(case.directory / "input"), str(outputs)],
+        [*command, str(case.input_directory), str(outputs)],
         capture_output=True,
         timeout=300,
     )
@@ -647,7 +674,7 @@ def verify_source_excluded(case: Case, files: list[Path]) -> str | None:
 def verify_module_stubs_excluded(case: Case, files: list[Path]) -> str | None:
     """§7.5: `<name>.py` and `<name>.pyi` are excluded for every registered module."""
     registered = set()
-    for sidecar in (case.directory / "input").glob("*/*/_native/native.toml"):
+    for sidecar in case.input_directory.glob("*/*/_native/native.toml"):
         document = tomllib.loads(sidecar.read_text(encoding="utf-8"))
         for module in document.get("ios", {}).get("contributes", {}).get(
             "python_modules", []
@@ -691,7 +718,7 @@ def check(case: Case, exit_code: int, reported: dict, outputs: Path) -> Result:
 
     # A case needing a stated resolution cannot be run against a consumer that
     # cannot be told one. README.md says so; this is where it takes effect.
-    if (case.directory / "input" / "resolved.toml").exists() and not reported.get(
+    if (case.input_directory / "resolved.toml").exists() and not reported.get(
         "capabilities", {}
     ).get("injected_resolution", False):
         return Result(
@@ -790,14 +817,28 @@ def main() -> int:
     parser.add_argument("command", nargs=argparse.REMAINDER)
     args = parser.parse_args()
 
-    cases = [case for profile in args.profile for case in load_cases(profile)]
+    # §8.1: conformance is "the core plus at least one platform profile". The
+    # platform profiles selected are what the consumer builds, and the core
+    # cases are exercised for exactly those — a core case run only against
+    # Android would leave an `core + ios` claim resting on nothing.
+    platforms = {p for p in args.profile if p in ("android", "ios")}
+    if not platforms:
+        print(
+            "note: no platform profile selected, so the core cases run for both."
+            "\n      §8.1 makes conformance the core plus at least one platform"
+            " profile, so this is a development run rather than a claim.\n"
+        )
+        platforms = {"android", "ios"}
+    cases = [
+        case for profile in args.profile for case in load_cases(profile, platforms)
+    ]
     if not cases:
         print("no cases found for the selected profile(s)")
         return 1
 
     if args.list:
         for case in cases:
-            print(f"{case.profile}/{case.name}  §{case.spec.get('section', '?')}  "
+            print(f"{case.label}  §{case.spec.get('section', '?')}  "
                   f"requirement {case.requirement}  {case.outcome}")
         return 0
 
@@ -808,11 +849,11 @@ def main() -> int:
     results = []
     with tempfile.TemporaryDirectory(prefix="native-integration-conformance-") as workspace:
         for case in cases:
-            outputs = Path(workspace) / case.profile / case.name
+            outputs = Path(workspace) / case.profile / case.name / case.platform
             results.append(check(case, *run_consumer(command, case, outputs), outputs))
 
     for result in results:
-        print(f"{result.status.upper():12} {result.case.profile}/{result.case.name}"
+        print(f"{result.status.upper():12} {result.case.label}"
               f"  (requirement {result.case.requirement})")
         for line in result.detail:
             print(f"             {line}")

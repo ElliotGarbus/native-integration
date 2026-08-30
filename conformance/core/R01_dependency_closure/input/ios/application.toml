@@ -1,0 +1,5 @@
+[build]
+deployment_target = "16.0"
+
+[answers.values]
+"examplytics.analytics_key" = "ak_live_4f2c19"

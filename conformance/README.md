@@ -43,6 +43,34 @@ conformance/
       expected/             the conformance record, and a diagnostics note
 ```
 
+### A core case runs for every platform the consumer builds
+
+[§8.1](../SPEC.md#81-conformance-is-per-platform) makes conformance "the core
+plus at least one platform profile", so a **core** requirement binds a consumer
+whichever platform it builds. A corpus that exercised the core only against
+Android could not establish a `core + ios` claim at all — the Android cases
+would never run, and the core ones would hand an iOS-only consumer a closure it
+does not build for.
+
+So a core case ships one input tree per platform:
+
+```
+core/R12_floor_unmet/
+  input/android/    min_sdk 31 against an application configured for 26
+  input/ios/        deployment_target 18.0 against 16.0
+```
+
+`run.py` runs it once per selected **platform** profile, and prints which:
+
+```
+FAIL   core/R12_floor_unmet [ios]   (requirement 12)
+```
+
+The platform profiles you select are what decides. `--profile core --profile ios`
+runs the core cases for iOS only; naming no platform profile runs both and says
+that this is a development run rather than a claim. An Android or iOS case ships
+a single flat `input/`, since it has only one platform to begin with.
+
 `expected/` holds the conformance record where the case has one. A blocking case
 has no resolution to record, so it carries `diagnostics.txt` instead — a
 human-readable note saying what the diagnostic has to convey, authored from the
@@ -308,7 +336,9 @@ is **dangerous** rather than merely wrong.
 | `android/R41_artifact_feature_undecided` | 41 | lets an artifact make hardware mandatory without the application choosing |
 
 Beyond category 1, **every blocking requirement in all three of §8.1's profiles
-now has a case** — core, Android and iOS.
+now has a case** — core, Android and iOS — and the core cases are exercised for
+both platforms, so `core + android` and `core + ios` are each a claim the corpus
+can actually check.
 
 Three accept cases sit beside them so the corpus is not only negatives:
 `core/R01_dependency_closure` compares a record,

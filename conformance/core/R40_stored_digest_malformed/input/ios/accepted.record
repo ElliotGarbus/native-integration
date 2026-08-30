@@ -1,0 +1,9 @@
+build contract 1.0
+build platform ios
+dist pyr40 binary-target ChartingRenderer.xcframework checksum=e11d5b0c93a7
+dist pyr40 contract 1
+dist pyr40 contributes swift-package Charting products=Charting requirement=from:2.4.0 url=https://github.com/example/charting
+dist pyr40 input native.toml sha256=e52212a2eacaab5e587e5631e05d6e77cbf1669c604738ec064889ca0a12f5d3
+dist pyr40 origin direct
+dist pyr40 package https://github.com/example/charting requested=from:2.4.0 revision=8a1f0c9e4b2d7f36a05c1e8b9d4427fa3c60e15b version=2.4.0
+dist pyr40 version 1.0.0

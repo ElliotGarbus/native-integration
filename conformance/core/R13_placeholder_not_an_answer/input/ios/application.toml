@@ -1,0 +1,6 @@
+[build]
+deployment_target = "16.0"
+
+# The scaffold, unedited (§5.4).
+[answers.values]
+"pyanalytics.analytics_key" = "<TODO: your Examplytics project key>"

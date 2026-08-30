@@ -1,0 +1,14 @@
+contract = "1"
+
+[[ios.requires.application_value]]
+id = "deep_link"
+kind = "info_plist"
+key = "VendorDeepLinkHost"
+reason = "The deep-link host you registered"
+placeholder = "<TODO: your deep-link host>"
+
+# The same `id`, on the same platform, as an action (§5).
+[[ios.requires.application_action]]
+id = "deep_link"
+summary = "Register your link domain for Universal Links"
+reason = "Universal Links need an apple-app-site-association file on your domain."

@@ -1,0 +1,4 @@
+contract = "2"
+
+[ios.requires]
+deployment_target = "15.0"

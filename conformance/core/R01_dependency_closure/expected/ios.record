@@ -1,0 +1,11 @@
+build contract 1.0
+build platform ios
+dist examplytics contract 1
+dist examplytics contributes swift-source swift/Bridge.swift
+dist examplytics contributes symbol-prefix Examplytics
+dist examplytics floor deployment_target configured=16.0 declared=15.0 state=met
+dist examplytics input native.toml sha256=b883b21285a72f2c85c2e6ef93834375c31e507895e3f69180050dec1b3f198e
+dist examplytics input swift/Bridge.swift sha256=6198ee27bd898cd8d0bfd684e40aee51410d1a6a4b9629ffedd02b685827573a
+dist examplytics origin direct
+dist examplytics value analytics_key key=ExamplyticsAPIKey kind=info_plist state=supplied
+dist examplytics version 1.0.0

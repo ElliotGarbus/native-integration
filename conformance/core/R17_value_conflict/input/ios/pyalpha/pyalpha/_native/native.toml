@@ -1,0 +1,8 @@
+contract = "1"
+
+[[ios.requires.application_value]]
+id = "vendor_key"
+kind = "info_plist"
+key = "VendorAPIKey"
+reason = "Your vendor API key, from the pyalpha console"
+placeholder = "<TODO: your vendor API key>"

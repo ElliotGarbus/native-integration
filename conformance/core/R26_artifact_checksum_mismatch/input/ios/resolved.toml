@@ -1,0 +1,11 @@
+[[package]]
+url = "https://github.com/example/charting"
+version = "2.4.0"
+revision = "8a1f0c9e4b2d7f36a05c1e8b9d4427fa3c60e15b"
+declared_by = "pyr26"
+
+  # §7.2: a binary target's bytes come from a URL the package's revision does
+  # not cover, so the checksum is what pins them.
+  [[package.binary_target]]
+  name = "ChartingRenderer.xcframework"
+  checksum = "e11d5b0c93a726f4180dc35ba9f27e64108c3d95b2af7016e5c48d3b9207fa14"

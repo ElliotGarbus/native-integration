@@ -1,0 +1,5 @@
+contract = "1"
+
+# The source root climbs out of the sidecar directory (§4.1).
+[ios.contributes.src]
+swift = ["../../../outside"]

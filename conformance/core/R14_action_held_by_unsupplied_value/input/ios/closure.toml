@@ -1,0 +1,7 @@
+platform = "ios"
+
+[[distribution]]
+name = "pyr14"
+version = "1.0.0"
+origin = "direct"
+entry_point = "pyr14._native"
