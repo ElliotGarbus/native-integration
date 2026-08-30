@@ -618,11 +618,20 @@ def run_consumer(command: list[str], case: Case, outputs: Path) -> tuple[int, di
     themselves.
     """
     outputs.mkdir(parents=True, exist_ok=True)
-    completed = subprocess.run(
-        [*command, str(case.input_directory), str(outputs)],
-        capture_output=True,
-        timeout=300,
-    )
+    # A consumer that hangs, or that cannot be launched at all, is a failed case
+    # naming what went wrong — not a traceback out of the harness that abandons
+    # every case after it. This corpus exists to report on consumers that
+    # misbehave, so misbehaviour is input here like any other.
+    try:
+        completed = subprocess.run(
+            [*command, str(case.input_directory), str(outputs)],
+            capture_output=True,
+            timeout=300,
+        )
+    except subprocess.TimeoutExpired:
+        return 1, {"_malformed": "the consumer did not finish within 300 seconds"}
+    except OSError as exc:
+        return 1, {"_malformed": f"the consumer could not be run: {exc}"}
     # Strictly, not `errors="replace"`. Replacing turns invalid UTF-8 into
     # U+FFFD before the JSON is parsed, so a consumer could ship bytes this
     # interface says are UTF-8 and never hear about it — most easily in a field
@@ -856,10 +865,18 @@ def check(case: Case, exit_code: int, reported: dict, outputs: Path) -> Result:
 
     expected_record = case.expected_record
     if expected_record is not None:
+        # JSON admits a lone surrogate: "\ud800" parses, and the str it yields
+        # has no UTF-8 encoding at all. record-format.md opens by requiring the
+        # record to be UTF-8, so that is a failed case — and encoding it
+        # unguarded would have been a crash of the harness instead.
+        try:
+            actual_record = reported.get("record", "").encode("utf-8")
+        except UnicodeEncodeError as exc:
+            return Result(case, FAIL, [f"the record is not encodable as UTF-8: {exc}"])
         problems.extend(
             compare_records(
                 expected_record.read_bytes(),
-                reported.get("record", "").encode("utf-8"),
+                actual_record,
                 ignore_digests=bool(case.spec.get("ignore_digests")),
                 # The advisories the consumer actually claims, not the ones
                 # the case names. An advisory operand is compared only against
