@@ -39,15 +39,20 @@ class ContractVersion:
 
     @classmethod
     def parse(cls, text: object) -> "ContractVersion":
-        """Parse ``"1"`` or ``"1.1"``. Raises :class:`ValueError` otherwise."""
+        """Parse ``"1"`` or ``"1.1"``. Raises :class:`ValueError` otherwise.
+
+        Not stripped first. §4.3 calls the grammar exact and names `" 1"` among
+        the values that are invalid rather than lenient spellings of ``"1"``, so
+        accepting it here would be the consumer inventing a tolerance the
+        specification refuses.
+        """
         if not isinstance(text, str):
             raise ValueError("contract must be a string")
-        stripped = text.strip()
-        if not _CONTRACT.match(stripped):
+        if not _CONTRACT.match(text):
             raise ValueError(
                 f"contract {text!r} is not a major, optionally with a minor — e.g. \"1\" or \"1.1\""
             )
-        match = _PARTS.match(stripped)
+        match = _PARTS.match(text)
         assert match is not None  # the registry's pattern admits nothing else
         return cls(int(match.group(1)), int(match.group(2) or 0))
 

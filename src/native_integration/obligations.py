@@ -19,10 +19,14 @@ from typing import Mapping
 
 from .registry import PLATFORM_TOKEN, Registry
 
-#: A check that answers to the same requirement wherever it fires. §4.4's
-#: fail-closed rule is one rule, not one per container.
+#: A check that answers to the same requirement wherever it fires. Requirement
+#: 8 is the fail-closed rule, and it claims both halves outright: "an
+#: unrecognized key in a platform table it is building … and a value from a
+#: closed vocabulary it does not implement — a value `kind`, a Gradle
+#: configuration, a capability key — substituting no default".
 BY_CHECK: Mapping[str, int] = {
     "unknown-key": 8,
+    "value": 8,
 }
 
 #: Otherwise the declaration family decides, longest prefix first. §8.4 is
@@ -61,6 +65,10 @@ BY_FAMILY: Mapping[str, int] = {
 
 #: Where the family's requirement is not the one that owns a particular rule.
 BY_DECLARATION_CHECK: Mapping[tuple[str, str], int] = {
+    # Requirement 9 enforces `platforms` entirely, including "a name this
+    # document does not define" — so this closed vocabulary is its, not
+    # requirement 8's.
+    ("platforms", "value"): 9,
     # §5 gives values and actions one `id` space, so uniqueness is one rule and
     # the generator emits one id for it, against the value's declaration. §8.4
     # puts that rule in requirement 22 rather than with the value keys.

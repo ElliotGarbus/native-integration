@@ -119,6 +119,22 @@ def test_the_corpus_attributions(contract, identifier, number):
     assert obligations.for_identifier(identifier, contract) == number
 
 
+def test_a_closed_vocabulary_is_requirement_8s_except_where_9_claims_it(contract):
+    """Requirement 8 fails closed "on a value from a closed vocabulary it does
+    not implement". Requirement 9 enforces `platforms` entirely, and says so."""
+    assert obligations.for_identifier(
+        "ni.decl.<platform>.requires.application_value.kind.value", contract
+    ) == 8
+    assert obligations.for_identifier(
+        "ni.decl.android.contributes.gradle_dependencies.configuration.value", contract
+    ) == 8
+    assert obligations.for_identifier("ni.decl.platforms.value", contract) == 9
+    # The platform column is a different rule, and §8.4 gives it to 13.
+    assert obligations.for_identifier(
+        "ni.decl.<platform>.requires.application_value.kind.wrong-platform", contract
+    ) == 13
+
+
 def test_a_view_links_combination_and_its_content_differ(contract):
     """§6.6 splits between requirement 29 and requirement 30, and so must we."""
     combination = (
