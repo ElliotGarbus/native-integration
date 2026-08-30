@@ -685,7 +685,6 @@ def malformed(reported: object) -> str | None:
 #: Assertions the harness verifies itself, against the payload a consumer wrote
 #: into its output directory. Everything else in README.md's table is *attested*
 #: — the consumer's own claim, which is evidence of intent and not of behaviour.
-PAYLOAD_SOURCE_SUFFIXES = (".java", ".kt", ".swift")
 
 
 def payload_files(outputs: Path) -> list[Path] | None:
@@ -703,10 +702,47 @@ def verify_sidecar_excluded(case: Case, files: list[Path]) -> str | None:
     return None if not offenders else f"the payload carries {offenders[0].name}"
 
 
+def contributed_source(case: Case) -> dict[str, bytes]:
+    """Every file under a `contributes.src` root, by name, with its bytes.
+
+    Derived from the sidecars, because requirement 24 is about **contributed**
+    source and nothing else. An application may own a `.java` or a `.swift` of
+    its own and put it where it likes; a rule that rejected the suffix would
+    fail a consumer for shipping the application's own file, which no
+    requirement forbids.
+    """
+    found: dict[str, bytes] = {}
+    for sidecar in case.input_directory.glob("*/*/_native/native.toml"):
+        document = tomllib.loads(sidecar.read_text(encoding="utf-8"))
+        for platform in ("android", "ios"):
+            src = document.get(platform, {}).get("contributes", {}).get("src", {})
+            for language in ("java", "kotlin", "swift"):
+                for root in src.get(language, []):
+                    directory = sidecar.parent / root
+                    if not directory.is_dir():
+                        continue  # R04's case: unreadable, and reported as that
+                    for member in directory.rglob("*"):
+                        if member.is_file():
+                            found[member.name] = member.read_bytes()
+    return found
+
+
 def verify_source_excluded(case: Case, files: list[Path]) -> str | None:
-    """Requirement 24: contributed source is compiled, never shipped."""
-    offenders = [f for f in files if f.suffix in PAYLOAD_SOURCE_SUFFIXES]
-    return None if not offenders else f"the payload carries {offenders[0].name}"
+    """Requirement 24: contributed source is compiled, never shipped.
+
+    A payload file offends where it is one of the contributed files — by name,
+    or by carrying the same bytes under another name, which is the same source
+    shipped with the label changed.
+    """
+    contributed = contributed_source(case)
+    # An empty file matches every empty file, and says nothing about which.
+    bodies = {body for body in contributed.values() if body.strip()}
+    for member in files:
+        if member.name in contributed:
+            return f"the payload carries the contributed {member.name}"
+        if member.stat().st_size < 1_000_000 and member.read_bytes() in bodies:
+            return f"the payload carries contributed source as {member.name}"
+    return None
 
 
 def verify_module_stubs_excluded(case: Case, files: list[Path]) -> str | None:

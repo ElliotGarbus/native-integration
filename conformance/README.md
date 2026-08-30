@@ -268,7 +268,7 @@ labelled so that nobody reads testimony as evidence.
 | Assertion | Requirement | |
 | --- | --- | --- |
 | `sidecar_excluded_from_payload` | 6 — the sidecar directory reaches no device payload | **verified** |
-| `contributed_source_excluded_from_payload` | 24 | **verified** |
+| `contributed_source_excluded_from_payload` | 24 — the source the sidecars contribute, by name or by bytes; an application's own `.java` is not checked, because no requirement forbids it | **verified** |
 | `python_module_stubs_excluded` | 36 — `<name>.py` and `<name>.pyi` | **verified** |
 | `no_producer_import` | 3 | attested |
 | `every_diagnostic_names_a_distribution` | 18 | attested, and largely superseded — `diagnostics` carries the names now, and the corpus checks them |
