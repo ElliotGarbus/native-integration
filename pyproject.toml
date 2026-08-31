@@ -21,10 +21,12 @@ classifiers = [
 dependencies = []
 
 [project.optional-dependencies]
+# The reader's own test suite, and nothing else. `tools/` is not in the wheel,
+# so an extra carrying a checker's dependency would offer an installing user a
+# package for a script they do not have; CI installs `jsonschema` itself, and
+# `tools/check_spec.py` reports its absence rather than skipping the schema
+# cases in silence.
 test = ["pytest>=7"]
-# tools/check_spec.py exercises the generated JSON Schema against every
-# current-specification sidecar, and against the cases SPEC.md refuses.
-spec = ["jsonschema>=4"]
 
 [project.urls]
 Specification = "https://github.com/ElliotGarbus/native-integration/blob/main/SPEC.md"
