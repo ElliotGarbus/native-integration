@@ -38,15 +38,31 @@ OUTPUT = ROOT / "docs" / "REQUIREMENTS.md"
 #: an oversight.
 BEYOND_THE_READER = {
     6: "the payload is assembled by the build tool, not here",
-    20: "surfacing a report is the build tool's output; producing it is `findings.py`",
+    12: "the last clause: which findings a report sets apart is its layout. §5.1 "
+    "asks for a declared `target_sdk` to get the prominence a repository "
+    "contribution gets, and the one standing channel this reader has for that "
+    "is S9's advisory — which an obligation stated as a MUST cannot use, "
+    "because §8.5 lets a consumer decline an advisory",
+    20: "the scaffolding clause: an acknowledgement is scaffolded into a file "
+    "this reader does not write, so whether it is commented out is decided "
+    "where the writing happens",
     24: "the payload again",
     28: "honoring a suppression in the merged manifest, and promoting a "
     "feature in it, are the build tool's",
     30: "the attributes are carried into the record here; writing them into the "
     "manifest is the build tool's",
+    31: "the last clause: keeps are validated here and *applied* by the build "
+    "tool. §6.7 conditions applying them on the application having enabled "
+    "shrinking, which nothing tells this reader and which validating a pattern "
+    "does not depend on",
     34: "the declaration is checked here; the privacy manifest is generated, not read",
     35: "the refusal and the conflicts are enforced here; writing the Info.plist "
     "is the build tool's",
+    36: "the duplicate `name`, the identifier rule, and the `products` a "
+    "registration resolves to are checked here. Linking those products into "
+    "the application target, registering the module before interpreter "
+    "initialization, and excluding `<name>.py` and `<name>.pyi` from the "
+    "payload are all the build tool's",
     37: "the union is recorded here; linking it is the build tool's",
     39: "writing the record to disk is the tool's; producing it is `recording.py`",
     45: "the bootstrap's own activity, which this library neither writes nor sees",
@@ -73,6 +89,9 @@ STRUCTURAL = {
     "observation cannot be mistaken for an answer",
     16: "the reader produces findings and a record, and writes no "
     "application-owned artifact of any kind",
+    20: "the prohibition: this library writes no file at all, so there is no "
+    "code path that could modify one the application owns — which is how a "
+    "prohibition is discharged",
     18: "`Finding.__post_init__` rejects a finding that names no distribution",
     19: "`discovery.py` enumerates `contract.ENTRY_POINT_GROUP` and nothing "
     "else, so a group for another major version is never read — nor named "
@@ -151,8 +170,14 @@ An obligation whose clauses fall in more than one of those carries more than
 one entry. Requirement 30 is split because the attributes are validated here
 and written into the manifest elsewhere; requirement 9 is split because the
 `platforms` key is a check and refusing an unimplemented profile is not. A row
-naming a module claims every clause of that requirement is discharged by it,
+naming a module claims **every** clause of that requirement is discharged by it,
 which is why the split is worth the noise.
+
+That claim is strong enough to be worth stating twice: 12, 20, 31 and 36 each
+carried a clause about generating a project inside a row that named a module,
+and a reader that validates a keep pattern has not applied it. Four entries were
+added rather than four clauses implemented, because the clauses are the build
+tool's — but a table that says so is the difference between a gap and a lie.
 
 Structural validation is not listed rule by rule. `structure.py` walks a sidecar
 against [`contract/v1.toml`](../contract/v1.toml), so every check the registry
