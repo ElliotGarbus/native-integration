@@ -1,0 +1,32 @@
+# §8.4 requirement 25, via §6.3: "**Within one sidecar, a module is declared
+# once.** Two entries naming the same `group:artifact` — in either form, or one
+# of each — **MUST** be rejected, naming the distribution and the module, unless
+# they are identical in every field, in which case the duplicate coalesces."
+#
+# The companion to `R25_configuration_disagreement`, and §6.3 puts them one
+# paragraph apart for a reason it states: "A producer contradicting itself is a
+# mistake to report, not a composition to resolve, and it is the one duplicate
+# case with a single author who can fix it." Two distributions naming one module
+# in two forms is a composition Gradle resolves; one distribution naming it
+# twice is two versions of a single author's intent, and no resolver can tell
+# which was meant.
+#
+# Both spellings are here, in one sidecar. `com.vendor:sdk` is declared twice as
+# a `module` with different bounds, and `com.other:widget` once as a
+# `coordinate` and once as a `module` — which is §6.3's "one of each", the
+# spelling a check written over `module` alone would miss entirely.
+#
+# `com.third:tool` is declared twice and identically, and must **not** be
+# reported: §6.3 coalesces that one, and a check that failed on repetition
+# rather than on contradiction would reject a sidecar the section admits.
+requirement = 25
+profile     = "android"
+section     = "6.3"
+
+outcome = "blocking"
+
+diagnostics = [
+  { id = "ni.req.25", distributions = ["pytwice"] },
+]
+advisories  = []
+assertions  = []

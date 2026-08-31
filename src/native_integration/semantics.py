@@ -115,6 +115,7 @@ def check(
         _component_names(resolved, findings)
         _keep_patterns(resolved, findings)
         _configurations(resolved, findings)
+        _duplicate_modules(resolved, findings)
         _repositories(resolved, findings)
         _permissions(resolved, application, record)
         _meta_data(resolved, application, findings, record)
@@ -367,13 +368,8 @@ def _configurations(resolved: Sequence[Resolved], findings: Findings) -> None:
     declared: dict[str, list[_Claim]] = {}
     for entry in resolved:
         for dependency in entry.sidecar.entries("contributes", "gradle_dependencies"):
-            coordinate = dependency.get("coordinate")
-            module = (
-                coordinate.rsplit(":", 1)[0]
-                if isinstance(coordinate, str)
-                else dependency.get("module")
-            )
-            if not isinstance(module, str):
+            module = _module_of(dependency)
+            if module is None:
                 continue
             declared.setdefault(module, []).append(
                 _Claim(
@@ -393,6 +389,77 @@ def _configurations(resolved: Sequence[Resolved], findings: Findings) -> None:
             where="android.contributes.gradle_dependencies",
             detail=[f"{claim.distribution} asks for `{claim.value}`" for claim in claims],
         )
+
+
+def _module_of(dependency: Mapping[str, Any]) -> str | None:
+    """`group:artifact`, from either of §6.3's two forms."""
+    coordinate = dependency.get("coordinate")
+    if isinstance(coordinate, str):
+        return coordinate.rsplit(":", 1)[0]
+    module = dependency.get("module")
+    return module if isinstance(module, str) else None
+
+
+def _canonical(value: Any) -> Any:
+    """A declaration in a form two of them can be compared by.
+
+    §6.3's exception is "identical in **every** field", so the comparison is
+    over the whole entry rather than over the fields this reader happens to
+    read — a `version` table, a `configuration`, and anything a later minor
+    adds. Nested tables and lists are ordered, because a producer writing the
+    same two fields in the other order has written the same declaration.
+    """
+    if isinstance(value, Mapping):
+        return tuple(sorted((key, _canonical(held)) for key, held in value.items()))
+    if isinstance(value, (list, tuple)):
+        return tuple(_canonical(held) for held in value)
+    return value
+
+
+def _duplicate_modules(resolved: Sequence[Resolved], findings: Findings) -> None:
+    """§6.3: "Within one sidecar, a module is declared once."
+
+    Two entries naming the same `group:artifact` — "in either form, or one of
+    each" — are rejected unless identical in every field, in which case the
+    duplicate coalesces. §6.3 gives the reason for treating this differently
+    from the cross-sidecar case one paragraph below it: "A producer
+    contradicting itself is a mistake to report, not a composition to resolve,
+    and it is the one duplicate case with a single author who can fix it."
+
+    So this is per sidecar, and `_configurations` is not. Two distributions may
+    name one module in two forms and Gradle selects between them; one
+    distribution naming it twice has stated two versions of its own intent, and
+    no resolver can tell which it meant.
+    """
+    for entry in resolved:
+        declared: dict[str, list[Mapping[str, Any]]] = {}
+        for dependency in entry.sidecar.entries("contributes", "gradle_dependencies"):
+            module = _module_of(dependency)
+            if module is not None:
+                declared.setdefault(module, []).append(dependency)
+
+        for module, entries in sorted(declared.items()):
+            if len(entries) < 2:
+                continue
+            if len({_canonical(dependency) for dependency in entries}) == 1:
+                continue  # identical in every field, so the duplicate coalesces
+            findings.requirement(
+                CONFIGURATION,
+                entry.sidecar.distribution,
+                message=f"`{module}` is declared more than once in one sidecar",
+                where="android.contributes.gradle_dependencies",
+                detail=[
+                    "the entries differ, and a producer contradicting itself is a "
+                    "mistake to report rather than a composition to resolve",
+                    *(
+                        "- "
+                        + ", ".join(
+                            f"{key} = {held!r}" for key, held in sorted(dependency.items())
+                        )
+                        for dependency in entries
+                    ),
+                ],
+            )
 
 
 # -- §6.4: overlapping repository scopes -------------------------------------

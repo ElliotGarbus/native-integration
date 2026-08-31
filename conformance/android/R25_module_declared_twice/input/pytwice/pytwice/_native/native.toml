@@ -1,0 +1,30 @@
+contract = "1"
+
+# One module, two bounds. §6.3: rejected, naming the distribution and the
+# module.
+[[android.contributes.gradle_dependencies]]
+module = "com.vendor:sdk"
+version = { at_least = "2.0.0", below = "3.0.0" }
+
+[[android.contributes.gradle_dependencies]]
+module = "com.vendor:sdk"
+version = { at_least = "1.0.0", below = "2.0.0" }
+
+# §6.3's "one of each": the same `group:artifact` reached by both spellings.
+[[android.contributes.gradle_dependencies]]
+coordinate = "com.other:widget:4.1.0"
+
+[[android.contributes.gradle_dependencies]]
+module = "com.other:widget"
+version = { at_least = "4.0.0", below = "5.0.0" }
+
+# Identical in every field, which §6.3 coalesces. Nothing is reported for it.
+[[android.contributes.gradle_dependencies]]
+module = "com.third:tool"
+version = { at_least = "1.2.0", below = "2.0.0" }
+configuration = "compileOnly"
+
+[[android.contributes.gradle_dependencies]]
+module = "com.third:tool"
+version = { at_least = "1.2.0", below = "2.0.0" }
+configuration = "compileOnly"
