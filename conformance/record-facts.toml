@@ -443,34 +443,6 @@ section = "6.5"
 [facts."effective.permission".values]
 never-for-location = ["true"]
 
-# §6.4: "Two distributions may declare the same repository, and it merges by one
-# rule." Identity is the `url`; `groups` and `modules` union, and any
-# `credentials_required = true` wins.
-#
-# A separate fact from `dist <d> contributes gradle-repository` for the reason
-# §6.5's permission merge is separate from its contributions: the contributions
-# record who asked for what, and this records what will actually be configured.
-# The direction matters here too — the narrowly-scoped declaration loses, and a
-# repository one distribution said was open is authenticated if another said it
-# was not.
-#
-# `reason` is deliberately absent. §6.4 keeps every one "attributed to the
-# distribution that wrote it", which is what the per-distribution lines already
-# do; collecting them here would drop the attribution the section asks for.
-
-[facts."effective.gradle-repository"]
-template = "effective gradle-repository <url>"
-required = ["distributions"]
-optional = ["credentials-required", "groups", "modules"]
-lists = ["distributions", "groups", "modules"]
-section = "6.4"
-# Recorded only where it holds, as `never-for-location` is. §6.4 makes any one
-# `true` decisive, so `false` is the absence of a claim rather than a claim.
-[facts."effective.gradle-repository".values]
-credentials-required = ["true"]
-[facts."effective.gradle-repository".formats]
-url = "url"
-
 # §6.8 and §7.4's shared key spaces, settled. `distributions` names who claimed
 # the key; `source=application` says the application set it itself and won,
 # which is §6.8's "the application's own value always wins" and requirement 32's

@@ -493,18 +493,13 @@ part a rewrite flattens.
   two cases and says why: two distributions naming one module is a composition
   Gradle resolves, one distribution naming it twice is two versions of a single
   author's intent.
-- **27** — §6.4's same-`url` merge was skipped by the overlap check, correctly,
-  and then left as two facts. §6.4 gives it a table: `groups` and `modules`
-  union, any `credentials_required = true` wins. **This is §6.5's permission
-  merge one section earlier, and the lesson did not transfer.** It loses in the
-  same direction, too: the narrowly-scoped declaration is the one that looks
-  careful, and the repository ends up serving both bounds and needing a login.
-- Writing that merge exposed **a second half of §6.4's identity rule**. The
-  scheme is compared case-insensitively — but the credential answer was joined
-  by raw string, so an application answering `https://` for a sidecar that wrote
-  `HTTPS://` was told its credentials were not configured. `url_identity` is now
-  the one spelling of the rule, and the recorded url is the identity rather than
-  whichever sidecar was read first.
+- **27** — §6.4's identity is the `url` with its scheme compared
+  case-insensitively, and §7.2 imports the rule for a package url. The
+  credential answer was joined by **raw string**, so an application answering
+  `https://` for a sidecar that wrote `HTTPS://` was told its credentials were
+  not configured. `url_identity` is now the one spelling of the rule, used by
+  the overlap check, the merge, the credential join and the recorded url — which
+  no longer depends on which sidecar was read first.
 
 ### Four rows that claimed a clause about generating a project
 
@@ -523,6 +518,52 @@ layout, and this reader emits findings and a record.
 "surfacing a report is the build tool's output; producing it is `findings.py`"
 against a requirement about not modifying the application's files.
 
+### An asymmetry I read as a gap, and was wrong about
+
+This round first added an `effective gradle-repository` fact, on the reasoning
+that §6.4's same-`url` merge is §6.5's permission merge one section earlier and
+the lesson had not transferred. **That was wrong, and the corpus fixture written
+alongside it was worse: it made a record fact §8 does not require into a
+conformance obligation, which is the one thing this corpus must never do.**
+
+Three things, checked afterwards rather than before:
+
+1. Requirement 28 says "Merge permission attributes least-restrictively **and
+   report the merge**". Requirement 27 says "**merge** two declarations of one
+   `url` by unioning their scopes, taking any `credentials_required = true`, and
+   keeping every `reason` attributed" — and nothing about reporting the result.
+   The asymmetry is at the requirement level, not only in the prose.
+2. §6.5 requires its merge recorded because the derivations are *directional*:
+   unbounded defeats bounded, and `never_for_location` holds only where every
+   declaration asserts it. Two requests do not tell a reader the effective
+   ceiling. §6.4's scope union is a set union of two lists the record already
+   carries per distribution.
+3. The one §6.4 outcome that **is** directional — a repository turned
+   authenticated by any single `true` — is already required in the record, by
+   §9.6's *every authenticated repository or package* row, and was already
+   written before this round began.
+
+The apparent evidence for a gap was that one row of §6.4's three-row merge table
+names the record and two do not. That is explainable rather than accidental:
+merging destroys attribution, so `reason` needs a clause to survive it, and
+`groups`/`modules` survive in their inputs.
+
+The other apparent evidence was that requirement 27's union clause is
+unfixturable. It is unfixturable *here*, for the ordinary reason six other
+assertions are unverified: a consumer that skipped the union fails when a
+coordinate does not resolve from the repository, which is a build and not a read.
+
+So the fact is gone and `R27_same_url_is_one_repository` asserts what §8 asks:
+that the same url is a merge rather than a conflict, that §9.6's
+authenticated-repository row is answered once for the repository, and that the
+credential answer joins on §6.4's identity. It still discriminates — restoring
+the raw-string join fails it.
+
+The lesson is narrower than "check the spec": the reasoning that produced the
+mistake was a good argument from §6.5's rationale, applied to a section whose
+obligations I had not re-read. **An argument for what a requirement should say is
+not evidence about what it does say.**
+
 ### One asymmetry left standing, deliberately
 
 §7.4's `append` fixes a **deterministic order** for concatenating array-valued
@@ -531,8 +572,10 @@ be recorded with its distribution. The reader does the second. It records no
 merged array — and unlike §6.5, which says "the result **MUST** appear in the
 record", §7.4 says no such thing about `append`.
 
-That difference is either deliberate or an oversight in the specification, and
-it is not a consumer's to resolve. Adding an `effective plist-append` fact would
+That difference reads as deliberate, on the same test §6.4 turned out to pass:
+§7.4 argues its own restraint — "giving this one key a structured form would be
+modelling a single Apple key", and "the load-bearing half is the attribution,
+which the record carries either way". Adding an `effective plist-append` fact would
 record something no clause requires, which is how a reader starts defining the
 contract. Recorded here as a question for the specification rather than
 answered in code: **§6.5 requires its merge in the record and §7.4 does not,

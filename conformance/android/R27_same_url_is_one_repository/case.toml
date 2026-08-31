@@ -1,0 +1,43 @@
+# §8.4 requirement 27, via §6.4: "**Two distributions may declare the same
+# repository, and it merges by one rule.** Repository identity is the `url`,
+# compared with its scheme case-insensitively and the rest byte-for-byte; a
+# consumer **MUST NOT** normalize further, since a trailing path segment is a
+# different repository."
+#
+# The other side of `R27_repository_scope_overlap`. There two repositories at
+# different URLs contest a group and the build fails; here one repository is
+# declared twice and the build proceeds, because §6.4 says the same url "is not
+# a conflict". A consumer that treated every second declaration as an overlap
+# would fail this.
+#
+# `pyauth` writes the scheme in upper case and `pyscope` in lower. That is one
+# repository, and three things follow from it:
+#
+# - the scopes do not overlap-conflict, they merge;
+# - §9.6's authenticated-repository row is answered **once**, for the
+#   repository, rather than once per declaration — and it is answered at all
+#   because §6.4 gives any single `credentials_required = true` the merge, so
+#   `pyscope`'s open declaration does not keep it open;
+# - the application's credential answer is joined on the same identity. It
+#   spells the scheme lower-case and `pyauth` wrote it upper-case, and §2.2
+#   keys the answer by the `url` — a consumer matching raw strings tells the
+#   application its credentials are not configured when they are.
+#
+# What is deliberately **not** asserted here is the merged scope. §6.4 requires
+# the union and says nothing about recording it, unlike §6.5 one section later,
+# whose merge is directional in a way two requests do not reveal. The union is a
+# set union of two lists this record already carries per distribution, and a
+# consumer that skipped it fails when a coordinate does not resolve — which is a
+# build, not a read. Asserting a fact §8 does not require would be this corpus
+# inventing an obligation.
+requirement = 27
+profile     = "android"
+section     = "6.4"
+
+outcome = "accept"
+
+diagnostics = []
+advisories  = []
+assertions  = []
+
+record = "android.record"

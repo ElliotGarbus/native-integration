@@ -11,4 +11,3 @@ dist pyscope contributes gradle-repository https://maven.vendor.com/releases aut
 dist pyscope input native.toml sha256=44bd5a790b887f50eca6de27bbf54d22c3bb820094f4a3f44c45830980905c7f
 dist pyscope origin direct
 dist pyscope version 1.0.0
-effective gradle-repository https://maven.vendor.com/releases credentials-required=true distributions=pyauth,pyscope groups=com.vendor modules=com.vendor.partners:adapter

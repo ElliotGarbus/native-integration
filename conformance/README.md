@@ -412,10 +412,10 @@ Two more of that shape were added when the reader's own gate was reviewed:
   applies and the build proceeds. Without it, a consumer that gated the whole
   record passed all three requirement-38 cases while asking the application to
   accept its own decisions;
-- `android/R27_repository_scopes_merged` — one repository declared twice, which
-  §6.4 makes a merge rather than a conflict, against
-  `R27_repository_scope_overlap` where two repositories contest a group and the
-  build fails.
+- `android/R27_same_url_is_one_repository` — one repository declared twice, in
+  two spellings of the scheme, which §6.4 makes a merge rather than a conflict,
+  against `R27_repository_scope_overlap` where two repositories at different
+  URLs contest a group and the build fails.
 
 ## Running it
 
