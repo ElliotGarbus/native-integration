@@ -21,7 +21,7 @@ import re
 from dataclasses import dataclass
 from typing import Any, Iterable, Mapping, Sequence
 
-from .application import Application
+from .application import Application, url_identity
 from .findings import Findings
 from .integration import Resolved
 from .recording import Record
@@ -116,7 +116,7 @@ def check(
         _keep_patterns(resolved, findings)
         _configurations(resolved, findings)
         _duplicate_modules(resolved, findings)
-        _repositories(resolved, findings)
+        _repositories(resolved, findings, record)
         _permissions(resolved, application, record)
         _meta_data(resolved, application, findings, record)
     else:
@@ -490,12 +490,21 @@ def _intersects(
     return contested
 
 
-def _repositories(resolved: Sequence[Resolved], findings: Findings) -> None:
+def _repositories(
+    resolved: Sequence[Resolved], findings: Findings, record: Record
+) -> None:
     """A repository is the most powerful thing a sidecar can contribute.
 
     Two both claiming `com.vendor` means a coordinate under that group can be
     served by either, and which one wins is a resolution-order accident — which
     is precisely the substitution dependency confusion is.
+
+    Two declaring the same `url` is the opposite case, and §6.4 makes it a merge
+    rather than a conflict: `groups` and `modules` union, and any
+    `credentials_required = true` wins. That result is recorded, for §6.5's
+    reason one section later — the merge widens what a repository may serve and
+    can turn an open one authenticated, and a record holding only the two
+    requests leaves a reviewer to work that out. Which is where it goes unworked.
     """
     declared: list[tuple[str, str, tuple[set[str], set[str]]]] = []
     for entry in resolved:
@@ -525,14 +534,53 @@ def _repositories(resolved: Sequence[Resolved], findings: Findings) -> None:
                 ],
             )
 
+    _merged_repositories(resolved, record)
+
+
+def _merged_repositories(resolved: Sequence[Resolved], record: Record) -> None:
+    """§6.4's table, applied. Identity is the url, and the rest unions.
+
+    Grouped by the identity §6.4 fixes rather than by the string: the scheme is
+    compared case-insensitively, so `HTTPS://` and `https://` are one
+    repository, and the section forbids normalizing any further because a
+    trailing path segment is a different repository.
+    """
+    merged: dict[tuple[str, str], dict[str, Any]] = {}
+    for entry in resolved:
+        for repository in entry.sidecar.entries("contributes", "gradle_repositories"):
+            url = repository.get("url")
+            if not isinstance(url, str):
+                continue
+            identity = url_identity(url)
+            groups, modules = _scope(repository)
+            held = merged.setdefault(
+                identity,
+                {"distributions": set(), "groups": set(), "modules": set(),
+                 "authenticated": False},
+            )
+            held["distributions"].add(entry.distribution)
+            held["groups"] |= groups
+            held["modules"] |= modules
+            held["authenticated"] |= bool(repository.get("credentials_required"))
+
+    for identity, held in sorted(merged.items()):
+        # The identity, not the spelling either sidecar happened to use. The
+        # per-distribution lines above record what each one declared, verbatim;
+        # this one records the repository, and taking the first spelling seen
+        # would make the record depend on the order the closure was read in.
+        scheme, rest = identity
+        record.add(
+            "effective", "gradle-repository", f"{scheme}://{rest}" if scheme else rest,
+            distributions=sorted(held["distributions"]),
+            groups=sorted(held["groups"]) or None,
+            modules=sorted(held["modules"]) or None,
+            credentials_required=True if held["authenticated"] else None,
+        )
+
 
 def _same_url(one: str, other: str) -> bool:
     """§6.4: the scheme compared case-insensitively, the rest byte for byte."""
-    def split(url: str) -> tuple[str, str]:
-        scheme, separator, rest = url.partition("://")
-        return (scheme.lower(), rest) if separator else ("", url)
-
-    return split(one) == split(other)
+    return url_identity(one) == url_identity(other)
 
 
 # -- §5.2, §6.8, §7.4: one key, two declarations -----------------------------

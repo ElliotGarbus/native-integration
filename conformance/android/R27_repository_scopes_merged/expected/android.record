@@ -1,0 +1,14 @@
+build contract 1.0
+build platform android
+decision credential-required https://maven.vendor.com/releases kind=repository
+dist pyauth contract 1
+dist pyauth contributes gradle-repository HTTPS://maven.vendor.com/releases authenticated=true modules=com.vendor.partners:adapter reason="The partner adapter sits behind the vendor's login; ask them for a token"
+dist pyauth input native.toml sha256=b01103de40941b03ef76ec021171805c77c857379bde9da8bc810314495632b5
+dist pyauth origin direct
+dist pyauth version 2.0.0
+dist pyscope contract 1
+dist pyscope contributes gradle-repository https://maven.vendor.com/releases authenticated=false groups=com.vendor reason="The vendor publishes its SDK here rather than to Maven Central"
+dist pyscope input native.toml sha256=44bd5a790b887f50eca6de27bbf54d22c3bb820094f4a3f44c45830980905c7f
+dist pyscope origin direct
+dist pyscope version 1.0.0
+effective gradle-repository https://maven.vendor.com/releases credentials-required=true distributions=pyauth,pyscope groups=com.vendor modules=com.vendor.partners:adapter

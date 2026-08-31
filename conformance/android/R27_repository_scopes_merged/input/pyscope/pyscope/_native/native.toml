@@ -1,0 +1,7 @@
+contract = "1"
+
+# Open, and bounded to one group.
+[[android.contributes.gradle_repositories]]
+url = "https://maven.vendor.com/releases"
+groups = ["com.vendor"]
+reason = "The vendor publishes its SDK here rather than to Maven Central"

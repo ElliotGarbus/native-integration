@@ -1,0 +1,9 @@
+contract = "1"
+
+# The same repository, in §6.4's terms: the scheme differs in case and nothing
+# else does. Authenticated, and bounded to a module in another group.
+[[android.contributes.gradle_repositories]]
+url = "HTTPS://maven.vendor.com/releases"
+modules = ["com.vendor.partners:adapter"]
+credentials_required = true
+reason = "The partner adapter sits behind the vendor's login; ask them for a token"

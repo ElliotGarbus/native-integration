@@ -1,0 +1,13 @@
+[build]
+min_sdk = 26
+compile_sdk = 35
+
+# §2.2: the credential is a reference, never a literal. The url is spelled with
+# a lower-case scheme and the sidecar that needs it wrote `HTTPS://`, which
+# §6.4 makes the same repository.
+[answers.credentials."https://maven.vendor.com/releases"]
+kind = "env"
+locator = "VENDOR_MAVEN_TOKEN"
+
+[answers.initial_acceptance]
+date = "2026-08-24"

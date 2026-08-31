@@ -30,6 +30,25 @@ def normalize_name(name: str) -> str:
     return re.sub(r"[-_.]+", "-", name).lower()
 
 
+def url_identity(url: str) -> tuple[str, str]:
+    """What makes two repository or package URLs the same one (§6.4).
+
+    "Repository identity is the `url`, compared with its scheme
+    case-insensitively and the rest byte-for-byte; a consumer **MUST NOT**
+    normalize further, since a trailing path segment is a different
+    repository." §7.2 imports the rule for a Swift package: its `url` is an
+    https URL "on §6.4's terms", and every rule §6.4 states about an
+    authenticated repository holds there too.
+
+    Both halves matter. Folding case across the whole URL would merge two
+    repositories that differ only in a path segment's case, which §6.4 says are
+    different repositories; comparing raw strings splits one repository into
+    two over a scheme nobody types consistently.
+    """
+    scheme, separator, rest = url.partition("://")
+    return (scheme.lower(), rest) if separator else ("", url)
+
+
 @dataclass(frozen=True)
 class Answer:
     """An answer the application gave, and the date §9.6 records it against."""
@@ -145,7 +164,20 @@ class Application:
         return self.exported_components.get(component, Approval())
 
     def credential(self, url: str) -> Credential | None:
-        return self.credentials.get(url)
+        """§2.2's join, on §6.4's identity rather than on the raw string.
+
+        The answer is keyed by the repository or package `url`, and §6.4 fixes
+        what makes two of those the same one: the scheme compared
+        case-insensitively, the rest byte for byte. An application answering
+        `https://` for a sidecar that wrote `HTTPS://` has answered — matching
+        the strings would tell it otherwise, and the diagnostic it would then
+        read says its credentials are not configured when they are.
+        """
+        wanted = url_identity(url)
+        for offered, credential in self.credentials.items():
+            if url_identity(offered) == wanted:
+                return credential
+        return None
 
     def artifact_feature(self, name: str) -> FeatureDecision | None:
         return self.artifact_features.get(name)

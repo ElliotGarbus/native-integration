@@ -18,7 +18,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Iterable, Mapping
 
-from .application import Application, meets
+from .application import Application, meets, url_identity
 from .document import Sidecar
 from .findings import Findings
 from .recording import Record, normalize_name, text_of
@@ -791,7 +791,16 @@ def _credentials(
         for kind, url, reason in wanted:
             # §9.5: that one is required is a fact about the integration; the
             # credential is not, and never appears.
-            record.add("decision", "credential-required", url, kind=kind)
+            #
+            # Written on §6.4's identity, so that two sidecars declaring one
+            # repository in two spellings of the scheme produce one fact rather
+            # than two records that never compare.
+            scheme, rest = url_identity(url)
+            record.add(
+                "decision", "credential-required",
+                f"{scheme}://{rest}" if scheme else rest,
+                kind=kind,
+            )
             if application.credential(url) is not None:
                 continue
             findings.requirement(
