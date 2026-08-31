@@ -38,18 +38,17 @@ OUTPUT = ROOT / "docs" / "REQUIREMENTS.md"
 #: an oversight.
 BEYOND_THE_READER = {
     6: "the payload is assembled by the build tool, not here",
-    19: "surfacing a report is the build tool's output; producing it is `findings.py`",
-    20: "the same",
+    20: "surfacing a report is the build tool's output; producing it is `findings.py`",
     24: "the payload again",
-    28: "the declaration is checked here; promoting a feature in the merged "
-    "manifest is the build tool's",
+    28: "honoring a suppression in the merged manifest, and promoting a "
+    "feature in it, are the build tool's",
     30: "the attributes are carried into the record here; writing them into the "
     "manifest is the build tool's",
     34: "the declaration is checked here; the privacy manifest is generated, not read",
-    35: "the refusal is enforced here; the Info.plist is the build tool's",
+    35: "the refusal and the conflicts are enforced here; writing the Info.plist "
+    "is the build tool's",
     37: "the union is recorded here; linking it is the build tool's",
     39: "writing the record to disk is the tool's; producing it is `recording.py`",
-    43: "the generated project is the tool's",
     45: "the bootstrap's own activity, which this library neither writes nor sees",
     46: "the bootstrap again",
 }
@@ -59,23 +58,66 @@ BEYOND_THE_READER = {
 #: §8.4's obligations are prohibitions, and the way to discharge a prohibition
 #: is to have no code that could violate it.
 STRUCTURAL = {
-    1: "`reader.read` skips a source the `Closure` does not contain, so a "
-    "contribution from outside it is never read, let alone accepted",
+    1: "`reader.read` skips a source the `Closure` does not contain, and this "
+    "library offers no way to build a `Closure` from what is installed — a "
+    "convenience that evaluated markers against this interpreter would be the "
+    "one code path able to violate the requirement",
     3: "nothing in this package imports a producing distribution or executes "
     "any sidecar content; a sidecar is TOML read as data",
+    9: "the second sentence: `reader.read` raises `UnimplementedProfile` for a "
+    "platform outside the caller's `profiles`, before a sidecar is opened, so "
+    "a partial resolution for it is never produced",
     10: "`Application` is that way — one field per row of §2.2's table, joined "
     "as §2.2 joins it",
-    11: "every `Finding` carries the producer's `reason` in its detail and the "
-    "distribution in its attribution, enforced by the constructor",
     15: "there is no code path that inspects the application's project, so an "
     "observation cannot be mistaken for an answer",
     16: "the reader produces findings and a record, and writes no "
     "application-owned artifact of any kind",
     18: "`Finding.__post_init__` rejects a finding that names no distribution",
-    21: "the same constructor: the `reason` is the producer's own sentence and "
-    "the attribution is the producer's name",
+    19: "`discovery.py` enumerates `contract.ENTRY_POINT_GROUP` and nothing "
+    "else, so a group for another major version is never read — nor named "
+    "anywhere it could be",
     42: "`Credential.__repr__` keeps the locator out of a traceback, and no "
     "credential value is passed to `Record` anywhere",
+}
+
+#: Discharged by the *content* of what the reader produces rather than by a
+#: check it performs. A handful of §8.4's obligations are about what a report
+#: or a record has to carry, and nothing refuses a sidecar over them, so no
+#: `findings.requirement` call names the number and the syntax tree cannot see
+#: it. Named here with the code that does the work and the test that holds it,
+#: because "the module mentions the number" is the wrong evidence for a clause
+#: about content.
+IN_WHAT_IT_PRODUCES = {
+    11: "`integration._addressed_to_a_person` puts an action's `summary`, "
+    "`instructions` and `acceptance` into the finding's detail, and "
+    "`integration._floors` the declared and configured values for a floor, "
+    "which carries no `reason` (`tests/test_actions.py`)",
+    21: "the same lines each name the declaring distribution rather than "
+    "reading as this consumer's own guidance, and `native.toml` is a hashed "
+    "input of the record (`tests/test_actions.py`)",
+    28: "the first clause: `semantics._permissions` merges `max_sdk_version` "
+    "and `never_for_location` least-restrictively across the closure and "
+    "writes one `effective permission` fact naming every distribution that "
+    "asked (`conformance/android/R28_permission_attributes_merged`)",
+    43: "`recording.py`'s fact vocabulary and `integration.decisions` — every "
+    "value and action with its state, and each suppression, approval, feature "
+    "decision and path choice with what it affected and its date "
+    "(`conformance/record-format.md`)",
+}
+
+#: A requirement one of the two tables above claims *and* a check reports.
+#: Ordinarily that combination is the double-counting `tests/test_requirements
+#: .py` exists to catch — "structural" means there is no call site at which the
+#: obligation can be forgotten, and a check is a call site. It is legitimate
+#: only where the requirement has clauses of both kinds, and then it has to say
+#: which clause is which.
+SPLIT = {
+    9: "the `platforms` key is a check on a sidecar; refusing a profile this "
+    "consumer does not implement is a refusal at the API boundary, and §8.4 "
+    "states them in one requirement as two sentences",
+    28: "the feature clauses are checks and refuse a sidecar; the permission "
+    "merge refuses nothing and is a fact in the record",
 }
 
 HEADER = """# Where each consumer obligation lives
@@ -91,17 +133,26 @@ paths out of the modules' syntax trees, so neither column is transcribed. An
 obligation nothing discharges appears as `—` and fails
 `tests/test_requirements.py`.
 
-Three kinds of entry:
+Four kinds of entry:
 
 - a **module** discharges the obligation with a check that produces a finding.
 - **structural** marks one discharged by the shape of the API rather than by a
   check — you cannot construct a `Finding` without naming a distribution, so
   requirement 18 has no call site at which it can be forgotten.
+- **in what it produces** marks one about the *content* of a report or a
+  record rather than about accepting or refusing a sidecar. Nothing fails when
+  these are unmet, so no `findings.requirement` call names them and the syntax
+  tree cannot see them; the note names the code and the test instead.
 - **beyond this reader** marks one that binds a consumer where it *generates a
   project*. This library reads, validates, resolves and records; it builds
-  nothing, and says so rather than leaving a blank. Several obligations are
-  split — the declaration is checked here and the generated artifact is the
-  build tool's — and those carry both a module and the note.
+  nothing, and says so rather than leaving a blank.
+
+An obligation whose clauses fall in more than one of those carries more than
+one entry. Requirement 30 is split because the attributes are validated here
+and written into the manifest elsewhere; requirement 9 is split because the
+`platforms` key is a check and refusing an unimplemented profile is not. A row
+naming a module claims every clause of that requirement is discharged by it,
+which is why the split is worth the noise.
 
 Structural validation is not listed rule by rule. `structure.py` walks a sidecar
 against [`contract/v1.toml`](../contract/v1.toml), so every check the registry
@@ -122,6 +173,12 @@ def discharged() -> dict[int, set[str]]:
     `findings.rule(…)` call resolves through the registry instead, so
     `structure.py` is credited with the whole image of the obligations mapping
     rather than with a list this tool would have to keep in step.
+
+    An `obligation=N` keyword counts too. Where two sections state the same
+    rule for different material — §6.8's `<meta-data>` and §7.4's `Info.plist`
+    settle a contested key identically — the check is written once and told
+    which obligation it is discharging, and the call site naming the constant
+    is the module reporting it just as directly as the call inside would be.
     """
     found: dict[int, set[str]] = {}
     for path in sorted(PACKAGE.glob("*.py")):
@@ -139,12 +196,20 @@ def discharged() -> dict[int, set[str]]:
             if isinstance(node, ast.FunctionDef)
         }
         for node in ast.walk(tree):
-            if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Attribute):
+            if not isinstance(node, ast.Call):
                 continue
-            if node.func.attr != "requirement" or not node.args:
-                continue
-            for number in _numbers(node.args[0], constants, helpers):
-                found.setdefault(number, set()).add(path.stem)
+            named: list[ast.expr] = [
+                keyword.value for keyword in node.keywords if keyword.arg == "obligation"
+            ]
+            if (
+                isinstance(node.func, ast.Attribute)
+                and node.func.attr == "requirement"
+                and node.args
+            ):
+                named.append(node.args[0])
+            for argument in named:
+                for number in _numbers(argument, constants, helpers):
+                    found.setdefault(number, set()).add(path.stem)
     return found
 
 
@@ -188,10 +253,11 @@ def structural_image() -> set[int]:
     )
 
 
-def advisories_offered() -> set[str]:
+def advisories_offered() -> dict[str, str]:
+    """The advisory codes this reader offers, against the module reporting each."""
     from native_integration import advisories  # noqa: PLC0415
 
-    return set(advisories.claimed())
+    return dict(advisories.claimed())
 
 
 def build() -> str:
@@ -211,7 +277,11 @@ def build() -> str:
         about = contract.about(contract.requirement_id(number))
         parts = [f"`{name}.py`" for name in sorted(by_module.get(number, ()))]
         where = ", ".join(parts)
-        for label, table in (("structural", STRUCTURAL), ("beyond this reader", BEYOND_THE_READER)):
+        for label, table in (
+            ("structural", STRUCTURAL),
+            ("in what it produces", IN_WHAT_IT_PRODUCES),
+            ("beyond this reader", BEYOND_THE_READER),
+        ):
             if number in table:
                 note = f"*{label}* — {table[number]}"
                 where = f"{where}<br>{note}" if where else note
@@ -239,7 +309,7 @@ def build() -> str:
     for identifier in codes:
         code = identifier.rsplit(".", 1)[-1]
         about = contract.about(identifier)
-        state = "`advisories.py`" if code in offered else "*not offered*"
+        state = f"`{offered[code]}.py`" if code in offered else "*not offered*"
         lines.append(f"| {code} | {_prose(about['summary'])} | {state} |")
 
     return "\n".join(lines) + "\n"

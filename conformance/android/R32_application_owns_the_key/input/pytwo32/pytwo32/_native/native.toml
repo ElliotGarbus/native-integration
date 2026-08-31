@@ -1,0 +1,6 @@
+contract = "1"
+
+[[android.contributes.meta_data]]
+key = "com.example.MODE"
+value = 1
+reason = "The SDK reads mode 1 as conservative batching"

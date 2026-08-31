@@ -10,13 +10,11 @@ and nothing is excused that is actually implemented.
 from __future__ import annotations
 
 import importlib.util
-import sys
 from pathlib import Path
 
 import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT / "src"))
 
 from native_integration import registry  # noqa: E402
 
@@ -56,6 +54,7 @@ def test_every_obligation_is_discharged_or_named(tool, contract):
         set(tool.discharged())
         | tool.structural_image()
         | set(tool.STRUCTURAL)
+        | set(tool.IN_WHAT_IT_PRODUCES)
         | set(tool.BEYOND_THE_READER)
     )
     assert numbers(contract) - accounted == set()
@@ -67,14 +66,30 @@ def test_every_note_is_about_an_obligation_that_exists(tool, contract):
     defined = numbers(contract)
     assert set(tool.BEYOND_THE_READER) <= defined
     assert set(tool.STRUCTURAL) <= defined
+    assert set(tool.IN_WHAT_IT_PRODUCES) <= defined
+    assert set(tool.SPLIT) <= defined
 
 
-def test_a_structural_obligation_is_not_also_a_check(tool):
-    """The two are different claims. `structural` says there is no call site at
-    which the obligation can be forgotten, which a module reporting it would
-    contradict — the check is the call site."""
+def test_a_declared_obligation_is_not_also_a_check(tool):
+    """The claims are different, and claiming both without saying why is how a
+    row overstates itself. `structural` says there is no call site at which the
+    obligation can be forgotten, which a module reporting it contradicts — the
+    check is the call site. `in what it produces` says nothing refuses over it.
+
+    A requirement with clauses of both kinds is legitimate and has to be in
+    `SPLIT`, naming which clause is which."""
     reported = set(tool.discharged()) | tool.structural_image()
-    assert set(tool.STRUCTURAL) & reported == set()
+    declared = set(tool.STRUCTURAL) | set(tool.IN_WHAT_IT_PRODUCES)
+    assert declared & reported <= set(tool.SPLIT)
+
+
+def test_nothing_is_split_that_is_not_claimed_twice(tool):
+    """The exemption is not a place to park a number. A row that stopped being
+    claimed twice should lose its entry rather than keep an excuse for an
+    overlap that no longer exists."""
+    reported = set(tool.discharged()) | tool.structural_image()
+    declared = set(tool.STRUCTURAL) | set(tool.IN_WHAT_IT_PRODUCES)
+    assert set(tool.SPLIT) <= declared & reported
 
 
 def test_the_table_on_disk_is_current(tool):
@@ -89,4 +104,4 @@ def test_the_advisories_offered_are_ones_the_registry_defines(tool, contract):
         for identifier in contract.diagnostics
         if identifier.startswith("ni.adv.")
     }
-    assert tool.advisories_offered() <= defined
+    assert set(tool.advisories_offered()) <= defined

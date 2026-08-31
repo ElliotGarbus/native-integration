@@ -7,3 +7,8 @@ compile_sdk = 35
 [answers.exported_components."org.pyr30.RedirectActivity"]
 approved = true
 date = "2026-08-24"
+
+# §9.1's bootstrap action, covering the initial set — without it a first build
+# blocks, since "the first build is step 4, not an exemption".
+[answers.initial_acceptance]
+date = "2026-08-24"

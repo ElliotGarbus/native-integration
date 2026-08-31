@@ -1,0 +1,7 @@
+platform = "android"
+
+[[distribution]]
+name = "pyr23k"
+version = "1.0.0"
+origin = "direct"
+entry_point = "pyr23k._native"

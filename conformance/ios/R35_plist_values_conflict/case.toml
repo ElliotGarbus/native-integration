@@ -1,0 +1,31 @@
+# §8.4 requirement 35, via §7.4: "A consumer **MUST** fail on two distributions
+# setting the same key to different values, naming the distributions."
+#
+# A category-1 case. `pyalpha35` and `pybeta35` both set `ExampleAdsMode`, to
+# `fast` and to `safe`. Each sidecar is valid; only a consumer holding the whole
+# closure sees that one `Info.plist` cannot hold both.
+#
+# There is no order-independent winner, which is why this fails rather than
+# picking one. Whichever the consumer writes, the other producer's SDK reads a
+# key configured for someone else and behaves in a way that vendor never
+# shipped — and the application author, who chose two dependencies rather than
+# a plist, has nothing in front of them that explains it.
+#
+# The distinction from `core/R17_value_conflict` is which channel the values
+# arrive through. R17 is two §5.2 values the application supplied for one
+# `(kind, key)`. This is two §7.4 contributions, declared by the producers
+# themselves, and §7.4 states it as its own rule.
+requirement = 35
+profile     = "ios"
+section     = "7.4"
+
+outcome = "blocking"
+
+diagnostics = [
+  { id = "ni.req.35", distributions = ["pyalpha35", "pybeta35"] },
+]
+advisories  = []
+
+assertions = ["every_diagnostic_names_a_distribution"]
+
+# The build does not proceed, so there is no resolution to record.

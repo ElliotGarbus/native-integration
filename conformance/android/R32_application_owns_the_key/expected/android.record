@@ -1,0 +1,13 @@
+build contract 1.0
+build platform android
+dist pyone32 contract 1
+dist pyone32 contributes meta-data com.example.MODE type=string value=fast
+dist pyone32 input native.toml sha256=428c1935f942de13d4189cf697832d0d2565266c28a8f1c81b13ab603268c5b9
+dist pyone32 origin direct
+dist pyone32 version 1.0.0
+dist pytwo32 contract 1
+dist pytwo32 contributes meta-data com.example.MODE type=integer value=1
+dist pytwo32 input native.toml sha256=813cf5206ffa608a1b2ab60f133a5ca2c1477129809ee660ee0fd3c68d95173a
+dist pytwo32 origin direct
+dist pytwo32 version 1.0.0
+effective meta-data com.example.MODE distributions=pyone32,pytwo32 source=application type=string value=balanced

@@ -1,0 +1,13 @@
+platform = "android"
+
+[[distribution]]
+name = "pymergea"
+version = "1.0.0"
+origin = "direct"
+entry_point = "pymergea._native"
+
+[[distribution]]
+name = "pymergeb"
+version = "2.0.0"
+origin = "direct"
+entry_point = "pymergeb._native"

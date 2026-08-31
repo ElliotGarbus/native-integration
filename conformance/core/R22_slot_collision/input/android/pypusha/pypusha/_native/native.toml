@@ -1,0 +1,9 @@
+contract = "1"
+
+# One `Configuration` is returned by one application class, so the second
+# vendor to ask cannot be accommodated by doing what it says.
+[[android.requires.application_action]]
+id = "work_manager_configuration"
+summary = "Implement Configuration.Provider and return PushA's WorkManager configuration"
+reason = "Retry backoff for push receipts is set on the WorkManager configuration"
+slot = "androidx.work.Configuration.Provider"

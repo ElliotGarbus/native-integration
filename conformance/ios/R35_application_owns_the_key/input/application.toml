@@ -1,0 +1,10 @@
+[build]
+deployment_target = "16.0"
+
+# Not an answer to anything a producer asked. §7.4's key space is shared with
+# the application, and this is the application's own `Info.plist` entry.
+[application.info_plist]
+ExampleAdsMode = "balanced"
+
+[answers.initial_acceptance]
+date = "2026-08-24"

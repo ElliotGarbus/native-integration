@@ -1,0 +1,12 @@
+# Both values are supplied and the action is acknowledged, so nothing here is
+# outstanding. What blocks is the declaration itself: the answer to
+# `support_contact` has nowhere to go.
+[build]
+deployment_target = "16.0"
+
+[answers.values]
+"pyinline.team_identifier" = "A1B2C3D4E5"
+"pyinline.support_contact" = "support@example.com"
+
+[answers.acknowledged]
+"pyinline" = ["app_group_entitlement"]

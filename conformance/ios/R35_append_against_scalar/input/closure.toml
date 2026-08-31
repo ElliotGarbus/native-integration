@@ -1,0 +1,13 @@
+platform = "ios"
+
+[[distribution]]
+name = "pyschemes"
+version = "1.0.0"
+origin = "direct"
+entry_point = "pyschemes._native"
+
+[[distribution]]
+name = "pyprobe"
+version = "1.0.0"
+origin = "direct"
+entry_point = "pyprobe._native"

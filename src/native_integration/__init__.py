@@ -50,7 +50,7 @@ from .document import Sidecar
 from .findings import Finding, Findings
 from .graph import Artifact, Graph, Package, graph_of
 from .integration import Resolved
-from .reader import Integration, IntegrationError, read
+from .reader import Integration, IntegrationError, UnimplementedProfile, read
 from .recording import Fact, Record, RecordError
 from .registry import PLATFORMS, Registry
 from .registry import load as load_registry
@@ -87,6 +87,7 @@ __all__ = [
     "Resolved",
     "Sidecar",
     "SidecarSource",
+    "UnimplementedProfile",
     "__version__",
     "discover",
     "graph_of",

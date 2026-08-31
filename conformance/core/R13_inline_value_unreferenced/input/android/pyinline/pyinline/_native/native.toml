@@ -1,0 +1,24 @@
+contract = "1"
+
+# Referenced, and therefore fine: the action below names it in `uses`, so the
+# supplied string reaches a person who has somewhere to put it.
+[[android.requires.application_value]]
+id = "team_identifier"
+kind = "inline"
+reason = "Your vendor team identifier, for the shared user id"
+placeholder = "<TODO: your ten-character team identifier>"
+
+# Referenced by nothing. Neither a contribution nor an action names it, and it
+# carries no `key` of its own, so a consumer honouring the declaration has
+# nowhere to write the answer.
+[[android.requires.application_value]]
+id = "support_contact"
+kind = "inline"
+reason = "An address the SDK console shows on the crash page"
+placeholder = "<TODO: your support address>"
+
+[[android.requires.application_action]]
+id = "shared_user_id"
+summary = "Set the shared user id to your team identifier"
+reason = "The service and the host application share a process."
+uses = ["team_identifier"]

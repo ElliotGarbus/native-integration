@@ -1,0 +1,7 @@
+platform = "android"
+
+[[distribution]]
+name = "pyinline"
+version = "1.0.0"
+origin = "direct"
+entry_point = "pyinline._native"

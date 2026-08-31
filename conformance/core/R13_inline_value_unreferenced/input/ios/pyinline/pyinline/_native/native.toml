@@ -1,0 +1,24 @@
+contract = "1"
+
+# Referenced, and therefore fine: the action below names it in `uses`, so the
+# supplied string reaches a person who has somewhere to put it.
+[[ios.requires.application_value]]
+id = "team_identifier"
+kind = "inline"
+reason = "Your Apple Developer team identifier, for the App Group name"
+placeholder = "<TODO: your ten-character team identifier>"
+
+# Referenced by nothing. Neither a contribution nor an action names it, and it
+# carries no `key` of its own, so a consumer honouring the declaration has
+# nowhere to write the answer.
+[[ios.requires.application_value]]
+id = "support_contact"
+kind = "inline"
+reason = "An address the SDK console shows on the crash page"
+placeholder = "<TODO: your support address>"
+
+[[ios.requires.application_action]]
+id = "app_group_entitlement"
+summary = "Add an App Group named after your team identifier"
+reason = "The extension and the host application share a container."
+uses = ["team_identifier"]

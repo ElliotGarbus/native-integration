@@ -1,0 +1,35 @@
+# §8.4 requirement 23, via §6.1 rule 1: "Every contributed source file's path
+# **and** its declared `package` falls under an owned namespace", and "a file
+# whose two namespaces are not equal, on either language" is rejected.
+#
+# This is a category-1 case, and the one §6.1's own note singles out:
+#
+#   `javac` enforces the path-to-package correspondence itself and `kotlinc`
+#   does not, which is exactly why the equality check is stated here rather
+#   than left to the toolchain: a Kotlin file at
+#   `kotlin/org/example/mypkg/Bridge.kt` declaring `package org.other` compiles
+#   cleanly and lands a class outside the namespace its distribution claimed.
+#
+# That is this fixture, verbatim. `pyr23k` owns `org.example.mypkg` and stages a
+# file whose path sits inside it, so a consumer checking the path alone sees
+# nothing wrong. The class it actually produces is `org.other.Bridge`, which the
+# distribution never claimed and another distribution may own — the substitution
+# §6.1 exists to close, arriving through the one language whose compiler will
+# not catch it.
+#
+# Checking the declaration alone is the mirror failure, and would let the file
+# sit anywhere in the tree. Both operands are derived and both are checked.
+requirement = 23
+profile     = "android"
+section     = "6.1"
+
+outcome = "blocking"
+
+diagnostics = [
+  { id = "ni.req.23", distributions = ["pyr23k"] },
+]
+advisories  = []
+
+assertions = ["every_diagnostic_names_a_distribution"]
+
+# The build does not proceed, so there is no resolution to record.

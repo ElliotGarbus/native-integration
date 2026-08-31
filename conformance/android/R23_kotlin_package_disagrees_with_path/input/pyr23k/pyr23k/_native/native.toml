@@ -1,0 +1,9 @@
+contract = "1"
+
+[android.owns]
+java_namespaces = ["org.example.mypkg"]
+
+# The path below is inside the owned namespace. The `package` the file declares
+# is not, and `kotlinc` will not say so.
+[android.contributes.src]
+kotlin = ["kotlin"]

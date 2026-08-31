@@ -1,0 +1,31 @@
+# §8.4 requirement 35, via §7.4: "A key the **application** also sets is the
+# application's: the consumer **MUST** keep the application's value and report
+# the override."
+#
+# The same closure as `R35_plist_values_conflict` — `pyone35` wants
+# `ExampleAdsMode` to be `fast`, `pytwo35` wants `safe` — with one difference:
+# the application sets the key itself. That is not the consumer resolving a
+# disagreement between two producers, which it has no basis to do; it is the
+# disagreement no longer being anyone else's to settle.
+#
+# So this case is the pair to that one, and the pair is the point. Failing is
+# right when nothing in the integration is entitled to decide, and wrong once
+# something is — a consumer that failed here would be refusing to build over a
+# key the application had already answered.
+#
+# What the requirement asks beyond keeping the value is that the override be
+# *reported*, and the record is where a reviewer sees it: the two contributions
+# stay, and the `effective` fact names the application as the source alongside
+# the distributions it overrode. Dropping the contributions would hide that two
+# producers wanted something else, which is exactly what someone removing the
+# application's own entry later needs to know.
+requirement = 35
+profile     = "ios"
+section     = "7.4"
+
+outcome = "accept"
+
+diagnostics = []
+advisories  = []
+
+assertions = []

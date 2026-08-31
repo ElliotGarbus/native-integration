@@ -1,0 +1,10 @@
+[build]
+deployment_target = "16.0"
+
+# Supplied, so the scalar claim is live. An unsupplied value would fail on
+# requirement 13 and never reach the key space this case is about.
+[answers.values]
+"pyprobe.probe_scheme" = "exampleprobe"
+
+[answers.initial_acceptance]
+date = "2026-08-24"

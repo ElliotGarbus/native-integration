@@ -1,0 +1,12 @@
+contract = "1"
+
+# A package fetched from a URL and a plist key, so that the reported set is
+# visibly the whole inherited native surface rather than a single line.
+[[ios.contributes.swift_packages]]
+name = "ExampleAds"
+url = "https://github.com/example/example-ads"
+requirement = { from = "4.0.0" }
+products = ["ExampleAds"]
+
+[ios.contributes.info_plist.values]
+ExampleAdsMode = "production"

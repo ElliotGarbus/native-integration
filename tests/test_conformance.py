@@ -27,8 +27,6 @@ sys.path.insert(0, str(ROOT / "conformance"))
 
 import consumer  # noqa: E402
 
-sys.path.insert(0, str(ROOT / "src"))
-
 from native_integration import advisories  # noqa: E402
 
 CORPUS = ROOT / "conformance"

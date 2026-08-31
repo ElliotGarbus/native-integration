@@ -1,0 +1,4 @@
+contract = "1"
+
+[ios.contributes.info_plist.values]
+ExampleAdsMode = "safe"

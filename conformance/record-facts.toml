@@ -414,6 +414,72 @@ exported = ["true", "false"]
 [facts."dist.artifact-declares.component".formats]
 coordinate = "coordinate"
 
+# -------------------------------------------- the effective registration ---
+#
+# §6.5: "Attributes merge least-restrictively, and the merge is reported ... The
+# result MUST appear in the record and report with the distributions that
+# produced it."
+#
+# A separate fact from `dist <d> contributes permission`, because both are
+# required and they say different things: the contributions record who asked for
+# what, and this records what the manifest will actually carry. Deriving one
+# from the other is the consumer's job, and a record that only held the requests
+# would make a reviewer redo the merge in their head — which is where the
+# widening goes unnoticed.
+#
+# Integration-wide, so no `dist` subject; the contributors are named instead. A
+# suppressed permission has no fact here at all, which is §6.5's "absent from
+# the effective merged manifest" made visible.
+
+[facts."effective.permission"]
+template = "effective permission <name>"
+required = ["distributions"]
+optional = ["max-sdk", "never-for-location"]
+lists = ["distributions"]
+section = "6.5"
+# Only ever recorded where it holds. §6.5 gives it force only when every
+# declaration asserts it, so its absence and `false` are the same statement and
+# a format that admitted both would have two spellings for one merge.
+[facts."effective.permission".values]
+never-for-location = ["true"]
+
+# §6.8 and §7.4's shared key spaces, settled. `distributions` names who claimed
+# the key; `source=application` says the application set it itself and won,
+# which is §6.8's "the application's own value always wins" and requirement 32's
+# and 35's "keep and report the application's own value".
+[facts."effective.meta-data"]
+template = "effective meta-data <key>"
+required = ["distributions", "type", "value"]
+optional = ["source"]
+lists = ["distributions"]
+section = "6.8"
+[facts."effective.meta-data".values]
+type = ["string", "integer", "boolean"]
+source = ["application"]
+[facts."effective.meta-data".typed_value]
+key = "type"
+operand = "value"
+[facts."effective.meta-data".typed_value.formats]
+integer = "integer"
+boolean = "boolean"
+
+[facts."effective.plist-value"]
+template = "effective plist-value <key>"
+required = ["distributions", "type", "value"]
+optional = ["source"]
+lists = ["distributions"]
+section = "7.4"
+[facts."effective.plist-value".values]
+type = ["string", "integer", "float", "boolean"]
+source = ["application"]
+[facts."effective.plist-value".typed_value]
+key = "type"
+operand = "value"
+[facts."effective.plist-value".typed_value.formats]
+integer = "integer"
+float = "float"
+boolean = "boolean"
+
 # --------------------------------------- the application's own decisions ---
 #
 # §2.2's answers joined by something other than (distribution, id). These are

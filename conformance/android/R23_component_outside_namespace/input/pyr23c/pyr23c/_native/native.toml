@@ -1,0 +1,11 @@
+contract = "1"
+
+[android.owns]
+java_namespaces = ["org.example.mypkg"]
+
+# `com.vendor.sdk` is not owned here, and no `from_dependency` attributes the
+# class to an artifact that would exempt it.
+[[android.contributes.components]]
+kind = "service"
+name = "com.vendor.sdk.TrackerService"
+reason = "The SDK delivers measurement callbacks to this service"

@@ -1,0 +1,5 @@
+# No `[answers.initial_acceptance]`, which is the fixture. Everything else is
+# answered, so that what blocks is the acceptance gate and nothing else.
+[build]
+min_sdk = 26
+compile_sdk = 35

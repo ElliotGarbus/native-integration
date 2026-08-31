@@ -1,0 +1,7 @@
+contract = "1"
+
+[[ios.requires.application_action]]
+id = "notification_service_extension"
+summary = "Create a notification service extension and call PushAHandler from it"
+reason = "Rich push payloads are decrypted in the extension before display"
+slot = "com.apple.usernotifications.service"

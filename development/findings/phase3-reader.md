@@ -68,13 +68,18 @@ declaration belongs to — which is what makes a hand-derived table safe to keep
 
 ## Where the obligations landed
 
-Sixty-one rows: 46 numbered and 15 advisory.
+Sixty-one rows: 46 numbered and 15 advisory, of which 6 are offered.
 
-| | Count |
+| The 46 numbered | Count |
 | --- | --- |
-| discharged by a check in a module | 39 |
-| discharged by the shape of the API | 9 |
-| beyond this reader | 13, of which 7 also carry a module |
+| discharged by a check in a module | 29 |
+| discharged by the shape of the API | 9, of which 1 also carries a check |
+| discharged by what the reader produces | 4, of which 1 also carries a check |
+| beyond this reader | 11, of which 5 also carry a module |
+
+The counts here are as of the review below, which moved several rows; the third
+category did not exist when this section was first written, and that is most of
+what the review was about.
 
 The nine structural ones are the entries worth arguing about, because "the API
 makes it unforgettable" is the kind of claim that is easy to make and hard to
@@ -85,12 +90,15 @@ it is discharged by nothing in the package doing it, which is a property of the
 code as written rather than one the code enforces. It is listed as structural
 because the alternative was leaving it blank, and a blank reads as an oversight.
 
-The seven split rows are the honest ones. Requirement 30 validates a view-link's
+The split rows are the honest ones. Requirement 30 validates a view-link's
 attributes here and writes them into a manifest in a build tool; the reader does
 the first half and says so. `tools/requirements_table.py` renders both notes
 rather than picking one, which took two attempts — the first version treated
 "beyond this reader" as exclusive and `tests/test_requirements.py` caught five
 requirements marked excused that were partly implemented.
+
+Splitting a row was the right instinct and was applied to too few rows. The
+review below is what that cost.
 
 ## The corpus defect: R01 passed for the wrong reason
 
@@ -265,11 +273,13 @@ section's title while meaning a different section: §5.2 is "Values" and §5.3 i
 "Actions". That is a rarer mistake than a number going stale under renumbering,
 which is the one that actually happened five times.
 
-One pair is beyond it entirely: **§6.2 and §7.3 are both titled "Source"**, the
-only duplicate heading in SPEC.md, so no check of this shape can tell a citation
-of one from a citation of the other. That is worth fixing as a documentation
-matter rather than a checker one — a cross-reference reading "see Source" is
-ambiguous to a reader too — and it is recorded here rather than acted on.
+One pair was beyond it entirely: **§6.2 and §7.3 were both titled "Source"**,
+the only duplicate heading in SPEC.md, so no check of this shape could tell a
+citation of one from a citation of the other. The fix was the documentation's
+rather than the checker's — a cross-reference reading "see Source" is ambiguous
+to a reader too — and the headings are now "Java and Kotlin source" and "Swift
+source". A checker that cannot express a rule is sometimes telling you the
+document is the thing that is wrong.
 
 And the mechanism is not really the checker. Writing the title beside the number
 makes the author read the title, which is where a wrong number becomes obvious.
@@ -287,10 +297,157 @@ the first attempt writes "section 7.3 of first-attempt.md" in words. The two
 documents number the same subjects differently, so an unqualified § pointing at
 the wrong one is the confusion the check exists to end.
 
+## The gate found eight, and a green corpus found none of them
+
+Everything above was written while the corpus was green on all three profiles.
+A review of Phase 3 against §8 rather than against the test run found eight
+requirements the reader claimed and did not satisfy. That gap is the finding,
+and it is worth more than the eight fixes.
+
+None of the eight were caught by a passing corpus, because **a fixture is
+evidence about the clause it exercises and silence about every other clause of
+the same number**. `tests/test_conformance.py` pins `UNIMPLEMENTED = {}` and
+the unverified set exactly, which is a strong guard against losing what is
+tested. It says nothing about a requirement whose second sentence has no case.
+`docs/REQUIREMENTS.md` was the other half of the illusion: it is generated, so
+it reads as derived, but what it derived was "some module mentions this
+number".
+
+| # | Claimed | Actually |
+| --- | --- | --- |
+| 38 | `acceptance.py` | returned no delta on a first build, with a comment arguing for the reading §9.1 forecloses |
+| 23 | every §6.1 rule | rules 3–5 only; a file's path namespace and its `package` declaration were never compared |
+| 22 | — | slots were written to the record and never compared |
+| 28 | *beyond this reader* | the merge §6.5 requires **in the record** was parked with the manifest |
+| 35 | `structure.py` | per-sidecar refusals only; two distributions setting one key differently accepted |
+| 32 | `structure.py` | producer conflicts only; the application could not own a key |
+| 11, 21 | *structural*, "enforced by the constructor" | the constructor requires a distribution and nothing else |
+| 13 | `integration.py` | an `inline` value nothing references was accepted |
+
+Four of the eight are dangerous rather than merely absent: 23 admits class
+substitution by putting a file whose `package` is `org.other` under a path
+`kotlinc` compiles without complaint; 22 lets two SDKs silently contend for one
+extension point; 28 shows a record whose permissions are not the ones that get
+merged; and 38 accepts an application's entire inherited native surface by
+omission, on the one build where all of it is new.
+
+### The shape of the mistake
+
+Each of the eight is the same error in a different requirement: **a numbered
+requirement with several clauses was discharged by whichever clause was easiest
+to check, and the row claimed the number.** §8.4 states requirements as
+sentences, not as bullet lists, so "report the merge" sits inside requirement 28
+next to two feature rules that *are* structural, and a table with one row per
+number has nowhere to say that only some of it is done.
+
+So the mapping now splits by clause. `IN_WHAT_IT_PRODUCES` is a third column
+for obligations about the *content* of a report or a record rather than about
+refusing a sidecar — nothing fails when they are unmet, so no
+`findings.requirement` call names them and the syntax tree cannot see them.
+`SPLIT` names the two requirements claimed in two columns and says which clause
+is which, and `tests/test_requirements.py` fails both on an undeclared overlap
+and on a `SPLIT` entry that has stopped overlapping. Three rows were plainly
+wrong rather than overstated: 19 is `discovery.py` iterating one entry-point
+group, 43 is the record's own fact vocabulary, and S1 was reported by
+`structure.py` while `advisories.claimed()` omitted it — a conformance claim
+understating itself, which is the same failure of derivation pointing the other
+way.
+
+### Two requirements were made true rather than annotated
+
+`Closure.from_installed` walked `Requires-Dist` over the installed
+distributions and evaluated environment markers against *this* interpreter,
+which is what requirement 1 names in terms: markers are evaluated "for the
+target platform and Python version, never for the build host". It was
+documented as a convenience for host builds and used by nothing. Annotating the
+row would have left the API; the API is gone, and requirement 1 is structural in
+the strong sense the column claims — there is no code that can violate it.
+
+Requirement 9's second sentence — fail, rather than building partially, when
+asked for a profile the consumer does not implement — had no code path, because
+this reader implements both profiles and branching on `platform == "android"`
+is not a refusal. `read()` now takes `profiles`, and an Android-only build tool
+passing `("android",)` gets `UnimplementedProfile` before a sidecar is opened.
+That is the §8.1 separability Phase 3 was supposed to demonstrate and had only
+asserted.
+
+### What the corpus grew
+
+Ten fixtures, one per missing clause, chosen so that each fails for exactly the
+reason its number names:
+
+| Fixture | The clause |
+| --- | --- |
+| `core/R38_first_build_unaccepted` | no stored record and no `initial_acceptance` |
+| `core/R13_inline_value_unreferenced` | an `inline` value answered and discarded |
+| `core/R22_slot_collision` | one slot, two distributions, on both platforms |
+| `android/R23_kotlin_package_disagrees_with_path` | §6.1 rule 1, the case `kotlinc` accepts |
+| `android/R23_component_outside_namespace` | §6.1 rule 2, without `from_dependency` |
+| `android/R28_permission_attributes_merged` | all four least-restrictive outcomes |
+| `android/R32_application_owns_the_key` | the application's `<meta-data>` value wins |
+| `ios/R35_plist_values_conflict` | two distributions, one key, two values |
+| `ios/R35_append_against_scalar` | one key claimed as array and as scalar |
+| `ios/R35_application_owns_the_key` | the application's `Info.plist` value wins |
+
+`R22_slot_collision` is the one that changed shape under review. It was written
+as an iOS case, because §5.7's worked example is Apple's and every identifier in
+§5.7's table is Apple's. `check_spec.py` refused it: requirement 22 is §8.1's
+**core** row, so the case owes an Android input too. §5.7's own note says why
+the requirement is core — `slot` "is a field of the action table, which is one
+table with one field set on both platforms" — and finding an Android surface
+that two producers can genuinely contend for took longer than writing the
+check. `WorkManager`'s `Configuration.Provider` is one: one application class
+implements it, one `Configuration` comes back, and two SDKs each wanting their
+own worker factory is the iOS contention in a different vocabulary. A consumer
+that had implemented slots as an iOS feature passes the iOS input and fails
+this.
+
+Ten fixtures for eight requirements, and the corpus was green before all of
+them. Phase 2's rule — a fixture for "must not accept X" needs an X — has a
+companion: **a requirement with N clauses needs N fixtures, or a row that admits
+it has fewer.**
+
+### What the reader gained, in code
+
+`semantics.py` grew the closure-wide rules that were missing: `_contributed_files`
+and `_component_names` for §6.1's first two rules, `_slots` for §5.7, and
+`_permissions`, `_meta_data` and `_info_plist` sharing a `_settle` helper —
+because §6.8 and §7.4 resolve a contested key identically ("equal values
+coalesce, differing values fail, the application's own value always wins") and
+writing that twice is how the two drift. Three `effective` fact types carry the
+results into the record, which is where requirements 28, 32 and 35 said to put
+them and where a hand-written merge would otherwise be invisible.
+
+`Application` grew `initial_acceptance`, `manifest_meta_data` and `info_plist`.
+The last two are not answers — an application configures its own manifest and
+plist for its own reasons and owes nobody a justification — but a producer
+contributing the same key is a conflict only the consumer can see.
+
+### One thing the registry still does not do
+
+The review's other finding stands and is now stated where it belongs, in
+`structure.py`'s own docstring: **the registry-driven claim is true of shape and
+stops there.** `contract/v1.toml` carries a `merge` value on around twenty-five
+declarations — `report_together`, `union_widest`, `coalesce_or_fail`,
+`must_agree` — and no module reads one. `semantics.py` states each of those
+rules in Python, and `integration.FLOORS`, `integration.LANGUAGES`,
+`semantics.RESERVED` and `graph.METADATA_NAMES` are hand-written copies of
+vocabulary the registry also holds. A new floor in `v1.toml` is still a new line
+in `integration.py`.
+
+Two of those four (`RESERVED`, `METADATA_NAMES`) have exact registers in
+`contract/v1.toml` and could be read from them today; `merge` would be a larger
+piece of work and a real one, since it is the difference between the semantic
+rules being data and being prose-in-Python. Neither was done here. What was done
+is to stop the docstring implying otherwise, which is the minimum a claim like
+that owes a reader.
+
 ## What is not done
 
 - **No consumer generates anything.** Six assertions stay unverified until one
   does.
+- **`merge` is registry data nothing reads**, and four vocabulary constants are
+  duplicated between `contract/v1.toml` and the modules that use them.
 - **§4.3's under-declaration rule still has no fixture**, for the reason Phase 2
   gave: every entry in `contract/v1.toml` is 1.0, so nothing can under-declare.
   The reader implements it; nothing exercises it.

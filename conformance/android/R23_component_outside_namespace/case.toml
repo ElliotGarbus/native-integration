@@ -1,0 +1,30 @@
+# §8.4 requirement 23, via §6.1 rule 2: "Every producer-sourced component name
+# ([§6.6]) falls under an owned namespace. A component attributed to a declared
+# dependency is exempt; the class is not the producer's."
+#
+# A category-1 case. `pyr23c` owns `org.example.mypkg` and registers
+# `com.vendor.sdk.TrackerService` in the application's manifest — a class in a
+# namespace it does not own and did not claim. The registration is what gives
+# the class a lifecycle in the application's process, so a consumer that writes
+# it through is starting code on behalf of a distribution that never said it
+# owned it, and no other distribution can be told it lost the name.
+#
+# The exemption is what makes the rule usable rather than absolute: a component
+# whose class ships inside a declared dependency's artifact is written with
+# `from_dependency`, and is not checked against ownership, because the class is
+# not the producer's to own. This sidecar declares no `from_dependency`, which
+# is the difference between the two and the whole of what the rule turns on.
+requirement = 23
+profile     = "android"
+section     = "6.1"
+
+outcome = "blocking"
+
+diagnostics = [
+  { id = "ni.req.23", distributions = ["pyr23c"] },
+]
+advisories  = []
+
+assertions = ["every_diagnostic_names_a_distribution"]
+
+# The build does not proceed, so there is no resolution to record.

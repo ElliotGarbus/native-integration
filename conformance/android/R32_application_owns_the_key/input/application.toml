@@ -1,0 +1,10 @@
+[build]
+min_sdk = 26
+compile_sdk = 35
+
+# The application's own `<meta-data>` entry, which §6.8 says always wins.
+[application.manifest_meta_data]
+"com.example.MODE" = "balanced"
+
+[answers.initial_acceptance]
+date = "2026-08-24"

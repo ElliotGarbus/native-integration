@@ -65,7 +65,10 @@ ATTESTED = {
     # §8.4 requirement 18, enforced in `Finding.__post_init__` rather than
     # remembered at each call site.
     "every_diagnostic_names_a_distribution": True,
-    # §5.1: every finding carries the producer's own `reason`.
+    # §5.6 and requirement 21: an action's `summary`, `instructions` and
+    # `acceptance` reach the report, each line naming the distribution that
+    # supplied it, and never rendered as this consumer's own guidance. The
+    # scaffolded-block half of the clause is a build tool's and is not attested.
     "instructions_attributed_to_producer": True,
     # §9.5: a credential reaches the record as `credential-required` and the
     # locator is never read, let alone written.
@@ -92,7 +95,12 @@ def application_of(raw: Mapping[str, Any]) -> Application:
     """
     build = raw.get("build", {})
     answers = raw.get("answers", {})
+    # Not answers: §6.8 and §7.4's key spaces are shared with the application,
+    # which sets its own entries for its own reasons and wins where it does.
+    owns = raw.get("application", {})
     return Application(
+        manifest_meta_data=owns.get("manifest_meta_data", {}),
+        info_plist=owns.get("info_plist", {}),
         android={
             key: value
             for key, value in build.items()
@@ -101,6 +109,14 @@ def application_of(raw: Mapping[str, Any]) -> Application:
         deployment_target=str(build.get("deployment_target", "")),
         date=str(build.get("date", "")),
         core_library_desugaring=bool(build.get("core_library_desugaring", False)),
+        # §9.1's bootstrap action. Spelled by presence, like a suppression: a
+        # case that has performed it says so, and one that has not is a first
+        # build and blocks.
+        initial_acceptance=(
+            Answer(date=str(answers["initial_acceptance"].get("date", "")))
+            if isinstance(answers.get("initial_acceptance"), dict)
+            else None
+        ),
         values={
             _split_id(key): value for key, value in answers.get("values", {}).items()
         },

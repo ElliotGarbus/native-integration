@@ -14,6 +14,17 @@ What is *not* here, because it needs more than the one file: namespace
 containment and closure-wide collision, path escape, the contract version gate
 against the consumer's own version, and every merge rule between distributions.
 Those are §8's semantic rules.
+
+So "adding a declaration to the registry extends this validator" is a claim
+about *shape*, and it stops there. The registry also carries a `merge` value on
+around twenty-five declarations — `report_together`, `union_widest`,
+`coalesce_or_fail`, `must_agree` — and nothing reads them: `semantics.py`
+states each of those rules in Python instead. The same goes for the vocabulary
+a semantic rule needs rather than a shape check does, which is written out in
+the module that uses it: `integration.FLOORS` and `integration.LANGUAGES`,
+`semantics.RESERVED`, `graph.METADATA_NAMES`. A new floor in `v1.toml` is a new
+line in `integration.py` too. Worth knowing before trusting a registry edit to
+carry itself through.
 """
 
 from __future__ import annotations

@@ -5,3 +5,4 @@ dist pyreason contributes permission android.permission.INTERNET reason="Telemet
 dist pyreason input native.toml sha256=8e9b14b530056c41046fcd61451af4cea301910d0c6a20d8c2ddcea3b05b4d49
 dist pyreason origin direct
 dist pyreason version 1.0.0
+effective permission android.permission.INTERNET distributions=pyreason

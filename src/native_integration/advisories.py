@@ -11,11 +11,15 @@ and the application's answers, which is the whole of what this library sees.
 The rest of §8.5 needs a linked binary (S10, S15), a merged manifest (S11), a
 resolved `.aar`'s contents (S6, S12) or SwiftPM's own conflict reporting (S14),
 and this reader vouches for none of them.
+
+:func:`claimed` is the list, and it names S1 as well, which `structure.py`
+reports while walking the registry. The list is what a consumer declares; the
+module that holds each branch is an implementation detail of this one.
 """
 
 from __future__ import annotations
 
-from typing import Iterable, Sequence
+from typing import Mapping, Sequence
 
 from .application import Application
 from .findings import Findings
@@ -190,6 +194,25 @@ def _service_types(declared: object) -> tuple[str, ...]:
     return ()
 
 
-def claimed() -> Iterable[str]:
-    """The advisory codes this reader offers, for a consumer to declare."""
-    return ("S5", "S7", "S8", "S9", "S13")
+def claimed() -> Mapping[str, str]:
+    """The advisory codes this reader offers, and the module reporting each.
+
+    Declared rather than derived, because §8.5 is a **SHOULD** and what a
+    consumer offers is a claim it makes, not a fact about its call graph. What
+    is derived is the other direction: `tests/test_requirements.py` holds every
+    code here to one the registry defines.
+
+    S1 is `structure.py`'s and belongs on this list even though it is reported
+    from the other side of the library: §4.4 makes an unrecognized top-level
+    *table* a warning rather than a refusal — a future platform and a typo are
+    indistinguishable from inside version 1 — and a consumer that reports it is
+    offering the advisory whichever module holds the branch.
+    """
+    return {
+        "S1": "structure",
+        "S5": "advisories",
+        "S7": "advisories",
+        "S8": "advisories",
+        "S9": "advisories",
+        "S13": "advisories",
+    }

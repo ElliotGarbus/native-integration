@@ -308,6 +308,57 @@ where a component is still pending" stays recoverable.
 repository or package needs one; that is a fact about the integration, and the
 credential is not ([§9.5](../SPEC.md#95-secrets-are-never-recorded)).
 
+### 3.4 `effective`
+
+What the application will actually register, where
+[§6.5](../SPEC.md#65-permissions-and-features) computes it from more than one
+declaration. Integration-wide like a `decision`, so no `dist` subject; the
+contributors are named instead.
+
+```
+effective permission android.permission.ACCESS_FINE_LOCATION distributions=analytics-shim,map-sdk never-for-location=true
+effective permission android.permission.BLUETOOTH_SCAN distributions=analytics-shim,map-sdk max-sdk=33
+```
+
+This does not duplicate the `contributes permission` facts above it. Those
+record who asked for what; this records the result, which §6.5 **requires** to
+appear "in the record and report with the distributions that produced it".
+Both are needed because the merge is lossy in the direction that matters: an
+entry with no `max_sdk_version` defeats one that has it, a lower ceiling gives
+way to a higher, and `never_for_location` holds only where every declaration
+asserts it. In each case the narrower declaration is the one that looks
+careful, and a record holding only the requests leaves a reviewer to derive
+what was actually registered.
+
+`max-sdk` is absent where any declaration stated no ceiling, because unbounded
+is the widest need. `never-for-location` appears only where it holds, since its
+absence and `false` say the same thing.
+
+A **suppressed** permission has no `effective` fact at all, which is how §6.5's
+"absent from the effective merged manifest" stays visible in the record.
+
+The two shared key spaces settle the same way.
+[§6.8](../SPEC.md#68-manifest-meta-data) and
+[§7.4](../SPEC.md#74-infoplist) both put the application's own entry above every
+contribution, and both require it to be kept and reported:
+
+```
+effective meta-data com.example.MODE distributions=analytics-shim,map-sdk source=application type=string value=balanced
+effective plist-value ExampleAdsMode distributions=map-sdk type=string value=fast
+```
+
+`source=application` says the application set the key itself and won. The
+contributions it overrode stay in the record beside it — an application removing
+its own entry later needs to see the disagreement it was standing on top of.
+
+A key whose only claimant is a [§5.2](../SPEC.md#52-values) value the
+application *supplied* has no `effective` fact, and the supplied string never
+appears. Its state is already recorded against the requirement that asked for
+it, and [§9.5](../SPEC.md#95-secrets-are-never-recorded) is the reason the
+content is not: an `api_key` delivered through `manifest_meta_data` is exactly
+what §5.2 is used for. A producer's own declaration is public by construction
+and is recorded in full.
+
 ## 4. What is deliberately not in it
 
 | | Why |
@@ -349,6 +400,7 @@ dist examplytics origin direct
 dist examplytics owns java-namespace org.example.analytics
 dist examplytics value analytics_key key=com.example.analytics.API_KEY kind=manifest_meta_data state=supplied
 dist examplytics version 1.0.0
+effective permission android.permission.INTERNET distributions=examplytics
 ```
 
 Every line is a fact [§9.6](../SPEC.md#96-what-a-record-must-contain) requires

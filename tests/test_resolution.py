@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from native_integration import document, integration, registry
+from native_integration import document, integration, registry, semantics
 from native_integration.application import Answer, Application, Approval, Credential
 from native_integration.discovery import source_from_path
 from native_integration.findings import Findings
@@ -41,10 +41,13 @@ def application_for(path: Path) -> Application:
     raw = tomllib.loads(path.read_text(encoding="utf-8"))
     build = raw.get("build", {})
     answers = raw.get("answers", {})
+    owns = raw.get("application", {})
     return Application(
         android={k: v for k, v in build.items() if isinstance(v, int) and not isinstance(v, bool)},
         deployment_target=str(build.get("deployment_target", "")),
         core_library_desugaring=bool(build.get("core_library_desugaring", False)),
+        manifest_meta_data=owns.get("manifest_meta_data", {}),
+        info_plist=owns.get("info_plist", {}),
         values={
             tuple(key.split(".", 1)): value  # type: ignore[misc]
             for key, value in answers.get("values", {}).items()
@@ -119,6 +122,9 @@ def resolve_case(case: Path, platform: str):
             )
         )
     integration.decisions(resolved, application=application, findings=log, record=record)
+    semantics.check(
+        resolved, application=application, findings=log, record=record, platform=platform
+    )
     return resolved, log, record
 
 

@@ -1,0 +1,14 @@
+contract = "1"
+
+# The careful declaration, and the one the merge overrides in both directions.
+[[android.contributes.permissions]]
+name = "android.permission.ACCESS_FINE_LOCATION"
+reason = "Region-accurate delivery estimates"
+max_sdk_version = 30
+never_for_location = true
+
+[[android.contributes.permissions]]
+name = "android.permission.BLUETOOTH_SCAN"
+reason = "Discovers the vendor's beacons"
+max_sdk_version = 30
+never_for_location = true

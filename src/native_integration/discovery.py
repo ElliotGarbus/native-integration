@@ -10,7 +10,12 @@ directory's *files*.
 The candidate set is the application's resolved dependency closure. It is an
 input here rather than something this library computes, because the closure is
 resolved for the **target platform**, which the consuming build tool knows and
-a desktop interpreter does not.
+a desktop interpreter does not. Requirement 1 says so in terms — markers and
+extras are evaluated "for the target platform and Python version, never for the
+build host" — so there is deliberately no constructor here that walks what
+happens to be installed. A prohibition is discharged by having no code that can
+violate it, and a convenience that resolves against this interpreter is exactly
+the code that can.
 """
 
 from __future__ import annotations
@@ -19,7 +24,7 @@ import re
 from dataclasses import dataclass, field
 from importlib import metadata
 from pathlib import Path
-from typing import Iterable, Mapping, Sequence
+from typing import Iterable, Mapping
 
 from .contract import ENTRY_POINT_GROUP
 from .findings import Findings
@@ -67,10 +72,6 @@ class Closure:
     #: containing exactly the closure may treat all installed distributions as
     #: candidates.
     isolated: bool = False
-    #: Names :meth:`from_installed` walked to and could not find. A closure with
-    #: anything here is incomplete, and a distribution that would have declared a
-    #: sidecar may be missing from it — so it is reported rather than swallowed.
-    missing: tuple[str, ...] = ()
 
     @classmethod
     def direct(cls, *names: str) -> "Closure":
@@ -83,71 +84,6 @@ class Closure:
     @classmethod
     def isolated_environment(cls) -> "Closure":
         return cls({}, isolated=True)
-
-    @classmethod
-    def from_installed(
-        cls, roots: Sequence[str], *, extras: Mapping[str, Sequence[str]] | None = None
-    ) -> "Closure":
-        """Walk ``Requires-Dist`` from ``roots`` over the *installed* distributions.
-
-        A convenience for tools that build for the host, and a starting point
-        for others. It needs ``packaging`` (``pip install native-integration[closure]``)
-        to parse requirements and evaluate environment markers, and it resolves
-        against this interpreter — which is not the target platform, so a real
-        consumer should supply its own closure instead.
-        """
-        try:
-            from packaging.requirements import Requirement  # noqa: PLC0415
-        except ModuleNotFoundError as exc:  # pragma: no cover - depends on install
-            raise RuntimeError(
-                "Closure.from_installed() needs `packaging`; install "
-                "native-integration[closure], or construct a Closure directly"
-            ) from exc
-
-        extras = {normalize_name(k): tuple(v) for k, v in (extras or {}).items()}
-        origins: dict[str, Origin] = {}
-        for root in roots:
-            origins[normalize_name(root)] = Origin(direct=True)
-
-        frontier = list(origins)
-        dependents: dict[str, set[str]] = {}
-        missing: list[str] = []
-        while frontier:
-            current = frontier.pop(0)
-            try:
-                dist = metadata.distribution(current)
-            except metadata.PackageNotFoundError:
-                # Not installed here, so its own requirements cannot be walked
-                # and any sidecar it ships is invisible. Recorded rather than
-                # swallowed: the caller is entitled to know the closure is
-                # partial before it decides what may configure the build.
-                missing.append(current)
-                continue
-            wanted = set(extras.get(current, ()))
-            for raw in dist.metadata.get_all("Requires-Dist") or []:
-                requirement = Requirement(raw)
-                environment = {"extra": ""}
-                if requirement.marker is not None:
-                    if not any(
-                        requirement.marker.evaluate({**environment, "extra": e})
-                        for e in ("", *wanted)
-                    ):
-                        continue
-                name = normalize_name(requirement.name)
-                dependents.setdefault(name, set()).add(normalize_name(current))
-                if name not in origins:
-                    origins[name] = Origin()
-                    frontier.append(name)
-
-        return cls(
-            {
-                name: origin
-                if origin.direct
-                else Origin(via=tuple(sorted(dependents.get(name, ()))))
-                for name, origin in origins.items()
-            },
-            missing=tuple(sorted(missing)),
-        )
 
     def contains(self, name: str) -> bool:
         return self.isolated or normalize_name(name) in self.members

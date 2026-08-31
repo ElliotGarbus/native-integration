@@ -1,0 +1,6 @@
+[build]
+compile_sdk = 35
+min_sdk = 24
+
+[answers.initial_acceptance]
+date = "2026-08-24"

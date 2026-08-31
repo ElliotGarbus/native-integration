@@ -1,0 +1,7 @@
+contract = "1"
+
+[[android.requires.application_action]]
+id = "worker_factory"
+summary = "Implement Configuration.Provider and install PushBWorkerFactory"
+reason = "Delivery receipts run as workers and need PushB's factory to construct"
+slot = "androidx.work.Configuration.Provider"

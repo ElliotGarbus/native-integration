@@ -7,3 +7,4 @@ dist pyr26 contributes permission android.permission.INTERNET
 dist pyr26 input native.toml sha256=b3fe9c263a542b5a872b8216103d56204848baac2b0c3a89b40d4cccae770d7f
 dist pyr26 origin direct
 dist pyr26 version 1.0.0
+effective permission android.permission.INTERNET distributions=pyr26

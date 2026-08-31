@@ -1,0 +1,36 @@
+# §8.4 requirement 28, via §6.5: "Attributes merge least-restrictively, and the
+# merge is reported. A consumer **MUST** register a permission with the widest
+# need any distribution stated: an entry with no `max_sdk_version` defeats one
+# that has it, a lower `max_sdk_version` gives way to a higher, and
+# `never_for_location` holds only when **every** declaration of that permission
+# asserts it. The result **MUST** appear in the record and report with the
+# distributions that produced it."
+#
+# All four clauses, in one closure, because they interact and a case per clause
+# would not show that.
+#
+# `ACCESS_FINE_LOCATION` — `pymergea` bounds it to API 30 and `pymergeb` states
+# no bound. Unbounded is the wider need, so the ceiling goes, and the merged
+# permission is unbounded. Both assert `never_for_location`, so it holds.
+#
+# `BLUETOOTH_SCAN` — `pymergea` bounds it to 30 and asserts
+# `never_for_location`; `pymergeb` bounds it to 33 and says nothing about
+# location. The higher ceiling wins, and `never_for_location` does **not** hold,
+# because one declaration is not every declaration.
+#
+# The direction of both merges is what makes this worth recording rather than
+# computing on demand. The careful-looking declaration loses: `pymergea` bounded
+# its permission and disclaimed location, and the installed application has
+# neither bound nor disclaimer. A record holding only the two requests leaves
+# that inference to whoever reads it, which is where it goes unmade — so §6.5
+# requires the result itself, attributed to the distributions that produced it.
+requirement = 28
+profile     = "android"
+section     = "6.5"
+
+outcome = "accept"
+
+diagnostics = []
+advisories  = []
+
+assertions = []

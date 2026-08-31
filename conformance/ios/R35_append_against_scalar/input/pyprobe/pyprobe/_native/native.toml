@@ -1,0 +1,9 @@
+contract = "1"
+
+# The same key, asked for as one string. §5.5's `info_plist` kind is a scalar
+# claim because that is what the consumer writes for it.
+[[ios.requires.application_value]]
+id = "probe_scheme"
+kind = "info_plist"
+key = "LSApplicationQueriesSchemes"
+reason = "The SDK checks whether the companion app is installed"

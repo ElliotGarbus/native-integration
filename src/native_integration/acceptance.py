@@ -18,6 +18,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Mapping, Sequence
 
+from .application import Application
 from .findings import Findings
 from .recording import Fact, Record, RecordError, digest, read
 
@@ -59,17 +60,12 @@ def check(
     stored: str | None,
     *,
     findings: Findings,
+    application: Application | None = None,
     distributions: Sequence[str] = (),
 ) -> Delta:
-    """Compare, report, and refuse to build through a change nobody accepted.
-
-    A first build has nothing to compare against and is not thereby a change:
-    §9.1's gate is about what the application has already seen, and an
-    application seeing an integration for the first time is accepting it by
-    adding the dependency.
-    """
+    """Compare, report, and refuse to build through a change nobody accepted."""
     if stored is None:
-        return Delta()
+        return _first_build(record, findings, application or Application(), distributions)
 
     accepted = _stored_facts(stored, findings, distributions)
     if accepted is None:
@@ -94,6 +90,50 @@ def check(
     if delta:
         _report(delta, findings, distributions)
     return delta
+
+
+def _first_build(
+    record: Record,
+    findings: Findings,
+    application: Application,
+    distributions: Sequence[str],
+) -> Delta:
+    """No stored record, which §9.1 makes step 4 rather than an exemption.
+
+    The tempting reading is that a first build has nothing to compare against
+    and so is not a change. §9.1 forecloses it: *"treating 'no record yet' as
+    implicit approval does not [satisfy this], because the first build is the
+    one where an application acquires all of its inherited native surface at
+    once."* An exemption here is the largest one available — every permission,
+    every repository, every contributed class, waved through together.
+
+    So everything is the delta, and the application must have performed the
+    bootstrap action §9.1 allows: *"a single bootstrap action covering the
+    initial set satisfies this"*.
+    """
+    everything = Delta(added=tuple(sorted(record)))
+    if application.initial_acceptance is not None:
+        return Delta()
+    # A resolution that failed to compute is not one an application can accept.
+    # §9.1's lifecycle begins by computing the resolution and the gate is step
+    # 4 of it, so a build already failing validation is not "silently writing a
+    # record and proceeding" — it is not proceeding at all, and a second
+    # diagnostic saying so would bury the one the author can act on.
+    if not findings.ok:
+        return everything
+    findings.requirement(
+        UNACCEPTED,
+        *(sorted({subject_of(line) for line in everything.added if subject_of(line)})
+          or distributions or ("the application",)),
+        message="this integration has never been accepted, and there is no stored record",
+        where="accepted.record",
+        detail=[
+            *(f"+ {line}" for line in everything.added),
+            "the first build is the one where an application acquires all of its "
+            "inherited native surface at once",
+        ],
+    )
+    return everything
 
 
 def _stored_facts(

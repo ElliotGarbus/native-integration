@@ -1,0 +1,33 @@
+# §8.4 requirement 38, via §9.1: "**The first build is step 4, not an
+# exemption.** When no accepted record exists, every contribution is new, and a
+# consumer **MUST** require the same explicit acceptance it would require for a
+# change — reporting the whole effective set rather than silently writing a
+# record and proceeding."
+#
+# The companion to `R38_unaccepted_change`, and the harder half. That case has a
+# stored record and a delta against it, which any consumer keeping a lockfile
+# will notice. This one has no stored record at all, and the tempting reading is
+# that nothing has changed because there is nothing to compare against. §9.1
+# forecloses it in terms: treating "no record yet" as implicit approval does not
+# satisfy the requirement, "because the first build is the one where an
+# application acquires *all* of its inherited native surface at once".
+#
+# So the exemption this case exists to refuse is the largest one available. The
+# sidecar here contributes a permission, a repository and a Maven dependency —
+# an application that never accepted any of them would ship all three.
+#
+# The application answers nothing, which is the point: adding a dependency is
+# not accepting what it brings. `[answers.initial_acceptance]`, which every
+# passing case in this corpus carries, is the bootstrap action §9.1 allows, and
+# its absence here is the whole fixture.
+requirement = 38
+profile     = "core"
+section     = "9.1"
+
+outcome = "blocking"
+
+diagnostics = [
+  { id = "ni.req.38", distributions = ["pyfirst"] },
+]
+advisories  = []
+assertions  = []

@@ -295,6 +295,10 @@ def test_the_worked_example_is_reproduced_from_facts():
         "dist", "examplytics", "input", "native.toml",
         sha256="3de10e32e5acdc2e46c4a3b55a1263a3a0547188407fb799d39df73e5e2b0a5a",
     )
+    record.add(
+        "effective", "permission", "android.permission.INTERNET",
+        distributions=["examplytics"],
+    )
 
     expected = _exact(
         CONFORMANCE / "core" / "R01_dependency_closure" / "expected" / "android.record"

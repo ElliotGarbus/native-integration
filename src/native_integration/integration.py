@@ -54,6 +54,9 @@ class Resolved:
     sidecar: Sidecar
     #: Every contributed source file, normalized and sorted.
     sources: tuple[str, ...] = ()
+    #: The same files with the source root each was staged from, which §6.1
+    #: rule 1 needs: a path namespace is only meaningful relative to its root.
+    staged: tuple[tuple[str, str], ...] = ()
     #: Java namespaces this distribution claims exclusively (§6.1).
     owns: tuple[str, ...] = ()
     #: Values by id, with the state §5.4 puts them in.
@@ -86,8 +89,10 @@ def resolve(
     record.add("dist", name, "contract", str(sidecar.document.get("contract", "")))
     record.add("dist", name, "origin", origin, via=sorted(set(via)) or None)
 
-    sources = _sources(sidecar, findings, record)
+    staged = _sources(sidecar, findings, record)
+    sources = tuple(path for _root, path in staged)
     _inputs(sidecar, sources, findings, record)
+    _unreferenced_inline(sidecar, findings)
     owns = _ownership(sidecar, record)
     _floors(sidecar, application, findings, record)
     values = _values(sidecar, application, findings, record)
@@ -97,22 +102,27 @@ def resolve(
     else:
         _ios(sidecar, record)
 
-    return Resolved(sidecar=sidecar, sources=sources, owns=owns, values=values)
+    return Resolved(
+        sidecar=sidecar, sources=sources, staged=staged, owns=owns, values=values
+    )
 
 
 # -- §6.2, §7.3: contributed source ----------------------------------------
 
 
-def _sources(sidecar: Sidecar, findings: Findings, record: Record) -> tuple[str, ...]:
+def _sources(
+    sidecar: Sidecar, findings: Findings, record: Record
+) -> tuple[tuple[str, str], ...]:
     """Every file staged from the listed directories, and the fact for each.
 
     A directory is listed; the *files* are what the record names, because a
     reviewer comparing two runs wants to see a file appear rather than a
-    directory stay the same.
+    directory stay the same. The root is kept beside each file for §6.1 rule 1,
+    which derives a namespace from the path *relative to the root it came from*.
     """
     verb = SOURCE_VERB[sidecar.platform]
     src = sidecar.section("contributes", "src")
-    found: list[str] = []
+    found: list[tuple[str, str]] = []
     for language, suffix in LANGUAGES[sidecar.platform]:
         listed = src.get(language, [])
         if not isinstance(listed, list):
@@ -131,7 +141,7 @@ def _sources(sidecar: Sidecar, findings: Findings, record: Record) -> tuple[str,
                 )
                 continue
             for path in staged:
-                found.append(path)
+                found.append((directory, path))
                 record.add("dist", normalize_name(sidecar.distribution),
                            "contributes", verb, path)
 
@@ -141,7 +151,7 @@ def _sources(sidecar: Sidecar, findings: Findings, record: Record) -> tuple[str,
                 record.add("dist", normalize_name(sidecar.distribution),
                            "contributes", "symbol-prefix", prefix)
 
-    return tuple(sorted(set(found)))
+    return tuple(sorted(set(found), key=lambda pair: pair[1]))
 
 
 def _obligation_for(exc: ResourceError) -> int:
@@ -294,7 +304,99 @@ def _values(
     return states
 
 
+def _referenced(node: object) -> Iterable[str]:
+    """Every `{ application_value = "id" }` reference in a declaration tree.
+
+    §5.2's reference form can appear wherever a declaration admits it, and
+    §6.6's `view_links` is where it does today. Walking the tree rather than
+    the two places it is currently legal keeps this rule from silently
+    narrowing when a later contract admits a third.
+    """
+    if isinstance(node, dict):
+        target = node.get("application_value")
+        if isinstance(target, str) and len(node) == 1:
+            return [target]
+        return [name for value in node.values() for name in _referenced(value)]
+    if isinstance(node, list):
+        return [name for item in node for name in _referenced(item)]
+    return []
+
+
+def _unreferenced_inline(sidecar: Sidecar, findings: Findings) -> None:
+    """§5.2, through requirement 13: "reject an `inline` value that neither a
+    contribution references nor an action `uses`".
+
+    Every other value kind names a `key`, which is where the consumer writes
+    it. An `inline` value names none, so the only thing that makes it reachable
+    is something pointing at it. One that nothing points at is a question put to
+    the application whose answer goes nowhere — the author supplies a value, the
+    build proceeds, and no file changes. Left standing it is worse than noise:
+    it reads as a satisfied requirement.
+    """
+    declared = {
+        entry["id"]: entry
+        for entry in sidecar.entries("requires", "application_value")
+        if entry.get("kind") == "inline" and isinstance(entry.get("id"), str)
+    }
+    if not declared:
+        return
+
+    reached = set(_referenced(sidecar.section("contributes")))
+    for action in sidecar.entries("requires", "application_action"):
+        reached.update(
+            name for name in action.get("uses", []) or [] if isinstance(name, str)
+        )
+
+    for identifier in sorted(set(declared) - reached):
+        findings.requirement(
+            VALUE,
+            sidecar.distribution,
+            message=f"the inline value `{identifier}` is referenced by nothing",
+            where=f"{sidecar.platform}.requires.application_value",
+            detail=[
+                "an `inline` value has no `key`, so a contribution referencing it "
+                "or an action using it is the only thing that puts it anywhere",
+                "as declared it asks the application for a string and discards it",
+            ],
+        )
+
+
 # -- §5.3: actions ----------------------------------------------------------
+
+
+def _addressed_to_a_person(
+    entry: Mapping[str, object], distribution: str
+) -> list[str]:
+    """§5.6's three fields, attributed, which requirement 11 asks a report for.
+
+    "Report every unmet requirement ... and, for an action, the `summary` plus
+    `instructions` and `acceptance` wherever the sidecar declares them." A
+    finding that carried only `reason` would tell an author that something is
+    unacknowledged and not what to do about it, which is the whole content of
+    an action.
+
+    Every line names the distribution because §5.6 requires it to: this is
+    untrusted third-party prose that a person — or an agent working on their
+    behalf — may act on, and a consumer "**MUST** attribute this text to the
+    declaring distribution wherever it renders it ... as content that
+    distribution supplied", and **MUST NOT** present it as its own guidance.
+    """
+    lines: list[str] = []
+    summary = entry.get("summary")
+    if isinstance(summary, str) and summary:
+        lines.append(f"{distribution} asks: {summary}")
+    instructions = entry.get("instructions")
+    if isinstance(instructions, str) and instructions:
+        lines.append(f"{distribution}'s instructions: {instructions}")
+    acceptance = entry.get("acceptance")
+    if isinstance(acceptance, list):
+        stated = [item for item in acceptance if isinstance(item, str) and item]
+        if stated:
+            lines.append(f"{distribution}'s acceptance criteria:")
+            # §5.6: "Each item in `acceptance` is checked independently", so
+            # they are rendered as a list rather than joined into a sentence.
+            lines.extend(f"  - {item}" for item in stated)
+    return lines
 
 
 def _actions(
@@ -337,6 +439,7 @@ def _actions(
         if satisfied or state == "dismissed" or conditional:
             continue
         detail = [str(entry["reason"])] if isinstance(entry.get("reason"), str) else []
+        detail.extend(_addressed_to_a_person(entry, sidecar.distribution))
         if held:
             # §5.3, and the half requirement 14 exists for. Both ids, because a
             # report naming only the action sends an author to work they have

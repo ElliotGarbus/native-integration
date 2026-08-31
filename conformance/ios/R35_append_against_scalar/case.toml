@@ -1,0 +1,38 @@
+# §8.4 requirement 35, via §7.4: "A key belongs to one mode, and the requirement
+# side counts ... A consumer **MUST** fail when one key is claimed both ways,
+# naming both declarers, and **MUST NOT** merge a scalar into an array or an
+# array into a scalar."
+#
+# A category-1 case, and the one §7.4's note picks out as likeliest:
+#
+#   `LSApplicationQueriesSchemes` is also the likeliest thing the requirement
+#   half catches. It is the array key producers actually contribute, and a
+#   value of kind `info_plist` naming it would ask the consumer to write one
+#   string where a list belongs — the array-against-scalar collision this rule
+#   closes on the contribution side, arriving through the other channel.
+#
+# So the two claims here arrive through different channels on purpose.
+# `pyschemes` declares the key under `append`, which is what makes it an array
+# key — §7.4 is explicit that the declarations say which keys hold arrays and
+# that this document knows nothing of Apple's schema. `pyprobe` asks the
+# application for a §5.2 value of kind `info_plist` naming the same key, which
+# is a scalar claim because the consumer writes one string for it.
+#
+# Neither declaration is wrong on its own, and the merged result has no
+# unambiguous plist form: an array with a string welded on, or a string that
+# discards everyone else's schemes. Both are silent, and both break an SDK that
+# will look for its own scheme and not find it.
+requirement = 35
+profile     = "ios"
+section     = "7.4"
+
+outcome = "blocking"
+
+diagnostics = [
+  { id = "ni.req.35", distributions = ["pyprobe", "pyschemes"] },
+]
+advisories  = []
+
+assertions = ["every_diagnostic_names_a_distribution"]
+
+# The build does not proceed, so there is no resolution to record.

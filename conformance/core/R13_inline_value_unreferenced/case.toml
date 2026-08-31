@@ -1,0 +1,28 @@
+# §8.4 requirement 13, via §5.2: a consumer MUST "reject an `inline` value that
+# neither a contribution references nor an action `uses`".
+#
+# Every other value kind carries a `key`, which is the consumer's instruction
+# for where the answer goes: `info_plist` writes it to `Info.plist`, `meta_data`
+# to the manifest, `build_config` to the generated config. `inline` carries no
+# key, because the point of `inline` is that the answer is substituted at the
+# one place that named it — §6.6's `view_links`, or an action's `uses`.
+#
+# So an `inline` value nothing names is not an under-specified declaration; it
+# is a question with nowhere to put the answer. The application here supplies
+# one, which is the shape that makes the rule worth having: the author is
+# prompted, answers, the build succeeds, and the string is discarded. Nothing
+# downstream fails, so nothing downstream reports it — the author is left
+# believing a requirement was satisfied. That is why §5.2 puts the burden on the
+# producer to reference what it asks for, and why this is the consumer's to
+# catch rather than a linter's.
+requirement = 13
+profile     = "core"
+section     = "5.2"
+
+outcome = "blocking"
+
+diagnostics = [
+  { id = "ni.req.13", distributions = ["pyinline"] },
+]
+advisories  = []
+assertions  = []

@@ -1,0 +1,9 @@
+contract = "1"
+
+# The same surface, asked for in the same words Apple uses, by a distribution
+# that has no way of knowing the other one exists.
+[[ios.requires.application_action]]
+id = "service_extension"
+summary = "Add a UNNotificationServiceExtension target that forwards to PushBKit"
+reason = "Delivery receipts are only observable from the extension"
+slot = "com.apple.usernotifications.service"

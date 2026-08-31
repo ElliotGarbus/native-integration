@@ -1,0 +1,52 @@
+# §8.4 requirement 22, via §5.7: "When two actions in the effective set share a
+# slot, a consumer **MUST** report them together, naming both distributions."
+#
+# A category-1 case, and §5.7's own worked example on iOS. Apple allows exactly
+# one notification service extension per application. `pypusha` asks the
+# application to create one and call into its handler; `pypushb`, added later,
+# asks for the same thing. §5.7 states the harm:
+#
+#   Nothing about either action alone reveals the conflict: each reads as a
+#   reasonable, self-contained request, and an application author acting on
+#   them one at a time creates two extension targets — which iOS does not run
+#   side by side — or overwrites one vendor's handler with the other's, and
+#   finds out only when that vendor's feature silently stops working.
+#
+# So the two actions are individually well-formed and individually reasonable.
+# A consumer that reports them one at a time has reported nothing useful: the
+# author does the first, does the second, and ships an application where one of
+# the two SDKs quietly does not work.
+#
+# The requirement is core rather than iOS, and the Android input is why. §5.7's
+# note is careful about this: the mechanism is "a field of the action table,
+# which is one table with one field set on both platforms", and what differs is
+# only which surfaces a platform caps at one. Android's manifest merges by
+# union under distinct class names, so its singletons are mostly the bootstrap's
+# and unclaimable — but not all of them are. `WorkManager` takes its
+# configuration from the application class implementing one interface and
+# returning one `Configuration`, and two SDKs each asking for their own is the
+# same contention in a different vocabulary. A consumer that implemented slots
+# as an iOS feature would pass the case below and miss it.
+#
+# The slot is compared for equality and never interpreted. Each side uses its
+# own platform's identifier for the surface, which is what §5.7 recommends and
+# does not require — a consumer treating either as a vocabulary would be
+# interpreting slots, and equality is the whole of the mechanism.
+requirement = 22
+profile     = "core"
+section     = "5.7"
+
+outcome = "blocking"
+
+diagnostics = [
+  { id = "ni.req.22", distributions = ["pypusha", "pypushb"] },
+  # Neither action is acknowledged, which is requirement 14's and not this
+  # case's subject. Acknowledging them would be answering a question the
+  # application cannot answer twice, which is the point of the case.
+  { id = "ni.req.14", distributions = ["pypusha", "pypushb"] },
+]
+advisories  = []
+
+assertions = ["every_diagnostic_names_a_distribution"]
+
+# The build does not proceed, so there is no resolution to record.

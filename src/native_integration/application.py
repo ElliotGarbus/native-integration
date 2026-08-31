@@ -95,6 +95,23 @@ class Application:
     date: str = ""
     core_library_desugaring: bool = False
 
+    #: What the application sets itself in the two key spaces it shares with
+    #: producers: §6.8's `<meta-data>` and §7.4's `Info.plist`. Not answers —
+    #: the application configures these for its own reasons and owes nobody a
+    #: justification — but a producer contributing the same key is a conflict
+    #: only the consumer can see, and §6.8 and §7.4 both resolve it the same
+    #: way: "the application's own value always wins".
+    manifest_meta_data: Mapping[str, object] = field(default_factory=dict)
+    info_plist: Mapping[str, object] = field(default_factory=dict)
+
+    #: §9.1's bootstrap action: the application has accepted an integration it
+    #: has no stored record for. Absent means it has not, which is a first build
+    #: and blocks — "the first build is step 4, not an exemption". This is an
+    #: answer rather than a fact about the integration, so it never reaches the
+    #: record: a record that changed on being accepted could not be compared
+    #: against the thing that was accepted.
+    initial_acceptance: Answer | None = None
+
     # -- joined by (distribution, id) --------------------------------------
     values: Mapping[tuple[str, str], str] = field(default_factory=dict)
     acknowledged: Mapping[tuple[str, str], Answer] = field(default_factory=dict)

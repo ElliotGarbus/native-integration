@@ -1,0 +1,29 @@
+# §8.4 requirement 32, via §6.8: "Merge contributed `meta_data` with §5.2's
+# delivery as one key space, keeping and reporting the application's own entry
+# where it sets the key."
+#
+# §6.8's table states the three outcomes in order: equal values coalesce,
+# differing values fail, and "the application's own value always wins".
+# `R32_meta_data_type_conflict` is the middle one. This is the third.
+#
+# `pyone32` declares `com.example.MODE` as the string `fast` and `pytwo32` as
+# the integer `1` — a disagreement in type as well as content, which §6.8 calls
+# out because both render to `android:value="1"`-style text and a consumer
+# comparing the rendered manifest would coalesce them. The application sets the
+# key itself, so there is nothing left for the consumer to decide, and the
+# build proceeds.
+#
+# The record keeps all three: the two contributions, and the effective entry
+# attributed to the application and naming the distributions it overrode. That
+# is the "reporting" half of the requirement — an application that removes its
+# own entry later needs to see the disagreement it was standing on top of.
+requirement = 32
+profile     = "android"
+section     = "6.8"
+
+outcome = "accept"
+
+diagnostics = []
+advisories  = []
+
+assertions = []

@@ -1,0 +1,13 @@
+build contract 1.0
+build platform ios
+dist pyone35 contract 1
+dist pyone35 contributes plist-value ExampleAdsMode type=string value=fast
+dist pyone35 input native.toml sha256=7957dcc241faf00b7faf4e853eeb26a80454af1cf9b44eff3fe984ce6ed85822
+dist pyone35 origin direct
+dist pyone35 version 1.0.0
+dist pytwo35 contract 1
+dist pytwo35 contributes plist-value ExampleAdsMode type=string value=safe
+dist pytwo35 input native.toml sha256=462b1b4c4d0ad8a29d5370e96d751a38c1d7c34545e74932b32c3fd529732f38
+dist pytwo35 origin direct
+dist pytwo35 version 1.0.0
+effective plist-value ExampleAdsMode distributions=pyone35,pytwo35 source=application type=string value=balanced

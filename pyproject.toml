@@ -21,11 +21,6 @@ classifiers = [
 dependencies = []
 
 [project.optional-dependencies]
-# Only for Closure.from_installed(), which parses Requires-Dist and evaluates
-# environment markers. A consumer that resolves its own closure — which every
-# real one does, because the closure is resolved for the *target* platform —
-# needs none of this.
-closure = ["packaging>=23"]
 test = ["pytest>=7"]
 # tools/check_spec.py exercises the generated JSON Schema against every
 # current-specification sidecar, and against the cases SPEC.md refuses.

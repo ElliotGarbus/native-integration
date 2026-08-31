@@ -1,30 +1,41 @@
-"""The rules no single sidecar can break (§5.2, §6.1, §6.3, §6.4, §6.7, §6.8, §7.5).
+"""What a sidecar means, once its shape is known (§5.2, §6.1, §6.3–§6.8, §7.5).
 
-Each sidecar here is valid on its own. Only a consumer holding the whole closure
-sees the conflict, and only it knows which Python distributions to name — Gradle
-sees one module, the manifest shows one entry, and the application author sees a
-build that works until the day the order changes.
+Most of this is the rules no single sidecar can break. Each is valid on its own,
+and only a consumer holding the whole closure sees the conflict — Gradle sees one
+module, the manifest shows one entry, and the application author sees a build
+that works until the day the order changes. That is why those rules name *both*
+distributions: a diagnostic naming the merged result describes a symptom the
+author cannot act on, since they do not choose the manifest, they choose the
+dependencies.
 
-That is why every rule below names *both* distributions. A diagnostic that named
-the merged result would describe a symptom the author cannot act on: they do not
-choose the manifest, they choose the dependencies.
+§6.1 is the exception and is here whole rather than split, because its five rules
+are one subject. Rules 1 to 3 are answerable from a single sidecar — what it
+staged, what it declared, what it claims to own — and rules 4 and 5 need the
+closure. Separating them by which needs a neighbour would put the definition of
+ownership in one file and half its consequences in another.
 """
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import Any, Iterable, Mapping, Sequence
 
 from .application import Application
 from .findings import Findings
 from .integration import Resolved
+from .recording import Record
+from .resources import ResourceError, normalize
 
 #: §8.4, by number.
 OWNERSHIP = 23
+UNREADABLE = 4
+SLOT = 22
 CONFIGURATION = 25
 REPOSITORY = 27
 KEEP = 31
 META_DATA = 32
+PLIST = 35
 VALUE_CONFLICT = 17
 PYTHON_MODULE = 36
 
@@ -41,13 +52,6 @@ RESERVED: tuple[str, ...] = (
     "com.chaquo.python",
     "org.beeware.android",
 )
-
-#: §5.2's kinds that share a key space with a §6 or §7 contribution.
-SHARED_KEY_SPACE: Mapping[str, str] = {
-    "manifest_meta_data": "android",
-    "info_plist": "ios",
-}
-
 
 def contains(outer: str, inner: str) -> bool:
     """§6.1's containment, on dot-separated segments and never on raw strings.
@@ -80,6 +84,13 @@ class _Claim:
     distribution: str
     value: Any
     where: str = ""
+    #: Whether the claim is an application's answer to a §5.2 value rather than
+    #: something the sidecar itself declares. It counts for agreement and never
+    #: for content: requirement 42 forbids writing an application-supplied
+    #: secret into the record, and a supplied string is the one kind of claim
+    #: here that could be one — `analytics_key` and `api_key` are what §5.2 is
+    #: mostly used for. A producer's own declaration is public by construction.
+    answer: bool = False
 
 
 def check(
@@ -87,22 +98,179 @@ def check(
     *,
     application: Application,
     findings: Findings,
+    record: Record,
     platform: str,
     reserved: Iterable[str] = RESERVED,
 ) -> None:
-    """Every closure-wide rule, over the sidecars that survived validation."""
+    """Every closure-wide rule, over the sidecars that survived validation.
+
+    The record is here because two of §6 and §7's rules do not merely reject a
+    closure — they merge one, and §6.5 and §7.4 both require the merged result
+    to be recorded. Computing the merge to find the conflict and then computing
+    it again elsewhere to write it down is how the two come to disagree.
+    """
     if platform == "android":
         _ownership(resolved, findings, tuple(reserved))
+        _contributed_files(resolved, findings)
+        _component_names(resolved, findings)
         _keep_patterns(resolved, findings)
         _configurations(resolved, findings)
         _repositories(resolved, findings)
-        _meta_data(resolved, application, findings)
+        _permissions(resolved, application, record)
+        _meta_data(resolved, application, findings, record)
     else:
         _python_modules(resolved, findings)
+        _info_plist(resolved, application, findings, record)
     _values(resolved, application, findings, platform)
+    _slots(resolved, findings, platform)
 
 
 # -- §6.1: ownership ---------------------------------------------------------
+
+
+#: §6.1: "a path segment that is not a valid Java identifier ... since it cannot
+#: name a package". Kotlin permits more in a backticked identifier; the rule is
+#: stated over Java identifiers for both languages, and is what a package name
+#: has to be to survive the round trip through a directory name.
+IDENTIFIER = re.compile(r"[A-Za-z_$][A-Za-z0-9_$]*")
+
+#: The `package` a source file declares. Java terminates it with `;` and Kotlin
+#: does not, so the terminator is optional. Anchored to a line start because a
+#: `package` appearing anywhere else is not the declaration.
+PACKAGE = re.compile(
+    r"^[ \t]*package[ \t]+([A-Za-z_$][\w$]*(?:[ \t]*\.[ \t]*[A-Za-z_$][\w$]*)*)[ \t]*;?",
+    re.M,
+)
+
+#: Comments, so that a commented-out `package` is not read as one. Strings are
+#: not stripped: a `package` declaration cannot appear inside one at line start
+#: in either language without the file already failing to compile.
+COMMENTS = re.compile(r"//[^\n]*|/\*.*?\*/", re.S)
+
+
+def declared_package(text: str) -> str | None:
+    """The package a Java or Kotlin file declares, or `None` for the default one."""
+    found = PACKAGE.search(COMMENTS.sub(lambda m: "\n" * m.group(0).count("\n"), text))
+    return re.sub(r"[ \t]+", "", found.group(1)) if found else None
+
+
+def path_namespace(root: str, path: str) -> str:
+    """§6.1's derivation: the file's directory, relative to its source root.
+
+    `java/org/example/mypkg/Bridge.java` under root `java` yields
+    `org.example.mypkg`, and a file directly in the root yields the empty
+    string — the default package, which is contained by nothing.
+    """
+    prefix = f"{normalize(root)}/"
+    inside = path[len(prefix):] if path.startswith(prefix) else path
+    return ".".join(inside.split("/")[:-1])
+
+
+def _contributed_files(
+    resolved: Sequence[Resolved], findings: Findings
+) -> None:
+    """§6.1 rule 1, over every file staged from a declared source root.
+
+    Two namespaces are derived per file and both are checked, which the note
+    under the rule explains is not redundancy: `javac` enforces the
+    correspondence between them and `kotlinc` does not, so a Kotlin file at
+    `kotlin/org/example/mypkg/Bridge.kt` declaring `package org.other` compiles
+    cleanly and lands a class outside the namespace its distribution claimed.
+    Checking the path alone misses it; checking the declaration alone lets a
+    file sit anywhere in the tree.
+
+    Comparison is case-sensitive throughout, as the platform's own is.
+    """
+    for entry in resolved:
+        owned = entry.owns
+        for root, path in entry.staged:
+            where = path
+            derived = path_namespace(root, path)
+            if not derived:
+                _reject(findings, entry, where,
+                        "sits directly in its source root, so its path names no package",
+                        ["the default package is contained by nothing, and cannot be owned"])
+                continue
+            bad = [s for s in derived.split(".") if not IDENTIFIER.fullmatch(s)]
+            if bad:
+                _reject(findings, entry, where,
+                        "has a path segment that cannot name a package",
+                        [f"`{s}` is not a Java identifier" for s in bad])
+                continue
+
+            try:
+                text = entry.sidecar.source.read_text(path)
+            except ResourceError as problem:
+                # §4.1's UTF-8 rule, reached here because the file is being read
+                # rather than merely listed. Requirement 4's obligation, not
+                # this one's, so it is reported as that.
+                findings.requirement(
+                    UNREADABLE, entry.sidecar.distribution,
+                    message=f"a contributed source file {problem.reason}",
+                    where=problem.relpath,
+                )
+                continue
+
+            stated = declared_package(text)
+            if stated is None:
+                _reject(findings, entry, where,
+                        "declares no `package`",
+                        [f"its path says `{derived}`",
+                         "the default package is contained by nothing"])
+                continue
+            if stated != derived:
+                _reject(findings, entry, where,
+                        "declares a `package` its path disagrees with",
+                        [f"the path says `{derived}`", f"the file says `{stated}`",
+                         "`kotlinc` compiles this cleanly, which is why the rule is "
+                         "stated rather than left to the toolchain"])
+                continue
+            for namespace, source in ((derived, "its path"), (stated, "its `package`")):
+                if not any(contains(owner, namespace) for owner in owned):
+                    _reject(findings, entry, where,
+                            f"is outside every namespace its distribution owns, by {source}",
+                            [f"{source} says `{namespace}`",
+                             "owned: " + (", ".join(f"`{n}`" for n in owned) or "nothing")])
+
+
+def _reject(
+    findings: Findings, entry: Resolved, where: str, what: str, detail: Sequence[str]
+) -> None:
+    findings.requirement(
+        OWNERSHIP,
+        entry.sidecar.distribution,
+        message=f"`{where}` {what}",
+        where=where,
+        detail=detail,
+    )
+
+
+def _component_names(resolved: Sequence[Resolved], findings: Findings) -> None:
+    """§6.1 rule 2: a producer-sourced component name is under an owned namespace.
+
+    "A component attributed to a declared dependency is exempt; the class is not
+    the producer's." That is the whole of the exemption — `from_dependency` says
+    the class ships in someone else's artifact, and requiring the producer to own
+    a namespace it does not write into would make the declaration unusable.
+    """
+    for entry in resolved:
+        for component in entry.sidecar.entries("contributes", "components"):
+            name = component.get("name")
+            if not isinstance(name, str) or component.get("from_dependency"):
+                continue
+            if any(contains(owner, name) for owner in entry.owns):
+                continue
+            findings.requirement(
+                OWNERSHIP,
+                entry.sidecar.distribution,
+                message=f"the component `{name}` is outside every namespace it owns",
+                where="android.contributes.components",
+                detail=[
+                    "owned: " + (", ".join(f"`{n}`" for n in entry.owns) or "nothing"),
+                    "a component from a declared dependency is exempt, and this one "
+                    "declares no `from_dependency`",
+                ],
+            )
 
 
 def _ownership(
@@ -341,8 +509,114 @@ def _values(
         )
 
 
+# -- §5.7: one surface, two claimants ----------------------------------------
+
+
+def _slots(resolved: Sequence[Resolved], findings: Findings, platform: str) -> None:
+    """§5.7: two actions claiming a surface the platform allows one of.
+
+    The failure this catches is not a conflict anyone can see in a sidecar.
+    §5.7's example is two push SDKs each asking the application to create a
+    notification service extension: "nothing about either action alone reveals
+    the conflict: each reads as a reasonable, self-contained request, and an
+    application author acting on them one at a time creates two extension
+    targets — which iOS does not run side by side — or overwrites one vendor's
+    handler with the other's, and finds out only when that vendor's feature
+    silently stops working."
+
+    So the report has to arrive *before* the author starts, which is why it is
+    made from the declarations rather than from anything they resolved to.
+
+    The slot is compared for equality and never read. It is an opaque string,
+    and the note under §5.7's table is explicit that a consumer treating those
+    identifiers as a vocabulary would be interpreting them — equality can miss a
+    collision between two producers who chose different spellings, and cannot
+    invent one.
+    """
+    claimed: dict[str, list[_Claim]] = {}
+    for entry in resolved:
+        for action in entry.sidecar.entries("requires", "application_action"):
+            slot, identifier = action.get("slot"), action.get("id")
+            if isinstance(slot, str) and isinstance(identifier, str):
+                claimed.setdefault(slot, []).append(
+                    _Claim(entry.sidecar.distribution, identifier)
+                )
+
+    for slot, claims in sorted(claimed.items()):
+        if len(claims) < 2:
+            continue
+        findings.requirement(
+            SLOT,
+            *(claim.distribution for claim in claims),
+            message=f"two actions claim the slot `{slot}`",
+            where=f"{platform}.requires.application_action",
+            detail=[
+                *(f"{claim.distribution} asks for it as `{claim.value}`" for claim in claims),
+                "the platform allows one, and satisfying these one at a time "
+                "silently leaves one of them broken",
+            ],
+        )
+
+
+def _permissions(
+    resolved: Sequence[Resolved], application: Application, record: Record
+) -> None:
+    """§6.5's merge, which the record has to carry rather than imply.
+
+    "A consumer **MUST** register a permission with the widest need any
+    distribution stated: an entry with no `max_sdk_version` defeats one that has
+    it, a lower `max_sdk_version` gives way to a higher, and
+    `never_for_location` holds only when **every** declaration of that
+    permission asserts it. The result **MUST** appear in the record and report
+    with the distributions that produced it."
+
+    Both directions of the merge lose information a reviewer needs. A permission
+    bounded to API 30 by one distribution and unbounded by another is registered
+    unbounded, and the record that showed only the two requests would leave
+    whoever reads it to work that out — which is the step where a widening gets
+    missed, because the bounded declaration is the one that looks careful.
+
+    A suppressed permission is absent entirely: §6.5 requires it to be absent
+    from the effective merged manifest, and this is what the record says that
+    manifest will contain.
+    """
+    declared: dict[str, list[_Claim]] = {}
+    for entry in resolved:
+        for permission in entry.sidecar.entries("contributes", "permissions"):
+            name = permission.get("name")
+            if isinstance(name, str):
+                declared.setdefault(name, []).append(
+                    _Claim(entry.distribution, permission)
+                )
+
+    for name, claims in sorted(declared.items()):
+        if application.suppression(name) is not None:
+            continue
+        bounds = [claim.value.get("max_sdk_version") for claim in claims]
+        # An absent bound is unbounded, and unbounded is the widest need there
+        # is — so one omission defeats every stated ceiling.
+        widest = (
+            None
+            if any(not isinstance(b, int) or isinstance(b, bool) for b in bounds)
+            else max(int(b) for b in bounds)  # type: ignore[arg-type]
+        )
+        record.add(
+            "effective", "permission", name,
+            distributions=sorted({claim.distribution for claim in claims}),
+            max_sdk=widest,
+            never_for_location=(
+                True
+                if all(claim.value.get("never_for_location") is True for claim in claims)
+                else None
+            ),
+        )
+
+
 def _meta_data(
-    resolved: Sequence[Resolved], application: Application, findings: Findings
+    resolved: Sequence[Resolved],
+    application: Application,
+    findings: Findings,
+    record: Record,
 ) -> None:
     """§6.8: one manifest entry, and equality by type as well as content.
 
@@ -351,6 +625,12 @@ def _meta_data(
     for the consumer that compares the rendered manifest text: both produce
     `android:value="1"`, so merging after rendering sees agreement and coalesces,
     and the two producers who disagreed about the type both believe they won.
+
+    §6.8's table gives the third outcome: "the application's own value always
+    wins". Where the application sets the key itself there is no disagreement
+    left to report — it is settled, not resolved by the consumer — so the
+    producers' values do not fail the build, and requirement 32's "keeping and
+    reporting the application's own entry" is what the record carries.
     """
     keyed: dict[str, list[_Claim]] = {}
     contributed: set[str] = set()
@@ -360,7 +640,7 @@ def _meta_data(
             if isinstance(key, str):
                 contributed.add(key)
                 keyed.setdefault(key, []).append(
-                    _Claim(entry.sidecar.distribution, (_type_of(value), value))
+                    _Claim(entry.distribution, (_type_of(value), value))
                 )
         # §6.8 and §5.2 share one key space: a `manifest_meta_data` delivery is
         # the same manifest entry. An application-supplied value is always a
@@ -374,26 +654,174 @@ def _meta_data(
             )
             if isinstance(key, str) and supplied is not None:
                 keyed.setdefault(key, []).append(
-                    _Claim(entry.sidecar.distribution, ("string", supplied))
+                    _Claim(entry.distribution, ("string", supplied), answer=True)
                 )
 
-    for key, claims in sorted(keyed.items()):
+    _settle(
+        keyed,
+        owned=application.manifest_meta_data,
+        findings=findings,
+        record=record,
+        verb="meta-data",
+        obligation=META_DATA,
+        where="android.contributes.meta_data",
+        subject="`<meta-data>` key",
         # A key claimed only through §5.2 is a disagreement between two values,
         # which is requirement 17's and already reported. This rule is §6.8's,
         # and needs a `meta_data` contribution on at least one side of it.
-        if key not in contributed or len(claims) < 2:
-            continue
-        if len({claim.value for claim in claims}) < 2:
-            continue
+        reportable=contributed,
+    )
+
+
+# -- §7.4: one Info.plist key, one mode --------------------------------------
+
+
+def _info_plist(
+    resolved: Sequence[Resolved],
+    application: Application,
+    findings: Findings,
+    record: Record,
+) -> None:
+    """§7.4's two rules that need the whole closure, and the mode conflict.
+
+    "A key belongs to one mode, and the requirement side counts." A key under
+    `append` is an array key; a key under `values`, *or delivered by a value of
+    kind `info_plist`*, is a scalar one. One key claimed both ways has "no
+    unambiguous plist form and no order-independent winner", so it fails naming
+    both declarers — and a consumer must not merge a scalar into an array or an
+    array into a scalar to make the problem go away.
+
+    §7.4's note names the case this actually catches: `LSApplicationQueriesSchemes`
+    is the array key producers really do contribute, and a value of kind
+    `info_plist` naming it asks the consumer to write one string where a list
+    belongs.
+
+    Which keys hold arrays is not knowledge this reader has, and §7.4 is
+    explicit that it should not be: "it deliberately requires no list of which
+    Apple keys hold arrays. The declarations say which."
+    """
+    scalars: dict[str, list[_Claim]] = {}
+    arrays: dict[str, list[_Claim]] = {}
+    contributed: set[str] = set()
+    for entry in resolved:
+        plist = entry.sidecar.section("contributes", "info_plist")
+        for key, value in (plist.get("values") or {}).items():
+            if isinstance(key, str):
+                contributed.add(key)
+                scalars.setdefault(key, []).append(
+                    _Claim(entry.distribution, (_type_of(value), value), "values")
+                )
+        for key in plist.get("append") or {}:
+            if isinstance(key, str):
+                arrays.setdefault(key, []).append(
+                    _Claim(entry.distribution, None, "append")
+                )
+        for declaration in entry.sidecar.entries("requires", "application_value"):
+            if declaration.get("kind") != "info_plist":
+                continue
+            key = declaration.get("key")
+            supplied = application.value(
+                entry.distribution, str(declaration.get("id"))
+            )
+            if isinstance(key, str) and supplied is not None:
+                scalars.setdefault(key, []).append(
+                    _Claim(
+                        entry.distribution,
+                        ("string", supplied),
+                        "requires.application_value",
+                        answer=True,
+                    )
+                )
+
+    for key in sorted(set(scalars) & set(arrays)):
         findings.requirement(
-            META_DATA,
-            *(claim.distribution for claim in claims),
-            message=f"one `<meta-data>` key is declared two ways: `{key}`",
-            where="android.contributes.meta_data",
+            PLIST,
+            *(claim.distribution for claim in scalars[key] + arrays[key]),
+            message=f"`{key}` is claimed as both a scalar and an array",
+            where="ios.contributes.info_plist",
             detail=[
-                f"{claim.distribution} declares {claim.value[0]} {claim.value[1]!r}"
-                for claim in claims
+                *(f"{claim.distribution} sets it as a scalar, in `{claim.where}`"
+                  for claim in scalars[key]),
+                *(f"{claim.distribution} appends to it, in `append`"
+                  for claim in arrays[key]),
+                "one key has one plist form, and neither mode may absorb the other",
             ],
+        )
+
+    _settle(
+        {key: claims for key, claims in scalars.items() if key not in arrays},
+        owned=application.info_plist,
+        findings=findings,
+        record=record,
+        verb="plist-value",
+        obligation=PLIST,
+        where="ios.contributes.info_plist.values",
+        subject="`Info.plist` key",
+        # As with §6.8: a key claimed only through §5.2 is two supplied values
+        # disagreeing, which is requirement 17's and reported there. This rule
+        # needs a `values` contribution on at least one side of it.
+        reportable=contributed,
+    )
+
+
+def _settle(
+    keyed: Mapping[str, Sequence[_Claim]],
+    *,
+    owned: Mapping[str, Any],
+    findings: Findings,
+    record: Record,
+    verb: str,
+    obligation: int,
+    where: str,
+    subject: str,
+    reportable: set[str] | None = None,
+) -> None:
+    """One key space, resolved: the application's value, agreement, or a failure.
+
+    §6.8 and §7.4 state the same three outcomes in the same order, and the
+    ordering is the rule. Equal content coalesces. Differing content fails,
+    because there is no order-independent winner and whichever the consumer
+    wrote, the other producer's SDK would read a key configured for someone
+    else. And the application's own value beats both, since it is the one party
+    to the integration entitled to settle what its own manifest says.
+    """
+    for key, claims in sorted(keyed.items()):
+        who = sorted({claim.distribution for claim in claims})
+        if key in owned:
+            value = owned[key]
+            record.add(
+                "effective", verb, key,
+                type=_type_of(value), value=value,
+                distributions=who,
+                source="application",
+            )
+            continue
+
+        if len({claim.value for claim in claims}) > 1:
+            if reportable is not None and key not in reportable:
+                continue
+            findings.requirement(
+                obligation,
+                *(claim.distribution for claim in claims),
+                message=f"one {subject} is declared two ways: `{key}`",
+                where=where,
+                detail=[
+                    f"{claim.distribution} declares {claim.value[0]} {claim.value[1]!r}"
+                    for claim in claims
+                ],
+            )
+            continue
+
+        # The agreed content, taken from a declaration rather than an answer.
+        # A key whose only claimant is a supplied value is already recorded as
+        # `state=supplied` against the requirement that asked for it, and the
+        # string itself stays out: see `_Claim.answer`.
+        declared = [claim for claim in claims if not claim.answer]
+        if not declared:
+            continue
+        kind, value = declared[0].value
+        record.add(
+            "effective", verb, key, type=kind, value=value, distributions=who
         )
 
 

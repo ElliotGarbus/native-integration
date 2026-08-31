@@ -1,0 +1,16 @@
+contract = "1"
+
+# Three contributions rather than one, so the reported set is visibly the whole
+# inherited native surface rather than a single line an author might skim past.
+[[android.contributes.permissions]]
+name = "android.permission.ACCESS_FINE_LOCATION"
+reason = "The SDK attaches a coarse region to each request"
+
+[[android.contributes.gradle_dependencies]]
+module = "com.example.ads:android"
+version = { at_least = "4.0.0", below = "5.0.0" }
+
+[[android.contributes.gradle_repositories]]
+url = "https://maven.example.com/releases"
+groups = ["com.example.ads"]
+reason = "The SDK is not published to Maven Central"

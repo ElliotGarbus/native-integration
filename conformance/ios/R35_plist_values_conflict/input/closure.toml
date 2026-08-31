@@ -1,0 +1,13 @@
+platform = "ios"
+
+[[distribution]]
+name = "pyalpha35"
+version = "1.0.0"
+origin = "direct"
+entry_point = "pyalpha35._native"
+
+[[distribution]]
+name = "pybeta35"
+version = "1.0.0"
+origin = "direct"
+entry_point = "pybeta35._native"

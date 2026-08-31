@@ -33,8 +33,27 @@ from .findings import Finding, Findings
 from .graph import Graph
 from .integration import Resolved
 from .recording import Record
-from .registry import load as load_registry
+from .registry import PLATFORMS, load as load_registry
 from .resources import SidecarSource
+
+
+class UnimplementedProfile(ValueError):
+    """Asked to build for a platform this consumer's profile set omits (§8.1).
+
+    Requirement 9's second sentence: a consumer **MUST** fail "rather than
+    building partially" when the platform is one whose conformance profile it
+    does not implement. §8.1 makes conformance per-platform on purpose, so an
+    Android-only tool is a conforming consumer — and the way it stays one is by
+    refusing iOS outright rather than reading iOS sidecars with half the rules.
+
+    Raised rather than reported. Every other failure in this library is a
+    finding, because every other failure is something a sidecar or an
+    application did and the report is how a person learns of it. This one is
+    the consumer's own configuration, known before a single sidecar is read,
+    and there is no distribution to attribute it to. A caller that ignores
+    `Integration.ok` would build partially anyway; a caller that never gets an
+    `Integration` cannot.
+    """
 
 
 class IntegrationError(Exception):
@@ -81,6 +100,7 @@ def read(
     graph: Graph | None = None,
     accepted: str | None = None,
     contract: str = "1.0",
+    profiles: Sequence[str] = PLATFORMS,
 ) -> Integration:
     """Read every sidecar and resolve them into one integration.
 
@@ -88,9 +108,24 @@ def read(
     entered, which the record carries and requirement 1 turns on. `graph` is a
     resolution the consumer already performed — §9.4's obligations are about
     what a resolved artifact declares, so without one those go unchecked rather
-    than guessed at. `accepted` is the last accepted record, without which
-    §9.1's gate has nothing to compare and does not fire.
+    than guessed at. `accepted` is the last accepted record; absent one this is
+    a first build, which §9.1 gates exactly as it gates a change, and which
+    `application.initial_acceptance` is how an application passes.
+
+    `profiles` names the §8.1 conformance profiles the calling consumer
+    implements. It defaults to both because this reader implements both; a tool
+    that generates only Gradle passes `("android",)` and gets
+    :class:`UnimplementedProfile` for anything else, which is requirement 9's
+    "fail, rather than building partially".
     """
+    if platform not in profiles:
+        raise UnimplementedProfile(
+            f"this consumer does not implement the {platform!r} conformance "
+            f"profile (it implements {', '.join(sorted(profiles)) or 'none'}); "
+            "§8.1 makes conformance per-platform, and requirement 9 requires "
+            "failing here rather than building part of it"
+        )
+
     application = application or Application()
     closure = closure or Closure.isolated_environment()
     graph = graph or Graph()
@@ -124,7 +159,11 @@ def read(
         )
 
     semantics.check(
-        resolved, application=application, findings=findings, platform=platform
+        resolved,
+        application=application,
+        findings=findings,
+        record=record,
+        platform=platform,
     )
     advisories.report(
         resolved, application=application, findings=findings, platform=platform
@@ -145,6 +184,7 @@ def read(
         record,
         accepted,
         findings=findings,
+        application=application,
         distributions=[source.distribution for source in sources],
     )
 

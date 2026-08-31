@@ -1,0 +1,13 @@
+contract = "1"
+
+# No ceiling at all, which is the wider need and defeats `pymergea`'s.
+[[android.contributes.permissions]]
+name = "android.permission.ACCESS_FINE_LOCATION"
+reason = "Fraud checks compare the request's region"
+never_for_location = true
+
+# A higher ceiling, and no claim about location.
+[[android.contributes.permissions]]
+name = "android.permission.BLUETOOTH_SCAN"
+reason = "Pairs with the vendor's hardware"
+max_sdk_version = 33

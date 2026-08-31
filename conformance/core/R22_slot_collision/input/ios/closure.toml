@@ -1,0 +1,13 @@
+platform = "ios"
+
+[[distribution]]
+name = "pypusha"
+version = "1.0.0"
+origin = "direct"
+entry_point = "pypusha._native"
+
+[[distribution]]
+name = "pypushb"
+version = "2.1.0"
+origin = "direct"
+entry_point = "pypushb._native"

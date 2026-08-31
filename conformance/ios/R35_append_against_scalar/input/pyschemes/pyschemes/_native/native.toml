@@ -1,0 +1,6 @@
+contract = "1"
+
+# Declaring the key here is what makes it an array key. §7.4 fixes no list of
+# which Apple keys hold arrays, on purpose.
+[ios.contributes.info_plist.append]
+LSApplicationQueriesSchemes = ["exampleschemes"]

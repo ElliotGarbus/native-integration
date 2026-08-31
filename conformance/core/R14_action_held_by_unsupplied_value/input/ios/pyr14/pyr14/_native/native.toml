@@ -7,8 +7,18 @@ conditional = true
 reason = "The App Group identifier this SDK shares data through"
 placeholder = "group.<TODO: your bundle id>.example"
 
+# §5.6's optional fields, declared so that requirement 11's report clause has
+# something to carry: the finding must name the `summary` plus `instructions`
+# and `acceptance` wherever a sidecar declares them.
 [[ios.requires.application_action]]
 id = "app_group_entitlement"
 summary = "Enable App Groups and add the identifier above to the entitlement"
 reason = "The container is shared through the entitlement."
+instructions = """Open the application target's Signing & Capabilities tab, add \
+the App Groups capability, and add the identifier supplied as `app_group_id` to \
+the list. Repeat for every extension target that links PyR14Kit."""
+acceptance = [
+  "The application target's entitlement lists the App Group identifier",
+  "Every extension target linking PyR14Kit lists the same identifier",
+]
 uses = ["app_group_id"]

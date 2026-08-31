@@ -1,0 +1,16 @@
+build contract 1.0
+build platform android
+dist pymergea contract 1
+dist pymergea contributes permission android.permission.ACCESS_FINE_LOCATION max-sdk=30 never-for-location=true reason="Region-accurate delivery estimates"
+dist pymergea contributes permission android.permission.BLUETOOTH_SCAN max-sdk=30 never-for-location=true reason="Discovers the vendor's beacons"
+dist pymergea input native.toml sha256=4abdaf27fcae06a1733c13705dc72fe3b321c86785a1541550cea812b93aab12
+dist pymergea origin direct
+dist pymergea version 1.0.0
+dist pymergeb contract 1
+dist pymergeb contributes permission android.permission.ACCESS_FINE_LOCATION never-for-location=true reason="Fraud checks compare the request's region"
+dist pymergeb contributes permission android.permission.BLUETOOTH_SCAN max-sdk=33 reason="Pairs with the vendor's hardware"
+dist pymergeb input native.toml sha256=61267c209df6381bd55f7059371e52887392a6f1c14dfa7dd5e4b3ab84bdcef7
+dist pymergeb origin direct
+dist pymergeb version 2.0.0
+effective permission android.permission.ACCESS_FINE_LOCATION distributions=pymergea,pymergeb never-for-location=true
+effective permission android.permission.BLUETOOTH_SCAN distributions=pymergea,pymergeb max-sdk=33

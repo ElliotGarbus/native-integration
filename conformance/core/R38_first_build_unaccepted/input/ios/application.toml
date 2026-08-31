@@ -1,0 +1,4 @@
+# No `[answers.initial_acceptance]`, which is the fixture. Everything else is
+# answered, so that what blocks is the acceptance gate and nothing else.
+[build]
+deployment_target = "16.0"

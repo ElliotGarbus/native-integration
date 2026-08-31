@@ -11,3 +11,4 @@ dist examplytics origin direct
 dist examplytics owns java-namespace org.example.analytics
 dist examplytics value analytics_key key=com.example.analytics.API_KEY kind=manifest_meta_data state=supplied
 dist examplytics version 1.0.0
+effective permission android.permission.INTERNET distributions=examplytics
