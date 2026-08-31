@@ -88,6 +88,11 @@ class Application:
     android: Mapping[str, int] = field(default_factory=dict)
     #: §5.1's iOS floor, as the application configures it.
     deployment_target: str = ""
+    #: The date the build is being made on, for a decision the consumer makes
+    #: itself (§9.7's packaging metadata). Told rather than read off the clock:
+    #: a record carrying today's date differs from yesterday's for no reason,
+    #: and §9.1's gate would report a change that is not one.
+    date: str = ""
     core_library_desugaring: bool = False
 
     # -- joined by (distribution, id) --------------------------------------

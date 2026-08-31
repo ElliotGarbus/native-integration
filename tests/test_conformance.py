@@ -31,21 +31,11 @@ CORPUS = ROOT / "conformance"
 #: name for the missing work rather than "TODO", so that the list reads as a
 #: statement about coverage instead of a snooze button.
 #:
-#: Both groups need an input the reader does not read yet. §9.4's `resolved.toml`
-#: stands in for a resolver — none of it is expressible by shipping sidecars, and
-#: a corpus carrying real `.aar` files would be testing Gradle. §9.1's
-#: `accepted.record` is the last accepted state, without which no single run can
-#: show a delta.
+#: What remains needs §9.1's `accepted.record` — the last accepted state,
+#: without which no single run can show a delta.
 UNIMPLEMENTED: dict[str, str] = {
-    "R31_keep_matches_foreign_class": "§6.7 checks the pattern against the "
-    "resolved artifact's class listing, which is a stated resolution",
-    "R41_artifact_feature_undecided": "§9.4's required-feature decision is about "
-    "a resolved artifact's own manifest",
-    "R44_packaging_collision": "§9.7 collides files between resolved artifacts",
-    "R33_path_dependency_in_graph": "§7.2's strongest check is on the resolved "
-    "graph rather than the declaration",
-    "R26_artifact_checksum_mismatch": "§9.1 compares against the last accepted "
-    "record, and the digest is a resolved artifact's",
+    "R26_artifact_checksum_mismatch": "§9.1 compares a resolved digest against "
+    "the last accepted record",
     "R38_unaccepted_change": "§9.1's acceptance gate needs the last accepted record",
     "R40_stored_digest_malformed": "§9.3 rejects a stored digest that is not 64 "
     "lowercase hexadecimal characters, which needs the stored record",

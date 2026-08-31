@@ -26,7 +26,13 @@ from typing import Any, Mapping
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
-from native_integration import document, integration, registry, semantics  # noqa: E402
+from native_integration import (  # noqa: E402
+    document,
+    graph,
+    integration,
+    registry,
+    semantics,
+)
 from native_integration.application import (  # noqa: E402
     Answer,
     Application,
@@ -42,6 +48,36 @@ from native_integration.recording import Record  # noqa: E402
 #: What this consumer can be told, rather than having to do. `run.py` refuses a
 #: case needing a stated resolution unless the consumer says it accepts one.
 CAPABILITIES = {"injected_resolution": True}
+
+#: The attested assertions, and only the ones that say something true about this
+#: reader. `README.md` labels these the consumer's own claim rather than
+#: evidence, which is exactly why the list is short: an assertion about work the
+#: reader never attempts would be testimony to nothing, and vouching for it is
+#: how a conformance claim overstates itself.
+#:
+#: `objc_categories_linked` is absent for that reason — linking is a build
+#: tool's, and this reader produces no build. So are the verified assertions
+#: about a payload or a merged manifest, which `run.py` marks unverified when it
+#: finds no file, and which is the honest answer.
+ATTESTED = {
+    # §3.3: the reader parses a sidecar as data and never imports the
+    # distribution that ships it.
+    "no_producer_import": True,
+    # §8.4 requirement 18, enforced in `Finding.__post_init__` rather than
+    # remembered at each call site.
+    "every_diagnostic_names_a_distribution": True,
+    # §5.1: every finding carries the producer's own `reason`.
+    "instructions_attributed_to_producer": True,
+    # §9.5: a credential reaches the record as `credential-required` and the
+    # locator is never read, let alone written.
+    "no_credential_in_record": True,
+    # §8.4 requirement 16: an unsupplied value is reported, never guessed at,
+    # and a placeholder is not an answer.
+    "no_invented_value": True,
+    # §8.4 requirement 29: an unapproved export blocks. The failure the
+    # requirement guards is a consumer that writes `exported=false` instead.
+    "no_unexported_fallback": True,
+}
 
 
 def read_toml(path: Path) -> dict[str, Any]:
@@ -64,6 +100,7 @@ def application_of(raw: Mapping[str, Any]) -> Application:
             if isinstance(value, int) and not isinstance(value, bool)
         },
         deployment_target=str(build.get("deployment_target", "")),
+        date=str(build.get("date", "")),
         core_library_desugaring=bool(build.get("core_library_desugaring", False)),
         values={
             _split_id(key): value for key, value in answers.get("values", {}).items()
@@ -137,6 +174,7 @@ def run(base: Path, platform: str) -> tuple[str, Findings, Record]:
     """One case, for one platform."""
     closure = read_toml(base / "closure.toml")
     application = application_of(read_toml(base / "application.toml"))
+    resolution = graph.graph_of(read_toml(base / "resolved.toml"))
     findings = Findings(registry.load())
     record = Record()
     integration.build_facts(record, contract="1.0", platform=platform)
@@ -168,6 +206,7 @@ def run(base: Path, platform: str) -> tuple[str, Findings, Record]:
                 record=record,
                 origin=entry.get("origin", "direct"),
                 via=entry.get("via", ()),
+                resolved_versions=graph.resolved_versions(resolution),
             )
         )
 
@@ -176,6 +215,15 @@ def run(base: Path, platform: str) -> tuple[str, Findings, Record]:
     )
     integration.decisions(
         resolved, application=application, findings=findings, record=record
+    )
+    graph.check(
+        resolution,
+        resolved,
+        application=application,
+        findings=findings,
+        record=record,
+        platform=platform,
+        date=application.date,
     )
     outcome = "blocking" if findings.blocking else "accept"
     return outcome, findings, record
@@ -230,7 +278,7 @@ def main(argv: list[str]) -> int:
                 "outcome": outcome,
                 "diagnostics": findings.as_diagnostics(),
                 "advisories": findings.as_advisories(),
-                "assertions": {},
+                "assertions": ATTESTED,
                 "capabilities": CAPABILITIES,
                 "outputs": str(outputs),
                 "record": record.render(),

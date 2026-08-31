@@ -2,5 +2,13 @@
 min_sdk = 26
 compile_sdk = 35
 
+# The date the build is being made on, which the consumer is told rather than
+# asking the clock for. §9.6 requires a date on the collision row, and §9.7's
+# first row is decided by the consumer itself, so there is no answer to take one
+# from — a consumer reading its own clock would emit a record that differed from
+# yesterday's for no reason, and §9.1's gate would report a change that is not
+# one. Pinning the build date is what `SOURCE_DATE_EPOCH` exists for.
+date = "2026-08-24"
+
 # The application answers nothing. §9.7's first row is the consumer's own
 # authority, and needing an answer here is what would make the row useless.

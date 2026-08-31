@@ -72,8 +72,14 @@ def resolve(
     record: Record,
     origin: str = "direct",
     via: Iterable[str] = (),
+    resolved_versions: Mapping[str, str] | None = None,
 ) -> Resolved:
-    """One sidecar, against one application, onto the record."""
+    """One sidecar, against one application, onto the record.
+
+    `resolved_versions` is what each declared Gradle module actually became,
+    where the consumer knows. §6.3's record carries the request and the result
+    side by side, and the result is the half a reviewer compares between runs.
+    """
     name = normalize_name(sidecar.distribution)
 
     record.add("dist", name, "version", sidecar.version)
@@ -87,7 +93,7 @@ def resolve(
     values = _values(sidecar, application, findings, record)
     _actions(sidecar, application, values, findings, record)
     if sidecar.platform == "android":
-        _android(sidecar, application, record)
+        _android(sidecar, application, record, resolved_versions or {})
     else:
         _ios(sidecar, record)
 
@@ -408,7 +414,12 @@ def _requirement_of(entry: Mapping[str, object]) -> str | None:
     return None
 
 
-def _android(sidecar: Sidecar, application: Application, record: Record) -> None:
+def _android(
+    sidecar: Sidecar,
+    application: Application,
+    record: Record,
+    resolved_versions: Mapping[str, str],
+) -> None:
     name = normalize_name(sidecar.distribution)
 
     def fact(*positionals: object, **keyed: object) -> None:
@@ -425,6 +436,7 @@ def _android(sidecar: Sidecar, application: Application, record: Record) -> None
             "gradle-dependency", module,
             configuration=entry.get("configuration", "implementation"),
             requested=_requested(entry),
+            resolved=resolved_versions.get(module),
         )
 
     for entry in sidecar.entries("contributes", "gradle_repositories"):
