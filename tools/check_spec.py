@@ -964,6 +964,62 @@ except ImportError:  # pragma: no cover - the check degrades rather than lying
     problems.append("jsonschema is not installed, so the schema was not exercised")
 check("every current-specification sidecar validates against the generated schema", problems)
 
+# --- 18b. every fragment `explain` emits is a sidecar the schema accepts -----
+# `explain` answers with a minimal fragment in correct form, generated from the
+# registry. "Correct" is the whole claim: a fragment that omitted a required
+# sibling, or picked the alternative a constraint forbids, would teach an author
+# the one spelling the section rejects — and would do it in the tool they
+# reached for *because* they had got the spelling wrong.
+#
+# So every one is generated and validated here. The exemplars in the registry's
+# `example` fields are what a type cannot supply, and this is what holds them to
+# the vocabulary they illustrate.
+problems = []
+try:
+    import jsonschema  # noqa: F811
+
+    sys.path.insert(0, str(ROOT / "src"))
+    from native_integration import fragments as _fragments  # noqa: E402
+    from native_integration import registry as _registry  # noqa: E402
+
+    known = _registry.load()
+    validator = jsonschema.Draft202012Validator(SCHEMA)
+    written = 0
+    for declaration_id in sorted(known.declarations):
+        try:
+            text = _fragments.fragment(known, declaration_id)
+        except _fragments.Unwritable:
+            continue  # a forbidden key, whose correct form is its absence
+        try:
+            document = tomllib.loads(text)
+        except tomllib.TOMLDecodeError as exc:
+            problems.append(f"the fragment for {declaration_id} is not TOML: {exc}")
+            continue
+        written += 1
+        for error in sorted(validator.iter_errors(document), key=lambda e: list(e.absolute_path)):
+            where = ".".join(str(p) for p in error.absolute_path) or "<root>"
+            problems.append(
+                f"the fragment for {declaration_id} fails the schema at {where}: "
+                f"{error.message}"
+            )
+        # And the fragment has to actually carry what it was asked about.
+        path = declaration_id.replace("<platform>", "android").split(".")
+        holder = document
+        for segment in path[:-1]:
+            held = holder.get(segment) if isinstance(holder, dict) else None
+            holder = held[0] if isinstance(held, list) and held else held
+            if holder is None:
+                break
+        if isinstance(holder, dict) and path[-1] not in holder:
+            problems.append(
+                f"the fragment for {declaration_id} does not carry {path[-1]}"
+            )
+    if written < len(known.declarations) - 5:
+        problems.append(f"only {written} fragments were generated, of {len(known.declarations)}")
+except ImportError:  # pragma: no cover - the check degrades rather than lying
+    problems.append("jsonschema is not installed, so the fragments were not exercised")
+check("every fragment `explain` emits validates against the schema", problems)
+
 # --- 19. the schema refuses what it claims to refuse -------------------------
 # A schema nothing is known to fail is a schema that might accept anything.
 #
