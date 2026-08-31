@@ -55,6 +55,7 @@ since = "1.0"
 section = "4.3"
 anchor = "43-contract-version"
 description = '**Required.** Major of this document, optionally with a minor — `"1"` or `"1.1"`.'
+example = "1"
 
 [declarations."platforms"]
 node = "field"
@@ -148,6 +149,7 @@ since = "1.0"
 section = "5.1"
 anchor = "51-build-floors"
 description = "The iOS floor, and a **TOML string** where the three above are integers. One to three ASCII-decimal components, compared component-wise and numerically with absent components read as zero"
+example = "15.0"
 
 
 # ------------------------------------------------------------------- Values ---
@@ -173,6 +175,7 @@ since = "1.0"
 section = "5.2"
 anchor = "52-values"
 description = "**Required.** A logical name, unique among the requirements in one platform table; identity is (distribution, platform, `id`)"
+example = "vendor_api_key"
 
 [declarations."<platform>.requires.application_value.kind"]
 node = "field"
@@ -208,6 +211,7 @@ since = "1.0"
 section = "5.2"
 anchor = "52-values"
 description = "The platform key the value is written to. **Required** for every kind but `inline`, where it **MUST** be absent — an `inline` value is consumed by a contribution that references it or an action that `uses` it ([§5.5](#55-value-kinds))"
+example = "com.example.vendor.API_KEY"
 
 [declarations."<platform>.requires.application_value.reason"]
 node = "field"
@@ -219,6 +223,7 @@ since = "1.0"
 section = "5.2"
 anchor = "52-values"
 description = "**Required.** What the value is and where to obtain it"
+example = "Your vendor API key, from the vendor console"
 
 [declarations."<platform>.requires.application_value.placeholder"]
 node = "field"
@@ -231,6 +236,7 @@ since = "1.0"
 section = "5.2"
 anchor = "52-values"
 description = "**Recommended.** Text the consumer scaffolds; the build does not proceed while it stands"
+example = "<TODO: your vendor API key>"
 
 [declarations."<platform>.requires.application_value.conditional"]
 node = "field"
@@ -268,6 +274,7 @@ since = "1.0"
 section = "5.3"
 anchor = "53-actions"
 description = "**Required.** A logical name, unique among the requirements in one platform table; identity is (distribution, platform, `id`), and the application acknowledges by it"
+example = "enable_reporting"
 
 [declarations."<platform>.requires.application_action.summary"]
 node = "field"
@@ -279,6 +286,7 @@ since = "1.0"
 section = "5.3"
 anchor = "53-actions"
 description = "**Required.** One line, imperative. What a report shows"
+example = "Turn the reporting dashboard on in the vendor console"
 
 [declarations."<platform>.requires.application_action.reason"]
 node = "field"
@@ -290,6 +298,7 @@ since = "1.0"
 section = "5.3"
 anchor = "53-actions"
 description = "**Required.** Why it is needed, and what breaks without it"
+example = "The SDK posts usage to the dashboard, and the posts are dropped until it exists."
 
 [declarations."<platform>.requires.application_action.instructions"]
 node = "field"
@@ -302,10 +311,12 @@ since = "1.0"
 section = "5.3"
 anchor = "53-actions"
 description = "Optional prose telling a reader how to do it. Never acted on by a consumer ([§5.6](#56-instructions-and-acceptance-criteria))"
+example = "In the vendor console, open Settings, then Reporting, and switch the dashboard on."
 
 # A11: `acceptance` is an array of strings. §5.3's field table states no TOML
 # type for any action field; the type is read off its example and §5.6's "Each
 # item in `acceptance` is checked independently".
+
 [declarations."<platform>.requires.application_action.acceptance"]
 node = "field"
 type = "array"
@@ -319,6 +330,7 @@ since = "1.0"
 section = "5.3"
 anchor = "53-actions"
 description = "**Recommended.** Statements of the **end state**, never of an operation"
+example = ["The vendor console shows a first event within a minute of a debug build starting"]
 
 [declarations."<platform>.requires.application_action.uses"]
 node = "field"
@@ -332,6 +344,7 @@ since = "1.0"
 section = "5.3"
 anchor = "53-actions"
 description = "Optional. Value `id`s this action consumes, which **MUST** resolve to values the same sidecar declares for the **same platform**"
+example = ["vendor_api_key"]
 
 [declarations."<platform>.requires.application_action.slot"]
 node = "field"
@@ -345,6 +358,7 @@ since = "1.0"
 section = "5.7"
 anchor = "57-slots"
 description = "Optional. An opaque key naming a contended application-owned surface ([§5.7](#57-slots))"
+example = "ios.url_callback"
 
 [declarations."<platform>.requires.application_action.conditional"]
 node = "field"
@@ -383,6 +397,7 @@ since = "1.0"
 section = "6.1"
 anchor = "61-ownership"
 description = "Java namespaces this distribution claims exclusively; overlapping claims fail the build. Required when contributing Java/Kotlin, producer-sourced components, or keep patterns"
+example = ["org.example.vendor"]
 
 
 # ---------------------------------------------------- Android contributions ---
@@ -407,6 +422,7 @@ since = "1.0"
 section = "6.2"
 anchor = "62-java-and-kotlin-source"
 description = "Directories whose `.java` files the application's own toolchain compiles"
+example = ["java"]
 
 [declarations."android.contributes.src.kotlin"]
 node = "field"
@@ -419,6 +435,7 @@ since = "1.0"
 section = "6.2"
 anchor = "62-java-and-kotlin-source"
 description = "Directories whose `.kt` files the application's own toolchain compiles"
+example = ["kotlin"]
 
 [declarations."android.contributes.gradle_dependencies"]
 node = "array_of_tables"
@@ -445,6 +462,7 @@ since = "1.0"
 section = "6.3"
 anchor = "63-gradle-dependencies"
 description = "`group:artifact:version`, exactly versioned. The version is visible in the sidecar, but it states no upper bound: Gradle may resolve past a major the producer never compiled against"
+example = "com.example.vendor:sdk:4.1.0"
 
 [declarations."android.contributes.gradle_dependencies.module"]
 node = "field"
@@ -458,6 +476,7 @@ since = "1.0"
 section = "6.3"
 anchor = "63-gradle-dependencies"
 description = "`group:artifact`, paired with a bounded `version`. **Recommended** where the producer's own source compiles against the dependency, because `below` is the only way to say which major it cannot survive"
+example = "com.example.vendor:sdk"
 
 [declarations."android.contributes.gradle_dependencies.version"]
 node = "field"
@@ -476,6 +495,7 @@ since = "1.0"
 section = "6.3"
 anchor = "63-gradle-dependencies"
 description = "**Required** with `module` and **forbidden** with `coordinate`. **Both** `at_least` (inclusive) and `below` (exclusive) are required within it; a range open at either end is invalid, as are changing (`-SNAPSHOT`) and dynamic (`+`, `latest.release`) versions"
+example = { at_least = "4.0.0", below = "5.0.0" }
 
 [declarations."android.contributes.gradle_dependencies.configuration"]
 node = "field"
@@ -518,6 +538,7 @@ since = "1.0"
 section = "6.4"
 anchor = "64-maven-repositories"
 description = "A Maven repository to add to resolution, **`https` only** (scheme compared case-insensitively). The most powerful thing a sidecar can contribute"
+example = "https://maven.example.com/releases"
 
 [declarations."android.contributes.gradle_repositories.reason"]
 node = "field"
@@ -530,6 +551,7 @@ since = "1.0"
 section = "6.4"
 anchor = "64-maven-repositories"
 description = "**Required.** Why the artifacts are not on Maven Central, and — when authenticated — which credential is needed and where to get it"
+example = "The vendor publishes its SDK here rather than to Maven Central"
 
 [declarations."android.contributes.gradle_repositories.groups"]
 node = "field"
@@ -543,6 +565,7 @@ since = "1.0"
 section = "6.4"
 anchor = "64-maven-repositories"
 description = "**At least one of `groups`/`modules` required.** Bounds what the repository may serve, by **exact** match on a group ID — never a prefix, so `org.example` does not admit `org.example.tools`"
+example = ["com.example.vendor"]
 
 [declarations."android.contributes.gradle_repositories.modules"]
 node = "field"
@@ -556,6 +579,7 @@ since = "1.0"
 section = "6.4"
 anchor = "64-maven-repositories"
 description = "**At least one of `groups`/`modules` required.** Bounds the repository by **exact** match on a `group:artifact` pair"
+example = ["com.example.vendor:sdk"]
 
 [declarations."android.contributes.gradle_repositories.credentials_required"]
 node = "field"
@@ -590,6 +614,7 @@ since = "1.0"
 section = "6.5"
 anchor = "65-permissions-and-features"
 description = "The canonical manifest string — `android.permission.INTERNET`, never a shorthand"
+example = "android.permission.INTERNET"
 
 [declarations."android.contributes.permissions.reason"]
 node = "field"
@@ -602,6 +627,7 @@ since = "1.0"
 section = "6.5"
 anchor = "65-permissions-and-features"
 description = "Recommended; carried into the record and report"
+example = "Delivering events to the vendor's API"
 
 [declarations."android.contributes.permissions.max_sdk_version"]
 node = "field"
@@ -648,6 +674,7 @@ since = "1.0"
 section = "6.5"
 anchor = "65-permissions-and-features"
 description = "Always registered `required=\"false\"`; only the application may promote a feature"
+example = "android.hardware.camera"
 
 [declarations."android.contributes.features.required"]
 node = "field"
@@ -692,6 +719,7 @@ since = "1.0"
 section = "6.6"
 anchor = "66-manifest-components"
 description = "The class. Under an owned namespace unless `from_dependency` says otherwise"
+example = "org.example.vendor.RedirectActivity"
 
 [declarations."android.contributes.components.from_dependency"]
 node = "field"
@@ -704,6 +732,7 @@ since = "1.0"
 section = "6.6"
 anchor = "66-manifest-components"
 description = "`group:artifact` of a dependency the same sidecar declares, which owns the class"
+example = "com.example.vendor:sdk"
 
 [declarations."android.contributes.components.foreground_service_type"]
 node = "field"
@@ -717,6 +746,7 @@ since = "1.0"
 section = "6.6"
 anchor = "66-manifest-components"
 description = "Android's own value, on a `service` only. Mandatory on Android 14+ for a foreground service"
+example = "dataSync"
 
 [declarations."android.contributes.components.exported_required"]
 node = "field"
@@ -740,6 +770,7 @@ since = "1.0"
 section = "6.6"
 anchor = "66-manifest-components"
 description = "**Required when `exported_required` is present.** Why the component is useless unless reachable"
+example = "Receives the payment redirect back from the issuing bank's app"
 
 [declarations."android.contributes.components.exported"]
 node = "field"
@@ -775,6 +806,7 @@ since = "1.0"
 section = "6.6"
 anchor = "66-manifest-components"
 description = "**Required.** The only `<data>` attribute a `view_links` entry must carry. `host`, `port`, `path`, `path_prefix`, `path_pattern`, `path_suffix`, `mime_type` and every other attribute the platform defines are equally declarable"
+example = "example-vendor-pay"
 
 [declarations."android.contributes.components.intent_filters"]
 node = "array_of_tables"
@@ -797,6 +829,7 @@ since = "1.0"
 section = "6.6"
 anchor = "66-manifest-components"
 description = "One vendor-defined action, on a component that is neither exported nor carrying `view_links`. Exactly one per filter; no categories and no data element"
+example = "android.intent.action.VIEW"
 
 [declarations."android.contributes.r8"]
 node = "table"
@@ -819,6 +852,7 @@ since = "1.0"
 section = "6.7"
 anchor = "67-shrinker-keep-patterns"
 description = "Class patterns the shrinker must keep; the consumer generates the `-keep` rules. Each must fall within an owned namespace, by its wildcard-free literal prefix"
+example = ["org.example.vendor.**"]
 
 [declarations."android.contributes.r8.keep"]
 node = "array_of_tables"
@@ -840,9 +874,11 @@ since = "1.0"
 section = "6.7"
 anchor = "67-shrinker-keep-patterns"
 description = "**Required.** Keeps a *dependency's* classes instead of an owned namespace's, checked against what the resolved artifact actually contains"
+example = "com.example.vendor.model.**"
 
 # A9: `from_dependency` is what makes this the second keep form, so it is
 # required. An entry without one would be a second spelling of `keep_classes`.
+
 [declarations."android.contributes.r8.keep.from_dependency"]
 node = "field"
 type = "string"
@@ -854,6 +890,7 @@ since = "1.0"
 section = "6.7"
 anchor = "67-shrinker-keep-patterns"
 description = "**Required.** `group:artifact` of a dependency the same sidecar declares; the pattern is evaluated against the effective compilation classpath and rejected where it matches a class from outside that dependency"
+example = "com.example.vendor:sdk"
 
 [declarations."android.contributes.meta_data"]
 node = "array_of_tables"
@@ -876,6 +913,7 @@ since = "1.0"
 section = "6.8"
 anchor = "68-manifest-meta-data"
 description = "The manifest entry's name, written exactly as the vendor code reads it. **Not** scoped by the declaring distribution, and it shares one key space with [§5.2](#52-values)'s `manifest_meta_data` delivery"
+example = "com.example.vendor.OPTIMIZE_INITIALIZATION"
 
 [declarations."android.contributes.meta_data.value"]
 node = "field"
@@ -887,6 +925,7 @@ since = "1.0"
 section = "6.8"
 anchor = "68-manifest-meta-data"
 description = "**Required.** A string, integer or boolean, mapped to `android:value` as the text verbatim, the digits, or `true`/`false`. Equality is by type as well as content, and the application's own entry wins. A value **MAY** be a resource reference — anything beginning `@` or `?` — only where the same sidecar declares an action asking the application to supply it"
+example = true
 
 [declarations."android.contributes.meta_data.reason"]
 node = "field"
@@ -898,6 +937,7 @@ since = "1.0"
 section = "6.8"
 anchor = "68-manifest-meta-data"
 description = "**Required.** The key is global, its effect is invisible in Python, and the report is where an application sees what a transitive dependency turned on"
+example = "The SDK reads it at startup to skip its own network probe"
 
 [declarations."android.contributes.queries"]
 node = "array_of_tables"
@@ -920,6 +960,7 @@ since = "1.0"
 section = "6.9"
 anchor = "69-package-visibility"
 description = "An application ID. **Exactly one** of `package` or `provider_authority` is required"
+example = "com.example.vendor.wallet"
 
 [declarations."android.contributes.queries.provider_authority"]
 node = "field"
@@ -931,6 +972,7 @@ since = "1.0"
 section = "6.9"
 anchor = "69-package-visibility"
 description = "A content provider authority. **Exactly one** of `package` or `provider_authority` is required"
+example = "com.example.vendor.wallet.provider"
 
 [declarations."android.contributes.queries.reason"]
 node = "field"
@@ -942,6 +984,7 @@ since = "1.0"
 section = "6.9"
 anchor = "69-package-visibility"
 description = "**Required.** Package visibility for the producer's own code. No veto, because removing one breaks the producer silently"
+example = "The SDK hands payment off to the wallet app when it is installed"
 
 
 # -------------------------------------------------------- iOS contributions ---
@@ -967,6 +1010,7 @@ since = "1.0"
 section = "7.2"
 anchor = "72-swift-packages"
 description = "**Required.** Local handle, unique within the sidecar; [§7.5](#75-python-modules) refers to packages by it"
+example = "VendorKit"
 
 [declarations."ios.contributes.swift_packages.url"]
 node = "field"
@@ -983,6 +1027,7 @@ since = "1.0"
 section = "7.2"
 anchor = "72-swift-packages"
 description = "The package repository. **Required**, and **MUST** be `https`"
+example = "https://github.com/example/vendorkit"
 
 [declarations."ios.contributes.swift_packages.products"]
 node = "field"
@@ -997,6 +1042,7 @@ since = "1.0"
 section = "7.2"
 anchor = "72-swift-packages"
 description = "**Required**, non-empty. Which of the package's products the application target links"
+example = ["VendorKit"]
 
 [declarations."ios.contributes.swift_packages.requirement"]
 node = "field"
@@ -1012,6 +1058,7 @@ since = "1.0"
 section = "7.2"
 anchor = "72-swift-packages"
 description = "Exactly one of `{ exact }`, `{ from }`, `{ revision }`. `branch` is invalid"
+example = { from = "4.0.0" }
 
 [declarations."ios.contributes.swift_packages.credentials_required"]
 node = "field"
@@ -1040,6 +1087,7 @@ since = "1.0"
 section = "7.2"
 anchor = "72-swift-packages"
 description = "**Required when `credentials_required` is set**, and unused otherwise: which credential is needed and where to obtain it"
+example = "The vendor gates the repository; ask them for a deploy token"
 
 [declarations."ios.contributes.src"]
 node = "table"
@@ -1061,6 +1109,7 @@ since = "1.0"
 section = "7.3"
 anchor = "73-swift-source"
 description = "Directories of `.swift` staged into the application target. For small shims only"
+example = ["swift"]
 
 [declarations."ios.contributes.src.symbol_prefixes"]
 node = "field"
@@ -1074,6 +1123,7 @@ since = "1.0"
 section = "7.1"
 anchor = "71-symbol-prefixes"
 description = "Prefixes the producer puts on its contributed Swift type names ([§7.1](#71-symbol-prefixes)). Guidance only; it does not cover file-scope functions or extension members, and it is invalid without contributed source"
+example = ["ExampleVendor"]
 
 [declarations."ios.contributes.accessed_api_types"]
 node = "array_of_tables"
@@ -1099,6 +1149,7 @@ since = "1.0"
 section = "7.3"
 anchor = "73-swift-source"
 description = "**Required.** Apple's canonical string for a required-reason API category, written exactly as Apple defines it. Valid only in a sidecar that also contributes Swift source"
+example = "NSPrivacyAccessedAPICategoryUserDefaults"
 
 [declarations."ios.contributes.accessed_api_types.reasons"]
 node = "field"
@@ -1113,6 +1164,7 @@ since = "1.0"
 section = "7.3"
 anchor = "73-swift-source"
 description = "**Required.** Apple's canonical reason codes, merged into the application's `PrivacyInfo.xcprivacy` and de-duplicated per `type`"
+example = ["CA92.1"]
 
 [declarations."ios.contributes.accessed_api_types.reason"]
 node = "field"
@@ -1125,6 +1177,7 @@ since = "1.0"
 section = "7.3"
 anchor = "73-swift-source"
 description = "Recommended prose. Apple's codes are opaque by design, and the record is where an application reads what its dependencies claim"
+example = "The shim caches the vendor's session token in UserDefaults"
 
 [declarations."ios.contributes.info_plist"]
 node = "table"
@@ -1176,6 +1229,7 @@ since = "1.0"
 section = "7.4"
 anchor = "74-infoplist"
 description = "Ad network identifiers, lowercase and ending `.skadnetwork`. The consumer renders `SKAdNetworkItems` from them"
+example = ["v9wttpbfk9.skadnetwork"]
 
 [declarations."ios.contributes.python_modules"]
 node = "array_of_tables"
@@ -1198,6 +1252,7 @@ since = "1.0"
 section = "7.5"
 anchor = "75-python-modules"
 description = "**Required.** The name Python imports. A single ASCII identifier, no dots"
+example = "vendor_kit"
 
 [declarations."ios.contributes.python_modules.swift_package"]
 node = "field"
@@ -1210,6 +1265,7 @@ since = "1.0"
 section = "7.5"
 anchor = "75-python-modules"
 description = "**Required.** A package the same sidecar declares, which implements the module"
+example = "VendorKit"
 
 [declarations."ios.contributes.python_modules.init"]
 node = "field"
@@ -1223,6 +1279,7 @@ since = "1.0"
 section = "7.5"
 anchor = "75-python-modules"
 description = "Optional initialization symbol; defaults to `PyInit_<name>`"
+example = "PyInit_VendorKit"
 
 [declarations."ios.contributes"]
 node = "table"
