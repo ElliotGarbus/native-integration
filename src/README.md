@@ -15,6 +15,29 @@ python3 -m pip install -e ".[test]"
 python3 -m pytest -q
 ```
 
+## The command line
+
+Installing the package puts `native-integration` on the path. It is **not
+normative** — `SPEC.md` is, and every answer the tool gives says so.
+
+```bash
+native-integration explain ni.req.29                 # a rule, by the id a build printed
+native-integration explain android.contributes.r8    # or by the key you are writing
+native-integration inspect dist/pyvendor-1.0.0-py3-none-any.whl
+native-integration validate src/pyvendor/_native --json
+native-integration conformance --profile android -- mytool build --record
+```
+
+`explain` is the one to reach for. It answers with the section, the rule's text,
+and a minimal fragment in correct form generated from
+[`contract/v1.toml`](../contract/v1.toml) — so a failure resolves to one
+paragraph rather than to a re-read of §6.
+
+`validate` reads one sidecar, which bounds what it can say. Rules that need the
+whole dependency closure are reported as *unchecked* rather than passed, and the
+four obligations [§2.2](../SPEC.md#22-how-the-application-answers) gives the
+application are reported as outstanding rather than as the producer's defects.
+
 ## A read, end to end
 
 ```python
