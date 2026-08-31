@@ -25,6 +25,10 @@ sys.path.insert(0, str(ROOT / "conformance"))
 
 import consumer  # noqa: E402
 
+sys.path.insert(0, str(ROOT / "src"))
+
+from native_integration import advisories  # noqa: E402
+
 CORPUS = ROOT / "conformance"
 
 #: What the reader does not do yet, and why. The reason is the specification's
@@ -33,13 +37,7 @@ CORPUS = ROOT / "conformance"
 #:
 #: What remains needs §9.1's `accepted.record` — the last accepted state,
 #: without which no single run can show a delta.
-UNIMPLEMENTED: dict[str, str] = {
-    "R26_artifact_checksum_mismatch": "§9.1 compares a resolved digest against "
-    "the last accepted record",
-    "R38_unaccepted_change": "§9.1's acceptance gate needs the last accepted record",
-    "R40_stored_digest_malformed": "§9.3 rejects a stored digest that is not 64 "
-    "lowercase hexadecimal characters, which needs the stored record",
-}
+UNIMPLEMENTED: dict[str, str] = {}
 
 
 def cases() -> list[tuple[Path, str]]:
@@ -86,6 +84,16 @@ def test_every_case_reports_exactly_what_it_expects(case, platform, corpus):
 
     assert reported == wanted
     assert outcome == spec.get("outcome")
+
+    # §8.5 is a SHOULD, so an advisory a case names and the reader does not
+    # offer is unsupported rather than wrong, and an extra one is a consumer
+    # being more helpful than the case asked for. What is checked is the reader
+    # not losing an advisory it does claim.
+    offered = {entry["id"] for entry in findings.as_advisories()}
+    for entry in spec.get("advisories", []):
+        code = entry["id"].rsplit(".", 1)[-1]
+        if code in advisories.claimed():
+            assert entry["id"] in offered
 
 
 @pytest.mark.parametrize("case, platform", cases(), ids=identify)

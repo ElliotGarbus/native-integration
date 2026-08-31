@@ -27,6 +27,8 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
 from native_integration import (  # noqa: E402
+    acceptance,
+    advisories,
     document,
     graph,
     integration,
@@ -213,6 +215,9 @@ def run(base: Path, platform: str) -> tuple[str, Findings, Record]:
     semantics.check(
         resolved, application=application, findings=findings, platform=platform
     )
+    advisories.report(
+        resolved, application=application, findings=findings, platform=platform
+    )
     integration.decisions(
         resolved, application=application, findings=findings, record=record
     )
@@ -225,6 +230,15 @@ def run(base: Path, platform: str) -> tuple[str, Findings, Record]:
         platform=platform,
         date=application.date,
     )
+
+    prior = base / "accepted.record"
+    acceptance.check(
+        record,
+        prior.read_text(encoding="utf-8") if prior.exists() else None,
+        findings=findings,
+        distributions=[entry["name"] for entry in closure.get("distribution", [])],
+    )
+
     outcome = "blocking" if findings.blocking else "accept"
     return outcome, findings, record
 
