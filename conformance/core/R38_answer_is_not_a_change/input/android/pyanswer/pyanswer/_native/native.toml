@@ -1,0 +1,25 @@
+contract = "1"
+
+[[android.requires.application_value]]
+id = "vendor_key"
+kind = "manifest_meta_data"
+key = "com.vendor.KEY"
+conditional = true
+reason = "Your vendor key, from the vendor console"
+placeholder = "<TODO: your vendor key>"
+
+[[android.requires.application_action]]
+id = "enable_dashboard"
+conditional = true
+summary = "Turn the reporting dashboard on in the vendor console"
+reason = "The SDK posts to it, and the posts are dropped until it exists."
+
+[[android.contributes.permissions]]
+name = "android.permission.INTERNET"
+reason = "Reaching the vendor's API"
+
+# The one the application suppresses (§6.5). The suppression is an answer:
+# recorded as it changes, and never gated.
+[[android.contributes.permissions]]
+name = "android.permission.ACCESS_COARSE_LOCATION"
+reason = "Regional endpoint selection"

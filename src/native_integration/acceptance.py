@@ -20,7 +20,7 @@ from typing import Mapping, Sequence
 
 from .application import Application
 from .findings import Findings
-from .recording import Fact, Record, RecordError, digest, read
+from .recording import Fact, Record, RecordError, digest, parse, read
 
 #: §8.4, by number.
 CHECKSUM = 26
@@ -36,6 +36,64 @@ DIGEST_OPERANDS = ("sha256", "checksum")
 #: The requirement over both is the same: record it, verify it on the next
 #: build, fail on a mismatch.
 PINNED = {"artifact": "sha256", "binary-target": "checksum"}
+
+#: §9.1's answers, by the `decision` they are recorded as. Every one is a row of
+#: §2.2's table: the application deciding something about its own build.
+ANSWERED = ("approve-export", "suppress-permission", "artifact-feature", "collision")
+
+#: The operands of a requirement fact that hold the application's answer to it.
+#: The rest of the line is the producer's: that a value is declared, its `kind`,
+#: the `key` it lands in, an action's `slot` and what it `uses`.
+ANSWER_OPERANDS = ("state", "date", "version")
+
+
+def resolution_only(line: str) -> str | None:
+    """One record line reduced to what §9.1 gates, or None where it gates none.
+
+    §9.1 splits the record in two and passes only the first half through steps
+    2 to 4. The accepted resolution is *"every contribution, the hashed inputs,
+    the resolved native graphs with their checksums and revisions, and the
+    material resolved artifacts bring with them"*. The application's answers —
+    *"supplied values, acknowledgements, dismissals, permission suppressions,
+    export approvals, required-feature decisions, colliding-path choices"* — are
+    *"recorded as they change"* and **MUST NOT** require acceptance of
+    themselves.
+
+    Three kinds of line come out differently:
+
+    * a `decision` the application made is dropped. §9.1's note says why in
+      terms: *"the application is the accepting party, so requiring it to accept
+      its own decision would be a confirmation dialog"*, and the click-through
+      §9.6 warns about is bought exactly that way. `decision credential-required`
+      is not dropped — that a repository needs a credential is a fact about a
+      producer's declaration (§9.5), not something the application decided.
+    * an `effective` merge is dropped, because every input to it is gated
+      already. A producer widening a permission moves the `contributes` line
+      too, so nothing escapes the gate; a *suppression* moves only this one, and
+      gating it would gate the answer a second time.
+    * a value or an action keeps everything except its `state`, `date` and
+      `version`. The split runs through the middle of these lines rather than
+      around them: that a producer newly demands a value is a change to the
+      resolution and must be accepted, and whether the application has answered
+      it yet is the application's own business.
+
+    The projection is deliberately not the identity on any answer-bearing line,
+    so a record that gains an answer compares equal to the one that lacked it.
+    """
+    fact = parse(line)
+    if fact.verb == "effective":
+        return None
+    if fact.verb == "decision" and fact.positionals[:1] and fact.positionals[0] in ANSWERED:
+        return None
+    if fact.verb == "dist" and fact.positionals[1:2] and fact.positionals[1] in ("value", "action"):
+        kept = tuple((key, value) for key, value in fact.keyed if key not in ANSWER_OPERANDS)
+        return Fact(fact.verb, fact.positionals, kept).render()
+    return line
+
+
+def gated(lines) -> set[str]:
+    """The half of a record §9.1 compares, projected line by line."""
+    return {kept for line in lines if (kept := resolution_only(line)) is not None}
 
 
 @dataclass(frozen=True)
@@ -72,9 +130,11 @@ def check(
         return Delta()
 
     # Compared as rendered lines rather than as parsed facts: the record *is*
-    # its bytes, and two facts that render identically are the same fact.
-    now = set(record)
-    was = {fact.render() for fact in accepted}
+    # its bytes, and two facts that render identically are the same fact. Both
+    # sides are projected first, so what is compared is the accepted resolution
+    # and not the answers §9.1 keeps out of the gate.
+    now = gated(record)
+    was = gated(fact.render() for fact in accepted)
     added = tuple(sorted(now - was))
     removed = tuple(sorted(was - now))
 
@@ -110,8 +170,12 @@ def _first_build(
     So everything is the delta, and the application must have performed the
     bootstrap action §9.1 allows: *"a single bootstrap action covering the
     initial set satisfies this"*.
+
+    "Everything" is the same half every other build compares. §9.1 asks for
+    *"the whole effective set"* to be reported, and an application's own answers
+    are not something it is being asked to accept on the first build either.
     """
-    everything = Delta(added=tuple(sorted(record)))
+    everything = Delta(added=tuple(sorted(gated(record))))
     if application.initial_acceptance is not None:
         return Delta()
     # A resolution that failed to compute is not one an application can accept.

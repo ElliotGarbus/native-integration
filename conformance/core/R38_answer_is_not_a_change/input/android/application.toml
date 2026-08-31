@@ -1,0 +1,13 @@
+[build]
+min_sdk = 26
+compile_sdk = 35
+
+# Three answers, none of which any producer asked to have accepted.
+[answers.values]
+"pyanswer.vendor_key" = "vk_live_4f2c19"
+
+[answers.acknowledged]
+"pyanswer" = ["enable_dashboard"]
+
+[answers.suppressed_permissions."android.permission.ACCESS_COARSE_LOCATION"]
+date = "2026-08-24"

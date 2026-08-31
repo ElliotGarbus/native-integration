@@ -1,0 +1,18 @@
+contract = "1"
+
+[[ios.requires.application_value]]
+id = "vendor_key"
+kind = "info_plist"
+key = "VendorAPIKey"
+conditional = true
+reason = "Your vendor key, from the vendor console"
+placeholder = "<TODO: your vendor key>"
+
+[[ios.requires.application_action]]
+id = "enable_dashboard"
+conditional = true
+summary = "Turn the reporting dashboard on in the vendor console"
+reason = "The SDK posts to it, and the posts are dropped until it exists."
+
+[ios.contributes.info_plist.values]
+VendorEnvironment = "production"

@@ -1,0 +1,41 @@
+# §8.4 requirement 38, via §9.1, and the half `R38_unaccepted_change` and
+# `R38_first_build_unaccepted` between them cannot show: what the gate must
+# **not** stop.
+#
+# §9.1 splits the record in two and passes only the first half through steps 2
+# to 4. "The accepted resolution" — every contribution, the hashed inputs, the
+# resolved graphs — is gated. "The application's answers" — supplied values,
+# acknowledgements, dismissals, permission suppressions, export approvals,
+# required-feature decisions, colliding-path choices — are "recorded as they
+# change" and "**MUST NOT** require acceptance of themselves".
+#
+# Nothing a producer declares has moved here. The sidecar is byte-for-byte the
+# one the stored record was written from, and its `input` digest says so. What
+# changed is entirely the application's: a conditional value it has now
+# supplied, a conditional action it has now acknowledged, and — on Android — a
+# permission it has now suppressed.
+#
+# A consumer that diffs the whole record blocks on all three, and the
+# application is then asked to accept its own decision. §9.1's note names that
+# outcome exactly: "requiring it to accept its own decision would be a
+# confirmation dialog, and the click-through §9.6 warns about is bought exactly
+# this way."
+#
+# The suppression is the sharpest of the three, because it moves two lines: the
+# `decision` and the `effective permission` §6.5 requires, which a suppressed
+# permission does not have. A consumer that excluded the decision from the gate
+# and still compared the merge would block on the same answer one step removed.
+#
+# The conditionals are deliberate. §8.2 records an unsatisfied conditional
+# requirement without failing, which is what lets a stored record hold
+# `state=unresolved` at all — a build that blocked would have written no record
+# to compare against.
+requirement = 38
+profile     = "core"
+section     = "9.1"
+
+outcome = "accept"
+
+diagnostics = []
+advisories  = []
+assertions  = []

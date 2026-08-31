@@ -1,0 +1,10 @@
+build contract 1.0
+build platform ios
+dist pyanswer action enable_dashboard conditional=true state=unresolved
+dist pyanswer contract 1
+dist pyanswer contributes plist-value VendorEnvironment type=string value=production
+dist pyanswer input native.toml sha256=bbeaa81e19d4a85911f5937922a99d2659297c523b53097f737d2e5804893833
+dist pyanswer origin direct
+dist pyanswer value vendor_key conditional=true key=VendorAPIKey kind=info_plist state=unresolved
+dist pyanswer version 1.0.0
+effective plist-value VendorEnvironment distributions=pyanswer type=string value=production

@@ -1,0 +1,12 @@
+build contract 1.0
+build platform android
+dist pyanswer action enable_dashboard conditional=true state=unresolved
+dist pyanswer contract 1
+dist pyanswer contributes permission android.permission.ACCESS_COARSE_LOCATION reason="Regional endpoint selection"
+dist pyanswer contributes permission android.permission.INTERNET reason="Reaching the vendor's API"
+dist pyanswer input native.toml sha256=97c246e64f504f536f6d1a38a3b0b8e536144292326b8367265a2add1194a6f2
+dist pyanswer origin direct
+dist pyanswer value vendor_key conditional=true key=com.vendor.KEY kind=manifest_meta_data state=unresolved
+dist pyanswer version 1.0.0
+effective permission android.permission.ACCESS_COARSE_LOCATION distributions=pyanswer
+effective permission android.permission.INTERNET distributions=pyanswer

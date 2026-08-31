@@ -1,0 +1,8 @@
+[build]
+deployment_target = "16.0"
+
+[answers.values]
+"pyanswer.vendor_key" = "vk_live_4f2c19"
+
+[answers.acknowledged]
+"pyanswer" = ["enable_dashboard"]
