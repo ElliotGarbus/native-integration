@@ -442,6 +442,102 @@ rules being data and being prose-in-Python. Neither was done here. What was done
 is to stop the docstring implying otherwise, which is the minimum a claim like
 that owes a reader.
 
+## The second review: the gate was gating the wrong half
+
+The round above fixed requirement 38's first build. A second review against §8
+found the other half of the same requirement, and it is the more damaging one.
+
+**§9.1 splits the record in two, and the comparison did not.** Only the accepted
+resolution passes through steps 2 to 4; the application's answers are "recorded
+as they change" and "**MUST NOT** require acceptance of themselves". The gate
+diffed the whole rendered record. So supplying a value a producer asked for,
+acknowledging an action, or suppressing a permission blocked the next build —
+the application asked to accept its own decision, which is the confirmation
+dialog §9.1's note forbids in terms and the click-through §9.6 warns about,
+bought exactly the way the note says it is bought.
+
+What makes this worth setting down is that the reasoning had already been done
+and applied to one field. `initial_acceptance` was deliberately kept off the
+record, with a comment saying why: *"a record that changed on being accepted
+could not be compared against the thing that was accepted."* That is the same
+argument, and it stopped at the field it was written for.
+
+### The split runs through the middle of a line, not around it
+
+The obvious fix — drop every line that mentions an answer — is wrong, and the
+fixture that catches it is worth more than the fix. `dist pyx value vendor_key
+… state=unresolved` is two statements: a producer demands a value, and the
+application has not answered. Dropping the line ungates the demand, so a
+producer could add a new required value and no one would have to accept it.
+
+So `resolution_only` projects each line rather than filtering it. A value or an
+action keeps everything except `state`, `date` and `version`. A `decision` the
+application made is dropped whole — except `decision credential-required`, which
+is a fact about a producer's declaration (§9.5) and not something anyone chose.
+An `effective` merge is dropped because every input to it is gated already: a
+producer widening a permission moves the `contributes` line too, while a
+suppression moves only the merge, so gating it would gate the answer one step
+removed.
+
+`core/R38_answer_is_not_a_change` carries all three shapes on both platforms and
+fails the previous reader. `tests/test_acceptance.py` pins the projection line
+by line, because the split runs through the middle of a fact and that is the
+part a rewrite flattens.
+
+### Three more clauses, and one of them had already been solved elsewhere
+
+- **25** — §6.3's "within one sidecar, a module is declared once" was absent.
+  Only the cross-sidecar `configuration` clause existed, so two entries for one
+  module with different version bounds were accepted, and a `coordinate` against
+  a `module` for the same artifact was never compared at all. §6.3 separates the
+  two cases and says why: two distributions naming one module is a composition
+  Gradle resolves, one distribution naming it twice is two versions of a single
+  author's intent.
+- **27** — §6.4's same-`url` merge was skipped by the overlap check, correctly,
+  and then left as two facts. §6.4 gives it a table: `groups` and `modules`
+  union, any `credentials_required = true` wins. **This is §6.5's permission
+  merge one section earlier, and the lesson did not transfer.** It loses in the
+  same direction, too: the narrowly-scoped declaration is the one that looks
+  careful, and the repository ends up serving both bounds and needing a login.
+- Writing that merge exposed **a second half of §6.4's identity rule**. The
+  scheme is compared case-insensitively — but the credential answer was joined
+  by raw string, so an application answering `https://` for a sidecar that wrote
+  `HTTPS://` was told its credentials were not configured. `url_identity` is now
+  the one spelling of the rule, and the recorded url is the identity rather than
+  whichever sidecar was read first.
+
+### Four rows that claimed a clause about generating a project
+
+12, 20, 31 and 36 each named a module for a requirement one of whose clauses is
+generation: applying keeps only where shrinking is enabled, linking a Swift
+product and excluding a module's stubs, and giving a declared `target_sdk` a
+report's prominence.
+
+**12 is the instructive one.** §5.1 asks for the prominence a repository
+contribution gets, and the reader does give a repository exactly that — through
+S9. But S9 is an advisory, and §8.5 lets a consumer decline one, so a MUST
+cannot be discharged through that channel. The clause is about a report's
+layout, and this reader emits findings and a record.
+
+20's row was not overstated so much as answering a different question:
+"surfacing a report is the build tool's output; producing it is `findings.py`"
+against a requirement about not modifying the application's files.
+
+### One asymmetry left standing, deliberately
+
+§7.4's `append` fixes a **deterministic order** for concatenating array-valued
+plist keys and requires every contributed `LSApplicationQueriesSchemes` entry to
+be recorded with its distribution. The reader does the second. It records no
+merged array — and unlike §6.5, which says "the result **MUST** appear in the
+record", §7.4 says no such thing about `append`.
+
+That difference is either deliberate or an oversight in the specification, and
+it is not a consumer's to resolve. Adding an `effective plist-append` fact would
+record something no clause requires, which is how a reader starts defining the
+contract. Recorded here as a question for the specification rather than
+answered in code: **§6.5 requires its merge in the record and §7.4 does not,
+for two merges of the same shape.**
+
 ## What is not done
 
 - **No consumer generates anything.** Six assertions stay unverified until one

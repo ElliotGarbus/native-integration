@@ -405,6 +405,18 @@ other side of a blocking case, which is the only way that case discriminates:
   pass `R44_packaging_collision` with the right outcome and the right id while
   getting the section backwards.
 
+Two more of that shape were added when the reader's own gate was reviewed:
+
+- `core/R38_answer_is_not_a_change` — the resolution has not moved and the
+  application has answered three of its own questions, so §9.1's second half
+  applies and the build proceeds. Without it, a consumer that gated the whole
+  record passed all three requirement-38 cases while asking the application to
+  accept its own decisions;
+- `android/R27_repository_scopes_merged` — one repository declared twice, which
+  §6.4 makes a merge rather than a conflict, against
+  `R27_repository_scope_overlap` where two repositories contest a group and the
+  build fails.
+
 ## Running it
 
 ```
