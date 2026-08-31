@@ -15,7 +15,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from decimal import Decimal
-from typing import Any, Iterable, Iterator, Sequence
+from typing import Any, Iterable, Iterator, Mapping, Sequence
 
 #: A scalar that needs no quoting, from record-format.md's `bare` production.
 BARE = re.compile(r"[A-Za-z0-9._:/@+~*-]+")
@@ -96,20 +96,28 @@ class Fact:
         cls,
         verb: str,
         *positionals: Scalar,
+        verbatim: Mapping[str, Scalar | Sequence[Scalar] | None] | None = None,
         **keyed: Scalar | Sequence[Scalar] | None,
     ) -> "Fact":
         """Build a fact, dropping any operand whose value is absent.
 
         An operand spelled `None` is omitted rather than written empty, which is
         what lets a caller pass an optional field through without a conditional
-        at every call site. Python keywords are spelled with `_`, which this
-        turns back into the format's `-`.
+        at every call site. Every key this format names itself is kebab-case, so
+        a Python keyword's `_` becomes `-`.
+
+        `verbatim` is for the one place that would be wrong. A `view-link`'s
+        `<data>` attributes are the sidecar's own spelling — `path_prefix`, not
+        `path-prefix` — because a record must not depend on §6.6's conversion to
+        an `android:` name having been performed, and re-spelling them here
+        would be performing half of it.
         """
         rendered: list[tuple[str, str]] = []
-        for name, value in keyed.items():
+        pairs = [(name.replace("_", "-"), value) for name, value in keyed.items()]
+        pairs.extend((verbatim or {}).items())
+        for key, value in pairs:
             if value is None:
                 continue
-            key = name.replace("_", "-")
             if isinstance(value, (list, tuple, set, frozenset)):
                 members = [v for v in value if v is not None]
                 if not members:

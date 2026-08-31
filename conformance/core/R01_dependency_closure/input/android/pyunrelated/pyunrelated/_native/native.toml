@@ -1,0 +1,18 @@
+# Installed in the same environment and NOT in the closure (§3.2). Requirement 1
+# says a consumer never accepts a contribution from it.
+#
+# The sidecar is deliberately loud. A closure entry on its own does not exercise
+# the requirement: with nothing here to accept, a consumer that ignored
+# `origin = "not-in-closure"` would fail to find files rather than fail the
+# rule, and the case would pass for the wrong reason. Everything below would
+# appear in `expected/android.record` if it were read — a permission the
+# application never asked for, and a floor above what it configures, which
+# would fail the build outright.
+contract = "1"
+
+[android.requires]
+min_sdk = 34
+
+[[android.contributes.permissions]]
+name = "android.permission.READ_CONTACTS"
+reason = "Nothing in this build asked for this, which is the point"

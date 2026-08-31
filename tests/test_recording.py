@@ -128,6 +128,19 @@ def test_keyed_operands_are_sorted_and_follow_the_positionals():
     assert fact.render() == "dist map-sdk floor min_sdk configured=26 declared=24 state=met"
 
 
+def test_a_view_link_attribute_keeps_the_sidecars_spelling():
+    """"`path_prefix`, not `pathPrefix` and not `path-prefix`" — a record must
+    not depend on §6.6's conversion to an `android:` name having been performed,
+    and re-spelling it here would be performing half of it."""
+    fact = Fact.of(
+        "dist", "x", "contributes", "view-link", "C",
+        verbatim={"scheme": "myapp", "path_prefix": "/callback", "ssp_prefix": "/o"},
+    )
+    assert fact.render() == (
+        "dist x contributes view-link C path_prefix=/callback scheme=myapp ssp_prefix=/o"
+    )
+
+
 def test_a_python_keyword_operand_reaches_the_format_as_kebab_case():
     fact = Fact.of("dist", "x", "contributes", "component", "C", kind="activity",
                    exported_required=True)

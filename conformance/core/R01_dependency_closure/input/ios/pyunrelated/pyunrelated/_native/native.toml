@@ -1,0 +1,9 @@
+# The iOS half of the same thing. See the Android sidecar beside this one for
+# why an out-of-closure distribution has to ship something worth refusing.
+contract = "1"
+
+[ios.requires]
+deployment_target = "18.0"
+
+[ios.contributes.info_plist.values]
+PyUnrelatedMode = "loud"
