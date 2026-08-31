@@ -28,6 +28,11 @@ dependencies = []
 # cases in silence.
 test = ["pytest>=7"]
 
+# Non-normative, and its own documentation says so. SPEC.md is the contract;
+# this is a way to retrieve one rule out of it.
+[project.scripts]
+native-integration = "native_integration.cli:main"
+
 [project.urls]
 Specification = "https://github.com/ElliotGarbus/native-integration/blob/main/SPEC.md"
 Source = "https://github.com/ElliotGarbus/native-integration"

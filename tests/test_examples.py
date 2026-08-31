@@ -25,17 +25,16 @@ import pytest
 ROOT = Path(__file__).resolve().parent.parent
 
 from native_integration import PLATFORMS, Closure, read, source_from_path  # noqa: E402
+from native_integration import obligations  # noqa: E402
 
 #: Held to SPEC.md. `check_spec.py` names the same set, for the same reason.
 LIVE = ("examples/pystripe", "development/examples/mediated-ads")
 
-#: Obligations an example sidecar cannot discharge, because they are discharged
-#: by the *application* rather than by the producer: a value only the developer
-#: knows (12), an action only they can acknowledge (13, 14), an export only they
-#: can approve (29). A sidecar that could satisfy these on its own would mean
-#: the consent §8.4 requires had been designed out, so their presence here is
-#: the point rather than a gap.
-UNANSWERED = ("ni.req.12", "ni.req.13", "ni.req.14", "ni.req.29")
+#: Obligations an example sidecar cannot discharge, because the *application*
+#: discharges them. The library names the set — `native-integration validate`
+#: reports exactly these separately for the same reason — so this holds the
+#: examples to the same reading rather than to a second copy of it.
+UNANSWERED = obligations.ANSWERED_BY_THE_APPLICATION
 
 
 def sidecars() -> list[Path]:
