@@ -89,6 +89,7 @@ def read(
     if declared is None:
         return None
 
+    before = len(findings.items)
     structure.validate(
         document,
         platform=platform,
@@ -97,6 +98,13 @@ def read(
     )
     _under_declaration(document, declared, source, findings)
     _platform_support(document, platform, source, findings, origin)
+
+    # §4.4's reasoning, one level up. A sidecar that failed validation is not a
+    # sidecar with one bad key in it — it is a document whose meaning the reader
+    # could not establish, and deriving requirements from the rest would report
+    # an unsupplied value for a declaration that may not be one.
+    if any(found.blocking for found in findings.items[before:]):
+        return None
 
     return Sidecar(
         distribution=source.distribution,

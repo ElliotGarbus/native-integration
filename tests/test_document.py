@@ -158,7 +158,9 @@ def test_building_for_a_platform_the_key_omits_fails(sidecar):
         origin="via pywrapper",
     )
     assert ids(log) == {"ni.req.9"}
-    assert parsed is not None  # the sidecar is readable; the build is not viable
+    # Nothing comes back: a distribution that does not support this platform
+    # contributes to it either way, and reading on would be deciding otherwise.
+    assert parsed is None
     reported = next(f for f in log if f.obligation == "ni.req.9")
     assert "via pywrapper" in " ".join(reported.detail)
 
