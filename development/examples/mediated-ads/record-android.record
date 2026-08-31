@@ -35,3 +35,7 @@ dist pyadmob-mintegral origin direct
 dist pyadmob-mintegral value mintegral_app_id kind=inline state=supplied
 dist pyadmob-mintegral value mintegral_app_key kind=inline state=supplied
 dist pyadmob-mintegral version 1.0.0
+effective meta-data com.google.android.gms.ads.flag.OPTIMIZE_INITIALIZATION distributions=pyadmob,pyadmob-applovin type=boolean value=true
+effective permission android.permission.ACCESS_NETWORK_STATE distributions=pyadmob,pyadmob-applovin
+effective permission android.permission.INTERNET distributions=pyadmob,pyadmob-applovin,pyadmob-mintegral
+effective permission com.google.android.gms.permission.AD_ID distributions=pyadmob

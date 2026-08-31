@@ -70,6 +70,16 @@ def application_for(platform: str) -> Application:
     return Application(
         android=build.get("android", {}),
         deployment_target=build.get("ios", {}).get("deployment_target", ""),
+        # §9.1, The lifecycle: without the bootstrap action the whole effective
+        # set is an unaccepted delta, and requirement 38 blocks. That is the
+        # correct answer for a first build, and it means this generator cannot
+        # write a record for an application that has not accepted one -- which
+        # is why the example answers it rather than this file assuming it.
+        initial_acceptance=(
+            Answer(date=build["initial_acceptance"]["date"])
+            if "initial_acceptance" in build
+            else None
+        ),
         values={
             (distribution, identifier): answer
             for distribution, section in answered

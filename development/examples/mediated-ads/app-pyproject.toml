@@ -90,6 +90,29 @@ tracking_usage_description = "Trailmap uses your activity to show ads for gear y
 [tool.examplebuild.native.pyadmob-mintegral.android.acknowledged]
 initialize_mintegral = { date = "2026-08-24" }
 
+# --- accepting the first build (§9.1, The lifecycle) ------------------------
+# §9.1 makes the first build step 4 rather than an exemption:
+# when no accepted record exists every contribution is new, and a consumer must
+# require the same explicit acceptance it would require for a change. "A single
+# bootstrap action covering the initial set satisfies this; treating 'no record
+# yet' as implicit approval does not, because the first build is the one where
+# an application acquires *all* of its inherited native surface at once."
+#
+# This is that bootstrap action, and it is the one line in this file that is
+# about the integration rather than about a package. Three ad SDKs arrive with
+# four permissions, a Maven repository, two `<meta-data>` entries and an
+# `SKAdNetworkItems` list between them — the largest single acquisition this
+# application will ever make, and the build that would otherwise wave it
+# through unread.
+#
+# It is an answer, so §9.1's second half applies: it is recorded as it changes
+# and never gated itself, and it never reaches the record beside it. A record
+# that changed on being accepted could not be compared against the thing that
+# was accepted.
+
+[tool.examplebuild.initial_acceptance]
+date = "2026-08-24"
+
 # --- what is NOT here -------------------------------------------------------
 #
 # No suppression, no export approval, no packaging choice. An ads integration

@@ -16,6 +16,8 @@ belong to.
 
 from __future__ import annotations
 
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -61,3 +63,24 @@ def test_every_published_example_is_a_sidecar_a_consumer_accepts(directory, plat
     )
     structural = [found for found in integration.findings.blocking if found.obligation not in UNANSWERED]
     assert not structural, "\n".join(found.render() for found in structural)
+
+
+def test_the_worked_records_still_regenerate():
+    """The other half, which nothing here was asking.
+
+    `tools/record_example.py` is a CI step of its own, and the suite's only
+    claim about the worked example was the producer half above. So when the
+    §9.1 acceptance gate landed, the generator stopped being able to write a
+    record at all -- the example had never answered the bootstrap action -- and
+    every test still passed. The failure surfaced only in CI, in the one step
+    nothing in here shadows.
+
+    This runs the step. It is a subprocess rather than an import because that
+    is what CI runs, and a test that reimplemented it would be checking a
+    second copy of the thing that broke.
+    """
+    finished = subprocess.run(
+        [sys.executable, str(ROOT / "tools" / "record_example.py"), "--check"],
+        capture_output=True, text=True, cwd=ROOT,
+    )
+    assert finished.returncode == 0, finished.stdout + finished.stderr
