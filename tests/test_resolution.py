@@ -25,6 +25,16 @@ CORPUS = ROOT / "conformance"
 R01 = CORPUS / "core" / "R01_dependency_closure"
 
 
+def expected_record(case: Path, platform: str) -> str:
+    """A case's expected record, decoded without newline translation.
+
+    `read_text` would fold CRLF to LF and make "byte for byte" below true by
+    construction on a Windows checkout. `newline=""` says that from 3.13 only,
+    and 3.11 is the floor, so the bytes are decoded directly.
+    """
+    return (case / "expected" / f"{platform}.record").read_bytes().decode("utf-8")
+
+
 def application_for(path: Path) -> Application:
     """The corpus's neutral spelling, adapted — which is what §2.2 asks of any
     consumer, and the shape of what a build tool writes once."""
@@ -115,9 +125,7 @@ def resolve_case(case: Path, platform: str):
 @pytest.mark.parametrize("platform", ["android", "ios"])
 def test_r01_is_reproduced_byte_for_byte_from_its_own_fixture(platform):
     _, log, record = resolve_case(R01, platform)
-    expected = (R01 / "expected" / f"{platform}.record").read_text(
-        encoding="utf-8", newline=""
-    )
+    expected = expected_record(R01, platform)
     assert record.render() == expected
     assert not list(log)
 
@@ -142,9 +150,7 @@ def test_every_expected_record_the_sidecars_alone_can_explain(case, platform):
     if (input_directory(case, platform) / "resolved.toml").exists():
         pytest.skip("needs a stated resolution, which is not wired up yet")
     _, _, record = resolve_case(case, platform)
-    expected = (case / "expected" / f"{platform}.record").read_text(
-        encoding="utf-8", newline=""
-    )
+    expected = expected_record(case, platform)
     assert record.render() == expected
 
 

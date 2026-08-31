@@ -23,6 +23,17 @@ def _records() -> list[Path]:
     return sorted(CONFORMANCE.glob("*/*/**/*.record"))
 
 
+def _exact(path: Path) -> str:
+    """The file's bytes, decoded, with no newline translation of any kind.
+
+    `read_text` translates CRLF to LF, which would make "round-trips byte for
+    byte" true by construction on a Windows checkout — the one place it could
+    plausibly be false. `newline=""` turns that off, but only from 3.13, and
+    3.11 is the floor here. Decoding the bytes is what §9.3 hashes anyway.
+    """
+    return path.read_bytes().decode("utf-8")
+
+
 def test_the_corpus_ships_records_to_check():
     """Most cases are blocking and carry a note instead of a record, so the set
     is small. It has to hold both kinds: an expected record is what a consumer
@@ -34,7 +45,7 @@ def test_the_corpus_ships_records_to_check():
 
 @pytest.mark.parametrize("path", _records(), ids=lambda p: str(p.relative_to(CONFORMANCE)))
 def test_every_corpus_record_round_trips_byte_for_byte(path):
-    text = path.read_text(encoding="utf-8", newline="")
+    text = _exact(path)
     facts = recording.read(text)
     assert "".join(f"{fact.render()}\n" for fact in facts) == text
 
@@ -42,7 +53,7 @@ def test_every_corpus_record_round_trips_byte_for_byte(path):
 @pytest.mark.parametrize("path", _records(), ids=lambda p: str(p.relative_to(CONFORMANCE)))
 def test_every_corpus_record_is_a_sorted_set(path):
     """`read` enforces the file's own properties, so this is what it rejects."""
-    recording.read(path.read_text(encoding="utf-8", newline=""))
+    recording.read(_exact(path))
 
 
 # -- the lexical rules -----------------------------------------------------
@@ -228,7 +239,7 @@ def test_a_malformed_digest_survives_the_read_and_fails_the_interpretation():
         CONFORMANCE / "core" / "R40_stored_digest_malformed" / "input" / "android"
         / "accepted.record"
     )
-    facts = recording.read(path.read_text(encoding="utf-8", newline=""))
+    facts = recording.read(_exact(path))
     abbreviated = [
         value
         for fact in facts
@@ -285,7 +296,7 @@ def test_the_worked_example_is_reproduced_from_facts():
         sha256="3de10e32e5acdc2e46c4a3b55a1263a3a0547188407fb799d39df73e5e2b0a5a",
     )
 
-    expected = (
+    expected = _exact(
         CONFORMANCE / "core" / "R01_dependency_closure" / "expected" / "android.record"
-    ).read_text(encoding="utf-8", newline="")
+    )
     assert record.render() == expected
