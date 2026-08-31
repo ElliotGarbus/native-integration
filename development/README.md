@@ -259,3 +259,17 @@ share is their cause — each round found the gaps on whichever platform the
 previous round's examples had not stressed, which is an argument about
 *selection* rather than about either platform. The next round should be chosen
 against that, not against a hunch.
+
+## Building against the specification
+
+Everything above tested the specification by *writing* against it. Testing it by
+*implementing* it came after, in phases, and each one recorded what it found the
+same way an example's `NOTES.md` does — because a phase that ends green says
+nothing about what it cost to get there.
+
+| | |
+| --- | --- |
+| [`findings/phase0-inventory.md`](findings/phase0-inventory.md) | what the repository actually contained, and the nine defects that audit found |
+| [`findings/phase1-registry.md`](findings/phase1-registry.md) | `contract/v1.toml` — the vocabulary as data, and the three artifacts generated from it |
+| [`findings/phase2-corpus.md`](findings/phase2-corpus.md) | the conformance corpus, its harness, and the cases that were green for the wrong reason |
+| [`findings/phase3-reader.md`](findings/phase3-reader.md) | the reader rewritten against SPEC.md, and the six assertions it cannot verify because it generates nothing |

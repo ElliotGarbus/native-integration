@@ -13,14 +13,16 @@ platforms = ["android", "ios"]
 min_sdk = 23
 compile_sdk = 35
 
-# The legacy manifest-read case §6.3 was written for: GMA reads this before any
-# Python runs and fails at startup without it.
-[[android.requires.application_values]]
+# The legacy manifest-read case §5.2, Values, was written for: GMA reads this
+# before any Python runs and fails at startup without it.
+[[android.requires.application_value]]
 id = "admob_app_id"
+kind = "manifest_meta_data"
+key = "com.google.android.gms.ads.APPLICATION_ID"
 reason = """\
 Your AdMob application ID, from the AdMob console. It is per-platform: the \
 Android and iOS consoles issue different IDs."""
-manifest_meta_data = "com.google.android.gms.ads.APPLICATION_ID"
+placeholder = "<TODO: your AdMob Android app ID, ca-app-pub-…~…>"
 
 [[android.contributes.gradle_dependencies]]
 module = "com.google.android.gms:play-services-ads"
@@ -36,13 +38,18 @@ reason = "Connectivity checks before an ad request"
 
 [[android.contributes.permissions]]
 name = "com.google.android.gms.permission.AD_ID"
+# The `reason` is read by an application developer in a build report, so it
+# names the choice rather than the section that governs it — suppression is
+# §6.5, Permissions and features, and citing that here would be the producer
+# explaining the specification to someone who just wants to know whether to
+# refuse the permission.
 reason = """\
-Reads the advertising ID for ad personalization. Suppress it (§6.7) if your \
+Reads the advertising ID for ad personalization. Suppress it if your \
 application is in a children's category."""
 
-# A producer-known constant, not an application value — the case §6.10 exists
-# for. The AppLovin adapter beside this one sets the same key to the same
-# value, which is the coalescing path rather than the conflict path.
+# A producer-known constant, not an application value — the case §6.8, Manifest
+# meta-data, exists for. The AppLovin adapter beside this one sets the same key
+# to the same value, which is the coalescing path rather than the conflict path.
 [[android.contributes.meta_data]]
 key = "com.google.android.gms.ads.flag.OPTIMIZE_INITIALIZATION"
 value = true
@@ -53,16 +60,25 @@ reason = "Moves ad initialization off the first frame; both mediation packages w
 [ios.requires]
 deployment_target = "15.0"
 
-# The table §6.3's rationale predicted, and the reason it had to be parallel
-# rather than platform-neutral: this value is *not* the Android one.
-[[ios.requires.application_values]]
+# The table §5.2's rationale predicted, and the reason identity is scoped by
+# platform as well as by distribution: this value is *not* the Android one,
+# under the same `id`.
+[[ios.requires.application_value]]
 id = "admob_app_id"
+kind = "info_plist"
+key = "GADApplicationIdentifier"
 reason = """\
 Your AdMob application ID for iOS, from the AdMob console. Different from the \
 Android ID for the same application."""
-info_plist_key = "GADApplicationIdentifier"
+placeholder = "<TODO: your AdMob iOS app ID, ca-app-pub-…~…>"
 
-[[ios.requires.usage_descriptions]]
+# §5.5, Value kinds: a usage description is the application's own sentence, in
+# its own voice, and a producer that wrote one would be putting words in App
+# Review's ear on the application's behalf. So the producer asks, and does not
+# supply.
+[[ios.requires.application_value]]
+id = "tracking_usage_description"
+kind = "usage_description"
 key = "NSUserTrackingUsageDescription"
 conditional = true
 reason = "Required only if you request App Tracking Transparency for personalized ads"
@@ -74,13 +90,14 @@ requirement = { from = "12.0.0" }
 products = ["GoogleMobileAds"]
 
 [ios.contributes]
-# Static libraries with Objective-C categories; without this the linker drops
-# them and the SDK dies on an unrecognized selector (§7.8).
+# Static libraries carrying the §7.6 Objective-C categories; without this the
+# linker drops them and the SDK dies on an unrecognized selector.
 objc_categories = true
 
 [ios.contributes.info_plist]
 # Google's own identifier, plus the mediated networks AdMob's documentation
-# lists. Both adapters repeat some of these — the de-duplication case (§7.6).
+# lists. Both adapters repeat some of these — the de-duplication case in §7.4,
+# Info.plist.
 skadnetwork_identifiers = [
   "cstr6suwn9.skadnetwork",
   "ludvb6z3bs.skadnetwork",

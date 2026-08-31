@@ -1,150 +1,96 @@
 """A reference reader for the native-integration specification.
 
-The specification puts 26 numbered obligations on a *consumer* — the build tool
-that reads sidecars and generates the native project. This library exists so
-that those are code paths a tool gets by using it, rather than prose it has to
-remember to implement.
+`SPEC.md` puts 44 numbered obligations and 15 advisory ones on a **consumer** —
+the build tool that reads sidecars and generates the native project. This
+library exists so that the reading half of that is a code path a tool gets by
+using it, rather than prose it has to remember to implement.
+
+It reads, validates, resolves and records. It generates nothing: no Gradle
+files, no Xcode project, no manifest. That boundary is deliberate, and it is
+where a build tool's own work starts.
 
 A minimal read::
 
-    from native_integration import Application, Closure, MappingAnswers, Platform, read
+    from native_integration import Application, Closure, read, source_from_path
 
     integration = read(
-        platform=Platform.ANDROID,
+        [source_from_path("pystripe/_native", distribution="pystripe")],
+        platform="android",
         closure=Closure.direct("pystripe"),
         application=Application(
-            android_sdk={"min_sdk": 24, "compile_sdk": 35},
-            answers=MappingAnswers(
-                application_values={"pystripe": {"stripe_return_scheme": "trailmap-pay"}},
-                allow_exported={"pystripe": ["org.pystripe.PaymentReturnActivity"]},
-            ),
+            android={"min_sdk": 24, "compile_sdk": 35},
+            values={("pystripe", "stripe_return_scheme"): "trailmap-pay"},
         ),
-        record_path="native-integration.lock.json",
     )
     print(integration.report())
     integration.raise_for_errors()
+    print(integration.record.render())
 
-``docs/REQUIREMENTS.md`` maps every §8 requirement to the code path that
-discharges it, and ``tests/test_requirement_coverage.py`` fails if one falls
-out of both tables.
+**The vocabulary is not written down twice.** Every declaration, every closed
+value, every refusal and every diagnostic id comes from
+[`contract/v1.toml`](../../contract/v1.toml) at run time, so a rule the registry
+states is a rule this reader enforces without anyone having transcribed it.
+`docs/REQUIREMENTS.md` maps each §8 obligation to the module that discharges it.
 """
 
 from __future__ import annotations
 
-from .answers import AnswerSource, CredentialKind, CredentialReference, MappingAnswers, NoAnswers
-from .context import Application, ConsumerProfile
+from .acceptance import Delta
+from .application import (
+    Answer,
+    Application,
+    Approval,
+    Credential,
+    FeatureDecision,
+    PackagingChoice,
+)
 from .contract import ENTRY_POINT_GROUP, IMPLEMENTED, ContractVersion
-from .diagnostics import (
-    Diagnostic,
-    DiagnosticBag,
-    IntegrationError,
-    Rule,
-    Severity,
-    SpecViolation,
-    UnimplementedObligation,
-)
 from .discovery import Closure, Origin, discover, normalize_name, source_from_path
-from .effective import Contribution, EffectiveSet, PrerequisiteStatus
-from .model import (
-    AndroidSection,
-    ApplicationValue,
-    Component,
-    GradleDependency,
-    GradleRepository,
-    IosSection,
-    Permission,
-    Platform,
-    Prerequisite,
-    PrerequisiteKind,
-    PythonModule,
-    Sidecar,
-    SwiftPackage,
-)
-from .ports import (
-    ArtifactInspector,
-    ArtifactManifest,
-    BinaryTarget,
-    DependencyRequest,
-    GradleGraph,
-    GradleResolver,
-    ManifestComponent,
-    ManifestFeature,
-    NO_RESOLVERS,
-    ResolutionFailure,
-    ResolvedArtifact,
-    ResolvedSwiftPackage,
-    Resolvers,
-    SwiftGraph,
-    SwiftPackageRequest,
-    SwiftResolver,
-)
-from .record import Delta, DistributionRecord, IntegrationRecord, MalformedRecord
-from .resolution import Integration, check_sidecar, read
-from .resources import SidecarSource
+from .document import Sidecar
+from .findings import Finding, Findings
+from .graph import Artifact, Graph, Package, graph_of
+from .integration import Resolved
+from .reader import Integration, IntegrationError, read
+from .recording import Fact, Record, RecordError
+from .registry import PLATFORMS, Registry
+from .registry import load as load_registry
+from .resources import ResourceError, SidecarSource
 
 __version__ = "0.1.0.dev0"
 
 __all__ = [
-    "AndroidSection",
-    "AnswerSource",
+    "Answer",
     "Application",
-    "ApplicationValue",
-    "ArtifactInspector",
-    "ArtifactManifest",
-    "BinaryTarget",
+    "Approval",
+    "Artifact",
     "Closure",
-    "Component",
-    "ConsumerProfile",
     "ContractVersion",
-    "Contribution",
-    "CredentialKind",
-    "CredentialReference",
+    "Credential",
     "Delta",
-    "DependencyRequest",
-    "Diagnostic",
-    "DiagnosticBag",
-    "DistributionRecord",
     "ENTRY_POINT_GROUP",
-    "EffectiveSet",
-    "GradleDependency",
-    "GradleGraph",
-    "GradleRepository",
-    "GradleResolver",
+    "Fact",
+    "FeatureDecision",
+    "Finding",
+    "Findings",
+    "Graph",
     "IMPLEMENTED",
     "Integration",
     "IntegrationError",
-    "IntegrationRecord",
-    "MalformedRecord",
-    "IosSection",
-    "ManifestComponent",
-    "ManifestFeature",
-    "MappingAnswers",
-    "NO_RESOLVERS",
-    "NoAnswers",
     "Origin",
-    "Permission",
-    "Platform",
-    "Prerequisite",
-    "PrerequisiteKind",
-    "PrerequisiteStatus",
-    "PythonModule",
-    "ResolutionFailure",
-    "ResolvedArtifact",
-    "ResolvedSwiftPackage",
-    "Resolvers",
-    "Rule",
-    "Severity",
+    "PLATFORMS",
+    "Package",
+    "PackagingChoice",
+    "Record",
+    "RecordError",
+    "Registry",
+    "ResourceError",
+    "Resolved",
     "Sidecar",
     "SidecarSource",
-    "SpecViolation",
-    "SwiftGraph",
-    "SwiftPackage",
-    "SwiftPackageRequest",
-    "SwiftResolver",
-    "UnimplementedObligation",
     "__version__",
-    "check_sidecar",
     "discover",
+    "graph_of",
+    "load_registry",
     "normalize_name",
     "read",
     "source_from_path",

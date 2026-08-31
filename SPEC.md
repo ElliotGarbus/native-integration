@@ -85,7 +85,7 @@ it.
   - [5.7 Slots](#57-slots)
 - [6. Android declarations](#6-android-declarations)
   - [6.1 Ownership](#61-ownership)
-  - [6.2 Source](#62-source)
+  - [6.2 Java and Kotlin source](#62-java-and-kotlin-source)
   - [6.3 Gradle dependencies](#63-gradle-dependencies)
   - [6.4 Maven repositories](#64-maven-repositories)
   - [6.5 Permissions and features](#65-permissions-and-features)
@@ -96,7 +96,7 @@ it.
 - [7. iOS declarations](#7-ios-declarations)
   - [7.1 Symbol prefixes](#71-symbol-prefixes)
   - [7.2 Swift packages](#72-swift-packages)
-  - [7.3 Source](#73-source)
+  - [7.3 Swift source](#73-swift-source)
   - [7.4 Info.plist](#74-infoplist)
   - [7.5 Python modules](#75-python-modules)
   - [7.6 Objective-C categories](#76-objective-c-categories)
@@ -1431,7 +1431,7 @@ they name.
 | § | Key | Declares | How conflicts resolve |
 | --- | --- | --- | --- |
 | [6.1](#61-ownership) | `android.owns.java_namespaces` | A claim on a Java/Kotlin namespace | Overlapping claims **fail** the build |
-| [6.2](#62-source) | `android.contributes.src` | Java/Kotlin source under an owned namespace | N/A — one producer owns the namespace |
+| [6.2](#62-java-and-kotlin-source) | `android.contributes.src` | Java/Kotlin source under an owned namespace | N/A — one producer owns the namespace |
 | [6.3](#63-gradle-dependencies) | `android.contributes.gradle_dependencies` | A Gradle dependency coordinate | Versions are requests Gradle resolves; two declarations differing in `configuration` fail |
 | [6.4](#64-maven-repositories) | `android.contributes.gradle_repositories` | A Maven repository URL | Bounded to declared groups; overlapping scopes fail |
 | [6.5](#65-permissions-and-features) | `android.contributes.permissions`, `.features` | A `<uses-permission>` or `<uses-feature>` entry | Union; the application may suppress a permission |
@@ -1488,7 +1488,7 @@ before this rule applies: [§6.7](#67-shrinker-keep-patterns) defines what part
 of a keep pattern is compared.
 
 Rule 1's operands need one too, since a path is not a namespace. Each directory
-listed in [§6.2](#62-source)'s `java` or `kotlin` is a **source root**, and for
+listed in [§6.2](#62-java-and-kotlin-source)'s `java` or `kotlin` is a **source root**, and for
 every file staged from it:
 
 | Operand | How it is derived |
@@ -1521,7 +1521,7 @@ claims a top-level name for one distribution, which makes accidental overlap
 with a sibling project far likelier.
 
 
-### 6.2 Source
+### 6.2 Java and Kotlin source
 
 Source code for "glue classes" your binding needs on the device, compiled by the application's own
 toolchain.
@@ -2397,8 +2397,8 @@ What a producer contributes on iOS. Requirements on the application are
 | --- | --- | --- | --- |
 | [7.1](#71-symbol-prefixes) | `ios.contributes.src.symbol_prefixes` | A declared prefix for contributed Swift type names | N/A — a diagnostic aid, not an enforced claim |
 | [7.2](#72-swift-packages) | `ios.contributes.swift_packages` | A SwiftPM package dependency | Locked to the resolved graph; a branch or path dependency **fails** |
-| [7.3](#73-source) | `ios.contributes.src` | Raw Swift source, compiled into the application target | N/A — no ownership or collision check |
-| [7.3](#73-source) | `ios.contributes.accessed_api_types` | A required-reason API disclosure for contributed source | Union; `reasons` de-duplicated per `type` |
+| [7.3](#73-swift-source) | `ios.contributes.src` | Raw Swift source, compiled into the application target | N/A — no ownership or collision check |
+| [7.3](#73-swift-source) | `ios.contributes.accessed_api_types` | A required-reason API disclosure for contributed source | Union; `reasons` de-duplicated per `type` |
 | [7.4](#74-infoplist) | `ios.contributes.info_plist.values` | A scalar `Info.plist` key | Equal values coalesce, differing values **fail**, the application's own value always wins |
 | [7.4](#74-infoplist) | `ios.contributes.info_plist.append`, `.skadnetwork_identifiers` | An array-valued `Info.plist` key, or an `SKAdNetworkItems` entry | Union |
 | [7.5](#75-python-modules) | `ios.contributes.python_modules` | A Python-extension-module registration (name and init symbol) | Two producers naming the same `name` **fail** |
@@ -2415,7 +2415,7 @@ swift = ["swift"]
 symbol_prefixes = ["MyPkg"]
 ```
 
-A producer that contributes Swift source ([§7.3](#73-source)) **SHOULD** do two
+A producer that contributes Swift source ([§7.3](#73-swift-source)) **SHOULD** do two
 things: name every class, struct, enum, and protocol it declares — its
 *types*, and in particular their `@objc` runtime names — with a consistent
 prefix, and declare that same prefix here.
@@ -2619,7 +2619,7 @@ what gets linked.
 Swift Package Manager is the **RECOMMENDED** channel for anything larger than a
 few glue files.
 
-### 7.3 Source
+### 7.3 Swift source
 
 Contributed Swift lands in the application's own compilation scope under exactly
 the names it was written with, which is why this is for shims and
@@ -3016,7 +3016,7 @@ is the core plus at least one platform profile**, and a consumer states which:
 | **iOS** | 33–37, 46 |
 
 Requirement 24 appears in the core, and **only** there, because contributed
-source exists on both platforms — [§6.2](#62-source) and [§7.3](#73-source) —
+source exists on both platforms — [§6.2](#62-java-and-kotlin-source) and [§7.3](#73-swift-source) —
 and every consumer excludes it from the Python payload; its `javac` charset
 clause binds only a consumer that compiles Java, which is why the Android row
 does not repeat it. Requirement 26 locks whichever native graphs the consumer
@@ -3200,11 +3200,11 @@ A conforming consumer **MUST**:
     segments; derive a contributed file's namespace from its path relative to
     its source root and check it, its declared `package`, and their equality,
     case-sensitively; and fail on a collision naming the distributions
-    responsible ([§6.1](#61-ownership), [§6.2](#62-source)).
+    responsible ([§6.1](#61-ownership), [§6.2](#62-java-and-kotlin-source)).
 24. Compile contributed source with the application's own toolchain and exclude
     it from any Python payload, on both platforms; and, where it compiles Java,
     force UTF-8 for `.java` rather than the platform default
-    ([§6.2](#62-source), [§7.3](#73-source)).
+    ([§6.2](#62-java-and-kotlin-source), [§7.3](#73-swift-source)).
 25. Reject a Gradle dependency declaring both or neither of `coordinate` and
     `module`, reject a changing or unbounded version, reject a processor
     configuration, reject two entries in one sidecar naming one module unless
@@ -3266,10 +3266,10 @@ A conforming consumer **MUST**:
     that a self-declared package is not pinned by the distribution's own
     version ([§7.2](#72-swift-packages)).
 34. Reject `symbol_prefixes` ([§7.1](#71-symbol-prefixes)) and
-    `accessed_api_types` ([§7.3](#73-source)) from a sidecar contributing no
+    `accessed_api_types` ([§7.3](#73-swift-source)) from a sidecar contributing no
     Swift source, and merge what `accessed_api_types` declares into the
     application's `PrivacyInfo.xcprivacy` in the order
-    [§7.3](#73-source) fixes.
+    [§7.3](#73-swift-source) fixes.
 35. Enforce [§7.4](#74-infoplist)'s TOML-to-plist mapping; fail on two
     distributions setting one key differently, and on one key claimed both as
     an array (`append`) and as a scalar — `values` or a value of kind
@@ -3825,7 +3825,7 @@ not have to find them scattered.
 | Limitation | What version 1 does instead |
 | --- | --- |
 | **A component exported by a resolved artifact bypasses the sidecar's approval gate** ([§6.6](#66-manifest-components), [§9.4](#94-what-resolved-artifacts-bring-with-them)). Moving a class from a sidecar declaration into a published `.aar` turns an approval into a merge AGP performs | Reports it with the prominence a contributed export gets, attributed to the artifact and to the distribution that pulled it in. Gating it would mean approving dozens of components nobody chose, on every build |
-| **Contributed Swift has no enforceable symbol boundary** ([§7.1](#71-symbol-prefixes), [§7.3](#73-source)). Prefixes are guidance, and reach neither file-scope functions and constants nor extension members, all of which land in the application's own scope | Asks for prefixes, attributes a duplicate-symbol error to the distribution whose prefix matches (8.S10), and points a producer with more than shims at a Swift package, which is its own module |
+| **Contributed Swift has no enforceable symbol boundary** ([§7.1](#71-symbol-prefixes), [§7.3](#73-swift-source)). Prefixes are guidance, and reach neither file-scope functions and constants nor extension members, all of which land in the application's own scope | Asks for prefixes, attributes a duplicate-symbol error to the distribution whose prefix matches (8.S10), and points a producer with more than shims at a Swift package, which is its own module |
 | **Package visibility has no application veto** ([§6.9](#69-package-visibility)). A transitive producer's `<queries>` entry widens what the application can see without the application deciding | Requires a `reason` on every entry and reports both, since withholding one would not reduce what the application may do — it would make a dependency's code get a wrong answer with no diagnostic |
 
 The first is the one with a security shape, and it is the reason
@@ -4203,7 +4203,7 @@ place: the value kinds of [§5.5](#55-value-kinds), the Gradle configurations of
 | `conditional` | Optional, default `false` |
 | **`[android.owns]`** [§6.1](#61-ownership) | |
 | `java_namespaces` | Java namespaces this distribution claims exclusively; overlapping claims fail the build. Required when contributing Java/Kotlin, producer-sourced components, or keep patterns |
-| **`[android.contributes.src]`** [§6.2](#62-source) | |
+| **`[android.contributes.src]`** [§6.2](#62-java-and-kotlin-source) | |
 | `java` | Directories whose `.java` files the application's own toolchain compiles |
 | `kotlin` | Directories whose `.kt` files the application's own toolchain compiles |
 | **`[[android.contributes.gradle_dependencies]]`** [§6.3](#63-gradle-dependencies) | A dependency is spelled in **exactly one** of two forms — an exact `coordinate`, or a `module` with a bounded `version`. Declaring both, or neither, is rejected |
@@ -4257,10 +4257,10 @@ place: the value kinds of [§5.5](#55-value-kinds), the Gradle configurations of
 | `requirement` | Exactly one of `{ exact }`, `{ from }`, `{ revision }`. `branch` is invalid |
 | `credentials_required` | Optional. Declares the repository authenticated; [§6.4](#64-maven-repositories)'s credential rules apply unchanged |
 | `reason` | **Required when `credentials_required` is set**, and unused otherwise: which credential is needed and where to obtain it |
-| **`[ios.contributes.src]`** [§7.3](#73-source) | |
+| **`[ios.contributes.src]`** [§7.3](#73-swift-source) | |
 | `swift` | Directories of `.swift` staged into the application target. For small shims only |
 | `symbol_prefixes` | Prefixes the producer puts on its contributed Swift type names ([§7.1](#71-symbol-prefixes)). Guidance only; it does not cover file-scope functions or extension members, and it is invalid without contributed source |
-| **`[[ios.contributes.accessed_api_types]]`** [§7.3](#73-source) — a sibling of `src`, not a child of it | |
+| **`[[ios.contributes.accessed_api_types]]`** [§7.3](#73-swift-source) — a sibling of `src`, not a child of it | |
 | `type` | **Required.** Apple's canonical string for a required-reason API category, written exactly as Apple defines it. Valid only in a sidecar that also contributes Swift source |
 | `reasons` | **Required.** Apple's canonical reason codes, merged into the application's `PrivacyInfo.xcprivacy` and de-duplicated per `type` |
 | `reason` | Recommended prose. Apple's codes are opaque by design, and the record is where an application reads what its dependencies claim |

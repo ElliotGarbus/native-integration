@@ -105,8 +105,8 @@ enforceable claim).
 
 | Path | Type | Cardinality | Required | Closed | Section |
 | --- | --- | --- | --- | --- | --- |
-| `android.contributes.src.java` | array of directory paths | table field | no | no | [§6.2](../../SPEC.md#62-source) |
-| `android.contributes.src.kotlin` | array of directory paths | table field | no | no | [§6.2](../../SPEC.md#62-source) |
+| `android.contributes.src.java` | array of directory paths | table field | no | no | [§6.2](../../SPEC.md#62-java-and-kotlin-source) |
+| `android.contributes.src.kotlin` | array of directory paths | table field | no | no | [§6.2](../../SPEC.md#62-java-and-kotlin-source) |
 | `android.contributes.gradle_dependencies[].coordinate` | string `group:artifact:version` | array-of-tables | exactly one of `coordinate` / `module` | no | [§6.3](../../SPEC.md#63-gradle-dependencies) |
 | `…gradle_dependencies[].module` | string `group:artifact` | | exactly one of `coordinate` / `module` | no | [§6.3](../../SPEC.md#63-gradle-dependencies) |
 | `…gradle_dependencies[].version` | inline table `{ at_least, below }`, **both** required | | **yes** with `module` | no | [§6.3](../../SPEC.md#63-gradle-dependencies) |
@@ -147,11 +147,11 @@ enforceable claim).
 | Path | Type | Cardinality | Required | Closed | Section |
 | --- | --- | --- | --- | --- | --- |
 | `ios.contributes.objc_categories` | boolean, **`true` only** — `false` rejected | field of `[ios.contributes]` | no | no | [§7.6](../../SPEC.md#76-objective-c-categories) |
-| `ios.contributes.src.swift` | array of directory paths | table field | no | no | [§7.3](../../SPEC.md#73-source) |
+| `ios.contributes.src.swift` | array of directory paths | table field | no | no | [§7.3](../../SPEC.md#73-swift-source) |
 | `ios.contributes.src.symbol_prefixes` | array of strings | table field | no; **invalid in a sidecar contributing no Swift source** | no | [§7.1](../../SPEC.md#71-symbol-prefixes) |
-| `ios.contributes.accessed_api_types[].type` | Apple's canonical string, **pass-through** | array-of-tables — a *sibling* of `src`, not a child | **yes** | no — pass-through | [§7.3](../../SPEC.md#73-source) |
-| `…accessed_api_types[].reasons` | array of Apple's canonical strings, **pass-through** | | **yes** | no — pass-through | [§7.3](../../SPEC.md#73-source) |
-| `…accessed_api_types[].reason` | string, prose | | RECOMMENDED | no | [§7.3](../../SPEC.md#73-source) |
+| `ios.contributes.accessed_api_types[].type` | Apple's canonical string, **pass-through** | array-of-tables — a *sibling* of `src`, not a child | **yes** | no — pass-through | [§7.3](../../SPEC.md#73-swift-source) |
+| `…accessed_api_types[].reasons` | array of Apple's canonical strings, **pass-through** | | **yes** | no — pass-through | [§7.3](../../SPEC.md#73-swift-source) |
+| `…accessed_api_types[].reason` | string, prose | | RECOMMENDED | no | [§7.3](../../SPEC.md#73-swift-source) |
 | `ios.contributes.swift_packages[].name` | string, local handle, unique within the sidecar | array-of-tables | **yes** | no | [§7.2](../../SPEC.md#72-swift-packages) |
 | `…swift_packages[].url` | `https` string | | **yes** | no | [§7.2](../../SPEC.md#72-swift-packages) |
 | `…swift_packages[].products` | array of product names, non-empty | | **yes** | no | [§7.2](../../SPEC.md#72-swift-packages) |
@@ -645,7 +645,7 @@ Three rules turn on this phrase and none defines it:
 
 - [§7.1](../../SPEC.md#71-symbol-prefixes): reject `symbol_prefixes` "in a
   sidecar that contributes no Swift source".
-- [§7.3](../../SPEC.md#73-source): reject `accessed_api_types` otherwise.
+- [§7.3](../../SPEC.md#73-swift-source): reject `accessed_api_types` otherwise.
 - [§6.1](../../SPEC.md#61-ownership): `java_namespaces` is REQUIRED "when the
   distribution contributes Java or Kotlin source".
 

@@ -394,7 +394,7 @@ platform = "android"
 required = false
 since = "1.0"
 section = "6.2"
-anchor = "62-source"
+anchor = "62-java-and-kotlin-source"
 
 [declarations."android.contributes.src.java"]
 node = "field"
@@ -405,7 +405,7 @@ platform = "android"
 required = false
 since = "1.0"
 section = "6.2"
-anchor = "62-source"
+anchor = "62-java-and-kotlin-source"
 description = "Directories whose `.java` files the application's own toolchain compiles"
 
 [declarations."android.contributes.src.kotlin"]
@@ -417,7 +417,7 @@ platform = "android"
 required = false
 since = "1.0"
 section = "6.2"
-anchor = "62-source"
+anchor = "62-java-and-kotlin-source"
 description = "Directories whose `.kt` files the application's own toolchain compiles"
 
 [declarations."android.contributes.gradle_dependencies"]
@@ -1048,7 +1048,7 @@ platform = "ios"
 required = false
 since = "1.0"
 section = "7.3"
-anchor = "73-source"
+anchor = "73-swift-source"
 
 [declarations."ios.contributes.src.swift"]
 node = "field"
@@ -1059,7 +1059,7 @@ platform = "ios"
 required = false
 since = "1.0"
 section = "7.3"
-anchor = "73-source"
+anchor = "73-swift-source"
 description = "Directories of `.swift` staged into the application target. For small shims only"
 
 [declarations."ios.contributes.src.symbol_prefixes"]
@@ -1084,7 +1084,7 @@ valid_when = "the sidecar contributes Swift source"
 merge = "union_dedup_by_type"
 since = "1.0"
 section = "7.3"
-anchor = "73-source"
+anchor = "73-swift-source"
 heading = "`[[ios.contributes.accessed_api_types]]`"
 heading_suffix = "— a sibling of `src`, not a child of it"
 
@@ -1097,7 +1097,7 @@ platform = "ios"
 required = true
 since = "1.0"
 section = "7.3"
-anchor = "73-source"
+anchor = "73-swift-source"
 description = "**Required.** Apple's canonical string for a required-reason API category, written exactly as Apple defines it. Valid only in a sidecar that also contributes Swift source"
 
 [declarations."ios.contributes.accessed_api_types.reasons"]
@@ -1111,7 +1111,7 @@ required = true
 merge = "union_dedup"
 since = "1.0"
 section = "7.3"
-anchor = "73-source"
+anchor = "73-swift-source"
 description = "**Required.** Apple's canonical reason codes, merged into the application's `PrivacyInfo.xcprivacy` and de-duplicated per `type`"
 
 [declarations."ios.contributes.accessed_api_types.reason"]
@@ -1123,7 +1123,7 @@ required = false
 recommended = true
 since = "1.0"
 section = "7.3"
-anchor = "73-source"
+anchor = "73-swift-source"
 description = "Recommended prose. Apple's codes are opaque by design, and the record is where an application reads what its dependencies claim"
 
 [declarations."ios.contributes.info_plist"]

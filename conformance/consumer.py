@@ -27,25 +27,22 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
 from native_integration import (  # noqa: E402
-    acceptance,
-    advisories,
-    document,
-    graph,
-    integration,
-    registry,
-    semantics,
-)
-from native_integration.application import (  # noqa: E402
     Answer,
     Application,
     Approval,
+    Closure,
     Credential,
     FeatureDecision,
+    Findings,
+    Origin,
     PackagingChoice,
+    Record,
+    graph_of,
+    load_registry,
+    read,
+    source_from_path,
 )
-from native_integration.discovery import source_from_path  # noqa: E402
-from native_integration.findings import Findings  # noqa: E402
-from native_integration.recording import Record  # noqa: E402
+from native_integration import advisories  # noqa: E402
 
 #: What this consumer can be told, rather than having to do. `run.py` refuses a
 #: case needing a stated resolution unless the consumer says it accepts one.
@@ -172,109 +169,83 @@ def sidecar_root(base: Path, distribution: str) -> Path | None:
     return found[0].parent if found else None
 
 
-def run(base: Path, platform: str) -> tuple[str, Findings, Record]:
-    """One case, for one platform."""
-    closure = read_toml(base / "closure.toml")
-    application = application_of(read_toml(base / "application.toml"))
-    resolution = graph.graph_of(read_toml(base / "resolved.toml"))
-    findings = Findings(registry.load())
-    record = Record()
-    integration.build_facts(record, contract="1.0", platform=platform)
+def closure_of(raw: Mapping[str, Any]) -> Closure:
+    """§3.2's origins, from what the corpus says a resolver would have produced.
 
-    resolved = []
-    for entry in closure.get("distribution", []):
-        # §3.2: a distribution outside the closure is skipped in silence. A
-        # debugging tool that happens to be installed beside the application,
-        # and happens to ship a sidecar, must not configure it — and is not an
-        # error either.
-        if entry.get("origin") == "not-in-closure":
+    A distribution marked `not-in-closure` is simply absent from the members,
+    which is the whole of requirement 1: it is installed alongside, it ships a
+    sidecar, and it configures nothing.
+    """
+    return Closure.of(
+        {
+            entry["name"]: Origin(
+                direct=entry.get("origin") == "direct",
+                via=tuple(entry.get("via", ())),
+            )
+            for entry in raw.get("distribution", [])
+            if entry.get("origin") != "not-in-closure"
+        }
+    )
+
+
+def sources_of(base: Path, raw: Mapping[str, Any], findings: Findings) -> list:
+    """The sidecar of each distribution, located on disk.
+
+    Discovery proper walks installed distributions' entry points; a corpus case
+    is a directory tree, so this stands in for that one step and nothing else.
+    """
+    found = []
+    for entry in raw.get("distribution", []):
+        name = entry["name"]
+        # §3.4: a distribution declaring more than one entry in the group is
+        # invalid, and a consumer must not select one or merge them.
+        if len(entry.get("entry_points", ())) > 1:
+            findings.requirement(
+                2,
+                name,
+                message=(
+                    f"the distribution declares {len(entry['entry_points'])} entries "
+                    "in the entry-point group"
+                ),
+            )
             continue
-        source = _source(base, entry, findings)
-        if source is None:
+        root = sidecar_root(base, name)
+        if root is None:
             continue
-        parsed = document.read(
-            source,
-            platform=platform,
-            findings=findings,
-            origin=_origin(entry),
-        )
-        if parsed is None:
-            continue
-        resolved.append(
-            integration.resolve(
-                parsed,
-                application=application,
-                findings=findings,
-                record=record,
-                origin=entry.get("origin", "direct"),
-                via=entry.get("via", ()),
-                resolved_versions=graph.resolved_versions(resolution),
+        found.append(
+            source_from_path(
+                root,
+                distribution=name,
+                version=entry.get("version", ""),
+                module=entry.get("entry_point", ""),
             )
         )
+    return found
 
-    semantics.check(
-        resolved, application=application, findings=findings, platform=platform
-    )
-    advisories.report(
-        resolved, application=application, findings=findings, platform=platform
-    )
-    integration.decisions(
-        resolved, application=application, findings=findings, record=record
-    )
-    graph.check(
-        resolution,
-        resolved,
-        application=application,
-        findings=findings,
-        record=record,
-        platform=platform,
-        date=application.date,
-    )
 
+def run(base: Path, platform: str) -> tuple[str, Findings, Record]:
+    """One case, for one platform."""
+    raw = read_toml(base / "closure.toml")
+    application = application_of(read_toml(base / "application.toml"))
     prior = base / "accepted.record"
-    acceptance.check(
-        record,
-        prior.read_text(encoding="utf-8") if prior.exists() else None,
-        findings=findings,
-        distributions=[entry["name"] for entry in closure.get("distribution", [])],
+
+    # Requirement 2 is found while locating sidecars, before the read begins, so
+    # its findings are made here and carried in.
+    findings = Findings(load_registry())
+    sources = sources_of(base, raw, findings)
+
+    integration = read(
+        sources,
+        platform=platform,
+        application=application,
+        closure=closure_of(raw),
+        graph=graph_of(read_toml(base / "resolved.toml")),
+        accepted=prior.read_text(encoding="utf-8") if prior.exists() else None,
     )
+    integration.findings.items[:0] = findings.items
 
-    outcome = "blocking" if findings.blocking else "accept"
-    return outcome, findings, record
-
-
-def _origin(entry: Mapping[str, Any]) -> str:
-    if entry.get("origin") == "direct":
-        return "as a direct dependency"
-    via = entry.get("via", ())
-    return "via " + ", ".join(via) if via else "in the dependency closure"
-
-
-def _source(base: Path, entry: Mapping[str, Any], findings: Findings):
-    """§3.4: a distribution declaring more than one entry in the group is invalid."""
-    name = entry["name"]
-    if len(entry.get("entry_points", ())) > 1:
-        findings.requirement(
-            2,
-            name,
-            message=(
-                f"the distribution declares {len(entry['entry_points'])} entries in "
-                "the entry-point group; a consumer must not select one or merge them"
-            ),
-        )
-        return None
-    root = sidecar_root(base, name)
-    if root is None:
-        findings.requirement(
-            4, name, message="the entry point names no readable sidecar directory"
-        )
-        return None
-    return source_from_path(
-        root,
-        distribution=name,
-        version=entry.get("version", ""),
-        module=entry.get("entry_point", ""),
-    )
+    outcome = "blocking" if integration.findings.blocking else "accept"
+    return outcome, integration.findings, integration.record
 
 
 def main(argv: list[str]) -> int:

@@ -11,10 +11,12 @@ platforms = ["android", "ios"]
 min_sdk = 23
 compile_sdk = 35
 
-[[android.requires.application_values]]
+[[android.requires.application_value]]
 id = "applovin_sdk_key"
+kind = "manifest_meta_data"
+key = "applovin.sdk.key"
 reason = "Your AppLovin SDK key, from the AppLovin dashboard under Account → Keys"
-manifest_meta_data = "applovin.sdk.key"
+placeholder = "<TODO: your AppLovin SDK key>"
 
 [[android.contributes.gradle_dependencies]]
 module = "com.google.ads.mediation:applovin"
@@ -28,8 +30,9 @@ reason = "Ad requests to the AppLovin network"
 name = "android.permission.ACCESS_NETWORK_STATE"
 reason = "Connectivity checks before an ad request"
 
-# Deliberately the same key and the same value as pyadmob's. §6.10 coalesces
-# equal values and keeps both provenance records; only a disagreement fails.
+# Deliberately the same key and the same value as pyadmob's. §6.8, Manifest
+# meta-data, coalesces equal values and keeps both provenance records; only a
+# disagreement fails.
 [[android.contributes.meta_data]]
 key = "com.google.android.gms.ads.flag.OPTIMIZE_INITIALIZATION"
 value = true

@@ -1,9 +1,9 @@
 # The reference reader
 
-`native_integration` is a reader for [the specification](../development/first-attempt.md): discovery,
-parsing, validation, and rule enforcement, so that a build tool gets the
-consumer obligations of §8 as code paths rather than as prose it has to
-remember to implement.
+`native_integration` is a reader for [the specification](../SPEC.md): discovery,
+parsing, validation, resolution and recording, so that a build tool gets §8's
+consumer obligations as code paths rather than as prose it has to remember to
+implement.
 
 It is **not** a build tool. It never writes a Gradle or Xcode project, never
 resolves a Maven coordinate, and never runs anything. It tells a consumer what
@@ -18,74 +18,102 @@ python3 -m pytest -q
 ## A read, end to end
 
 ```python
-from native_integration import Application, Closure, MappingAnswers, Platform, read
+from native_integration import Application, Closure, read, source_from_path
 
 integration = read(
-    platform=Platform.ANDROID,
-    closure=Closure.direct("pystripe"),          # your resolver's answer, for the target platform
-    application=Application(
-        android_sdk={"min_sdk": 24, "compile_sdk": 35},
-        answers=MappingAnswers(                  # your own configuration, adapted
-            application_values={"pystripe": {"stripe_return_scheme": "trailmap-pay"}},
-            allow_exported={"pystripe": ["org.pystripe.PaymentReturnActivity"]},
-        ),
+    [source_from_path("pystripe/_native", distribution="pystripe")],
+    platform="android",
+    closure=Closure.direct("pystripe"),          # your resolver's answer, for this platform
+    application=Application(                     # your own configuration, adapted
+        android={"min_sdk": 24, "compile_sdk": 35},
+        values={("pystripe", "stripe_return_scheme"): "trailmap-pay"},
     ),
-    resolvers=my_ports,                          # see "Ports" below
-    record_path="native-integration.lock.json",
 )
 
 print(integration.report())
-integration.raise_for_errors()                   # blocking diagnostics stop the build
-for permission in integration.effective.permissions():
-    ...                                          # stage it; the library computed it
+integration.raise_for_errors()                   # blocking findings stop the build
+print(integration.record.render())               # §9's durable, diffable record
 ```
 
-`integration.effective` is what the **sidecars** contribute, after the
-application's answers — permissions after suppression, components with their
-export decisions, generated intent filters with application values already
-substituted, the merged `Info.plist`, and the paths that must never reach the
-device.
+Four arguments are optional, and each one omitted narrows what can be checked
+rather than silently weakening a check that still claims to run:
 
-It is not the whole native surface. What a *resolved artifact* brings in on its
-own — an `.aar`'s permissions, its exported components, a `required="true"`
-feature this library overrides — lives in `integration.resolution.artifact_findings`
-and in the record, because §9 attributes those to the artifact rather than to
-the distribution that named the coordinate. A consumer staging a manifest needs
-both.
+| Omitted | What stops being checkable |
+| --- | --- |
+| `application` | every requirement is unanswered, so §5.4's satisfaction rules report against an application that answered nothing |
+| `closure` | §3.2's origin is unknown, so nothing is attributed to the dependency that brought it in |
+| `graph` | §9.4 and §9.7 — what a *resolved* artifact declares, and which artifacts collide on a packaged path |
+| `accepted` | §9.1's gate has no prior record to compare against, and does not fire |
+
+`graph` is the one to look at twice. §9.4's obligations are about the manifest
+inside a resolved `.aar` and the files inside a resolved archive — things only a
+tool that has done the resolving can see. Passing a `Graph` built from that
+resolution is what turns those obligations on; without one they are not guessed
+at.
+
+## What it cannot tell you
+
+Against the [conformance corpus](../conformance/README.md) this reader passes
+every case it can and reports six runs as **unverified**, which is a worse
+outcome than a pass and a better one than a false pass. Each is an assertion
+about *generated output*: that the sidecar stayed out of the payload, that a
+view-link's attributes reached the manifest, that a feature decision was
+applied, that the Python module stubs were excluded, that the Objective-C
+categories were linked. The harness asks for a manifest or a payload to inspect
+and there is none. Closing them takes a build tool, not a better reader.
+
+## What comes back
+
+`Integration` holds four things: the `record`, the `findings`, the `resolved`
+sidecars, and the `delta` against the accepted record.
+
+`findings` is the whole diagnostic surface. Each `Finding` names the
+distribution it is about, the §8 obligation it discharges, and the registry rule
+that produced it — `integration.ok` is false when any of them is blocking.
+`resolved` is per-sidecar: what each distribution declared, after the
+application's answers.
 
 ## Where the obligations live
 
 [`docs/REQUIREMENTS.md`](../docs/REQUIREMENTS.md) maps every §8 requirement to
-the code path that discharges it. It is generated from `rules.py` and from
-first-attempt.md itself, and CI fails if it drifts.
+the code that discharges it, or names why it is out of scope. It is generated by
+reading this package's own syntax tree, and CI fails if it drifts.
 
 | Module | What it holds |
 | --- | --- |
-| `discovery` | §3 — the closure, entry-point iteration, and reaching a distribution's files without importing it |
-| `sidecar`, `schema`, `contract` | §4 — the contract gate, the fail-closed key walk, and §§6–7's per-sidecar rules |
-| `crossrules` | the rules that are not properties of one sidecar: namespaces, component classes, module names, contested repository scopes |
-| `answers`, `context` | §2.2 — the application's side, joined on `(distribution, key)` |
-| `effective` | declarations become contributions: suppression, approval, substitution, satisfaction |
-| `native`, `ports` | §6.5/§7.4/§6.9/§9 — everything that needs a resolved graph |
-| `record` | §9 — the durable, diffable record, the delta, and the acceptance gate |
+| `registry` | `contract/v1.toml` and `diagnostics-v1.toml`, loaded — the vocabulary every other module reads |
+| `obligations` | which §8.4 requirement each registry check discharges |
+| `resources`, `discovery` | §3 and §4.1 — the closure, entry-point iteration, and reaching a distribution's files without importing it |
+| `document` | §4.3's gate, in order: parse, contract, version, then structure |
+| `structure` | §4.4 — the fail-closed key walk, driven entirely by the registry |
+| `findings` | a diagnostic that cannot be built without naming a distribution |
+| `application` | §2.2 — the application's side, and requirement 10's join keys |
+| `integration` | §5 — requirements resolved against the answers, and every sidecar-derived fact |
+| `semantics` | the rules that are not properties of one sidecar: namespaces, merges, cross-distribution conflicts |
+| `graph` | §9.4 and §9.7 — everything that needs a resolution the consumer performed |
+| `advisories` | §8.5's fifteen, none of them blocking |
+| `recording`, `acceptance` | §9 — the record, the delta, and the acceptance gate |
+| `reader` | the order the specification puts all of the above in |
 
-## Two design decisions worth knowing before you adopt it
+## Three design decisions worth knowing before you adopt it
 
-**A diagnostic cannot be built without naming a distribution.** Requirement 8.15
-is enforced by `Diagnostic.__post_init__`, not by discipline. If you find
-yourself with a finding that belongs to no distribution, it is a finding about
-your own configuration and does not go here.
+**The vocabulary is not written down twice.** Every declaration, every closed
+value, every refusal and every diagnostic id is read from
+[`contract/v1.toml`](../contract/v1.toml) at run time. A key added to the
+registry is a key this reader accepts, and one removed is one it refuses,
+without anyone transcribing either into Python. `structure.py` is the walk, not
+the vocabulary.
 
-**A missing port raises rather than passing.** Four obligations need something
-only a build tool has — a locked dependency graph with checksums, an archive
-listing, the manifest inside a resolved `.aar`. Those are `Protocol`s in
-`ports.py`. If a sidecar declares material that needs one and you supplied
-none, the read raises `UnimplementedObligation` naming the requirement. A tool
-must not be able to pass validation by leaving a check unimplemented — that is
-the "silently ignored" failure §4.4 exists to prevent, one level up.
+**A diagnostic cannot be built without naming a distribution.** Requirement 18
+is enforced by `Finding.__post_init__`, which raises, rather than by discipline.
+A finding that belongs to no distribution is a finding about your own
+configuration, and does not go here.
 
-`native_integration.testing` has stub ports that echo declarations back. They
-resolve nothing and exist for tests; do not ship them.
+**An invalid sidecar produces one finding, not a cascade.** A document that
+fails §4.4 is never resolved, so it cannot go on to report the values it did not
+supply and the actions nobody acknowledged. Those would be true statements about
+a file the reader has already refused to interpret, and the one thing the
+application can act on is the refusal.
 
 ## Status
 

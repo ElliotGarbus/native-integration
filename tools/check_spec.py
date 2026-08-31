@@ -36,6 +36,22 @@ EXAMPLES = sorted(
     [*ROOT.glob("examples/**/native.toml"), *ROOT.glob("development/examples/**/native.toml")]
 )
 
+#: Each example is held to the document it belongs to, so the two sets are split
+#: once here and every check below routes on it.
+#:
+#: Most of `development/examples/` is design exploration written alongside the
+#: first attempt — the sidecars that argued for a declaration, or against one —
+#: and holding those to SPEC.md would mean rewriting an argument into the
+#: vocabulary it produced, which destroys the evidence. They are frozen with the
+#: document they belong to, as `first-attempt.md` itself is.
+#:
+#: Getting this backwards is not a cosmetic mistake in either direction: a live
+#: example checked against the frozen document is checked against rules that no
+#: longer hold and, worse, is *not* checked against the ones that do.
+CURRENT_EXAMPLES = ("examples/pystripe", "development/examples/mediated-ads")
+LIVE = [p for p in EXAMPLES if p.relative_to(ROOT).as_posix().startswith(CURRENT_EXAMPLES)]
+FROZEN = [p for p in EXAMPLES if p not in LIVE]
+
 RFC2119 = r"MUST NOT|MUST|SHOULD NOT|SHOULD|MAY"
 failures: list[str] = []
 
@@ -149,12 +165,20 @@ for line, body in fenced(NEW, "json"):
 check("record digests are written in §9.3's canonical form", problems)
 
 # --- 4. documented keys exist in the spec -----------------------------------
-# Catches an example or a README block drifting after a schema change.
+# Catches an example or a README block drifting after a vocabulary change.
+#
+# The weakest check in the file, and deliberately kept anyway: a substring
+# search proves only that a key is spelled somewhere in the right document, not
+# that it is used correctly. `tests/test_examples.py` is the strong half for the
+# live set — it runs the real validator — and this catches the frozen set, which
+# has no validator to run because the vocabulary it uses no longer exists.
 problems = []
-for path in EXAMPLES:
-    for key in keys_of(tomllib.loads(path.read_text(encoding="utf-8"))):
-        if key not in SPEC:
-            problems.append(f"{path.relative_to(ROOT)} uses `{key}`, absent from first-attempt.md")
+for document, name, paths in ((NEW, "SPEC.md", LIVE), (SPEC, "first-attempt.md", FROZEN)):
+    for path in paths:
+        relative = path.relative_to(ROOT).as_posix()
+        for key in keys_of(tomllib.loads(path.read_text(encoding="utf-8"))):
+            if key not in document:
+                problems.append(f"{relative} uses `{key}`, absent from {name}")
 for line, body in toml_blocks(README):
     doc = tomllib.loads(body)
     # A `[project]` or `[tool.*]` fragment is the package's own build
@@ -315,7 +339,11 @@ def literal_prefix(pattern: str) -> str:
 
 
 def sidecar_sources():
-    for path in EXAMPLES:
+    """The first attempt's sidecars. Every rule in the loop below cites a
+    `first-attempt.md` section number, so the live examples are not here — they
+    go through `check_v1_sidecar`, which cites SPEC.md's.
+    """
+    for path in FROZEN:
         raw = path.read_text(encoding="utf-8")
         yield str(path.relative_to(ROOT)), raw, tomllib.loads(raw)
     for label, text in (("first-attempt.md", SPEC),):
@@ -517,7 +545,7 @@ if app_path.exists():
     for stray in set(app) - {"project", "tool"}:
         problems.append(f"app-pyproject.toml declares [{stray}] — it is not a sidecar")
 
-    declared = {v.get("id") for v in entries(side.get("android", {}), "requires", "application_values")}
+    declared = {v.get("id") for v in entries(side.get("android", {}), "requires", "application_value")}
     answered = set(per_pkg.get("android", {}).get("application_values", {}))
     for miss in sorted(declared - answered):
         problems.append(f"app-pyproject.toml does not supply application value `{miss}`")
@@ -531,10 +559,26 @@ if app_path.exists():
     for miss in sorted(exported - approved):
         problems.append(f"app-pyproject.toml does not approve exported component `{miss}`")
 
-    schemes = {u.get("id") for u in entries(side.get("ios", {}), "requires", "url_schemes")}
+    actions = {a.get("id") for a in entries(side.get("ios", {}), "requires", "application_action")}
     acked = set(per_pkg.get("ios", {}).get("acknowledged", []))
-    for miss in sorted(schemes - acked):
-        problems.append(f"app-pyproject.toml does not acknowledge url_scheme `{miss}`")
+    for miss in sorted(actions - acked):
+        problems.append(f"app-pyproject.toml does not acknowledge action `{miss}`")
+
+    # Each of the three checks above reads the sidecar through a key name, and
+    # each passes vacuously if that name is wrong: when `application_values`
+    # became `application_value`, the first one went on reporting success
+    # against an empty set. A pair that teaches §2.2's answer surface has
+    # something to answer in all three, so nothing found means nothing checked.
+    for what, found in (
+        ("application values", declared),
+        ("exported components", exported),
+        ("iOS actions", actions),
+    ):
+        if not found:
+            problems.append(
+                f"examples/pystripe/native.toml declares no {what}, so the check "
+                f"that its application half answers them is passing vacuously"
+            )
 
     floors = side.get("android", {}).get("requires", {})
     app_android = tool.get("android", {})
@@ -544,6 +588,41 @@ if app_path.exists():
 else:
     problems.append("examples/pystripe/app-pyproject.toml is missing")
 check("the paired application example answers its sidecar", problems)
+
+
+# --- 10a. the live examples cite sections that exist, and say which ---------
+# The examples explain themselves by pointing at the specification, and a
+# renumbering silently turns every one of those pointers into a lie. It happened
+# once already: `view_links` moved from §6.8 to §6.6 and the comment that
+# introduces the whole example went on naming the meta-data section.
+#
+# A bare `§6.8` asserts only that a section numbered 6.8 exists, so that is all
+# a checker can verify from it — which is why five stale citations survived a
+# check that every number resolved. A citation must therefore name its section.
+# `tools/citations.py` holds the rule and the reasoning; `tests/test_citations.py`
+# tests it, because a checker with no test of its own is what this whole file
+# exists to prevent and it is not exempt.
+#
+# Only the live set: the frozen examples cite `first-attempt.md`, where their
+# numbers are still right. That has a consequence worth stating, because it
+# constrains how a live example is written: within them **`§` means SPEC.md and
+# nothing else**. One with something to say about the first attempt writes
+# "section 7.3 of first-attempt.md" in words, which is clearer anyway — the two
+# documents number the same subjects differently, so an unqualified § pointing
+# at the wrong one is the exact confusion this check exists to end.
+sys.path.insert(0, str(ROOT / "tools"))
+import citations  # noqa: E402
+
+SECTIONS = citations.sections(NEW)
+problems = []
+# The example roots, not just the sidecar directories: the application halves
+# sit one level up, and they are the files that explain §2.2's join.
+for prefix in CURRENT_EXAMPLES:
+    for path in sorted((ROOT / prefix).rglob("*.toml")):
+        relative = path.relative_to(ROOT).as_posix()
+        text = path.read_text(encoding="utf-8")
+        problems.extend(found.render(relative) for found in citations.unnamed(text, SECTIONS))
+check("the live examples name the sections they cite", problems)
 
 
 # --- 11. SPEC.md is finished ------------------------------------------------
@@ -776,7 +855,7 @@ def check_v1_sidecar(rel: str, raw: str, doc: dict, problems: list[str]) -> None
         if not pkg.get("products"):
             problems.append(f"{rel} swift package `{pkg.get('name')}` declares no products")
 problems = []
-for path in sorted((ROOT / "development" / "redesign" / "examples").rglob("*.toml")):
+for path in [*sorted((ROOT / "development" / "redesign" / "examples").rglob("*.toml")), *LIVE]:
     raw = path.read_text(encoding="utf-8")
     try:
         doc = tomllib.loads(raw)

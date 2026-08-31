@@ -311,14 +311,14 @@ summary = "`android.contributes.src` carries a key this specification does not d
 [diagnostics."ni.decl.android.contributes.src.java.type"]
 declaration = "android.contributes.src.java"
 section = "6.2"
-anchor = "62-source"
+anchor = "62-java-and-kotlin-source"
 severity = "blocking"
 summary = "`android.contributes.src.java` is not of the type this declaration takes"
 
 [diagnostics."ni.decl.android.contributes.src.kotlin.type"]
 declaration = "android.contributes.src.kotlin"
 section = "6.2"
-anchor = "62-source"
+anchor = "62-java-and-kotlin-source"
 severity = "blocking"
 summary = "`android.contributes.src.kotlin` is not of the type this declaration takes"
 
@@ -906,7 +906,7 @@ summary = "`ios.contributes.src` carries a key this specification does not defin
 [diagnostics."ni.decl.ios.contributes.src.swift.type"]
 declaration = "ios.contributes.src.swift"
 section = "7.3"
-anchor = "73-source"
+anchor = "73-swift-source"
 severity = "blocking"
 summary = "`ios.contributes.src.swift` is not of the type this declaration takes"
 
@@ -927,35 +927,35 @@ summary = "`ios.contributes.accessed_api_types` carries a key this specification
 [diagnostics."ni.decl.ios.contributes.accessed_api_types.type.missing"]
 declaration = "ios.contributes.accessed_api_types.type"
 section = "7.3"
-anchor = "73-source"
+anchor = "73-swift-source"
 severity = "blocking"
 summary = "`ios.contributes.accessed_api_types.type` is required and is absent"
 
 [diagnostics."ni.decl.ios.contributes.accessed_api_types.type.type"]
 declaration = "ios.contributes.accessed_api_types.type"
 section = "7.3"
-anchor = "73-source"
+anchor = "73-swift-source"
 severity = "blocking"
 summary = "`ios.contributes.accessed_api_types.type` is not of the type this declaration takes"
 
 [diagnostics."ni.decl.ios.contributes.accessed_api_types.reasons.missing"]
 declaration = "ios.contributes.accessed_api_types.reasons"
 section = "7.3"
-anchor = "73-source"
+anchor = "73-swift-source"
 severity = "blocking"
 summary = "`ios.contributes.accessed_api_types.reasons` is required and is absent"
 
 [diagnostics."ni.decl.ios.contributes.accessed_api_types.reasons.type"]
 declaration = "ios.contributes.accessed_api_types.reasons"
 section = "7.3"
-anchor = "73-source"
+anchor = "73-swift-source"
 severity = "blocking"
 summary = "`ios.contributes.accessed_api_types.reasons` is not of the type this declaration takes"
 
 [diagnostics."ni.decl.ios.contributes.accessed_api_types.reason.type"]
 declaration = "ios.contributes.accessed_api_types.reason"
 section = "7.3"
-anchor = "73-source"
+anchor = "73-swift-source"
 severity = "blocking"
 summary = "`ios.contributes.accessed_api_types.reason` is not of the type this declaration takes"
 
@@ -1221,7 +1221,7 @@ summary = "`symbol_prefixes` is valid only where `swift` is declared"
 [diagnostics."ni.constraint.ios.contributes.accessed_api_types.requires-present.src.swift"]
 declaration = "ios.contributes.accessed_api_types"
 section = "7.3"
-anchor = "73-source"
+anchor = "73-swift-source"
 severity = "blocking"
 summary = "`accessed_api_types` is valid only where `src.swift` is declared"
 
@@ -1428,7 +1428,7 @@ profile = "android"
 section = "8.4"
 anchor = "84-requirements"
 severity = "blocking"
-summary = "Enforce every ownership rule, computing containment on dot-separated segments; derive a contributed file's namespace from its path relative to its source root and check it, its declared `package`, and their equality, case-sensitively; and fail on a collision naming the distributions responsible ([§6.1](#61-ownership), [§6.2](#62-source))."
+summary = "Enforce every ownership rule, computing containment on dot-separated segments; derive a contributed file's namespace from its path relative to its source root and check it, its declared `package`, and their equality, case-sensitively; and fail on a collision naming the distributions responsible ([§6.1](#61-ownership), [§6.2](#62-java-and-kotlin-source))."
 
 [diagnostics."ni.req.24"]
 requirement = 24
@@ -1436,7 +1436,7 @@ profile = "core"
 section = "8.4"
 anchor = "84-requirements"
 severity = "blocking"
-summary = "Compile contributed source with the application's own toolchain and exclude it from any Python payload, on both platforms; and, where it compiles Java, force UTF-8 for `.java` rather than the platform default ([§6.2](#62-source), [§7.3](#73-source))."
+summary = "Compile contributed source with the application's own toolchain and exclude it from any Python payload, on both platforms; and, where it compiles Java, force UTF-8 for `.java` rather than the platform default ([§6.2](#62-java-and-kotlin-source), [§7.3](#73-swift-source))."
 
 [diagnostics."ni.req.25"]
 requirement = 25
@@ -1516,7 +1516,7 @@ profile = "ios"
 section = "8.4"
 anchor = "84-requirements"
 severity = "blocking"
-summary = "Reject `symbol_prefixes` ([§7.1](#71-symbol-prefixes)) and `accessed_api_types` ([§7.3](#73-source)) from a sidecar contributing no Swift source, and merge what `accessed_api_types` declares into the application's `PrivacyInfo.xcprivacy` in the order [§7.3](#73-source) fixes."
+summary = "Reject `symbol_prefixes` ([§7.1](#71-symbol-prefixes)) and `accessed_api_types` ([§7.3](#73-swift-source)) from a sidecar contributing no Swift source, and merge what `accessed_api_types` declares into the application's `PrivacyInfo.xcprivacy` in the order [§7.3](#73-swift-source) fixes."
 
 [diagnostics."ni.req.35"]
 requirement = 35

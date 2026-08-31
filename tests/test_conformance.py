@@ -14,6 +14,8 @@ until it is removed from the list.
 
 from __future__ import annotations
 
+import re
+import subprocess
 import sys
 import tomllib
 from pathlib import Path
@@ -110,3 +112,62 @@ def test_every_diagnostic_names_the_distribution_the_case_names(case, platform, 
     for entry in spec.get("diagnostics", []):
         if entry["id"] in reported:
             assert reported[entry["id"]] == set(entry["distributions"])
+
+
+# --- the harness itself ------------------------------------------------------
+# Everything above runs the consumer in-process, which skips two things a real
+# conformance claim rests on: `run.py`'s own comparison of the emitted record
+# against `expected/<platform>.record`, and its assertion adapters. Both live in
+# the harness by design — it is the authority, and a test that reimplemented the
+# record comparison would be checking the reader against a second implementation
+# of the thing being tested.
+#
+# So this shells out to it, and pins the outcome exactly.
+
+#: Every case run the reader cannot answer, and the assertion that stops it.
+#: All six are about generated output, which a reader does not produce. Pinning
+#: the set rather than a count is the point: a case that becomes unverified is a
+#: regression, and one that stops being unverified needs this list shortened.
+UNVERIFIED = {
+    ("core/R01_dependency_closure", "sidecar_excluded_from_payload"),
+    ("android/R30_view_link_passthrough", "view_link_attributes_written_through"),
+    ("android/R41_artifact_feature_decided", "artifact_feature_decision_applied"),
+    ("ios/R36_python_module_registered", "python_module_stubs_excluded"),
+    ("ios/R37_objc_categories_union", "objc_categories_linked"),
+}
+
+SUMMARY = re.compile(
+    r"^(\d+) passed, (\d+) failed, (\d+) unverified, (\d+) unsupported$", re.M
+)
+
+
+@pytest.mark.parametrize("profile", ("core", "android", "ios"))
+def test_the_harness_reports_no_failure_and_only_the_known_unverified(profile):
+    finished = subprocess.run(
+        [sys.executable, str(ROOT / "conformance" / "run.py"), "--profile", profile,
+         sys.executable, str(ROOT / "conformance" / "consumer.py")],
+        capture_output=True, text=True, cwd=ROOT,
+    )
+    report = finished.stdout + finished.stderr
+
+    summary = SUMMARY.search(report)
+    assert summary, f"the harness printed no summary:\n{report}"
+    passed, failed, unverified, _unsupported = (int(n) for n in summary.groups())
+
+    assert failed == 0, report
+    assert passed, "the profile ran nothing, so it proved nothing"
+
+    # A core case is run once per platform, so `core/R01` appears twice and the
+    # platform stays on the key here to keep the count honest.
+    seen = [
+        (case.rsplit(" [", 1)[0], assertion)
+        for case, assertion in re.findall(
+            r"^UNVERIFIED\s+(\S+(?: \[\w+\])?).*\n\s+assertion (\w+):", report, re.M
+        )
+    ]
+    unknown = sorted(set(seen) - UNVERIFIED)
+    assert not unknown, f"newly unverified: {unknown}\n{report}"
+    assert unverified == len(seen), report
+
+    # §8.5's note, as the harness applies it: an unverified run is not a pass.
+    assert finished.returncode == (1 if unverified else 0), report

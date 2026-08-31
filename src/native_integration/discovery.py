@@ -21,10 +21,15 @@ from importlib import metadata
 from pathlib import Path
 from typing import Iterable, Mapping, Sequence
 
-from . import rules
 from .contract import ENTRY_POINT_GROUP
-from .diagnostics import DiagnosticBag
+from .findings import Findings
 from .resources import SIDECAR_NAME, SidecarSource
+
+#: §8.4, by number. Everything discovery can fail on is one of two obligations:
+#: a distribution declaring more than one entry (2), and a resource that cannot
+#: be materialized or read (4).
+ONE_ENTRY = 2
+UNREADABLE = 4
 
 _MODULE_REFERENCE = re.compile(r"\A[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*\Z")
 
@@ -161,7 +166,7 @@ def _entry_points(dist: metadata.Distribution) -> list[metadata.EntryPoint]:
 def discover(
     *,
     closure: Closure,
-    bag: DiagnosticBag,
+    findings: Findings,
     distributions: Iterable[metadata.Distribution] | None = None,
 ) -> list[SidecarSource]:
     """Every sidecar in the closure, as readable sources.
@@ -189,16 +194,18 @@ def discover(
             continue
 
         if len(entries) > 1:
-            bag.add(
-                rules.MULTIPLE_ENTRY_POINTS,
-                f"declares {len(entries)} entries in {ENTRY_POINT_GROUP} "
-                f"({', '.join(sorted(e.name for e in entries))}); a consumer must not "
-                "select one or merge them",
+            findings.requirement(
+                ONE_ENTRY,
                 name,
+                message=(
+                    f"declares {len(entries)} entries in {ENTRY_POINT_GROUP} "
+                    f"({', '.join(sorted(e.name for e in entries))}); a consumer must "
+                    "not select one or merge them"
+                ),
             )
             continue
 
-        source = locate(dist, entries[0].value, bag=bag)
+        source = locate(dist, entries[0].value, findings=findings)
         if source is not None:
             found.append(source)
 
@@ -206,7 +213,7 @@ def discover(
 
 
 def locate(
-    dist: metadata.Distribution, value: str, *, bag: DiagnosticBag
+    dist: metadata.Distribution, value: str, *, findings: Findings
 ) -> SidecarSource | None:
     """Turn an entry-point value into a readable sidecar directory.
 
@@ -217,11 +224,13 @@ def locate(
     """
     name = dist.metadata["Name"]
     if ":" in value or not _MODULE_REFERENCE.match(value.strip()):
-        bag.add(
-            rules.ENTRY_POINT_VALUE_INVALID,
-            f"entry-point value {value!r} is not an importable module reference — a dotted "
-            "path of Python identifiers, with no `:attr` suffix",
+        findings.requirement(
+            UNREADABLE,
             name,
+            message=(
+                f"entry-point value {value!r} is not an importable module reference — "
+                "a dotted path of Python identifiers, with no `:attr` suffix"
+            ),
         )
         return None
 
@@ -230,26 +239,26 @@ def locate(
     try:
         located = dist.locate_file(relative)
     except Exception as exc:  # pragma: no cover - loader dependent
-        bag.add(
-            rules.RESOURCE_UNREADABLE,
-            f"the resources of `{module}` could not be materialized: {exc}",
+        findings.requirement(
+            UNREADABLE,
             name,
+            message=f"the resources of `{module}` could not be materialized: {exc}",
         )
         return None
 
     root = Path(str(located))
     if not root.is_dir():
-        bag.add(
-            rules.RESOURCE_UNREADABLE,
-            f"entry point names `{module}`, but {root} is not a readable directory",
+        findings.requirement(
+            UNREADABLE,
             name,
+            message=f"entry point names `{module}`, but {root} is not a readable directory",
         )
         return None
     if not (root / SIDECAR_NAME).exists():
-        bag.add(
-            rules.SIDECAR_MISSING,
-            f"entry point names `{module}`, which contains no {SIDECAR_NAME}",
+        findings.requirement(
+            UNREADABLE,
             name,
+            message=f"entry point names `{module}`, which contains no {SIDECAR_NAME}",
         )
         return None
 

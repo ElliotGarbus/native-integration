@@ -1,11 +1,17 @@
 #!/usr/bin/env python3
-"""Generate docs/REQUIREMENTS.md from first-attempt.md §8 and the library's rule registry.
+"""Generate docs/REQUIREMENTS.md from the registry and the reader's own source.
 
-The point of the reference reader is that a consumer's obligations are code
-paths rather than prose it has to remember. That claim is only worth something
-if the mapping is derived rather than asserted, so this reads the requirement
-text out of the specification and the discharging code out of
-``native_integration.rules`` — neither by hand.
+The point of a reference reader is that a consumer's obligations are code paths
+rather than prose it has to remember. That claim is only worth something if the
+mapping is **derived**, so nothing here is transcribed: the obligations come
+from [`contract/diagnostics-v1.toml`](../contract/diagnostics-v1.toml), which
+`gen_error_ids.py` generates from SPEC.md §8, and the discharging code comes out
+of the modules' own syntax trees.
+
+Two things cannot be derived and are declared instead, with the reason attached
+to each: an obligation a *reading* library cannot discharge because it binds a
+consumer where it generates a project, and one discharged by the shape of the
+API rather than by a check.
 
     python3 tools/requirements_table.py          # rewrite docs/REQUIREMENTS.md
     python3 tools/requirements_table.py --check  # fail if it is out of date
@@ -13,129 +19,234 @@ text out of the specification and the discharging code out of
 
 from __future__ import annotations
 
-import re
+import ast
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
-from native_integration.rules import (  # noqa: E402
-    ADVISORY,
-    BEYOND_THE_READER,
-    RULES,
-    STRUCTURAL,
-)
+from native_integration import obligations, registry  # noqa: E402
 
+PACKAGE = ROOT / "src" / "native_integration"
 OUTPUT = ROOT / "docs" / "REQUIREMENTS.md"
+
+#: An obligation that binds a consumer where it **generates a project** —
+#: compiling contributed source, writing the manifest, assembling the payload.
+#: This library reads sidecars and computes a resolution; it builds nothing, so
+#: these are named rather than left as a blank a later reader would mistake for
+#: an oversight.
+BEYOND_THE_READER = {
+    6: "the payload is assembled by the build tool, not here",
+    19: "surfacing a report is the build tool's output; producing it is `findings.py`",
+    20: "the same",
+    24: "the payload again",
+    28: "the declaration is checked here; promoting a feature in the merged "
+    "manifest is the build tool's",
+    30: "the attributes are carried into the record here; writing them into the "
+    "manifest is the build tool's",
+    34: "the declaration is checked here; the privacy manifest is generated, not read",
+    35: "the refusal is enforced here; the Info.plist is the build tool's",
+    37: "the union is recorded here; linking it is the build tool's",
+    39: "writing the record to disk is the tool's; producing it is `recording.py`",
+    43: "the generated project is the tool's",
+    45: "the bootstrap's own activity, which this library neither writes nor sees",
+    46: "the bootstrap again",
+}
+
+#: Discharged by the shape of the API rather than by a check, which is stronger
+#: than a check: there is no call site at which it can be forgotten. Several of
+#: §8.4's obligations are prohibitions, and the way to discharge a prohibition
+#: is to have no code that could violate it.
+STRUCTURAL = {
+    1: "`reader.read` skips a source the `Closure` does not contain, so a "
+    "contribution from outside it is never read, let alone accepted",
+    3: "nothing in this package imports a producing distribution or executes "
+    "any sidecar content; a sidecar is TOML read as data",
+    10: "`Application` is that way — one field per row of §2.2's table, joined "
+    "as §2.2 joins it",
+    11: "every `Finding` carries the producer's `reason` in its detail and the "
+    "distribution in its attribution, enforced by the constructor",
+    15: "there is no code path that inspects the application's project, so an "
+    "observation cannot be mistaken for an answer",
+    16: "the reader produces findings and a record, and writes no "
+    "application-owned artifact of any kind",
+    18: "`Finding.__post_init__` rejects a finding that names no distribution",
+    21: "the same constructor: the `reason` is the producer's own sentence and "
+    "the attribution is the producer's name",
+    42: "`Credential.__repr__` keeps the locator out of a traceback, and no "
+    "credential value is passed to `Record` anywhere",
+}
 
 HEADER = """# Where each consumer obligation lives
 
-Every requirement in [§8 of the specification](../development/first-attempt.md#8-consuming-tool-requirements),
-against the code path in [`native_integration`](../src/native_integration/) that
+Every obligation in [§8 of the specification](../SPEC.md#8-conformance), against
+the code path in [`native_integration`](../src/native_integration/) that
 discharges it.
 
-**Generated** by `python3 tools/requirements_table.py` from first-attempt.md and
-`native_integration.rules`; CI fails if it drifts. A requirement that appears in
-neither column fails `tests/test_integration.py::test_every_requirement_is_discharged_somewhere`.
-
-Severity is not the reader's invention: §8 names three outcomes — **blocking**,
-**advisory**, **recorded** — and each rule below is registered at one of them,
-in one place, so "MUST fail" cannot decay into a warning through an edit at a
-call site.
+**Generated** by `python3 tools/requirements_table.py`, and CI fails if it
+drifts. The obligations are read from
+[`contract/diagnostics-v1.toml`](../contract/diagnostics-v1.toml) and the code
+paths out of the modules' syntax trees, so neither column is transcribed. An
+obligation nothing discharges appears as `—` and fails
+`tests/test_requirements.py`.
 
 Three kinds of entry:
 
-- a **rule code** is a check that produces a diagnostic.
-- a **structural** entry is an obligation discharged by the shape of the API
-  rather than by a check — you cannot construct a `Diagnostic` without naming a
-  distribution, so requirement 8.15 has no rule and cannot be forgotten either.
-- **beyond this reader** marks an obligation that binds a consumer where it
-  *generates a project* — compiling contributed source, writing the
-  application's activity or app delegate. This library reads sidecars and
-  computes an effective set; it builds nothing, so those are named rather than
-  left as a blank a later reader would mistake for an oversight.
+- a **module** discharges the obligation with a check that produces a finding.
+- **structural** marks one discharged by the shape of the API rather than by a
+  check — you cannot construct a `Finding` without naming a distribution, so
+  requirement 18 has no call site at which it can be forgotten.
+- **beyond this reader** marks one that binds a consumer where it *generates a
+  project*. This library reads, validates, resolves and records; it builds
+  nothing, and says so rather than leaving a blank. Several obligations are
+  split — the declaration is checked here and the generated artifact is the
+  build tool's — and those carry both a module and the note.
 
-Four requirements need something only a build tool has: a resolved dependency
-graph, an archive listing, the manifest inside a resolved `.aar`. Those are
-[ports](../src/native_integration/ports.py), and a sidecar that needs one when
-the consumer supplied none raises `UnimplementedObligation` rather than
-returning a clean result.
+Structural validation is not listed rule by rule. `structure.py` walks a sidecar
+against [`contract/v1.toml`](../contract/v1.toml), so every check the registry
+defines is a check it performs, and `obligations.py` maps each one to the
+obligation it answers to. That mapping is the only hand-derived table in the
+library, and `tests/test_obligations.py` holds it to every id the generators
+emit.
 
-| §8 | The requirement | Discharged by |
+| §8.4 | The obligation | Discharged by |
 | --- | --- | --- |"""
 
 
-def requirement_text() -> dict[int, str]:
-    spec = (ROOT / "development" / "first-attempt.md").read_text(encoding="utf-8")
-    block = spec.split("A conforming consumer **MUST**:")[1].split(
-        "A conforming consumer **SHOULD**:"
-    )[0]
-    found: dict[int, str] = {}
-    for match in re.finditer(r"^(\d+)\.\s(.*?)(?=^\d+\.\s|\Z)", block, re.M | re.S):
-        # A trailing block quote is rationale attached to the list, not part of
-        # the requirement it happens to follow.
-        body = re.split(r"\n\s*>", match.group(2))[0]
-        text = " ".join(body.split())
-        text = text.replace("**", "").replace("|", "\\|")
-        found[int(match.group(1))] = text
+def discharged() -> dict[int, set[str]]:
+    """Which module reports which obligation, out of the modules' own syntax.
+
+    A `findings.requirement(N, …)` call names its obligation directly, whether
+    as a literal or through one of the module's named constants. A
+    `findings.rule(…)` call resolves through the registry instead, so
+    `structure.py` is credited with the whole image of the obligations mapping
+    rather than with a list this tool would have to keep in step.
+    """
+    found: dict[int, set[str]] = {}
+    for path in sorted(PACKAGE.glob("*.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        constants = {
+            target.id: node.value.value
+            for node in tree.body
+            if isinstance(node, ast.Assign) and isinstance(node.value, ast.Constant)
+            for target in node.targets
+            if isinstance(target, ast.Name) and isinstance(node.value.value, int)
+        }
+        helpers = {
+            node.name: node
+            for node in ast.walk(tree)
+            if isinstance(node, ast.FunctionDef)
+        }
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Attribute):
+                continue
+            if node.func.attr != "requirement" or not node.args:
+                continue
+            for number in _numbers(node.args[0], constants, helpers):
+                found.setdefault(number, set()).add(path.stem)
     return found
 
 
-def advisory_text() -> dict[str, str]:
-    """§8's SHOULD items, by the identifier the specification gives them."""
-    spec = (ROOT / "development" / "first-attempt.md").read_text(encoding="utf-8")
-    block = spec.split("A conforming consumer **SHOULD**")[1].split("\n## ")[0]
-    found: dict[str, str] = {}
-    for match in re.finditer(r"^- \*\*(S\d+)\.\*\*\s(.*?)(?=^- \*\*S|\Z)", block, re.M | re.S):
-        text = " ".join(match.group(2).split()).replace("**", "").replace("|", "\\|")
-        found[match.group(1)] = text
-    return found
+def _numbers(
+    node: ast.expr, constants: dict[str, int], helpers: dict[str, ast.FunctionDef]
+) -> set[int]:
+    """Every obligation this expression can name.
+
+    A literal or a named constant names one. A call to a local helper names
+    whichever its returns do — §4.1's two failures answer to different
+    requirements and `integration.py` chooses between them in a function, which
+    is the right place for the choice and would otherwise read here as a gap.
+    """
+    if isinstance(node, ast.Constant) and isinstance(node.value, int):
+        return {node.value}
+    if isinstance(node, ast.Name) and node.id in constants:
+        return {constants[node.id]}
+    if isinstance(node, ast.IfExp):
+        return _numbers(node.body, constants, helpers) | _numbers(
+            node.orelse, constants, helpers
+        )
+    if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
+        helper = helpers.get(node.func.id)
+        if helper is not None:
+            return {
+                number
+                for statement in ast.walk(helper)
+                if isinstance(statement, ast.Return) and statement.value is not None
+                for number in _numbers(statement.value, constants, helpers)
+            }
+    return set()
+
+
+def structural_image() -> set[int]:
+    """Every obligation the registry-driven validator can report."""
+    return (
+        set(obligations.BY_CHECK.values())
+        | set(obligations.BY_FAMILY.values())
+        | set(obligations.BY_DECLARATION_CHECK.values())
+        | set(obligations.BY_CONSTRAINT.values())
+    )
+
+
+def advisories_offered() -> set[str]:
+    from native_integration import advisories  # noqa: PLC0415
+
+    return set(advisories.claimed())
 
 
 def build() -> str:
-    requirements = requirement_text()
-    lines = [HEADER]
-    for number in sorted(requirements):
-        codes = sorted(r.code for r in RULES.values() if number in r.requirements)
-        where = ", ".join(f"`{c}`" for c in codes)
-        if number in STRUCTURAL:
-            structural = f"*structural* — {STRUCTURAL[number]}"
-            where = f"{where}<br>{structural}" if where else structural
-        if not where and number in BEYOND_THE_READER:
-            where = f"*beyond this reader* — {BEYOND_THE_READER[number]}"
-        lines.append(f"| 8.{number} | {requirements[number]} | {where or '—'} |")
-    advisory = advisory_text()
-    lines.append("")
-    lines.append("## Advisory obligations (§8's SHOULD list)")
-    lines.append("")
-    lines.append(
-        "Reported, never blocking. One is deliberately not implemented, and says so — "
-        "an advisory obligation quietly skipped is how a conformance claim overstates "
-        "itself."
-    )
-    lines.append("")
-    lines.append("| §8 | The obligation | Discharged by |")
-    lines.append("| --- | --- | --- |")
-    for identifier in sorted(advisory):
-        target = ADVISORY.get(identifier, "—")
-        where = f"`{target}`" if target in RULES else f"*{target}*"
-        lines.append(f"| 8.{identifier} | {advisory[identifier]} | {where} |")
+    contract = registry.load()
+    by_module = discharged()
+    for number in structural_image():
+        by_module.setdefault(number, set()).add("structure")
 
-    lines.append("")
-    lines.append("## Rules with no requirement number")
-    lines.append("")
-    lines.append(
-        "Checks the specification states in §§3–9 without giving them a numbered "
-        "line in §8. They are enforced the same way."
+    numbers = sorted(
+        int(identifier.rsplit(".", 1)[-1])
+        for identifier in contract.diagnostics
+        if identifier.startswith("ni.req.")
     )
-    lines.append("")
-    lines.append("| Rule | Section | Severity |")
-    lines.append("| --- | --- | --- |")
-    for rule in sorted(RULES.values(), key=lambda r: (r.section, r.code)):
-        if not rule.requirements:
-            lines.append(f"| `{rule.code}` | {rule.section} | {rule.severity} |")
+
+    lines = [HEADER]
+    for number in numbers:
+        about = contract.about(contract.requirement_id(number))
+        parts = [f"`{name}.py`" for name in sorted(by_module.get(number, ()))]
+        where = ", ".join(parts)
+        for label, table in (("structural", STRUCTURAL), ("beyond this reader", BEYOND_THE_READER)):
+            if number in table:
+                note = f"*{label}* — {table[number]}"
+                where = f"{where}<br>{note}" if where else note
+        lines.append(f"| {number} | {_prose(about['summary'])} | {where or '—'} |")
+
+    offered = advisories_offered()
+    lines += [
+        "",
+        "## Advisory obligations (§8.5)",
+        "",
+        "Reported, never blocking. §8.5 is a **SHOULD** precisely so that a "
+        "consumer can say which it offers, and most of these need something a "
+        "reader does not have — a linked binary, a merged manifest, a resolved "
+        "`.aar`'s contents. Claiming one this library does not offer is how a "
+        "conformance claim overstates itself, so the column says *not offered* "
+        "rather than leaving a gap.",
+        "",
+        "| §8.5 | The obligation | Offered |",
+        "| --- | --- | --- |",
+    ]
+    codes = sorted(
+        (identifier for identifier in contract.diagnostics if identifier.startswith("ni.adv.")),
+        key=lambda i: int(i.rsplit(".", 1)[-1][1:]),
+    )
+    for identifier in codes:
+        code = identifier.rsplit(".", 1)[-1]
+        about = contract.about(identifier)
+        state = "`advisories.py`" if code in offered else "*not offered*"
+        lines.append(f"| {code} | {_prose(about['summary'])} | {state} |")
+
     return "\n".join(lines) + "\n"
+
+
+def _prose(text: str) -> str:
+    return " ".join(str(text).split()).replace("**", "").replace("|", "\\|")
 
 
 def main() -> int:

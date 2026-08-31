@@ -115,42 +115,46 @@ many of them there are.
 
 ## MA6 — the record, generated rather than illustrated
 
-[`record-android.json`](record-android.json) and
-[`record-ios.json`](record-ios.json) are the §9 records this set produces,
+[`record-android.record`](record-android.record) and
+[`record-ios.record`](record-ios.record) are the §9 records this set produces,
 written by `tools/record_example.py` and checked in CI. Appendix E shows the
 *shape* of a record and says so — hand-written, non-normative. These are the
-thing itself.
+thing itself, emitted by the reader in `src/`.
 
 The closure they are generated from is the ordinary one for this ecosystem: the
 application depends on the two **adapters** it wants, and each adapter depends
 on the mediation SDK, so `pyadmob` arrives underneath. The record says so:
 
-```json
-"name": "pyadmob",
-"origin": "via pyadmob-applovin, pyadmob-mintegral",
 ```
-
-and the entries under it include
-
-```
-meta-data com.google.android.gms.ads.APPLICATION_ID = ca-app-pub-…
+dist pyadmob origin transitive via=pyadmob-applovin,pyadmob-mintegral
+dist pyadmob value admob_app_id key=com.google.android.gms.ads.APPLICATION_ID kind=manifest_meta_data state=supplied
 ```
 
 An account identifier, demanded by a package the application never named,
 attributed to the two packages that brought it in. That is the README's opening
 paragraph as an artifact rather than a claim, and it is what §3.2's closure rule
-and §9's `origin` field exist to produce.
+and §9's origin line exist to produce.
 
 Two smaller things the pair shows that no single-platform record could:
 
-- **The same `id`, two values.** `GADApplicationIdentifier` in the iOS record
-  carries a different identifier from `com.google.android.gms.ads.APPLICATION_ID`
-  in the Android one — MA5, visible in the output rather than argued in prose.
+- **One `id`, two delivery sites.** `admob_app_id` is a single declared id, and
+  the two records land it on different keys — `GADApplicationIdentifier` under
+  iOS, `com.google.android.gms.ads.APPLICATION_ID` under Android — because the
+  AdMob console issues a different identifier per platform. That is MA5 as
+  output rather than prose. The differing *values* are in `app-pyproject.toml`
+  and deliberately not here: §9.5 keeps supplied values out of the record, so
+  what it can show is that the question was answered, not what with.
 - **MA3's prediction, confirmed.** The record keeps one `skadnetwork` line per
   identifier *per declaring distribution*, so `cstr6suwn9` appears under both
   `pyadmob` and `pyadmob-mintegral` while the merged plist carries it once.
   Provenance is per-package and de-duplication is per-application, which is the
   right split and also why an ads-heavy record grows the way MA3 predicted.
+
+One thing the earlier hand-written JSON version of these records carried and
+these do not: a resolved artifact and its digest. The reader is not a build
+tool — it never resolves a Gradle graph — so it records the *requested* range
+(`requested=range:24.0.0:25.0.0`) and leaves the resolved coordinate to the
+consumer that did the resolving. §9.4 is written for the consumer's half.
 
 ## What this did not exercise
 

@@ -2,12 +2,12 @@
 #
 # Read this beside app-pyproject.toml in the same directory: this file is what
 # the *package* declares, that one is what the *application* writes in reply.
-# It is the only worked pair in the example set, and the only place §2.2's
-# answer surface is shown end to end.
+# It is the only worked pair in the example set, and the only place the answer
+# surface of §2.2, How the application answers, is shown end to end.
 #
-# Chosen to test §6.8's `view_links` — the redirect-scheme machinery the spec
-# built for OAuth callbacks and no example had yet exercised — and to see what
-# a financial SDK asks of an application.
+# Chosen to test the `view_links` of §6.6, Manifest components — the
+# redirect-scheme machinery the spec built for OAuth callbacks and no example
+# had yet exercised — and to see what a financial SDK asks of an application.
 #
 # The result is an asymmetry: Android has the primitive and barely needs it,
 # iOS needs it and has nothing. See NOTES.md, findings T1 and T2.
@@ -19,9 +19,8 @@ contract = "1"
 [android.owns]
 java_namespaces = ["org.pystripe"]
 
-# The redirect activity below is this package's own class, so §6.8 needs the
-# source that holds it. Illustrative like the rest of the example set: a real
-# wheel ships the tree, this repository ships the declaration.
+# The redirect activity below is this package's own class, so §6.6 needs the
+# file that holds it — §6.2, Java and Kotlin source, is what carries it.
 [android.contributes.src]
 java = ["java"]
 
@@ -29,14 +28,19 @@ java = ["java"]
 min_sdk = 21
 compile_sdk = 34
 
-[[android.requires.application_values]]
-# Referenced inline by view_links below. §6.3 requires every inline reference to
-# resolve to a declared id — an implicit declaration would have no `reason`,
-# leaving the application told something is missing but not what.
+[[android.requires.application_value]]
+# Referenced inline by view_links below. §5.5, Value kinds, requires every
+# inline reference to resolve to a declared id — an implicit declaration would
+# have no `reason`, leaving the application told something is missing but not
+# what. `inline` is the kind for a value the consumer delivers nowhere of its
+# own accord: this one reaches the manifest through the view-link that
+# references it.
 id = "stripe_return_scheme"
+kind = "inline"
 reason = """\
 The URL scheme you registered with Stripe for 3D Secure returns; it must match \
 the return_url your server sends when confirming a PaymentIntent."""
+placeholder = "<TODO: your Stripe return scheme, e.g. myapp-stripe>"
 
 [[android.contributes.gradle_dependencies]]
 module = "com.stripe:stripe-android"
@@ -47,10 +51,10 @@ name = "android.permission.INTERNET"
 reason = "Stripe API calls and 3D Secure authentication"
 
 [[android.contributes.components]]
-# §6.8's view_links, finally exercised. The 3DS challenge hands control to the
+# §6.6's view_links, finally exercised. The 3DS challenge hands control to the
 # issuing bank in a browser; the return lands here. The scheme is per
 # application — registered in the Stripe dashboard — so the producer cannot
-# know it, which is the case §6.3's inline form exists for.
+# know it, which is the case §5.5's inline kind exists for.
 kind = "activity"
 name = "org.pystripe.PaymentReturnActivity"
 exported_required = true
@@ -72,18 +76,27 @@ from_dependency = "com.stripe:stripe-android"
 [ios.requires]
 deployment_target = "15.0"
 
-[[ios.requires.url_schemes]]
+[[ios.requires.application_action]]
 id = "stripe_3ds_callback"
-# Finding T2. The counterpart of the Android view_links above — but a
-# prerequisite rather than a contribution, because iOS binds URL registration to
-# the bundle rather than to a component, and the application must forward the
-# callback either way. Conditional because the native 3DS flow needs no scheme;
-# only the webview fallback does.
+# Finding T2. The counterpart of the Android view_links above — but an action
+# rather than a contribution, because iOS binds URL registration to the bundle
+# rather than to a component, and the application must forward the callback
+# either way. Conditional because the native 3DS flow needs no scheme; only the
+# webview fallback does.
+#
+# `slot` is §5.7's, Slots: two packages both wanting the URL-callback seam is
+# contention the application has to see, and the slot is what makes the pair
+# reportable together rather than as two unrelated asks.
 conditional = true
+slot = "ios.url_callback"
+summary = "Register a custom URL scheme and forward the callback to Stripe"
 reason = """\
 Required only if the 3D Secure webview fallback is reached, which happens on \
 older client versions. Register a custom URL scheme and forward it from \
 application(_:open:options:) to StripeAPI.handleURLCallback(with:)."""
+acceptance = [
+  "A 3D Secure webview payment returns to the application rather than leaving the browser open.",
+]
 
 [[ios.contributes.swift_packages]]
 name = "StripeIOS"
@@ -99,7 +112,8 @@ products = ["StripePaymentSheet"]
 #     the specification addresses. Firebase sidesteps the equivalent by
 #     swizzling; Stripe requires the explicit forward. The prerequisite above
 #     reports it; nothing generates it, because naming a producer symbol to
-#     receive the URL is the startup-hook shape §11 deliberately excludes.
+#     receive the URL is the startup-hook shape §11, Out of scope, deliberately
+#     excludes.
 #
 # T4  Google Pay. <meta-data android:name="com.google.android.gms.wallet.api.enabled"
 #     android:value="true"/> is a *fixed* entry, identical for every
@@ -107,8 +121,9 @@ products = ["StripePaymentSheet"]
 #     reopening trigger recorded for P3's deferred meta_data half.
 #
 # T5  Apple Pay. com.apple.developer.in-app-payments carries the merchant
-#     identifiers the application registered with Apple. §7.3 entitlements are
-#     key + reason, with no way to say the entitlement takes values or which
-#     ones. Recorded as P26 and decided against: the count was miscounted as
-#     three, and §7.3 now says the omission is deliberate — `reason` carries
-#     what a type tag could not.
+#     identifiers the application registered with Apple. Section 7.3 of
+#     first-attempt.md — a different document, so no § here — made entitlements
+#     a declaration of key + reason, with no way to say the entitlement takes
+#     values or which ones. Recorded as P26 and decided against: SPEC.md has no
+#     entitlement declaration at all, and this is one of §5.3's actions, whose
+#     `reason` carries what a type tag could not.

@@ -10,10 +10,12 @@
 > The contract stays unfrozen until something is built against it and run on a
 > device — see [Before a freeze](#before-a-freeze).
 >
-> **The reference reader under `src/` still implements the first attempt.** Its
-> architecture survived the rebuild and its rule set did not, so
-> [`docs/REQUIREMENTS.md`](docs/REQUIREMENTS.md) and the test suite describe
-> that document rather than this one. Rewriting it is the next piece of work.
+> **The reference reader under [`src/`](src/README.md) now implements this
+> document.** It was rewritten against it rather than patched, and it is run
+> against the [conformance corpus](conformance/README.md) in CI. Six of that
+> corpus's case runs come back *unverified* — every one an assertion about
+> generated output, which a reader does not produce. Closing them needs a build
+> tool, and no build tool exists yet.
 
 ## The problem
 
@@ -281,9 +283,11 @@ yet.
 | --- | --- |
 | [**SPEC.md**](SPEC.md) | the specification. [Appendix A](SPEC.md#appendix-a-a-complete-sidecar) is a whole sidecar, [Appendix B](SPEC.md#appendix-b-declaration-reference) every key it may contain, [§8](SPEC.md#8-consuming-tool-requirements) the consumer's checklist — forty-six requirements in a core profile plus one per platform, so an Android-only tool can conform without implementing Xcode |
 | [`examples/`](examples/) | one integration in full, both halves |
+| [`src/`](src/README.md) | the reference reader — discovery, parsing, validation, resolution, recording. Not a build tool: it writes no project, resolves no coordinate, runs nothing |
+| [`conformance/`](conformance/README.md) | the corpus a consumer is tested against, its harness, and a reference consumer driving the reader in `src/` |
+| [`contract/`](contract/) | the machine-readable vocabulary. Appendix B, the JSON schema and the diagnostic ids are all generated from it, and the reader reads it at run time |
 | [`development/`](development/) | the first attempt, the rebuild, eighteen sidecars, a forty-SDK survey, and the findings from each round |
-| [`src/`](src/README.md) | the reference reader — discovery, parsing, validation. Not a build tool: it writes no project, resolves no coordinate, runs nothing. It implements the **first attempt** |
-| `tools/`, `tests/` | `check_spec.py` (18 checks over both documents and every example), `toc.py`, `requirements_table.py`, and the reader's suite. All run in CI on every push |
+| `tools/`, `tests/` | `check_spec.py` (24 checks over both documents and every example), `toc.py`, `requirements_table.py`, and the reader's suite. All run in CI on every push |
 
 Each check exists because the corresponding mistake shipped at least once. They
 cover mechanical drift only — a section that contradicts itself still needs a
@@ -307,9 +311,11 @@ call:
 - **A sidecar authored outside this repository.**
 - **One integration on a device.** Nothing here has ever been run.
 - **A round that produces only corrections**, with no capability to add.
-- **The reference reader rewritten against this specification.** That is the
-  pacing item: when it moves, the converted sidecars graduate to `examples/` and
-  the frozen eighteen move under `development/`.
+- **A consumer that generates.** The reference reader now implements this
+  document, which moved the pacing item rather than removing it: it validates
+  and records, and the six assertions the conformance corpus cannot verify
+  against it are all about generated output. The next thing that has never been
+  done is writing the Gradle files and the Xcode project.
 
 ## License
 

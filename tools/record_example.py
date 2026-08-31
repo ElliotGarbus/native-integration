@@ -1,10 +1,11 @@
+#!/usr/bin/env python3
 """Generate the worked integration records for `development/examples/mediated-ads/`.
 
-The first attempt's Appendix E — SPEC.md's Appendix C — shows the shape of a
-record, hand-written and non-normative. This
-writes a real one, from the three sidecars in that directory and the
-`app-pyproject.toml` beside them — including the `origin` line for a package the
-application never named, which is the case the whole convention exists for.
+SPEC.md's Appendix C shows the shape of a record, hand-written and
+non-normative. This writes a real one, from the three sidecars in that directory
+and the `app-pyproject.toml` beside them — including the `origin` line for a
+package the application never named, which is the case the whole convention
+exists for.
 
     python3 tools/record_example.py           # write
     python3 tools/record_example.py --check   # fail if the files have drifted
@@ -12,7 +13,7 @@ application never named, which is the case the whole convention exists for.
 Regenerate whenever a mediated-ads sidecar or the application file changes; the
 record is a function of both, which is the property that makes it reviewable.
 
-§9 hashes the *bytes* of each input, so a checkout whose line endings differ
+§9.3 hashes the *bytes* of each input, so a checkout whose line endings differ
 from the repository's produces a different record for identical content. That is
 correct — a sidecar ships inside a wheel, where the bytes are fixed — and it is
 why `.gitattributes` pins this repository to LF.
@@ -28,16 +29,13 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
 from native_integration import (  # noqa: E402
+    Answer,
     Application,
     Closure,
-    ConsumerProfile,
-    MappingAnswers,
     Origin,
-    Platform,
     read,
     source_from_path,
 )
-from native_integration.testing import stub_resolvers  # noqa: E402
 
 EXAMPLE = ROOT / "development" / "examples" / "mediated-ads"
 ADAPTERS = ("pyadmob-applovin", "pyadmob-mintegral")
@@ -45,7 +43,7 @@ MEDIATION = "pyadmob"
 
 #: The application depends on the adapters it wants; each adapter depends on the
 #: mediation SDK, so `pyadmob` arrives underneath. That is the ordinary shape of
-#: this ecosystem and it puts the package demanding an account identifier one
+#: this ecosystem, and it puts the package demanding an account identifier one
 #: level below anything the application named.
 CLOSURE = Closure.of(
     {
@@ -56,32 +54,38 @@ CLOSURE = Closure.of(
 )
 
 
-def answers(platform: Platform) -> MappingAnswers:
+def application_for(platform: str) -> Application:
+    """The example's own `pyproject.toml`, in one build tool's spelling.
+
+    §2.2 fixes the capability and not the syntax, so this adaptation is the
+    example's, not the library's — which is the point of showing it.
+    """
     config = tomllib.loads((EXAMPLE / "app-pyproject.toml").read_text(encoding="utf-8"))
     build = config["tool"]["examplebuild"]
-    values = {
-        distribution: per_platform[platform.value]["application_values"]
+    answered = [
+        (distribution, per_platform[platform])
         for distribution, per_platform in build["native"].items()
-        if platform.value in per_platform
-        and "application_values" in per_platform[platform.value]
-    }
-    return MappingAnswers(
-        application_values=values,
-        usage_descriptions=build.get(platform.value, {}).get("usage_descriptions", {}),
+        if platform in per_platform
+    ]
+    return Application(
+        android=build.get("android", {}),
+        deployment_target=build.get("ios", {}).get("deployment_target", ""),
+        values={
+            (distribution, identifier): answer
+            for distribution, section in answered
+            for identifier, answer in section.get("application_values", {}).items()
+        },
+        acknowledged={
+            (distribution, identifier): Answer(date=held.get("date", ""))
+            for distribution, section in answered
+            for identifier, held in section.get("acknowledged", {}).items()
+        },
     )
 
 
-def record_for(platform: Platform) -> str:
+def record_for(platform: str) -> str:
     integration = read(
-        platform=platform,
-        closure=CLOSURE,
-        application=Application(
-            android_sdk={"min_sdk": 24, "compile_sdk": 35},
-            deployment_target="15.0",
-            answers=answers(platform),
-        ),
-        profile=ConsumerProfile(verify_resources=False),
-        sources=[
+        [
             source_from_path(
                 EXAMPLE / name,
                 distribution=name,
@@ -90,24 +94,33 @@ def record_for(platform: Platform) -> str:
             )
             for name in (MEDIATION, *ADAPTERS)
         ],
-        resolvers=stub_resolvers(),
-        accept_current_surface=True,
+        platform=platform,
+        closure=CLOSURE,
+        application=application_for(platform),
     )
-    return integration.record.dumps()
+    # A sidecar that fails validation contributes nothing, so an example that
+    # has drifted from the vocabulary would quietly write a two-line record and
+    # report success — a generator overstating itself, which is the thing this
+    # repository keeps testing other people's tools for.
+    integration.raise_for_errors()
+    return integration.record.render()
 
 
 def main() -> int:
     checking = "--check" in sys.argv
     problems = []
-    for platform in (Platform.ANDROID, Platform.IOS):
-        path = EXAMPLE / f"record-{platform.value}.json"
+    for platform in ("android", "ios"):
+        path = EXAMPLE / f"record-{platform}.record"
         rendered = record_for(platform)
         if checking:
             current = path.read_text(encoding="utf-8") if path.exists() else ""
             if current != rendered:
                 problems.append(path.relative_to(ROOT))
             continue
-        path.write_text(rendered, encoding="utf-8", newline=chr(10))
+        # newline: this repository pins LF (.gitattributes) and §9.3 hashes file
+        # bytes, so a generator emitting CRLF on Windows would write a record no
+        # LF checkout can reproduce.
+        path.write_text(rendered, encoding="utf-8", newline="\n")
         print(f"wrote {path.relative_to(ROOT)}")
 
     if problems:

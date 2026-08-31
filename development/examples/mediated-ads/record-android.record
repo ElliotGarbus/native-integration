@@ -1,0 +1,37 @@
+build contract 1.0
+build platform android
+dist pyadmob contract 1
+dist pyadmob contributes gradle-dependency com.google.android.gms:play-services-ads configuration=implementation requested=range:24.0.0:25.0.0
+dist pyadmob contributes meta-data com.google.android.gms.ads.flag.OPTIMIZE_INITIALIZATION type=boolean value=true
+dist pyadmob contributes permission android.permission.ACCESS_NETWORK_STATE reason="Connectivity checks before an ad request"
+dist pyadmob contributes permission android.permission.INTERNET reason="Ad requests and creative delivery"
+dist pyadmob contributes permission com.google.android.gms.permission.AD_ID reason="Reads the advertising ID for ad personalization. Suppress it if your application is in a children's category."
+dist pyadmob floor compile_sdk configured=35 declared=35 state=met
+dist pyadmob floor min_sdk configured=24 declared=23 state=met
+dist pyadmob input native.toml sha256=478e8f0b87674f33f7cf41520815d86edb452e1675a154203fa1ab7198252e62
+dist pyadmob origin transitive via=pyadmob-applovin,pyadmob-mintegral
+dist pyadmob value admob_app_id key=com.google.android.gms.ads.APPLICATION_ID kind=manifest_meta_data state=supplied
+dist pyadmob version 1.0.0
+dist pyadmob-applovin contract 1
+dist pyadmob-applovin contributes gradle-dependency com.google.ads.mediation:applovin configuration=implementation requested=range:13.0.0:14.0.0
+dist pyadmob-applovin contributes meta-data com.google.android.gms.ads.flag.OPTIMIZE_INITIALIZATION type=boolean value=true
+dist pyadmob-applovin contributes permission android.permission.ACCESS_NETWORK_STATE reason="Connectivity checks before an ad request"
+dist pyadmob-applovin contributes permission android.permission.INTERNET reason="Ad requests to the AppLovin network"
+dist pyadmob-applovin floor compile_sdk configured=35 declared=35 state=met
+dist pyadmob-applovin floor min_sdk configured=24 declared=23 state=met
+dist pyadmob-applovin input native.toml sha256=3b665e8666bb32a00492291eb33b7f74641ffc3f8551b17e6ab0b215ff587186
+dist pyadmob-applovin origin direct
+dist pyadmob-applovin value applovin_sdk_key key=applovin.sdk.key kind=manifest_meta_data state=supplied
+dist pyadmob-applovin version 1.0.0
+dist pyadmob-mintegral action initialize_mintegral date=2026-08-24 state=acknowledged uses=mintegral_app_id,mintegral_app_key version=1.0.0
+dist pyadmob-mintegral contract 1
+dist pyadmob-mintegral contributes gradle-dependency com.google.ads.mediation:mintegral configuration=implementation requested=range:16.9.0:17.0.0
+dist pyadmob-mintegral contributes gradle-repository https://dl-maven-android.mintegral.com/repository/mbridge_android_sdk_oversea authenticated=false groups=com.mbridge.msdk.oversea reason="Mintegral does not publish its Android SDK to Maven Central; the adapter's transitive dependency resolves only from this repository. No credential is needed."
+dist pyadmob-mintegral contributes permission android.permission.INTERNET reason="Ad requests to the Mintegral network"
+dist pyadmob-mintegral floor compile_sdk configured=35 declared=35 state=met
+dist pyadmob-mintegral floor min_sdk configured=24 declared=23 state=met
+dist pyadmob-mintegral input native.toml sha256=97b7e33a557c0743fc70ac2bdd99f6f5f20504c20bf7e9591ec32eaabcfdb480
+dist pyadmob-mintegral origin direct
+dist pyadmob-mintegral value mintegral_app_id kind=inline state=supplied
+dist pyadmob-mintegral value mintegral_app_key kind=inline state=supplied
+dist pyadmob-mintegral version 1.0.0

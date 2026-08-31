@@ -1,6 +1,7 @@
 # pyadmob-mintegral — HYPOTHETICAL. The Mintegral mediation adapter, chosen as
 # the third package because Mintegral is the adapter in this set that does not
-# publish to Maven Central. It is what puts §6.6 into a composition.
+# publish to Maven Central. It is what puts §6.4, Maven repositories, into a
+# composition.
 
 contract = "1"
 platforms = ["android", "ios"]
@@ -11,13 +12,40 @@ platforms = ["android", "ios"]
 min_sdk = 23
 compile_sdk = 35
 
-[[android.requires.application_values]]
+# Neither of these has a manifest key, because Mintegral's SDK takes them as
+# arguments at initialization rather than reading them from the manifest. Among
+# §5.5's value kinds that is `inline`: the consumer surfaces the value and
+# delivers it nowhere.
+# An `inline` value must be referenced by something, and the action below is
+# what references these — which is the honest shape, because an application
+# author who supplies the pair and never makes the call has a build that looks
+# configured and an SDK that never starts.
+[[android.requires.application_value]]
 id = "mintegral_app_id"
+kind = "inline"
 reason = "Your Mintegral application ID, from the Mintegral dashboard"
+placeholder = "<TODO: your Mintegral app ID>"
 
-[[android.requires.application_values]]
+[[android.requires.application_value]]
 id = "mintegral_app_key"
+kind = "inline"
 reason = "Your Mintegral application key, issued beside the application ID"
+placeholder = "<TODO: your Mintegral app key>"
+
+[[android.requires.application_action]]
+id = "initialize_mintegral"
+summary = "Initialize the Mintegral SDK with your application ID and key"
+reason = """\
+Mintegral's SDK takes its credentials as arguments to an initialization call \
+rather than reading them from the manifest, so no declaration can deliver \
+them."""
+uses = ["mintegral_app_id", "mintegral_app_key"]
+instructions = """\
+Call `MBridgeSDKFactory.getMBridgeSDK().init(...)` with the two values above, \
+once, before requesting an ad."""
+acceptance = [
+  "An ad request to the Mintegral network returns a fill or a no-fill rather than an initialization error.",
+]
 
 [[android.contributes.gradle_repositories]]
 url = "https://dl-maven-android.mintegral.com/repository/mbridge_android_sdk_oversea"

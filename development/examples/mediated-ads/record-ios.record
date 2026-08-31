@@ -1,0 +1,32 @@
+build contract 1.0
+build platform ios
+dist pyadmob contract 1
+dist pyadmob contributes objc-categories
+dist pyadmob contributes skadnetwork 4dzt52r2t5.skadnetwork
+dist pyadmob contributes skadnetwork cstr6suwn9.skadnetwork
+dist pyadmob contributes skadnetwork ludvb6z3bs.skadnetwork
+dist pyadmob contributes swift-package GoogleMobileAds products=GoogleMobileAds requirement=from:12.0.0 url=https://github.com/googleads/swift-package-manager-google-mobile-ads
+dist pyadmob floor deployment_target configured=15.0 declared=15.0 state=met
+dist pyadmob input native.toml sha256=478e8f0b87674f33f7cf41520815d86edb452e1675a154203fa1ab7198252e62
+dist pyadmob origin transitive via=pyadmob-applovin,pyadmob-mintegral
+dist pyadmob value admob_app_id key=GADApplicationIdentifier kind=info_plist state=supplied
+dist pyadmob value tracking_usage_description conditional=true key=NSUserTrackingUsageDescription kind=usage_description state=supplied
+dist pyadmob version 1.0.0
+dist pyadmob-applovin contract 1
+dist pyadmob-applovin contributes objc-categories
+dist pyadmob-applovin contributes skadnetwork 5lm9lj6jb7.skadnetwork
+dist pyadmob-applovin contributes skadnetwork ludvb6z3bs.skadnetwork
+dist pyadmob-applovin contributes swift-package AppLovinAdapter products=AppLovinAdapter requirement=from:13.0.0 url=https://github.com/googleads/googleads-mobile-ios-mediation-applovin
+dist pyadmob-applovin floor deployment_target configured=15.0 declared=15.0 state=met
+dist pyadmob-applovin input native.toml sha256=3b665e8666bb32a00492291eb33b7f74641ffc3f8551b17e6ab0b215ff587186
+dist pyadmob-applovin origin direct
+dist pyadmob-applovin version 1.0.0
+dist pyadmob-mintegral contract 1
+dist pyadmob-mintegral contributes objc-categories
+dist pyadmob-mintegral contributes skadnetwork cstr6suwn9.skadnetwork
+dist pyadmob-mintegral contributes skadnetwork kbd757ywx3.skadnetwork
+dist pyadmob-mintegral contributes swift-package MintegralAdapter products=MintegralAdapter requirement=from:7.7.0 url=https://github.com/googleads/googleads-mobile-ios-mediation-mintegral
+dist pyadmob-mintegral floor deployment_target configured=15.0 declared=15.0 state=met
+dist pyadmob-mintegral input native.toml sha256=97b7e33a557c0743fc70ac2bdd99f6f5f20504c20bf7e9591ec32eaabcfdb480
+dist pyadmob-mintegral origin direct
+dist pyadmob-mintegral version 1.0.0

@@ -16,24 +16,26 @@ SDK most people recognise:
 - an **exported component the application approves** — without which the build
   fails rather than quietly registering an activity that cannot receive the
   redirect;
-- a **conditional prerequisite the application acknowledges** — needed only if
-  the webview fallback is reached.
+- a **conditional action the application acknowledges** — needed only if the
+  webview fallback is reached.
 
 Each answer is filed under the **declaring distribution plus the key the
 declaration named**. The spelling of the application's file is illustrative —
-[§2.2](../development/first-attempt.md) defines the capability a build tool must offer and
-deliberately not the syntax — but that join is not.
+[§2.2](../SPEC.md#22-how-the-application-answers) defines the capability a build
+tool must offer and deliberately not the syntax — but that join is not.
 
 The most useful thing in the pair may be what is *absent*: the Stripe
 publishable key. It is per-application and looks like it belongs beside the
-return scheme, and it does not, because the SDK takes it at runtime and §6.3 is
+return scheme, and it does not, because the SDK takes it at runtime and §5.2 is
 only for values the build must embed. It goes in the application's Python. The
 scheme differs in kind because it is baked into a manifest intent filter, where
 no runtime call can reach it.
 
-`python3 tools/check_spec.py` keeps the two halves in step: a requirement added
-to the sidecar with no answer fails, and so does an answer removed from the
-application.
+Two things keep the pair honest. `python3 tools/check_spec.py` keeps the halves
+in step — a requirement added to the sidecar with no answer fails, and so does
+an answer removed from the application — and `tests/test_examples.py` runs the
+reader in [`src/`](../src/) over the sidecar itself, so a declaration that is
+spelled correctly and still wrong fails too.
 
 ---
 

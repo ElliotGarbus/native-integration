@@ -2,11 +2,17 @@
 # dependency closure, and never accept contributions from a distribution outside
 # it, whatever else is installed alongside.
 #
-# `pyunrelated` is in input/closure.toml marked `not-in-closure` and ships no
-# sidecar directory of its own: a consumer that enumerates entry points across
-# whatever is installed, rather than filtering against the closure, has nothing
-# to fail on here — which is why the assertion below carries the weight and the
-# record carries the rest.
+# `pyunrelated` is in input/closure.toml marked `not-in-closure`, and it ships a
+# deliberately loud sidecar on both platforms: a permission nothing asked for,
+# and a floor above what the application configures. A consumer that enumerates
+# entry points across whatever is installed, rather than filtering against the
+# closure, reads it and fails the build — so the rule is what breaks, rather
+# than a missing file.
+#
+# The fixture originally shipped no sidecar for it at all, which made the case
+# pass for the wrong reason: there was nothing to accept, so a consumer ignoring
+# `origin = "not-in-closure"` failed to find files rather than failing the rule.
+# Recorded in development/findings/phase3-reader.md.
 requirement = 1
 profile     = "core"
 section     = "3.2"
