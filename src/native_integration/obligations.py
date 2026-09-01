@@ -181,14 +181,18 @@ def for_constraint(identifier: str) -> int:
 
 #: Obligations the *application* discharges, not the producer: a value only the
 #: developer knows (13), an action only they can acknowledge (14), a floor only
-#: their configuration can meet (12), an export only they can approve (29).
+#: their configuration can meet (12), an export only they can approve (29), and
+#: an integration only they can accept (38) — §9.1 makes acceptance the
+#: application's act, and a producer has nothing to accept.
 #:
 #: They are not a lesser class of requirement — three of the four block a build.
 #: What they are is unanswerable from a sidecar alone, so a tool handed one
 #: sidecar and no application reports them as outstanding rather than as the
 #: producer's defects. A sidecar that could satisfy them on its own would mean
 #: the consent §8.4 requires had been designed out.
-ANSWERED_BY_THE_APPLICATION = ("ni.req.12", "ni.req.13", "ni.req.14", "ni.req.29")
+ANSWERED_BY_THE_APPLICATION = (
+    "ni.req.12", "ni.req.13", "ni.req.14", "ni.req.29", "ni.req.38",
+)
 
 
 def for_identifier(identifier: str, registry: Registry) -> int:

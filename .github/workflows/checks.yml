@@ -32,6 +32,8 @@ jobs:
         run: python3 tools/toc.py --check
       - name: Check the worked integration records are current
         run: python3 tools/record_example.py --check
+      - name: Check the packaged authoring guide matches SPEC.md
+        run: python3 tools/gen_authoring_guide.py --check
 
   reader:
     name: Reference reader

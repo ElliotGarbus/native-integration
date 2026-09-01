@@ -224,3 +224,78 @@ def test_conformance_says_the_corpus_is_not_in_the_package(capsys):
 def test_conformance_without_a_corpus_says_where_to_get_one(tmp_path, monkeypatch):
     monkeypatch.setattr(cli, "__file__", str(tmp_path / "cli.py"))
     assert cli.main(["conformance", "--profile", "core", "--", "x"]) == 2
+
+
+# -- the authoring procedure -------------------------------------------------
+
+
+def test_the_guide_is_the_specification_section(capsys):
+    """A copy, not a restatement. `tools/gen_authoring_guide.py --check` fails
+    the build when the two disagree; this checks the command reads the copy."""
+    code, out = run(capsys, "authoring-guide")
+    assert code == 0
+    assert "12.2 Sidecar authoring procedure" in out
+    assert "introduces nothing" in out
+    spec = (ROOT / "SPEC.md").read_text(encoding="utf-8")
+    for step in range(1, 9):
+        assert f"**{step}. " in out, f"step {step} is missing"
+        assert out.split(f"**{step}. ")[1][:20] in spec
+
+
+def test_the_guide_states_no_obligation_of_its_own(capsys):
+    """The property §12.2 is written to have, checked where an author reads it
+    rather than only where it is written."""
+    import re
+
+    _, out = run(capsys, "authoring-guide")
+    body = out[:out.index("Read it in full")]
+    unquoted = re.sub(r"`[^`]*`|\"[^\"]*\"", "", body)
+    assert not re.findall(
+        r"\b(MUST NOT|MUST|SHOULD NOT|SHOULD|REQUIRED|RECOMMENDED)\b", unquoted
+    )
+
+
+def test_the_template_carries_a_stable_url(capsys):
+    """It is copied into another repository, where nothing else says where the
+    rules are."""
+    code, out = run(capsys, "authoring-guide", "--template")
+    assert code == 0
+    assert cli.SPECIFICATION_URL in out
+    assert 'contract = "1"' in out
+
+
+def test_the_template_is_a_sidecar_a_consumer_accepts(capsys, tmp_path):
+    """Everything but `contract` is commented out, so what it emits has to be a
+    valid sidecar rather than a valid-looking one."""
+    import tomllib
+
+    _, out = run(capsys, "authoring-guide", "--template")
+    sidecar = tmp_path / "pytemplate" / "_native"
+    sidecar.mkdir(parents=True)
+    (sidecar / "native.toml").write_text(out, encoding="utf-8", newline=chr(10))
+    assert tomllib.loads(out) == {"contract": "1"}
+    code, _ = run(capsys, "validate", str(sidecar), "--json")
+    assert code == 0
+
+
+def test_every_step_of_the_procedure_is_parsed():
+    """The pairing derives from the guide's own text, so a step that stopped
+    being recognized would silently stop answering for anything."""
+    parsed = cli.steps()
+    assert [number for number, _, _ in parsed] == list(range(1, 9))
+    assert all(title for _, title, _ in parsed)
+
+
+def test_a_failure_names_the_step_that_decides_it(capsys):
+    _, out = run(capsys, "validate", str(EXAMPLE), "--explain-failures")
+    assert "step 4, For a requirement, choose the shape" in out
+    assert "step 3, Test every candidate contribution" in out
+    assert "native-integration authoring-guide" in out
+
+
+def test_explain_failures_is_in_the_json_too(capsys):
+    answer = json.loads(
+        run(capsys, "validate", str(EXAMPLE), "--json", "--explain-failures")[1]
+    )
+    assert answer["steps"]
+    assert all("step" in line or "no step" in line for line in answer["steps"])

@@ -18,6 +18,7 @@ Four subcommands, and the boundary between them is what a consumer knows:
                   rules that need one are reported as unchecked rather than
                   passed.
 * `conformance` — the corpus, run against someone else's consumer.
+* `authoring-guide` — §12.2, emitted where the author is working.
 
 Nothing here writes a project, resolves a coordinate, or executes anything a
 sidecar contains.
@@ -29,6 +30,7 @@ import argparse
 import json
 import subprocess
 import sys
+import re
 import tempfile
 import tomllib
 import zipfile
@@ -209,6 +211,24 @@ def build_parser() -> argparse.ArgumentParser:
             "--distribution", default="",
             help="the distribution's name, where the path does not give it",
         )
+        if name == "validate":
+            sub.add_argument(
+                "--explain-failures", action="store_true",
+                help="pair each finding with the step of §12.2 that decides it",
+            )
+
+    guide = subcommands.add_parser(
+        "authoring-guide", help="print §12.2, the sidecar authoring procedure",
+        description="Print the specification's authoring procedure. The people "
+        "who need it are working in another package's repository and will not "
+        "have this specification checked out, so it travels with the tool. "
+        + NON_NORMATIVE,
+        epilog=NON_NORMATIVE,
+    )
+    guide.add_argument(
+        "--template", action="store_true",
+        help="print a commented `native.toml` skeleton instead of the procedure",
+    )
 
     conformance_command = subcommands.add_parser(
         "conformance", help="run the conformance corpus against a consumer",
@@ -362,6 +382,157 @@ def explain(args: argparse.Namespace) -> int:
     return 0
 
 
+# -- the authoring procedure -------------------------------------------------
+
+#: Where an author can read the whole specification, printed on the skeleton so
+#: that a file copied into another repository still says where it came from.
+SPECIFICATION_URL = (
+    "https://github.com/ElliotGarbus/native-integration/blob/main/SPEC.md"
+)
+
+TEMPLATE = f"""# native.toml — the sidecar for this distribution.
+#
+# The specification: {SPECIFICATION_URL}
+# The procedure that produces this file: `native-integration authoring-guide`
+# Every key: SPEC.md's Appendix B, or `native-integration explain <key>`
+#
+# Delete what you do not declare. An empty table is not a placeholder: §4.4
+# makes a consumer fail closed on anything it does not recognize, and a table
+# left behind is one more thing for a reader to interpret.
+
+contract = "1"
+
+# Optional. The platforms this distribution functions on (§4.5). Omit it and
+# every platform is assumed; declare a table for a platform this omits and the
+# build fails.
+# platforms = ["android", "ios"]
+
+# --- what this distribution claims exclusively (§6.1) ------------------------
+# [android.owns]
+# java_namespaces = ["com.example.yourpackage"]
+
+# --- what the application's build must satisfy (§5) --------------------------
+# A floor is a minimum (§5.1); a value is a string the consumer can place
+# (§5.2); an action is an outcome it cannot (§5.3). Step 4 of the procedure
+# chooses between them.
+# [android.requires]
+# min_sdk = 24
+
+# --- what this distribution supplies (§6, §7) --------------------------------
+# Run step 3's three-part test before adding anything here: the producer knows
+# exactly what is required, the consumer can do it deterministically, and little
+# or no application policy is involved. A failure on any one of the three makes
+# it a requirement instead.
+# [[android.contributes.gradle_dependencies]]
+# coordinate = "com.example:sdk:1.0.0"
+
+# Check it before you ship it:
+#     native-integration validate path/to/_native --explain-failures
+"""
+
+
+def guide_text() -> str:
+    """§12.2, from the copy that ships beside the registry.
+
+    Read from package data rather than from `SPEC.md`, because the author this
+    is for does not have `SPEC.md`. `tools/gen_authoring_guide.py --check`
+    fails the build if the copy and the specification disagree.
+    """
+    path = registry.contract_directory() / "authoring-guide.md"
+    if not path.is_file():
+        raise UsageError(
+            f"{path.name} is missing from the package; run "
+            "tools/gen_authoring_guide.py"
+        )
+    return "\n".join(
+        line for line in path.read_text(encoding="utf-8").split("\n")
+        if not line.startswith("<!--")
+    ).strip("\n")
+
+
+def authoring_guide(args: argparse.Namespace) -> int:
+    if args.template:
+        print(TEMPLATE, end="")
+        return 0
+    print(guide_text())
+    print(f"\n  Read it in full at {SPECIFICATION_URL}")
+    print(f"  {NON_NORMATIVE}")
+    return 0
+
+
+#: Each step of §12.2, by the sections it cites. Derived from the guide's own
+#: text rather than written down again: a step is authoritative because of what
+#: it cites, so the citations are what a finding is matched against. A step
+#: whose citations changed changes what it answers for, automatically.
+def steps() -> list[tuple[int, str, set[str]]]:
+    found: list[tuple[int, str, set[str]]] = []
+    text = guide_text()
+    for match in re.finditer(r"\*\*(\d)\. (.+?)\*\*(.*?)(?=\n\*\*\d\. |\Z)", text, re.S):
+        number, title, body = int(match.group(1)), match.group(2), match.group(3)
+        sections = set(re.findall(r"\[\u00a7(\d+(?:\.\d+)?)\]", title + body))
+        found.append((number, title.rstrip("."), sections))
+    return found
+
+
+#: Which step of §12.2 answers for a section of the specification.
+#:
+#: The one hand-derived table in this phase, and it is a mapping of the
+#: document's own structure onto the procedure's, not a list of requirements.
+#: §12.2's steps 2 to 4 are *about* §2.1's three categories, so a finding is
+#: paired with the step that decides the category its rule belongs to:
+#:
+#:   §5  a requirement — step 4 chooses between floor, value and action
+#:   §6.1  an owned namespace — step 2 classifies it
+#:   §6, §7  a contribution — step 3's three-part test admits or refuses it
+#:   §12  conditionality — step 6
+#:   §4  the file and its declarations — step 7 checks them against Appendix B
+#:   §3  discovery — step 8 confirms what shipped
+#:
+#: Matching on the finding's own section is tried first and is exact; this is
+#: the fallback, because §8.4 is where a numbered requirement is *indexed* and
+#: the sections above are where its rules are *stated*.
+BY_SECTION = (("5", 4), ("6.1", 2), ("6", 3), ("7", 3), ("12", 6), ("4", 7), ("3", 8))
+
+
+def _step_for(section: str) -> int | None:
+    for prefix, number in BY_SECTION:
+        if section == prefix or section.startswith(prefix + "."):
+            return number
+    return None
+
+
+def explaining(findings: list[dict[str, Any]]) -> list[str]:
+    """One line per finding, naming the step of §12.2 that decides it.
+
+    A finding carries the section its rule comes from, and every step says which
+    sections it draws on, so an exact citation match is tried first. Where there
+    is none — a numbered requirement carries §8.4, the index rather than the
+    rule — the sections the requirement's own summary cites are tried, and then
+    `BY_SECTION`.
+    """
+    procedure = {number: title for number, title, _ in steps()}
+    cited = {number: sections for number, _, sections in steps()}
+    known = registry.load()
+    lines: list[str] = []
+    for finding in findings:
+        sections = {finding["section"]}
+        entry = known.diagnostics.get(finding["id"], {})
+        sections |= set(re.findall(r"\[§(\d+(?:\.\d+)?)\]", str(entry.get("summary", ""))))
+        chosen = next(
+            (number for number, wanted in sorted(cited.items()) if sections & wanted),
+            next((s for s in (_step_for(x) for x in sorted(sections)) if s), None),
+        )
+        where = "§" + ", §".join(sorted(sections - {"8.4"}) or sorted(sections))
+        if chosen is None:
+            lines.append(
+                f"  {finding['id']}  {where} — no step of §12.2 covers this; "
+                "`native-integration explain` has the rule"
+            )
+            continue
+        lines.append(f"  {finding['id']}  {where} — step {chosen}, {procedure[chosen]}")
+    return lines
+
+
 # -- inspect and validate ----------------------------------------------------
 
 
@@ -450,8 +621,8 @@ def validate(args: argparse.Namespace) -> int:
     unchecked.append(
         "one distribution was read, so every rule that needs the whole "
         "dependency closure went unchecked: an owned namespace two "
-        "distributions claim, two values targeting one key, a packaging "
-        "collision, and the §9.1 acceptance gate"
+        "distributions claim, two values targeting one key, one module "
+        "declared twice, and a packaging collision"
     )
 
     if args.json:
@@ -463,6 +634,8 @@ def validate(args: argparse.Namespace) -> int:
             "outstanding": outstanding,
             "unchecked": unchecked,
             "normative": False,
+            **({"steps": explaining(producer + outstanding)}
+               if getattr(args, "explain_failures", False) else {}),
         }, indent=2))
         return 1 if blocking else 0
 
@@ -484,6 +657,11 @@ def validate(args: argparse.Namespace) -> int:
         # the application's to discharge, and a sidecar cannot.
         print("\n  outstanding, for the application to answer:")
         show(outstanding)
+    if getattr(args, "explain_failures", False) and (producer or outstanding):
+        print("\n  the step of §12.2 each of these comes from:")
+        for line in explaining(producer + outstanding):
+            print(line)
+        print("\n  the whole procedure: native-integration authoring-guide")
     for note in unchecked:
         print(f"\n  not checked here: {note}")
     print(f"\n  {NON_NORMATIVE}")
@@ -551,6 +729,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 2
 
     handler = {
+        "authoring-guide": authoring_guide,
         "explain": explain,
         "inspect": inspect,
         "validate": validate,
