@@ -612,17 +612,30 @@ def validate(args: argparse.Namespace) -> int:
                     {"platform": platform, **_as_json(finding)}
                 )
 
+    # §9.1's gate is the application's act, and this reads one sidecar with no
+    # application and no stored record — so the gate is not evaluated against
+    # anything, it fires on the absence of an application. It would appear on
+    # every sidecar ever passed to this command, which makes it noise rather
+    # than a finding: an obligation that cannot vary with the input says
+    # nothing about the input. It belongs with what went unchecked.
+    unreachable = [f for f in findings if f["requirement"] == "ni.req.38"]
     outstanding = [
         f for f in findings
-        if f["requirement"] in obligations.ANSWERED_BY_THE_APPLICATION
+        if f not in unreachable
+        and f["requirement"] in obligations.ANSWERED_BY_THE_APPLICATION
     ]
-    producer = [f for f in findings if f not in outstanding]
+    producer = [f for f in findings if f not in outstanding and f not in unreachable]
     blocking = [f for f in producer if f["severity"] == "blocking"]
     unchecked.append(
         "one distribution was read, so every rule that needs the whole "
         "dependency closure went unchecked: an owned namespace two "
         "distributions claim, two values targeting one key, one module "
         "declared twice, and a packaging collision"
+    )
+    unchecked.append(
+        "no application was supplied, so §9.1's acceptance gate was not "
+        "evaluated either — there is no configuration to meet a floor, no "
+        "answer to a value, and no accepted record to compare against"
     )
 
     if args.json:

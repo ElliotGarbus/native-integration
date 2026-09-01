@@ -365,3 +365,49 @@ def test_nothing_documented_has_been_removed():
 def test_the_reference_says_the_tool_is_not_normative():
     text = " ".join(reference().split())
     assert "not normative" in text
+
+
+def test_the_acceptance_gate_is_unchecked_rather_than_outstanding(capsys, tmp_path):
+    """§9.1's gate fires on the absence of an application, which `validate`
+    always lacks — so it would appear on every sidecar ever passed to this
+    command. An obligation that cannot vary with the input says nothing about
+    the input, and belongs with what went unchecked."""
+    sidecar = tmp_path / "pyclean" / "_native"
+    sidecar.mkdir(parents=True)
+    (sidecar / "native.toml").write_text(
+        'contract = "1"\n\n[android.owns]\njava_namespaces = ["com.example.clean"]\n',
+        encoding="utf-8", newline="\n",
+    )
+    code, out = run(capsys, "validate", str(sidecar), "--json")
+    answer = json.loads(out)
+    assert code == 0
+    assert answer["outcome"] == "accept"
+    assert not answer["findings"] and not answer["outstanding"]
+    assert any("9.1" in note for note in answer["unchecked"])
+
+
+def test_the_producer_workflow_is_the_one_the_readme_documents(capsys, tmp_path):
+    """The worked example in `src/README.md`, run. A document showing output the
+    tool does not produce is worse than one showing none."""
+    sidecar = tmp_path / "pyvendor" / "_native"
+    sidecar.mkdir(parents=True)
+    draft = ('contract = "1"\n\n[[android.contributes.features]]\n'
+             'name = "android.hardware.camera"\nrequired = true\n')
+    (sidecar / "native.toml").write_text(draft, encoding="utf-8", newline="\n")
+
+    code, out = run(capsys, "validate", str(sidecar))
+    assert code == 1
+    assert "ni.decl.android.contributes.features.required.forbidden" in out
+    assert "native-integration explain ni.decl.android" in out
+
+    _, explained = run(capsys, "explain",
+                       "ni.decl.android.contributes.features.required.forbidden")
+    assert "6.5" in explained
+    assert "must not be declared by a producer" in explained
+
+    (sidecar / "native.toml").write_text(
+        draft.replace("required = true\n", ""), encoding="utf-8", newline="\n")
+    code, out = run(capsys, "validate", str(sidecar))
+    assert code == 0
+    assert "no finding, for the rules one sidecar can be held to" in out
+    assert "not checked here" in out

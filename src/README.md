@@ -31,36 +31,136 @@ requirement 28 beside two rules that are structural. Twice during this
 repository's own development a requirement was claimed and not satisfied while
 every test passed.
 
-This package answers both, from the same material:
+This package answers both from the same material. **The library** turns §8's
+obligations into code paths a build tool calls, rather than prose it has to
+remember to implement. **The command line** turns the specification into
+something you can query: a failure resolves to the one paragraph that decides
+it, and a draft sidecar can be held to the document before it ships.
+
+## The producer's workflow
+
+You maintain a Python package that binds a native SDK, and you are adding a
+sidecar to it. The loop is **draft, validate, explain, fix** — and it ends
+against the built artifact rather than the source tree.
+
+**1. Start from the procedure, not the reference.**
+
+```bash
+native-integration authoring-guide             # §12.2's eight ordered steps
+native-integration authoring-guide --template  # a skeleton to fill in
+```
+
+Step 3 is the one that matters and the one authors skip: the three-part test
+that decides whether an item is something you *contribute* or something you
+*require* of the application. Getting it wrong produces a sidecar that
+validates.
+
+**2. Validate the draft.** Point it at the directory holding `native.toml`:
+
+```
+$ native-integration validate src/pyvendor/_native
+pyvendor  —  src/pyvendor/_native
+  [blocking] (android) ni.decl.android.contributes.features.required.forbidden
+      `android.contributes.features.required` must not be declared by a producer
+      at android.contributes.features[0].required
+      native-integration explain ni.decl.android.contributes.features.required.forbidden
+```
+
+Every finding carries the command that explains it. The location is the path
+into your document, not a line number, because that is what you search for.
+
+**3. Explain what you do not recognize.**
+
+```
+$ native-integration explain ni.decl.android.contributes.features.required.forbidden
+ni.decl.android.contributes.features.required.forbidden   [blocking]
+
+  §6.5   SPEC.md#65-permissions-and-features
+
+  `android.contributes.features.required` must not be declared by a producer
+
+  no fragment: this key is not a field. Its correct form is its absence, which
+  no fragment can show
+```
+
+One paragraph, not a re-read of §6. Where the answer *is* a declaration rather
+than a refusal, it comes with a minimal fragment in correct form — which is
+usually faster to copy than to derive from the reference.
+
+**4. Fix and repeat** until the producer's half is clean:
+
+```
+$ native-integration validate src/pyvendor/_native
+pyvendor  —  src/pyvendor/_native
+  no finding, for the rules one sidecar can be held to
+
+  not checked here: one distribution was read, so every rule that needs the
+  whole dependency closure went unchecked …
+```
+
+**Read the `not checked here` lines before believing the first one.** A clean
+result means clean *for the rules one sidecar can be held to*. Whether your
+namespace collides with another package's, and whether the application can
+answer what you ask, are questions this cannot reach.
+
+Findings that *are* the application's — a floor its configuration must meet, a
+value only the developer knows — appear under `outstanding, for the application
+to answer`. They are real requirements and none of them is your defect, so they
+never fail the run. `--explain-failures` names the step of §12.2 behind each
+one.
+
+**5. Validate the artifact, not the source tree.**
+
+```bash
+python3 -m build
+native-integration validate dist/pyvendor-1.0.0-py3-none-any.whl
+```
+
+This is the step worth the discipline. A sidecar that is correct in `src/` and
+missing from the wheel is the one failure this convention cannot report — a
+consumer finds no sidecar, concludes the distribution declares nothing, and
+builds an application without it.
+
+## The consumer's workflow
+
+You are making a build tool honor sidecars. The loop is the same shape, with the
+corpus in place of `validate`.
+
+**1. Read [§8](../SPEC.md#8-conformance)** — forty-six numbered requirements, a
+core profile plus one per platform. §8.1 makes conformance per-platform, so an
+Android-only tool can conform without implementing anything for Xcode.
+
+**2. Use this library for the reading half**, or do not — it is a choice, not a
+requirement. `read()` gives you the effective set, the findings, the record and
+the delta; it stops exactly where a build tool begins.
+
+**3. Run the corpus rather than writing your own cases.**
+
+```bash
+native-integration conformance --profile android -- yourtool build --record
+```
+
+The cases were authored from the specification's prose, never by running an
+implementation — a corpus derived from consumer #1 cannot establish that
+consumer #2 agrees with the specification, only that it agrees with consumer #1.
+
+**4. Take a failure to `explain`.** Each case names the requirement it
+exercises, and `native-integration explain ni.req.38` is the rule that decides
+it.
+
+**5. Read `unverified` as the failure it is.** The harness reports three things
+that are not passes, and they mean different things:
 
 | | |
 | --- | --- |
-| **The library** | turns §8's obligations into code paths a build tool calls, rather than prose it has to remember to implement |
-| **`explain`** | turns a failure into the one paragraph that decides it, with a fragment in correct form |
-| **`validate`** | holds a sidecar to the specification before it ships, and says which rules it could not reach |
-| **`conformance`** | tests a build tool against fixtures written from the specification's prose, not from any implementation |
+| `failed` | the consumer did the wrong thing |
+| `unverified` | an assertion about a *numbered* requirement could not be checked — the run exits non-zero, because an obligation quietly skipped is how a conformance claim overstates itself |
+| `unsupported` | the consumer declined an **advisory**, which [§8.5](../SPEC.md#85-advisory-obligations) permits. A pass |
 
-## How to use it
-
-**Authoring a sidecar.** Start from the procedure, not the reference:
-`native-integration authoring-guide` prints
-[§12.2](../SPEC.md#122-sidecar-authoring-procedure)'s eight ordered steps, and
-`--template` prints a skeleton to fill in. When a key is unclear, ask for it by
-name — `native-integration explain android.contributes.r8` — rather than
-scanning §6. Then check the artifact you are about to publish:
-
-```bash
-native-integration validate dist/pyvendor-1.0.0-py3-none-any.whl --explain-failures
-```
-
-`--explain-failures` names the step of §12.2 each finding came from, which is
-usually more useful than the finding: a sidecar that declares the wrong *kind*
-of thing produces a valid-looking error about the shape it chose.
-
-**Implementing a consumer.** Read §8, then run the corpus rather than writing
-your own cases — `native-integration conformance --profile android -- yourtool
-build`. Use the library for the reading half if you want it; it stops exactly
-where a build tool begins.
+The requirement implementers miss is §9.1's acceptance gate: comparing the
+resolution against the last accepted record and refusing to build through a
+change nobody accepted. It is the largest obligation in the document that is not
+about reading a sidecar, and three cases turn on it.
 
 ## For a coding agent
 
@@ -71,16 +171,12 @@ agent working for the application author" as one party, because both fail the
 same way — by inventing a plausible shape — and both are repaired the same way,
 by retrieving the paragraph that decides the question.
 
-So an agent uses the tool exactly as a person does, and gets more out of two
-things in particular:
-
-- **`explain <id> --json`** returns the section, the rule, its severity, a
-  minimal valid fragment, and every related id — enough to repair against one
-  paragraph without loading the specification into context.
-- **`validate --json`** returns structured diagnostics, each carrying the
-  distribution it names and an id to explain, plus `unchecked`: the rules one
-  sidecar cannot exercise. An agent that reported success without reading that
-  field would be overstating what was verified.
+So an agent runs the same two workflows above. What it gets more from is
+`--json`, which every command answering a question accepts: the loop in step 3
+of the producer's workflow becomes a lookup rather than a page to parse, and
+`validate --json` carries `unchecked` and `outstanding` as separate arrays. An
+agent that reported success on `outcome` alone, without reading those, would be
+overstating what was verified.
 
 Two boundaries an agent must not cross, both of them the specification's rather
 than this tool's:
