@@ -100,6 +100,7 @@ since = "1.0"
 section = "5.1"
 anchor = "51-build-floors"
 description = "An Android floor, and a **TOML integer** — `\"24\"` and `24.0` are rejected. The build fails when the application is lower; the consumer never raises it"
+example = 24
 
 [declarations."android.requires.compile_sdk"]
 node = "field"
@@ -112,6 +113,7 @@ since = "1.0"
 section = "5.1"
 anchor = "51-build-floors"
 description = "An Android floor, on the same terms as `min_sdk`"
+example = 35
 
 [declarations."android.requires.target_sdk"]
 node = "field"
@@ -124,6 +126,7 @@ since = "1.0"
 section = "5.1"
 anchor = "51-build-floors"
 description = "An Android floor, on the same terms. It changes behavior app-wide, so declare it only when a behavior depends on it, and a consumer gives it the prominence a repository contribution gets"
+example = 33
 
 [declarations."android.requires.core_library_desugaring"]
 node = "field"
@@ -614,7 +617,7 @@ since = "1.0"
 section = "6.5"
 anchor = "65-permissions-and-features"
 description = "The canonical manifest string — `android.permission.INTERNET`, never a shorthand"
-example = "android.permission.INTERNET"
+example = "android.permission.BLUETOOTH"
 
 [declarations."android.contributes.permissions.reason"]
 node = "field"
@@ -627,7 +630,7 @@ since = "1.0"
 section = "6.5"
 anchor = "65-permissions-and-features"
 description = "Recommended; carried into the record and report"
-example = "Delivering events to the vendor's API"
+example = "Discovering the vendor's beacons on Android 11 and earlier"
 
 [declarations."android.contributes.permissions.max_sdk_version"]
 node = "field"
@@ -640,6 +643,7 @@ since = "1.0"
 section = "6.5"
 anchor = "65-permissions-and-features"
 description = "Optional. `android:maxSdkVersion`. Minimization; where two distributions differ, the **widest** need wins and the merge is reported"
+example = 30
 
 [declarations."android.contributes.permissions.never_for_location"]
 node = "field"

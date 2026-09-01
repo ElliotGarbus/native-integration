@@ -988,8 +988,14 @@ try:
     for declaration_id in sorted(known.declarations):
         try:
             text = _fragments.fragment(known, declaration_id)
-        except _fragments.Unwritable:
-            continue  # a forbidden key, whose correct form is its absence
+        except _fragments.Unwritable as why:
+            # Only a `forbidden` key may have no fragment: its correct form is
+            # its absence. Anything else means the registry is missing an
+            # exemplar, and skipping it would leave `explain` silently answering
+            # that declaration with two thirds of an answer.
+            if not known.declaration(declaration_id).get("forbidden"):
+                problems.append(f"{declaration_id} has no fragment: {why}")
+            continue
         try:
             document = tomllib.loads(text)
         except tomllib.TOMLDecodeError as exc:
@@ -1014,8 +1020,13 @@ try:
             problems.append(
                 f"the fragment for {declaration_id} does not carry {path[-1]}"
             )
-    if written < len(known.declarations) - 5:
-        problems.append(f"only {written} fragments were generated, of {len(known.declarations)}")
+    forbidden = sum(1 for e in known.declarations.values() if e.get("forbidden"))
+    if written != len(known.declarations) - forbidden:
+        problems.append(
+            f"{written} fragments were generated, and {len(known.declarations)} "
+            f"declarations less {forbidden} forbidden keys is "
+            f"{len(known.declarations) - forbidden}"
+        )
 except ImportError:  # pragma: no cover - the check degrades rather than lying
     problems.append("jsonschema is not installed, so the fragments were not exercised")
 check("every fragment `explain` emits validates against the schema", problems)

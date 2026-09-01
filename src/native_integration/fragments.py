@@ -29,8 +29,15 @@ from typing import Any, Iterator, Mapping, Sequence
 
 from .registry import PLATFORMS, Registry, RegistryError
 
-#: Values a type fixes on its own, so the registry carries no exemplar for them.
-_BY_TYPE: Mapping[str, Any] = {"boolean": True, "integer": 26}
+#: The one type that fixes its own value. A boolean's exemplar is `true`, and
+#: there is nothing an author could learn from a choice between two.
+#:
+#: An integer is deliberately *not* here. It looked like the same case and is
+#: not: `26` is a plausible `min_sdk` and a nonsense `compile_sdk`, and a
+#: fallback that renders both without complaint is a fallback that hides a
+#: missing exemplar behind a number nobody chose. An integer declaration with no
+#: `example` now has no fragment, and `check_spec.py` fails on it.
+_BY_TYPE: Mapping[str, Any] = {"boolean": True}
 
 
 class Inline(dict):

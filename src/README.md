@@ -122,10 +122,15 @@ reading this package's own syntax tree, and CI fails if it drifts.
 
 **The vocabulary is not written down twice.** Every declaration, every closed
 value, every refusal and every diagnostic id is read from
-[`contract/v1.toml`](native_integration/contract/v1.toml) at run time. A key added to the
-registry is a key this reader accepts, and one removed is one it refuses,
-without anyone transcribing either into Python. `structure.py` is the walk, not
-the vocabulary.
+[`contract/v1.toml`](native_integration/contract/v1.toml) at run time. A key
+added to the registry is a key this reader accepts, and one removed is one it
+refuses, without anyone transcribing either into Python. `structure.py` is the
+walk, not the vocabulary.
+
+That is why the registry is *package data* and sits inside the package rather
+than beside `SPEC.md`. It is loaded on import, so a build without it is a build
+that cannot be imported — which is what shipped, undetected, for as long as the
+loader also searched parent directories and every checkout had a copy in one.
 
 **A diagnostic cannot be built without naming a distribution.** Requirement 18
 is enforced by `Finding.__post_init__`, which raises, rather than by discipline.
