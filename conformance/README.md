@@ -244,7 +244,7 @@ assertions = []
 | Field | Meaning |
 | --- | --- |
 | `outcome` | `blocking` — the build **MUST NOT** proceed. `accept` — it proceeds |
-| `diagnostics` | findings the consumer must report — an id from [`contract/diagnostics-v1.toml`](../contract/diagnostics-v1.toml) and **the distributions it names**. Requirement 18 makes attribution part of the obligation, so the corpus checks it rather than taking a consumer's word |
+| `diagnostics` | findings the consumer must report — an id from [`contract/diagnostics-v1.toml`](../src/native_integration/contract/diagnostics-v1.toml) and **the distributions it names**. Requirement 18 makes attribution part of the obligation, so the corpus checks it rather than taking a consumer's word |
 | `advisories` | the same shape. Reported, never blocking ([§8.5](../SPEC.md#85-advisory-obligations)) |
 | `assertions` | named postconditions on what the consumer produced — the record, the payload, the generated project |
 | `record` | the `expected/` file to compare against, when the case has one |
@@ -257,7 +257,7 @@ it, just as a missing one does. So the set has to be derivable rather than
 guessed at, and one rule fixes it:
 
 > A finding carries the most specific id
-> [`contract/v1.toml`](../contract/v1.toml) defines for the check that failed,
+> [`contract/v1.toml`](../src/native_integration/contract/v1.toml) defines for the check that failed,
 > **and** the `ni.req.<n>` of the requirement it discharges. Where the registry
 > defines no id for that check, the requirement id stands alone.
 

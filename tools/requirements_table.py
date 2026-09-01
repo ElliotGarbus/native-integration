@@ -4,7 +4,7 @@
 The point of a reference reader is that a consumer's obligations are code paths
 rather than prose it has to remember. That claim is only worth something if the
 mapping is **derived**, so nothing here is transcribed: the obligations come
-from [`contract/diagnostics-v1.toml`](../contract/diagnostics-v1.toml), which
+from [`contract/diagnostics-v1.toml`](../src/native_integration/contract/diagnostics-v1.toml), which
 `gen_error_ids.py` generates from SPEC.md §8, and the discharging code comes out
 of the modules' own syntax trees.
 
@@ -147,7 +147,7 @@ discharges it.
 
 **Generated** by `python3 tools/requirements_table.py`, and CI fails if it
 drifts. The obligations are read from
-[`contract/diagnostics-v1.toml`](../contract/diagnostics-v1.toml) and the code
+[`contract/diagnostics-v1.toml`](../src/native_integration/contract/diagnostics-v1.toml) and the code
 paths out of the modules' syntax trees, so neither column is transcribed. An
 obligation nothing discharges appears as `—` and fails
 `tests/test_requirements.py`.
@@ -180,7 +180,7 @@ added rather than four clauses implemented, because the clauses are the build
 tool's — but a table that says so is the difference between a gap and a lie.
 
 Structural validation is not listed rule by rule. `structure.py` walks a sidecar
-against [`contract/v1.toml`](../contract/v1.toml), so every check the registry
+against [`contract/v1.toml`](../src/native_integration/contract/v1.toml), so every check the registry
 defines is a check it performs, and `obligations.py` maps each one to the
 obligation it answers to. That mapping is the only hand-derived table in the
 library, and `tests/test_obligations.py` holds it to every id the generators

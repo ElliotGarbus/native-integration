@@ -85,9 +85,9 @@ producer. `obligations.ANSWERED_BY_THE_APPLICATION` names the set once;
 `tests/test_examples.py` had its own copy of the same four numbers for the same
 reason and now reads it from there.
 
-## A packaging defect this phase surfaced, and did not fix
+## A packaging defect this phase surfaced — CLOSED
 
-**An installed wheel cannot import this package.**
+**An installed wheel could not import this package.**
 
 ```
 $ pip install native_integration-0.1.0.dev0-py3-none-any.whl
@@ -109,14 +109,25 @@ Phase 4 makes it visible rather than causing it: `[project.scripts]` puts
 `native-integration` on the path, and a console script that raises on import is
 plainly broken in a way a library used only from a checkout is not.
 
-**It is not fixed here, because the fix is a decision about where the published
-contract lives.** setuptools includes package data only from inside the package
-directory, so `contract/v1.toml` has to sit under `src/native_integration/` to
-ship — and it currently sits at the repository root deliberately, as a peer of
-`SPEC.md`, linked from the README, the conformance corpus and four findings
-documents. Moving it, copying it at build time, or shipping a second copy are
-three different answers with three different costs, and choosing one is not a
-CLI change.
+**Closed by moving the directory**, which was a decision about where the
+published contract lives rather than a CLI change. setuptools includes package
+data only from inside the package directory, so `contract/` is now
+`src/native_integration/contract/` and `package-data` names it. The alternatives
+— copying it at build time, or shipping a second copy — both leave two files
+that can disagree.
+
+The loader lost something in the move, and that is the part worth keeping.
+`_candidate_directories()` used to look beside the module *and then in every
+parent*, and the fallback is precisely why nobody noticed: every context this
+repository ran in had a parent holding a copy. A search that succeeds in
+development and fails in an install is worse than no search, so
+`contract_directory()` now looks in one place.
+
+Two tests guard it, one for each way it can come back — the directory moving out
+of the package, and `package-data` ceasing to name it. Both read a fact rather
+than building a wheel, which is what makes them cheap enough to keep. The wheel
+itself was built and installed once, by hand: `import native_integration`
+succeeds, and `native-integration explain ni.req.29` answers from it.
 
 `conformance` has the same shape and a smaller stake: the corpus is not in the
 wheel either, so the subcommand looks for it above the package and takes

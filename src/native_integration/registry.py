@@ -36,25 +36,23 @@ class RegistryError(RuntimeError):
     """
 
 
-def _candidate_directories() -> Iterator[Path]:
-    """Where `contract/` may sit, nearest first.
-
-    Packaged beside the module when installed; at the repository root in a
-    source checkout or an editable install.
-    """
-    here = Path(__file__).resolve()
-    yield here.parent / "contract"
-    for parent in here.parents:
-        yield parent / "contract"
-
-
 def contract_directory() -> Path:
-    for candidate in _candidate_directories():
-        if (candidate / "v1.toml").is_file():
-            return candidate
+    """`contract/`, which is package data and sits beside this module.
+
+    One place, not a search. An earlier version walked up from here as well, so
+    that a checkout found the copy at the repository root — and that is exactly
+    why nobody noticed the wheel shipped without one: every context this
+    repository ran in had a parent directory to fall back on, and an installed
+    package has none. A single location cannot be right in development and
+    missing in an install.
+    """
+    directory = Path(__file__).resolve().parent / "contract"
+    if (directory / "v1.toml").is_file():
+        return directory
     raise RegistryError(
-        "contract/v1.toml was not found beside the package or above it; "
-        "the reader cannot validate without the registry it is driven by"
+        f"{directory / 'v1.toml'} is missing. The registry is package data and "
+        "the reader is driven by it at run time, so this build is incomplete "
+        "rather than misconfigured"
     )
 
 

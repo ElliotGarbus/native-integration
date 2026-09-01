@@ -885,9 +885,9 @@ import gen_appendix_b  # noqa: E402
 import gen_error_ids  # noqa: E402
 import gen_schema  # noqa: E402
 
-REGISTRY = tomllib.loads((ROOT / "contract" / "v1.toml").read_text(encoding="utf-8"))
+REGISTRY = tomllib.loads((ROOT / "src" / "native_integration" / "contract" / "v1.toml").read_text(encoding="utf-8"))
 DIAGNOSTICS = tomllib.loads(
-    (ROOT / "contract" / "diagnostics-v1.toml").read_text(encoding="utf-8")
+    (ROOT / "src" / "native_integration" / "contract" / "diagnostics-v1.toml").read_text(encoding="utf-8")
 )["diagnostics"]
 
 problems = []
@@ -898,7 +898,7 @@ if (
     != (ROOT / "schema" / "native-integration-v1.schema.json").read_text(encoding="utf-8")
 ):
     problems.append("schema/native-integration-v1.schema.json — run: python3 tools/gen_schema.py")
-if gen_error_ids.build() != (ROOT / "contract" / "diagnostics-v1.toml").read_text(encoding="utf-8"):
+if gen_error_ids.build() != (ROOT / "src" / "native_integration" / "contract" / "diagnostics-v1.toml").read_text(encoding="utf-8"):
     problems.append("contract/diagnostics-v1.toml — run: python3 tools/gen_error_ids.py")
 check("the registry's generated targets are current", problems)
 

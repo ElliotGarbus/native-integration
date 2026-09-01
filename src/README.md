@@ -30,7 +30,7 @@ native-integration conformance --profile android -- mytool build --record
 
 `explain` is the one to reach for. It answers with the section, the rule's text,
 and a minimal fragment in correct form generated from
-[`contract/v1.toml`](../contract/v1.toml) — so a failure resolves to one
+[`contract/v1.toml`](native_integration/contract/v1.toml) — so a failure resolves to one
 paragraph rather than to a re-read of §6.
 
 `validate` reads one sidecar, which bounds what it can say. Rules that need the
@@ -122,7 +122,7 @@ reading this package's own syntax tree, and CI fails if it drifts.
 
 **The vocabulary is not written down twice.** Every declaration, every closed
 value, every refusal and every diagnostic id is read from
-[`contract/v1.toml`](../contract/v1.toml) at run time. A key added to the
+[`contract/v1.toml`](native_integration/contract/v1.toml) at run time. A key added to the
 registry is a key this reader accepts, and one removed is one it refuses,
 without anyone transcribing either into Python. `structure.py` is the walk, not
 the vocabulary.

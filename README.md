@@ -285,7 +285,7 @@ yet.
 | [`examples/`](examples/) | one integration in full, both halves |
 | [`src/`](src/README.md) | the reference reader — discovery, parsing, validation, resolution, recording. Not a build tool: it writes no project, resolves no coordinate, runs nothing |
 | [`conformance/`](conformance/README.md) | the corpus a consumer is tested against, its harness, and a reference consumer driving the reader in `src/` |
-| [`contract/`](contract/) | the machine-readable vocabulary. Appendix B, the JSON schema and the diagnostic ids are all generated from it, and the reader reads it at run time |
+| [`src/native_integration/contract/`](src/native_integration/contract/) | the machine-readable vocabulary. Appendix B, the JSON schema and the diagnostic ids are all generated from it, and the reader is driven by it at run time — which is why it ships *inside* the package rather than beside SPEC.md |
 | `native-integration` | the command line, from `src/native_integration/cli.py` — `explain` an id, `inspect` or `validate` a sidecar or a wheel, run the `conformance` corpus against a consumer. **Not normative**, and it says so in every answer it gives |
 | [`development/`](development/) | the first attempt, the rebuild, eighteen sidecars, a forty-SDK survey, and the findings from each round |
 | `tools/`, `tests/` | `check_spec.py` (24 checks over both documents and every example), `toc.py`, `requirements_table.py`, and the reader's suite. All run in CI on every push |

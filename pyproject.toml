@@ -41,7 +41,12 @@ Source = "https://github.com/ElliotGarbus/native-integration"
 where = ["src"]
 
 [tool.setuptools.package-data]
-native_integration = ["py.typed"]
+# The registry ships with the package, because the reader is driven by it at run
+# time: `contract.py` loads it on import, so a wheel without it is a wheel that
+# cannot be imported. setuptools includes package data only from inside the
+# package directory, which is why `contract/` lives here rather than beside
+# SPEC.md.
+native_integration = ["py.typed", "contract/*.toml"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

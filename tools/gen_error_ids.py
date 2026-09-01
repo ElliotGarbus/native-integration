@@ -37,9 +37,9 @@ import tomllib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-REGISTRY = ROOT / "contract" / "v1.toml"
+REGISTRY = ROOT / "src" / "native_integration" / "contract" / "v1.toml"
 SPEC = ROOT / "SPEC.md"
-OUTPUT = ROOT / "contract" / "diagnostics-v1.toml"
+OUTPUT = ROOT / "src" / "native_integration" / "contract" / "diagnostics-v1.toml"
 
 BLOCKING, ADVISORY = "blocking", "advisory"
 

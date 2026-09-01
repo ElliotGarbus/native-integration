@@ -37,7 +37,7 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parent.parent
-REGISTRY = ROOT / "contract" / "v1.toml"
+REGISTRY = ROOT / "src" / "native_integration" / "contract" / "v1.toml"
 OUTPUT = ROOT / "schema" / "native-integration-v1.schema.json"
 
 SCHEMA_ID = "https://elliotgarbus.github.io/native-integration/native-integration-v1.schema.json"

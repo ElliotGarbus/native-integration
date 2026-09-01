@@ -9,9 +9,15 @@ and refuses to invent anything it cannot find.
 
 from __future__ import annotations
 
+import tomllib
+from pathlib import Path
+
 import pytest
 
+import native_integration
 from native_integration import registry
+
+ROOT = Path(__file__).resolve().parent.parent
 
 
 @pytest.fixture(scope="module")
@@ -137,3 +143,31 @@ def test_a_check_the_registry_cannot_name_raises(contract):
         contract.requirement_id(999)
     with pytest.raises(registry.RegistryError):
         contract.refusal_id("ios.contributes.info_plist.values", "invented_register")
+
+
+# -- the registry is package data --------------------------------------------
+# Not a detail of layout. `contract.py` loads the registry when it is imported,
+# so a wheel without it is a wheel that cannot be imported at all — which is
+# what shipped, undetected, for as long as nothing installed this package
+# non-editable. Every context this repository ran in had a parent directory
+# holding a copy to fall back on.
+#
+# Two ways it can come back: the directory moves out of the package, or
+# `package-data` stops naming it. One test each, because building a wheel to
+# find out is slower than reading the two facts that decide it.
+
+def test_the_registry_sits_inside_the_package():
+    directory = Path(native_integration.__file__).resolve().parent / "contract"
+    assert (directory / "v1.toml").is_file()
+    assert (directory / "diagnostics-v1.toml").is_file()
+
+
+def test_the_build_ships_the_registry():
+    manifest = tomllib.loads(
+        (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    )
+    patterns = manifest["tool"]["setuptools"]["package-data"]["native_integration"]
+    assert any(pattern.startswith("contract/") for pattern in patterns), (
+        "setuptools includes package data only from inside the package "
+        "directory, and only what package-data names"
+    )
