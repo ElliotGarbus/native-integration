@@ -190,10 +190,48 @@ about reading a sidecar, and three cases turn on it.
 
 ## The API
 
-**One call, no side effects.** `read()` takes the sidecars in a closure and
-returns what they amount to. It writes no file, resolves no coordinate, reaches
-no network, and imports nothing a producer shipped. Everything it concluded is
-in the object it hands back.
+**Add one call to your build tool, at one seam, and refuse the build when it
+says to.**
+
+```python
+integration = read(sources, platform="android", closure=your_resolved_deps,
+                   application=your_config, accepted=last_record)
+
+if integration.findings.blocking:      # <- this line is the whole point
+    print(integration.report())
+    raise SystemExit(1)
+```
+
+Everything under [What it is worth](#what-it-is-worth) comes from those two
+lines: the ninety-seven declarations validated, the collisions that only appear
+once an application has two sidecars, the merge directions, and diagnostics with
+ids your users can look up themselves. You get all of it by calling `read()` and
+honoring the answer.
+
+Then three pieces of work, in this order:
+
+| | |
+| --- | --- |
+| **1. Adapt your configuration** into `Application` — your build tool's own spec file mapped onto [§2.2](../SPEC.md#22-how-the-application-answers)'s answers. [`conformance/consumer.py`](../conformance/consumer.py) is that adapter written out, in under 300 lines |
+| **2. Emit what it resolved** into the project writer you already have. `integration.resolved` is validated and merged; you loop it and add dependencies and manifest entries the way you do today |
+| **3. Persist `integration.record`** and pass it back as `accepted=` on the next build. That is [§9.1](../SPEC.md#91-the-lifecycle)'s gate — worth doing last, and worth not skipping |
+
+Then find out where you stand. The corpus runs *your* command and names every
+requirement you are missing:
+
+```bash
+native-integration conformance --profile android -- yourtool build
+```
+
+The library is about thirty of §8's forty-six requirements. Step 2 is most of
+the other fifteen, and it is work you already do — you are feeding it from a
+validated source instead of from nothing.
+
+### What the call takes and returns
+
+`read()` writes no file, resolves no coordinate, reaches no network, and imports
+nothing a producer shipped. Everything it concluded is in the object it hands
+back.
 
 | You supply | It returns |
 | --- | --- |
