@@ -40,8 +40,10 @@ it, and a draft sidecar can be held to the document before it ships.
 ## The producer's workflow
 
 You maintain a Python package that binds a native SDK, and you are adding a
-sidecar to it. The loop is **draft, validate, explain, fix** — and it ends
-against the built artifact rather than the source tree.
+sidecar to it. **This half is the command line** — you are writing TOML, not
+Python, and nothing here imports the library. The loop is **draft, validate,
+explain, fix**, and it ends against the built artifact rather than the source
+tree.
 
 **1. Start from the procedure, not the reference.**
 
@@ -50,7 +52,7 @@ native-integration authoring-guide             # §12.2's eight ordered steps
 native-integration authoring-guide --template  # a skeleton to fill in
 ```
 
-Step 3 is the one that matters and the one authors skip: the three-part test
+The step that matters most: the three-part test
 that decides whether an item is something you *contribute* or something you
 *require* of the application. Getting it wrong produces a sidecar that
 validates.
@@ -123,18 +125,34 @@ builds an application without it.
 
 ## The consumer's workflow
 
-You are making a build tool honor sidecars. The loop is the same shape, with the
-corpus in place of `validate`.
+You are making a build tool honor sidecars. **This half is the API, not the
+command line** — the CLI is how you test what you built, and nothing in it is
+something a build tool would shell out to.
 
 **1. Read [§8](../SPEC.md#8-conformance)** — forty-six numbered requirements, a
 core profile plus one per platform. §8.1 makes conformance per-platform, so an
 Android-only tool can conform without implementing anything for Xcode.
 
-**2. Use this library for the reading half**, or do not — it is a choice, not a
-requirement. `read()` gives you the effective set, the findings, the record and
-the delta; it stops exactly where a build tool begins.
+**2. Call `read()`** for the reading half — discovery, validation, resolution,
+the record and the delta. [A read, end to end](#a-read-end-to-end) below is the
+whole call; [What comes back](#what-comes-back) is what you get.
 
-**3. Run the corpus rather than writing your own cases.**
+Two pieces are yours and cannot be otherwise:
+
+| | |
+| --- | --- |
+| The **closure** | `read()` takes one rather than computing it, because the dependency closure is resolved for the *target* platform and only your build tool knows what that is. Requirement 1 forbids evaluating markers for the build host |
+| The **application's answers** | [§2.2](../SPEC.md#22-how-the-application-answers) fixes the capability a consumer must offer and deliberately not the syntax, so adapting your own configuration into `Application` is your work. A library that chose the spelling would be choosing what the specification refuses to fix |
+
+[`conformance/consumer.py`](../conformance/consumer.py) is that adapter written
+out — under 300 lines, and the smallest thing that turns a closure and a
+configuration into a verdict.
+
+Using the library is a **choice**. A consumer may implement §8 independently and
+still be tested by everything below; the corpus drives a command, not an import.
+
+**3. Then the command line, to test what you built.** Run the corpus rather than
+writing your own cases.
 
 ```bash
 native-integration conformance --profile android -- yourtool build --record
