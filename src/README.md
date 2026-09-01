@@ -105,23 +105,158 @@ python3 -m pip install native-integration     # or -e ".[test]" to work on it
 Installing the package puts `native-integration` on the path. It is **not
 normative** — `SPEC.md` is, and every answer the tool gives says so.
 
-```bash
-native-integration explain ni.req.29                 # a rule, by the id a build printed
-native-integration explain android.contributes.r8    # or by the key you are writing
-native-integration inspect dist/pyvendor-1.0.0-py3-none-any.whl
-native-integration validate src/pyvendor/_native --json
-native-integration conformance --profile android -- mytool build --record
+| Command | Answers |
+| --- | --- |
+| [`explain`](#explain) | what one rule says, and what correct form looks like |
+| [`inspect`](#inspect) | what a sidecar declares |
+| [`validate`](#validate) | whether a sidecar obeys the specification |
+| [`conformance`](#conformance) | whether a build tool does |
+| [`authoring-guide`](#authoring-guide) | how to write a sidecar in the first place |
+
+Every command takes `-h`. `--json` is for a script or an agent; without it the
+output is written to be read.
+
+### `explain`
+
+```
+native-integration explain <identifier> [--json] [--platform android|ios]
 ```
 
-`explain` is the one to reach for. It answers with the section, the rule's text,
-and a minimal fragment in correct form generated from
-[`contract/v1.toml`](native_integration/contract/v1.toml) — so a failure resolves to one
-paragraph rather than to a re-read of §6.
+The one to reach for. An id in — from a build log, from a diagnostic, or the
+key you are writing — and one rule out.
 
-`validate` reads one sidecar, which bounds what it can say. Rules that need the
-whole dependency closure are reported as *unchecked* rather than passed, and the
-four obligations [§2.2](../SPEC.md#22-how-the-application-answers) gives the
-application are reported as outstanding rather than as the producer's defects.
+| | |
+| --- | --- |
+| `<identifier>` | a diagnostic id (`ni.req.29`, `ni.decl.contract.pattern`, `ni.adv.S7`) or a declaration's dotted path (`android.contributes.r8`) |
+| `--platform` | which platform table to write a fragment into, for a declaration that exists on both. Default `android` |
+| `--json` | emit the answer as JSON |
+
+It resolves **every** id the generators emit and every declaration the contract
+defines — 238 and 97 respectively — so an id printed by a failing build always
+leads somewhere. A declaration may be spelled as the author has it
+(`android.requires.application_value.kind`) or as the registry stores it
+(`<platform>.requires.application_value.kind`).
+
+The answer carries the section and its anchor, the rule's own text, the severity
+where the id is a diagnostic, the §8.1 profile where it is a numbered
+requirement, and — for anything keyed to a declaration — a **minimal fragment in
+correct form**, generated from the registry and validated against the JSON
+schema. Two declarations have no fragment and say why: `exported` and a
+feature's `required` are not fields, so their correct form is their absence.
+
+**Exit status.** `0` when the id resolves, `2` when it does not — with near
+matches suggested.
+
+**`--json` keys.** `id`, `kind`, `contract`, `section`, `anchor`,
+`specification`, `rule`. Then, depending on what was asked for: `severity`,
+`declaration`, `requirement` and `profile` for a diagnostic; `node`, `category`,
+`platform`, `required`, `since` and `values` for a declaration; `fragment` and
+`related` wherever a declaration is involved, and `no_fragment` in place of the
+first where none can be written.
+
+### `inspect`
+
+```
+native-integration inspect <target> [--json] [--platform android|ios] [--distribution NAME]
+```
+
+What a sidecar declares, reported and not judged. Use it on someone else's
+package to see what installing it would bring.
+
+| | |
+| --- | --- |
+| `<target>` | a wheel, or a directory holding a `native.toml` |
+| `--platform` | platforms to read for. Default: every platform the sidecar supports |
+| `--distribution` | the distribution's name, where the path does not give it |
+| `--json` | emit the answer as JSON |
+
+A wheel is read as the zip it is. [§3.2](../SPEC.md#32-resolution) forbids
+importing a producing distribution, and unpacking an archive imports nothing —
+which is what makes it safe to inspect a package you have not installed.
+
+**Exit status.** `0` when the sidecar is readable; `2` when the target holds
+none, or holds more than one.
+
+**`--json` keys.** `distribution`, `origin`, `contract`, `platforms`,
+`declares` — the last a map of platform to the `owns` / `requires` /
+`contributes` keys present.
+
+### `validate`
+
+```
+native-integration validate <target> [--json] [--explain-failures]
+                                     [--platform android|ios] [--distribution NAME]
+```
+
+One sidecar, held to the specification. Run it on the built artifact before
+publishing: a sidecar correct in `src/` and missing from the wheel is the one
+failure this convention cannot report.
+
+| | |
+| --- | --- |
+| `<target>` | a wheel, or a directory holding a `native.toml` |
+| `--explain-failures` | pair each finding with the step of [§12.2](../SPEC.md#122-sidecar-authoring-procedure) that decides it |
+| `--platform` | platforms to read for. Default: every platform the sidecar supports |
+| `--distribution` | the distribution's name, where the path does not give it |
+| `--json` | emit the answer as JSON |
+
+**What it cannot say matters as much as what it can**, and the output separates
+three things rather than one:
+
+| | |
+| --- | --- |
+| **findings** | the producer's, and what a failing exit status means |
+| **outstanding** | obligations [§2.2](../SPEC.md#22-how-the-application-answers) gives the *application* — a value only the developer knows, an action only they can acknowledge, a floor only their configuration meets, an export only they can approve, an integration only they can accept. Real requirements, three of which block a real build, and none of them the sidecar's defect |
+| **unchecked** | rules one sidecar cannot exercise at all: an owned namespace two distributions claim, two values targeting one key, one module declared twice, a packaging collision |
+
+**Exit status.** `0` when nothing the producer can fix is blocking; `1` when
+something is. An outstanding obligation never fails the run.
+
+**`--json` keys.** `distribution`, `contract`, `outcome`, `findings`,
+`outstanding`, `unchecked`, `normative` (always `false`), and `steps` with
+`--explain-failures`. Each finding carries `id`, `requirement`,
+`distributions`, `section`, `severity`, `message`, `where` and `detail`.
+
+### `conformance`
+
+```
+native-integration conformance --profile core|android|ios [--corpus DIR] -- <consumer command>
+```
+
+The corpus, run against someone else's consumer. This only invokes the harness;
+[`conformance/run.py`](../conformance/README.md) is the authority on the result.
+
+| | |
+| --- | --- |
+| `--profile` | §8.1 profiles to claim. Repeatable, and naming a platform profile brings the core with it, because conformance is the core plus at least one platform profile |
+| `--corpus` | the `conformance/` directory of a checkout. Found automatically when you are inside one |
+| `<consumer>` | everything after `--` is the consumer command, run once per case |
+
+The corpus is **not** in the installed package, so this needs a checkout. It
+belongs to the specification rather than to this library, and its harness is
+deliberately kept out of the implementation it measures.
+
+**Exit status.** The harness's: non-zero if any case failed *or* went
+unverified. `unverified` is not a pass — it means an assertion about a numbered
+requirement could not be checked. `unsupported` is a pass: a declined advisory,
+which [§8.5](../SPEC.md#85-advisory-obligations) permits.
+
+### `authoring-guide`
+
+```
+native-integration authoring-guide [--template]
+```
+
+[§12.2](../SPEC.md#122-sidecar-authoring-procedure)'s eight ordered steps,
+printed where the author is working — they will not have this specification
+checked out. The text is a byte-for-byte copy carried in the package, and CI
+fails if it and `SPEC.md` disagree.
+
+| | |
+| --- | --- |
+| `--template` | print a commented `native.toml` skeleton instead, carrying the specification's URL |
+
+**Exit status.** `0`.
 
 ## A read, end to end
 

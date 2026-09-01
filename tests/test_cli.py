@@ -299,3 +299,69 @@ def test_explain_failures_is_in_the_json_too(capsys):
     )
     assert answer["steps"]
     assert all("step" in line or "no step" in line for line in answer["steps"])
+
+
+# -- the reference ------------------------------------------------------------
+# `src/README.md` is where the command line is written down, and there is no
+# other statement of it. A reference nobody checks is stale one flag later and
+# is read as authority anyway, so the parser and the document are held to each
+# other here: a command or an option that exists and is undocumented fails, and
+# so does one documented and removed.
+
+
+def reference() -> str:
+    text = (ROOT / "src" / "README.md").read_text(encoding="utf-8")
+    return text[text.index("## The command line"):text.index("## A read, end to end")]
+
+
+def parser_surface() -> dict[str, set[str]]:
+    import argparse
+
+    parser = cli.build_parser()
+    found = {}
+    for action in parser._actions:
+        if isinstance(action, argparse._SubParsersAction):
+            for name, sub in action.choices.items():
+                found[name] = {
+                    option
+                    for member in sub._actions
+                    if member.dest != "help"
+                    for option in (member.option_strings or [f"<{member.dest}>"])
+                }
+    return found
+
+
+def test_every_command_is_documented():
+    documented = reference()
+    for name in parser_surface():
+        assert f"### `{name}`" in documented, f"{name} has no section"
+
+
+def test_every_option_is_documented():
+    documented = reference()
+    missing = [
+        f"{name} {option}"
+        for name, options in parser_surface().items()
+        for option in options
+        if f"`{option}`" not in documented
+    ]
+    assert not missing
+
+
+def test_nothing_documented_has_been_removed():
+    """The other direction. An option that was deleted leaves a reference
+    telling the reader to pass a flag that now fails."""
+    import re
+
+    documented = reference()
+    every = {o for options in parser_surface().values() for o in options}
+    stale = [
+        flag for flag in set(re.findall(r"`(--[a-z-]+)`", documented))
+        if flag not in every
+    ]
+    assert not stale
+
+
+def test_the_reference_says_the_tool_is_not_normative():
+    text = " ".join(reference().split())
+    assert "not normative" in text
