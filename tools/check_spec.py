@@ -1605,6 +1605,31 @@ except ImportError:  # pragma: no cover
     problems.append("jsonschema is not installed, so the negative cases were not exercised")
 check("the schema refuses what SPEC.md refuses, for the stated reason", problems)
 
+# --- 19b. §12.2 states no obligation of its own ------------------------------
+# The authoring procedure is an ordering of guidance that already exists, and
+# the way it fails is by acquiring a rule while restating one — "do not
+# introduce new rules under cover of restating old ones". A procedure is exactly
+# where that happens, because a step reads naturally as an instruction.
+#
+# So the section holds itself to reporting obligations rather than stating them:
+# no RFC 2119 keyword in its own voice. Quoting one is fine — a quotation is
+# attributed by construction — so quoted spans are removed before looking.
+problems = []
+start = NEW.index("### 12.2 ")
+body = NEW[start:NEW.index(chr(10) + "## ", start)]
+unquoted = re.sub(r"`[^`]*`|\"[^\"]*\"|“[^”]*”", "", body)
+KEYWORDS = r"\b(MUST NOT|MUST|SHOULD NOT|SHOULD|REQUIRED|RECOMMENDED|MAY|OPTIONAL)\b"
+for keyword in re.findall(KEYWORDS, unquoted):
+    problems.append(
+        f"§12.2 says {keyword} in its own voice; it restates guidance and states "
+        "none, so an obligation here is either a citation that lost its section "
+        "or a new rule"
+    )
+# And a section that stopped citing is one whose authority cannot be checked.
+if len(re.findall(r"\(#[a-z0-9-]+\)", body)) < 15:
+    problems.append("§12.2 has lost citations; every decision in it is made elsewhere")
+check("§12.2 restates guidance and introduces none", problems)
+
 # --- 20. the conformance corpus obeys its own record format ------------------
 # `conformance/record-facts.toml` is the authoritative fact list, and a format
 # whose only specification is its examples is one two implementers can satisfy
