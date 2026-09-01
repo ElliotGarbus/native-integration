@@ -10,6 +10,13 @@ resolves a Maven coordinate, and never runs anything. It tells a consumer what
 the application's dependency closure declares, what the application still has
 to answer, and what changed since the last time anyone accepted it.
 
+Two audiences, and they use different halves of it. If you are **writing a
+sidecar**, you want [the producer's workflow](#the-producers-workflow) and
+[the command reference](#the-command-line); the library never comes into it. If
+you are **writing a build tool**, you want
+[the consumer's workflow](#the-consumers-workflow) and the API sections after
+it, and the command line only to test what you built.
+
 ## Why this exists
 
 The specification is forty-six numbered requirements across twelve sections. Two
@@ -52,10 +59,9 @@ native-integration authoring-guide             # §12.2's eight ordered steps
 native-integration authoring-guide --template  # a skeleton to fill in
 ```
 
-The step that matters most: the three-part test
-that decides whether an item is something you *contribute* or something you
-*require* of the application. Getting it wrong produces a sidecar that
-validates.
+The step that matters most is the three-part test, which decides whether an
+item is something you *contribute* or something you *require* of the
+application. Getting it wrong produces a sidecar that validates.
 
 **2. Validate the draft.** Point it at the directory holding `native.toml`:
 
@@ -209,6 +215,64 @@ than this tool's:
   observation of a project as satisfaction. An agent that did the work still has
   to have the acknowledgement recorded, with the date and version
   ([§5.4](../SPEC.md#54-how-a-requirement-is-satisfied)).
+
+## A read, end to end
+
+```python
+from native_integration import Application, Closure, read, source_from_path
+
+integration = read(
+    [source_from_path("pystripe/_native", distribution="pystripe")],
+    platform="android",
+    closure=Closure.direct("pystripe"),          # your resolver's answer, for this platform
+    application=Application(                     # your own configuration, adapted
+        android={"min_sdk": 24, "compile_sdk": 35},
+        values={("pystripe", "stripe_return_scheme"): "trailmap-pay"},
+    ),
+)
+
+print(integration.report())
+integration.raise_for_errors()                   # blocking findings stop the build
+print(integration.record.render())               # §9's durable, diffable record
+```
+
+Four arguments are optional, and each one omitted narrows what can be checked
+rather than silently weakening a check that still claims to run:
+
+| Omitted | What stops being checkable |
+| --- | --- |
+| `application` | every requirement is unanswered, so §5.4's satisfaction rules report against an application that answered nothing |
+| `closure` | §3.2's origin is unknown, so nothing is attributed to the dependency that brought it in |
+| `graph` | §9.4 and §9.7 — what a *resolved* artifact declares, and which artifacts collide on a packaged path |
+| `accepted` | §9.1's gate has no prior record to compare against, and does not fire |
+
+`graph` is the one to look at twice. §9.4's obligations are about the manifest
+inside a resolved `.aar` and the files inside a resolved archive — things only a
+tool that has done the resolving can see. Passing a `Graph` built from that
+resolution is what turns those obligations on; without one they are not guessed
+at.
+
+## What it cannot tell you
+
+Against the [conformance corpus](../conformance/README.md) this reader passes
+every case it can and reports six runs as **unverified**, which is a worse
+outcome than a pass and a better one than a false pass. Each is an assertion
+about *generated output*: that the sidecar stayed out of the payload, that a
+view-link's attributes reached the manifest, that a feature decision was
+applied, that the Python module stubs were excluded, that the Objective-C
+categories were linked. The harness asks for a manifest or a payload to inspect
+and there is none. Closing them takes a build tool, not a better reader.
+
+## What comes back
+
+`Integration` holds four things: the `record`, the `findings`, the `resolved`
+sidecars, and the `delta` against the accepted record.
+
+`findings` is the whole diagnostic surface. Each `Finding` names the
+distribution it is about, the §8 obligation it discharges, and the registry rule
+that produced it — `integration.ok` is false when any of them is blocking.
+`resolved` is per-sidecar: what each distribution declared, after the
+application's answers.
 
 ## The command line
 
@@ -371,64 +435,6 @@ fails if it and `SPEC.md` disagree.
 | `--template` | print a commented `native.toml` skeleton instead, carrying the specification's URL |
 
 **Exit status.** `0`.
-
-## A read, end to end
-
-```python
-from native_integration import Application, Closure, read, source_from_path
-
-integration = read(
-    [source_from_path("pystripe/_native", distribution="pystripe")],
-    platform="android",
-    closure=Closure.direct("pystripe"),          # your resolver's answer, for this platform
-    application=Application(                     # your own configuration, adapted
-        android={"min_sdk": 24, "compile_sdk": 35},
-        values={("pystripe", "stripe_return_scheme"): "trailmap-pay"},
-    ),
-)
-
-print(integration.report())
-integration.raise_for_errors()                   # blocking findings stop the build
-print(integration.record.render())               # §9's durable, diffable record
-```
-
-Four arguments are optional, and each one omitted narrows what can be checked
-rather than silently weakening a check that still claims to run:
-
-| Omitted | What stops being checkable |
-| --- | --- |
-| `application` | every requirement is unanswered, so §5.4's satisfaction rules report against an application that answered nothing |
-| `closure` | §3.2's origin is unknown, so nothing is attributed to the dependency that brought it in |
-| `graph` | §9.4 and §9.7 — what a *resolved* artifact declares, and which artifacts collide on a packaged path |
-| `accepted` | §9.1's gate has no prior record to compare against, and does not fire |
-
-`graph` is the one to look at twice. §9.4's obligations are about the manifest
-inside a resolved `.aar` and the files inside a resolved archive — things only a
-tool that has done the resolving can see. Passing a `Graph` built from that
-resolution is what turns those obligations on; without one they are not guessed
-at.
-
-## What it cannot tell you
-
-Against the [conformance corpus](../conformance/README.md) this reader passes
-every case it can and reports six runs as **unverified**, which is a worse
-outcome than a pass and a better one than a false pass. Each is an assertion
-about *generated output*: that the sidecar stayed out of the payload, that a
-view-link's attributes reached the manifest, that a feature decision was
-applied, that the Python module stubs were excluded, that the Objective-C
-categories were linked. The harness asks for a manifest or a payload to inspect
-and there is none. Closing them takes a build tool, not a better reader.
-
-## What comes back
-
-`Integration` holds four things: the `record`, the `findings`, the `resolved`
-sidecars, and the `delta` against the accepted record.
-
-`findings` is the whole diagnostic surface. Each `Finding` names the
-distribution it is about, the §8 obligation it discharges, and the registry rule
-that produced it — `integration.ok` is false when any of them is blocking.
-`resolved` is per-sidecar: what each distribution declared, after the
-application's answers.
 
 ## Where the obligations live
 

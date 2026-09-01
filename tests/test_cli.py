@@ -310,8 +310,18 @@ def test_explain_failures_is_in_the_json_too(capsys):
 
 
 def reference() -> str:
+    """`src/README.md`'s command reference — from its heading to the next one.
+
+    Bounded by the next `## ` rather than by a named section, so that moving a
+    section around it does not silently empty the slice and pass every test in
+    this group.
+    """
     text = (ROOT / "src" / "README.md").read_text(encoding="utf-8")
-    return text[text.index("## The command line"):text.index("## A read, end to end")]
+    start = text.index("## The command line")
+    end = text.index(chr(10) + "## ", start + 1)
+    section = text[start:end]
+    assert "### `explain`" in section, "the reference did not survive the slice"
+    return section
 
 
 def parser_surface() -> dict[str, set[str]]:
