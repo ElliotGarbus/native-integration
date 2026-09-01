@@ -14,8 +14,8 @@ Two audiences, and they use different halves of it. If you are **writing a
 sidecar**, you want [the producer's workflow](#the-producers-workflow) and
 [the command reference](#the-command-line); the library never comes into it. If
 you are **writing a build tool**, you want
-[the consumer's workflow](#the-consumers-workflow) and the API sections after
-it, and the command line only to test what you built. Either way,
+[the consumer's workflow](#the-consumers-workflow) and [the API](#the-api)
+after it, and the command line only to test what you built. Either way,
 [for a coding agent](#for-a-coding-agent) is what changes when an agent is doing
 the work rather than a person — which is less than you might expect.
 
@@ -142,8 +142,8 @@ core profile plus one per platform. §8.1 makes conformance per-platform, so an
 Android-only tool can conform without implementing anything for Xcode.
 
 **2. Call `read()`** for the reading half — discovery, validation, resolution,
-the record and the delta. [A read, end to end](#a-read-end-to-end) below is the
-whole call; [What comes back](#what-comes-back) is what you get.
+the record and the delta. [The API](#the-api) below is the whole of it: what it
+returns, what it is worth, and where it stops.
 
 Two pieces are yours and cannot be otherwise:
 
@@ -188,7 +188,65 @@ resolution against the last accepted record and refusing to build through a
 change nobody accepted. It is the largest obligation in the document that is not
 about reading a sidecar, and three cases turn on it.
 
-## A read, end to end
+## The API
+
+**One call, no side effects.** `read()` takes the sidecars in a closure and
+returns what they amount to. It writes no file, resolves no coordinate, reaches
+no network, and imports nothing a producer shipped. Everything it concluded is
+in the object it hands back.
+
+| You supply | It returns |
+| --- | --- |
+| the sidecars discovery found | `findings` — every diagnostic, each naming a distribution, the §8 obligation it discharges, and the rule that produced it |
+| the **closure**, resolved for the target platform | `record` — [§9](../SPEC.md#9-recording-and-review)'s durable, diffable record of what was resolved |
+| the **application's answers**, adapted from your own configuration | `resolved` — per sidecar, what each distribution declared after those answers |
+| optionally, a resolution you performed and the last accepted record | `delta` — what changed since the application last accepted anything |
+
+### What it is worth
+
+§8 is forty-six numbered requirements, and about thirty of them are about
+*reading*: what a sidecar may say, what two of them may say together, what the
+application still owes, and what changed since it last agreed to anything. This
+library is those thirty as code paths you call, rather than paragraphs you have
+to remember to implement.
+
+The value is not that it saves typing. It is that **a rule you never wrote can
+still fire.** A producer declares `required = true` on a feature; §6.5 forbids
+it; you did not write that check and your build fails anyway, naming the
+distribution and the rule. Multiply by thirty, and by every clause inside each
+one — §8 states requirements as sentences, and the clause an implementer misses
+is almost never the first one in the sentence.
+
+### Where it stops, and what that means for conformance
+
+**The library does not make your build tool conforming, and cannot.** Three
+things it does not do, worth being plain about before you adopt it:
+
+- **It computes a verdict; honoring it is your act.** `integration.ok` can be
+  `false` and your tool can write a Gradle file anyway. Refusing to build
+  through an unaccepted change is [§9.1](../SPEC.md#91-the-lifecycle)'s
+  obligation and only a build tool can discharge it. A library that could force
+  it would have to *be* the build tool.
+- **It never sees what you generate.** It can tell you a producer contributed
+  `android.permission.CAMERA`. Whether that permission reached your merged
+  manifest is a question about an artifact it does not look at.
+  [`docs/REQUIREMENTS.md`](../docs/REQUIREMENTS.md) marks fifteen of §8's
+  requirements *beyond this reader* for exactly this reason.
+- **Two of its inputs are yours, and it cannot check them.** Hand it a closure
+  computed for the build host rather than the target platform and it will
+  validate that closure quite happily — while you have broken requirement 1.
+
+What establishes conformance is the corpus, and it is built to be independent of
+this library on purpose: `native-integration conformance` runs **your command**
+as a subprocess, imports nothing of yours or ours, and compares what comes back
+against cases written from the specification's prose. Six of its assertions come
+back *unverified* against this library, because they are about generated output
+and a reader produces none — scoring full marks here would have proved nothing.
+
+So: the library is how you avoid re-deriving §8 from prose. The corpus is how
+you find out whether you got it right.
+
+### A read, end to end
 
 ```python
 from native_integration import Application, Closure, read, source_from_path
@@ -224,7 +282,7 @@ tool that has done the resolving can see. Passing a `Graph` built from that
 resolution is what turns those obligations on; without one they are not guessed
 at.
 
-## What it cannot tell you
+### What it cannot tell you
 
 Against the [conformance corpus](../conformance/README.md) this reader passes
 every case it can and reports six runs as **unverified**, which is a worse
@@ -235,7 +293,7 @@ applied, that the Python module stubs were excluded, that the Objective-C
 categories were linked. The harness asks for a manifest or a payload to inspect
 and there is none. Closing them takes a build tool, not a better reader.
 
-## What comes back
+### What comes back
 
 `Integration` holds four things: the `record`, the `findings`, the `resolved`
 sidecars, and the `delta` against the accepted record.
