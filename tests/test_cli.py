@@ -209,3 +209,18 @@ def test_the_parser_documents_that_this_is_not_normative():
     parser = cli.build_parser()
     assert "not normative" in parser.description
     assert "not normative" in parser.epilog
+
+
+def test_conformance_says_the_corpus_is_not_in_the_package(capsys):
+    """The one subcommand that cannot work from an install alone, saying so
+    before it is run rather than in the error afterwards."""
+    with pytest.raises(SystemExit):
+        cli.main(["conformance", "--help"])
+    help_text = capsys.readouterr().out
+    assert "not part of the installed package" in help_text
+    assert "--corpus" in help_text
+
+
+def test_conformance_without_a_corpus_says_where_to_get_one(tmp_path, monkeypatch):
+    monkeypatch.setattr(cli, "__file__", str(tmp_path / "cli.py"))
+    assert cli.main(["conformance", "--profile", "core", "--", "x"]) == 2

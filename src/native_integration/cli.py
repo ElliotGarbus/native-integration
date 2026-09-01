@@ -210,19 +210,27 @@ def build_parser() -> argparse.ArgumentParser:
             help="the distribution's name, where the path does not give it",
         )
 
-    conformance = subcommands.add_parser(
+    conformance_command = subcommands.add_parser(
         "conformance", help="run the conformance corpus against a consumer",
-        description="Run the corpus in `conformance/` against an external "
-        "consumer command. The harness is the authority on the outcome. "
+        description="Run the conformance corpus against an external consumer "
+        "command, and report per case. The harness is the authority on the "
+        "outcome. "
         + NON_NORMATIVE,
-        epilog=NON_NORMATIVE,
+        epilog="The corpus is not part of the installed package: it belongs to "
+        "the specification rather than to this library, and its harness is kept "
+        "out of the implementation it measures. So this needs a checkout of the "
+        "repository — found automatically when you are working inside one, and "
+        "named by --corpus otherwise. " + NON_NORMATIVE,
     )
-    conformance.add_argument(
+    conformance_command.add_argument(
         "--profile", choices=("core", *sorted(PLATFORMS)), action="append", required=True,
         help="§8.1 profiles to claim; naming a platform profile brings core with it",
     )
-    conformance.add_argument("--corpus", default="", help="the corpus directory")
-    conformance.add_argument(
+    conformance_command.add_argument(
+        "--corpus", default="",
+        help="the `conformance/` directory of a checkout of this repository",
+    )
+    conformance_command.add_argument(
         "consumer", nargs=argparse.REMAINDER,
         help="-- followed by the consumer command to run",
     )

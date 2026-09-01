@@ -129,10 +129,25 @@ than building a wheel, which is what makes them cheap enough to keep. The wheel
 itself was built and installed once, by hand: `import native_integration`
 succeeds, and `native-integration explain ni.req.29` answers from it.
 
-`conformance` has the same shape and a smaller stake: the corpus is not in the
-wheel either, so the subcommand looks for it above the package and takes
-`--corpus` otherwise. That one is arguably correct as it stands — the fixtures
-are the specification's, not the library's.
+### The corpus is the same shape and the opposite answer
+
+`conformance/` is not in the wheel either, and it stays out. The reason is not
+size, though 432 files against a 28-member wheel is not nothing, and it is not
+that the subcommand is optional. It is that `run.py` opens by saying it shares
+no code with any implementation, because "a harness that shared code with an
+implementation would be measuring agreement with that implementation" — and
+`conformance/consumer.py` says, in the same breath, that it is deliberately not
+part of the library.
+
+Moving the corpus inside the package would make the harness importable as
+`native_integration.conformance.run`, from the package whose reader it grades,
+and would drag the consumer adapter into the library that must not contain it.
+The registry had to move because the package cannot import without it. The
+corpus must not, for a reason of the same weight pointing the other way.
+
+What that leaves is one subcommand that needs a checkout, so `--help` says so
+rather than letting the failure explain it: the corpus is found automatically
+inside a checkout and named by `--corpus` otherwise.
 
 ## What Phase 4 did not build
 
