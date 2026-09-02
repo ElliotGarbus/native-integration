@@ -156,7 +156,7 @@ Two pieces are yours and cannot be otherwise:
 | The **application's answers** | [§2.2](../SPEC.md#22-how-the-application-answers) fixes the capability a consumer must offer and deliberately not the syntax, so adapting your own configuration into `Application` is your work. A library that chose the spelling would be choosing what the specification refuses to fix |
 
 [`conformance/consumer.py`](../conformance/consumer.py) is that adapter written
-out — about 100 lines, and the smallest thing that turns a closure and a
+out — about 150 lines, and the smallest thing that turns a closure and a
 configuration into a verdict.
 
 Using the library is a **choice**. A consumer may implement §8 independently and
@@ -206,10 +206,11 @@ if not integration.ok:                 # <- this line is the whole point
 ```
 
 `your_closure` and `your_application` are a `Closure` and an `Application` —
-[a read, end to end](#a-read-end-to-end) below shows constructing both from
-data your build tool already has. `read()` does not take your resolver's or
-your config's own types directly; adapting into these two shapes is the one
-piece of work this section assumes you have already done.
+[building one](#building-a-closure) and [the other](#building-an-application)
+below show constructing both from data your build tool already has. `read()`
+does not take your resolver's or your config's own types directly; adapting
+into these two shapes is the one piece of work this section assumes you have
+already done.
 
 Everything under [What it is worth](#what-it-is-worth) comes from those two
 lines: the ninety-seven declarations validated, the collisions that only appear
@@ -221,8 +222,8 @@ Then three pieces of work, in this order:
 
 | | |
 | --- | --- |
-| **1. Adapt your configuration** into `Application` — your build tool's own spec file mapped onto [§2.2](../SPEC.md#22-how-the-application-answers)'s answers. [`conformance/consumer.py`](../conformance/consumer.py) is that adapter written out, in about 100 lines |
-| **2. Emit what it resolved** into the project writer you already have. `integration.resolved` is validated and merged; you loop it and add dependencies and manifest entries the way you do today |
+| **1. Adapt your configuration** into `Application` — your build tool's own spec file mapped onto [§2.2](../SPEC.md#22-how-the-application-answers)'s answers. [`conformance/consumer.py`](../conformance/consumer.py) is that adapter written out, in about 150 lines |
+| **2. Emit what it resolved** into the project writer you already have. `integration.resolved` is what each distribution declared, validated; `integration.effective(...)` is what the merges decided. You loop the first for dependencies and source, the second for permissions and keys — [what comes back](#what-comes-back-and-what-to-do-with-it) says which is which, and why it matters |
 | **3. Persist `integration.record`** and pass it back as `accepted=` on the next build. That is [§9.1](../SPEC.md#91-the-lifecycle)'s gate — worth doing last, and worth not skipping |
 
 Then find out where you stand. The corpus runs *your* command and names every
@@ -293,18 +294,13 @@ and a reader produces none — scoring full marks here would have proved nothing
 So: the library is how you avoid re-deriving §8 from prose. The corpus is how
 you find out whether you got it right.
 
-### A read, end to end
+### Building a `Closure`
 
 `Closure` and `Application` are imported from here because this is where their
-*shape* is defined — `read()` has to accept something, and §2.2 deliberately
-does not fix a spelling for the application's answers, so this library fixes a
-neutral one instead. That import is unavoidable, the same way you cannot build
-a `pathlib.Path` without importing `Path`. What is never the library's is the
-*data* you put inside: every field below is read off something your build tool
-already has, not off a literal this package supplies.
-
-**Both shapes, in full** — nothing above names a field, and this is the whole
-of what `read()` can be handed:
+*shape* is fixed — `read()` has to accept something, and §2.2 deliberately does
+not fix a spelling for the application's answers, so this library fixes a
+neutral one. What is never the library's is the *data* inside: every field below
+is read off something your build tool already has.
 
 | `Closure` | |
 | --- | --- |
@@ -313,8 +309,25 @@ of what `read()` can be handed:
 | `Origin.direct: bool`, `Origin.via: tuple[str, ...]` | a direct dependency, or the sorted chain of dependents it came in through |
 | `Closure.direct(*names)`, `Closure.of(members)`, `Closure.isolated_environment()` | the three ways to build one |
 
-`Application` is bigger because [§2.2](../SPEC.md#22-how-the-application-answers)'s
-table is: one field per row, joined the way requirement 10 fixes.
+```python
+# Your resolver already produced this — every distribution it settled on for
+# this platform, however it got there. Building a Closure is relabeling that
+# result, not asking the library to resolve anything.
+closure = Closure.of({
+    "pystripe": Origin(direct=True),
+    "protobuf": Origin(via=("pystripe",)),
+})
+```
+
+`via` is what §3.2 calls provenance: the record attributes every contribution to
+the smallest unit that brought it in, so a transitive dependency's new
+permission is reported as *arriving through* `pystripe` rather than as
+something the application asked for.
+
+### Building an `Application`
+
+Bigger, because [§2.2](../SPEC.md#22-how-the-application-answers)'s table is:
+one field per row, joined the way requirement 10 fixes.
 
 | Answers | Field | Joined by |
 | --- | --- | --- |
@@ -338,22 +351,11 @@ key loses ([§6.8](../SPEC.md#68-manifest-meta-data),
 build's own date, told rather than read off the clock so that gate does not
 report a change that is not one.
 
-`sources` is worth being deliberate about too. There is a `source_from_path`
-that builds one by naming a directory directly — right for a test, or for a
-producer checking their own sidecar before publishing, which is what it is
-documented for. A build tool does not know its dependencies' sidecar
-directories up front, so its `sources` comes from `discover()` below instead,
-which walks installed distributions' entry points and returns every sidecar
-whose distribution `closure` contains, skipping the rest in silence (§3.2).
-
-Your own config file is real too. Say `examplebuild` scaffolds the placeholder
-[the top-level README](../README.md#a-sidecar-and-the-applications-reply)
+Your own config file is where these come from. Say `examplebuild` scaffolds the
+placeholder [the top-level README](../README.md#a-sidecar-and-the-applications-reply)
 shows, and the author filled it in:
 
 ```toml
-[project]
-dependencies = ["pystripe"]
-
 [tool.examplebuild.android]
 min_sdk = 24
 compile_sdk = 35
@@ -364,23 +366,6 @@ stripe_return_scheme = "trailmap-pay"
 ```
 
 ```python
-import tomllib
-from pathlib import Path
-
-from native_integration import (
-    Application, Closure, Findings, Origin, discover, load_registry, read,
-)
-
-# Your resolver already produced this — every distribution it settled on for
-# this platform, however it got there. Building a Closure is relabeling that
-# result, not asking the library to resolve anything.
-resolved = {"pystripe": Origin(direct=True), "protobuf": Origin(via=("pystripe",))}
-closure = Closure.of(resolved)
-
-# Your own config file, read as the neutral spelling above and nothing else.
-# `examplebuild`'s own table, under its own key — the spelling is yours;
-# `conformance/consumer.py`'s `application_of` is the same adaptation done
-# against the corpus's neutral spelling instead of a real pyproject.toml.
 config = tomllib.loads(Path("pyproject.toml").read_text())
 own = config.get("tool", {}).get("examplebuild", {})
 native = own.get("native", {})
@@ -392,17 +377,139 @@ application = Application(
         for key, value in by_platform.get("android", {}).get("values", {}).items()
     },
 )
-
-findings = Findings(load_registry())
-sources = discover(closure=closure, findings=findings)   # every sidecar in the closure
-
-integration = read(sources, platform="android", closure=closure, application=application)
-integration.findings.items[:0] = findings.items          # discover()'s own findings, if any
-
-print(integration.report())
-integration.raise_for_errors()                   # blocking findings stop the build
-print(integration.record.render())               # §9's durable, diffable record
 ```
+
+The spelling is yours. [`conformance/consumer.py`](../conformance/consumer.py)'s
+`application_of` is the same adaptation done against the corpus's neutral
+spelling instead of a real `pyproject.toml`, and covers every row of the table.
+
+### Finding the sidecars
+
+`discover()` is §3's discovery step: it walks the entry-point group across
+installed distributions and returns a `SidecarSource` for every one whose
+distribution `closure` contains, skipping the rest in silence (§3.2). It
+imports nothing — a distribution targeting Android may not be importable on
+the build host at all — and reaches the files through
+`Distribution.locate_file()`, which is why an editable install cannot be read
+([§12.2](../SPEC.md#122-sidecar-authoring-procedure), step 8).
+
+```python
+findings = Findings(load_registry())
+sources = discover(closure=closure, findings=findings)
+```
+
+It takes a `Findings` because requirements 2 and 4 are found *here*, before any
+sidecar is read: a distribution registering two entry points, or an entry
+point naming a directory that is not there. **Read those findings even when
+`sources` is empty.** An empty list with a blocking finding beside it is a
+distribution whose whole native surface just went silent, which is the failure
+§3.2's *fail, do not skip* rule exists to prevent — and `if not sources:
+return` is the natural way to write exactly that bug.
+
+`source_from_path(root, distribution=...)` builds one source by naming a
+directory. It is for a test, a fixture, or a producer checking their own
+sidecar; a build tool does not know its dependencies' sidecar directories up
+front.
+
+### The call
+
+```python
+record_path = Path("native-integration.record")   # wherever you keep §9's record
+
+integration = read(
+    sources,
+    platform="android",
+    closure=closure,
+    application=application,
+    accepted=record_path.read_text() if record_path.exists() else None,
+    findings=findings,                  # discover()'s findings come first
+    profiles=("android",),              # what this tool implements — see below
+)
+
+if not integration.ok:                  # <- the line only a build tool can write
+    print(integration.report())
+    raise SystemExit(1)
+```
+
+`read()` writes no file, resolves no coordinate, reaches no network, and imports
+nothing a producer shipped. It raises in one case only: `UnimplementedProfile`,
+when `platform` is not in `profiles`. That is requirement 9 —
+[§8.1](../SPEC.md#81-conformance-is-per-platform) makes conformance per-platform, so an
+Android-only tool is a conforming consumer, and the way it stays one is by
+refusing an iOS build outright rather than producing part of one. Pass the
+profiles you actually implement; the default claims both.
+
+`contract` (default `"1.0"`) is the specification revision you implement, and
+decides which sidecars are rejected as too new (§4.3).
+
+### What comes back, and what to do with it
+
+`Integration` holds `findings`, `resolved`, `record` and `delta`, and one method
+that is not any of those. In the order a build tool uses them:
+
+**`findings` — decide.** Every diagnostic, blocking and advisory, in the order
+they happened. `integration.ok` is false when any is blocking;
+`raise_for_errors()` throws an `IntegrationError` carrying `.findings` for the
+tool that would rather catch than check. Each `Finding` has `obligation` (the
+`ni.req.N` it discharges), `rule` (the finer registry id, where one fired),
+`distributions`, `severity`, `section`, `message`, `where` and `detail`.
+`findings.blocking`, `findings.advisories`, `findings.for_distribution(name)`
+are the views; `as_diagnostics()` and `as_advisories()` are the JSON shape the
+corpus reads. `report()` renders all of it for a terminal.
+
+**`resolved` — read what each distribution declared.** One `Resolved` per
+sidecar, after the application's answers:
+
+| | |
+| --- | --- |
+| `sidecar` | the parsed document. `sidecar.entries("contributes", "gradle_dependencies")` is the tuple of tables under that path for this platform; `sidecar.section("requires")` a single table; `sidecar.table` the platform's whole table |
+| `distribution` | its normalized name |
+| `owns` | the Java namespaces it claims (§6.1) |
+| `sources`, `staged` | every contributed source file, and each with the root it was staged from |
+| `values` | each declared value's `id` mapped to its §5.4 state: `supplied`, `unresolved` or `dismissed` |
+
+This is what you loop for the things a build tool copies through unchanged —
+Gradle coordinates, Swift packages, contributed source, components:
+
+```python
+for entry in integration.resolved:
+    for dep in entry.sidecar.entries("contributes", "gradle_dependencies"):
+        gradle.add(dep.get("coordinate") or dep["module"], dep.get("configuration", "implementation"))
+```
+
+**`effective(kind)` — read what the merge decided.** `resolved` says what each
+distribution *asked for*. Three things in §6 and §7 are not copied through but
+**merged**, and the merge is directional: §6.5 registers a permission with the
+widest `max_sdk_version` any contributor stated, and omits it entirely if the
+application suppressed it; §6.8 and §7.4 let the application's own value win a
+key. Those results live in the record as `effective` facts, and
+`integration.effective("permission")`, `effective("meta-data")` and
+`effective("plist-value")` return them parsed:
+
+```python
+for fact in integration.effective("permission"):
+    name, merged = fact.positionals[1], dict(fact.keyed)
+    manifest.add_permission(name, max_sdk=merged.get("max-sdk"))
+```
+
+**Do not write permissions from `resolved`.** A suppressed permission is still
+in `resolved` — it was contributed — and has no `effective` fact, which is how
+§6.5's *absent from the effective merged manifest* is spelled. The operand
+names are [record-format.md §3.4](../conformance/record-format.md#34-effective)'s.
+
+**`record` — persist, and hand back.** `integration.record.render()` is
+[§9](../SPEC.md#9-recording-and-review)'s record: bytewise sorted, one fact per
+line, diffable. Write it when the application *accepts* the resolution — behind
+a flag or a review, never on every build, because a tool that rewrote it each
+run would have a record and no gate. Pass its text back as `accepted=` next
+time.
+
+**`delta` — show what changed.** `added` and `removed` record lines against
+`accepted`, already projected to the half §9.1 gates: a producer's new
+permission is in it, the application's own answers are not. It is the content
+of the `ni.req.38` finding, and the thing a reviewer reads.
+
+### What each omitted argument switches off
 
 Four arguments are optional, and each one omitted narrows what can be checked
 rather than silently weakening a check that still claims to run:
@@ -416,9 +523,13 @@ rather than silently weakening a check that still claims to run:
 
 `graph` is the one to look at twice. §9.4's obligations are about the manifest
 inside a resolved `.aar` and the files inside a resolved archive — things only a
-tool that has done the resolving can see. Passing a `Graph` built from that
-resolution is what turns those obligations on; without one they are not guessed
-at.
+tool that has done the resolving can see. `graph_of(raw)` builds a `Graph` from
+a mapping in the corpus's `resolved.toml` shape: an `artifact` list of tables
+with `coordinate`, `sha256`, `declared_by`, `transitive`, `files`, `classes`,
+and `permission` / `feature` / `component` sub-tables carrying what the
+artifact's own manifest declares; a `package` list for Swift, with `url`,
+`revision`, and `binary_targets`. Passing one is what turns those obligations
+on; without one they are not guessed at.
 
 ### What it cannot tell you
 
@@ -430,17 +541,6 @@ view-link's attributes reached the manifest, that a feature decision was
 applied, that the Python module stubs were excluded, that the Objective-C
 categories were linked. The harness asks for a manifest or a payload to inspect
 and there is none. Closing them takes a build tool, not a better reader.
-
-### What comes back
-
-`Integration` holds four things: the `record`, the `findings`, the `resolved`
-sidecars, and the `delta` against the accepted record.
-
-`findings` is the whole diagnostic surface. Each `Finding` names the
-distribution it is about, the §8 obligation it discharges, and the registry rule
-that produced it — `integration.ok` is false when any of them is blocking.
-`resolved` is per-sidecar: what each distribution declared, after the
-application's answers.
 
 ## The command line
 

@@ -32,7 +32,7 @@ from .discovery import Closure
 from .findings import Finding, Findings
 from .graph import Graph
 from .integration import Resolved
-from .recording import Record
+from .recording import Fact, Record, parse
 from .registry import PLATFORMS, load as load_registry
 from .resources import SidecarSource
 
@@ -90,6 +90,31 @@ class Integration:
         if not self.ok:
             raise IntegrationError(self.findings.blocking)
 
+    def effective(self, kind: str) -> tuple[Fact, ...]:
+        """The merged results the record carries, as parsed facts.
+
+        `resolved` is per sidecar and says what each distribution *asked for*.
+        What a build tool writes is the merge: §6.5's permission with the widest
+        `max_sdk_version` any contributor stated, §6.8's and §7.4's keys after
+        the application's own value has won. Those exist only as `effective`
+        facts in the record, so this is where a consumer reads them from
+        rather than re-deriving a merge the specification already fixed.
+
+        `kind` is the fact's second word: ``"permission"``, ``"meta-data"`` or
+        ``"plist-value"``. Each fact's first positional after the kind is its
+        name; the keyed operands are the merge's outcome, spelled as
+        `conformance/record-format.md` §3.4 documents them.
+
+        A permission the application suppressed has **no** fact here. §6.5
+        requires it absent from the effective merged manifest, and a consumer
+        that looped `resolved` for permissions instead would write it anyway.
+        """
+        found = []
+        for line in self.record:
+            if line.startswith(f"effective {kind} "):
+                found.append(parse(line))
+        return tuple(found)
+
 
 def read(
     sources: Iterable[SidecarSource],
@@ -101,6 +126,7 @@ def read(
     accepted: str | None = None,
     contract: str = "1.0",
     profiles: Sequence[str] = PLATFORMS,
+    findings: Findings | None = None,
 ) -> Integration:
     """Read every sidecar and resolve them into one integration.
 
@@ -130,7 +156,11 @@ def read(
     closure = closure or Closure.isolated_environment()
     graph = graph or Graph()
 
-    findings = Findings(load_registry())
+    # A caller that ran `discover()` first already holds findings -- requirement
+    # 2 and 4 are found while locating sidecars, before the read begins. Taking
+    # that object rather than making a fresh one keeps them in the order they
+    # happened, and spares the caller from splicing two lists together.
+    findings = findings if findings is not None else Findings(load_registry())
     record = Record()
     integration.build_facts(record, contract=contract, platform=platform)
 

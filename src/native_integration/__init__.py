@@ -1,6 +1,6 @@
 """A reference reader for the native-integration specification.
 
-`SPEC.md` puts 44 numbered obligations and 15 advisory ones on a **consumer** —
+`SPEC.md` puts 46 numbered obligations and 15 advisory ones on a **consumer** —
 the build tool that reads sidecars and generates the native project. This
 library exists so that the reading half of that is a code path a tool gets by
 using it, rather than prose it has to remember to implement.
@@ -28,7 +28,7 @@ A minimal read::
 
 **The vocabulary is not written down twice.** Every declaration, every closed
 value, every refusal and every diagnostic id comes from
-[`contract/v1.toml`](../../contract/v1.toml) at run time, so a rule the registry
+[`contract/v1.toml`](contract/v1.toml) at run time, so a rule the registry
 states is a rule this reader enforces without anyone having transcribed it.
 `docs/REQUIREMENTS.md` maps each §8 obligation to the module that discharges it.
 """
