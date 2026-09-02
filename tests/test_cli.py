@@ -421,3 +421,26 @@ def test_the_producer_workflow_is_the_one_the_readme_documents(capsys, tmp_path)
     assert code == 0
     assert "no finding, for the rules one sidecar can be held to" in out
     assert "not checked here" in out
+
+
+def test_a_structural_rule_is_the_producers_whatever_number_it_rolls_up_to(capsys, tmp_path):
+    """§8.4 states requirements as sentences, so one number is several rules.
+    Requirement 29 covers both an export only the application can approve and
+    the structural component rules a producer must satisfy — and a `reason`
+    missing beside `exported_required` is a key only the producer can add."""
+    sidecar = tmp_path / "pycomponent" / "_native"
+    sidecar.mkdir(parents=True)
+    (sidecar / "native.toml").write_text(
+        'contract = "1"' + chr(10) * 2
+        + "[[android.contributes.components]]" + chr(10)
+        + 'kind = "activity"' + chr(10)
+        + 'name = "com.example.vendor.RedirectActivity"' + chr(10)
+        + "exported_required = true" + chr(10),
+        encoding="utf-8", newline=chr(10),
+    )
+    code, out = run(capsys, "validate", str(sidecar), "--json")
+    answer = json.loads(out)
+    assert code == 1, out
+    reported = [f["id"] for f in answer["findings"]]
+    assert any("required-if-present.exported_required" in name for name in reported)
+    assert not answer["outstanding"]

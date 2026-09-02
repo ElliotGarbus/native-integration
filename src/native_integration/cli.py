@@ -619,9 +619,19 @@ def validate(args: argparse.Namespace) -> int:
     # than a finding: an obligation that cannot vary with the input says
     # nothing about the input. It belongs with what went unchecked.
     unreachable = [f for f in findings if f["requirement"] == "ni.req.38"]
+    # By requirement number *and* by what kind of check fired, because a number
+    # is not one rule. Requirement 29 covers both an export only the application
+    # can approve and the structural component rules a producer must satisfy —
+    # so a missing `reason` beside `exported_required` came back as the
+    # application's to answer, which is a key only the producer can add.
+    #
+    # A finding whose `id` is finer than its requirement was produced by a
+    # registry rule: `ni.decl.…` or `ni.constraint.…`, a property of the
+    # document itself. Those are the producer's whatever number they roll up to.
     outstanding = [
         f for f in findings
         if f not in unreachable
+        and f["id"] == f["requirement"]
         and f["requirement"] in obligations.ANSWERED_BY_THE_APPLICATION
     ]
     producer = [f for f in findings if f not in outstanding and f not in unreachable]

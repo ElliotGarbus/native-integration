@@ -141,9 +141,12 @@ something a build tool would shell out to.
 core profile plus one per platform. §8.1 makes conformance per-platform, so an
 Android-only tool can conform without implementing anything for Xcode.
 
-**2. Call `read()`** for the reading half — discovery, validation, resolution,
-the record and the delta. [The API](#the-api) below is the whole of it: what it
-returns, what it is worth, and where it stops.
+**2. Call `discover()`, then `read()`.** `discover()` is §3's discovery step —
+it walks the entry-point group across installed distributions and returns the
+sidecars whose distribution is in your `closure`, ignoring everything else in
+the environment. `read()` is the reading half that follows — validation,
+resolution, the record and the delta. [The API](#the-api) below is the whole
+of it: what it returns, what it is worth, and where it stops.
 
 Two pieces are yours and cannot be otherwise:
 
@@ -153,7 +156,7 @@ Two pieces are yours and cannot be otherwise:
 | The **application's answers** | [§2.2](../SPEC.md#22-how-the-application-answers) fixes the capability a consumer must offer and deliberately not the syntax, so adapting your own configuration into `Application` is your work. A library that chose the spelling would be choosing what the specification refuses to fix |
 
 [`conformance/consumer.py`](../conformance/consumer.py) is that adapter written
-out — under 300 lines, and the smallest thing that turns a closure and a
+out — about 100 lines, and the smallest thing that turns a closure and a
 configuration into a verdict.
 
 Using the library is a **choice**. A consumer may implement §8 independently and
@@ -194,13 +197,19 @@ about reading a sidecar, and three cases turn on it.
 says to.**
 
 ```python
-integration = read(sources, platform="android", closure=your_resolved_deps,
-                   application=your_config, accepted=last_record)
+integration = read(sources, platform="android", closure=your_closure,
+                   application=your_application, accepted=last_record)
 
-if integration.findings.blocking:      # <- this line is the whole point
+if not integration.ok:                 # <- this line is the whole point
     print(integration.report())
     raise SystemExit(1)
 ```
+
+`your_closure` and `your_application` are a `Closure` and an `Application` —
+[a read, end to end](#a-read-end-to-end) below shows constructing both from
+data your build tool already has. `read()` does not take your resolver's or
+your config's own types directly; adapting into these two shapes is the one
+piece of work this section assumes you have already done.
 
 Everything under [What it is worth](#what-it-is-worth) comes from those two
 lines: the ninety-seven declarations validated, the collisions that only appear
@@ -212,7 +221,7 @@ Then three pieces of work, in this order:
 
 | | |
 | --- | --- |
-| **1. Adapt your configuration** into `Application` — your build tool's own spec file mapped onto [§2.2](../SPEC.md#22-how-the-application-answers)'s answers. [`conformance/consumer.py`](../conformance/consumer.py) is that adapter written out, in under 300 lines |
+| **1. Adapt your configuration** into `Application` — your build tool's own spec file mapped onto [§2.2](../SPEC.md#22-how-the-application-answers)'s answers. [`conformance/consumer.py`](../conformance/consumer.py) is that adapter written out, in about 100 lines |
 | **2. Emit what it resolved** into the project writer you already have. `integration.resolved` is validated and merged; you loop it and add dependencies and manifest entries the way you do today |
 | **3. Persist `integration.record`** and pass it back as `accepted=` on the next build. That is [§9.1](../SPEC.md#91-the-lifecycle)'s gate — worth doing last, and worth not skipping |
 
@@ -286,18 +295,109 @@ you find out whether you got it right.
 
 ### A read, end to end
 
-```python
-from native_integration import Application, Closure, read, source_from_path
+`Closure` and `Application` are imported from here because this is where their
+*shape* is defined — `read()` has to accept something, and §2.2 deliberately
+does not fix a spelling for the application's answers, so this library fixes a
+neutral one instead. That import is unavoidable, the same way you cannot build
+a `pathlib.Path` without importing `Path`. What is never the library's is the
+*data* you put inside: every field below is read off something your build tool
+already has, not off a literal this package supplies.
 
-integration = read(
-    [source_from_path("pystripe/_native", distribution="pystripe")],
-    platform="android",
-    closure=Closure.direct("pystripe"),          # your resolver's answer, for this platform
-    application=Application(                     # your own configuration, adapted
-        android={"min_sdk": 24, "compile_sdk": 35},
-        values={("pystripe", "stripe_return_scheme"): "trailmap-pay"},
-    ),
+**Both shapes, in full** — nothing above names a field, and this is the whole
+of what `read()` can be handed:
+
+| `Closure` | |
+| --- | --- |
+| `members: Mapping[str, Origin]` | every distribution's normalized name, and how it entered |
+| `isolated: bool` | §3.2's allowance: treat every installed distribution as a candidate |
+| `Origin.direct: bool`, `Origin.via: tuple[str, ...]` | a direct dependency, or the sorted chain of dependents it came in through |
+| `Closure.direct(*names)`, `Closure.of(members)`, `Closure.isolated_environment()` | the three ways to build one |
+
+`Application` is bigger because [§2.2](../SPEC.md#22-how-the-application-answers)'s
+table is: one field per row, joined the way requirement 10 fixes.
+
+| Answers | Field | Joined by |
+| --- | --- | --- |
+| a build floor | `android: Mapping[str, int]`, `deployment_target: str`, `core_library_desugaring: bool` | the key itself — `min_sdk`, `compile_sdk`, `target_sdk`, or the one iOS and one boolean floor |
+| a value | `values: Mapping[tuple[str, str], str]` | `(distribution, id)` |
+| an acknowledged action | `acknowledged: Mapping[tuple[str, str], Answer]` | `(distribution, id)` |
+| a dismissed conditional requirement | `dismissed: Mapping[tuple[str, str], Answer]` | `(distribution, id)` |
+| a suppressed permission | `suppressed_permissions: Mapping[str, Answer]` | the permission's name, applying to every contributor of it |
+| an approved export | `exported_components: Mapping[str, Approval]` | the component's class |
+| a repository or package credential | `credentials: Mapping[str, Credential]` | the `url`, on §6.4's identity rather than the raw string |
+| a resolved artifact's feature decision | `artifact_features: Mapping[str, FeatureDecision]` | the feature `name` |
+| a colliding path's choice | `packaging_choices: Mapping[str, PackagingChoice]` | the packaged `path` |
+
+`Answer` is just a `date`; `Approval`, `FeatureDecision` and `PackagingChoice`
+each add the one field their row needs — `approved`, `keep`, `artifact`.
+`manifest_meta_data` and `info_plist` are not answers at all: the application
+sets these itself, for its own reasons, and a producer contributing the same
+key loses ([§6.8](../SPEC.md#68-manifest-meta-data),
+[§7.4](../SPEC.md#74-infoplist)). `initial_acceptance` is
+[§9.1](../SPEC.md#91-the-lifecycle)'s first-build bootstrap, and `date` is the
+build's own date, told rather than read off the clock so that gate does not
+report a change that is not one.
+
+`sources` is worth being deliberate about too. There is a `source_from_path`
+that builds one by naming a directory directly — right for a test, or for a
+producer checking their own sidecar before publishing, which is what it is
+documented for. A build tool does not know its dependencies' sidecar
+directories up front, so its `sources` comes from `discover()` below instead,
+which walks installed distributions' entry points and returns every sidecar
+whose distribution `closure` contains, skipping the rest in silence (§3.2).
+
+Your own config file is real too. Say `examplebuild` scaffolds the placeholder
+[the top-level README](../README.md#a-sidecar-and-the-applications-reply)
+shows, and the author filled it in:
+
+```toml
+[project]
+dependencies = ["pystripe"]
+
+[tool.examplebuild.android]
+min_sdk = 24
+compile_sdk = 35
+
+# Added by examplebuild. Required by pystripe.
+[tool.examplebuild.native.pystripe.android.values]
+stripe_return_scheme = "trailmap-pay"
+```
+
+```python
+import tomllib
+from pathlib import Path
+
+from native_integration import (
+    Application, Closure, Findings, Origin, discover, load_registry, read,
 )
+
+# Your resolver already produced this — every distribution it settled on for
+# this platform, however it got there. Building a Closure is relabeling that
+# result, not asking the library to resolve anything.
+resolved = {"pystripe": Origin(direct=True), "protobuf": Origin(via=("pystripe",))}
+closure = Closure.of(resolved)
+
+# Your own config file, read as the neutral spelling above and nothing else.
+# `examplebuild`'s own table, under its own key — the spelling is yours;
+# `conformance/consumer.py`'s `application_of` is the same adaptation done
+# against the corpus's neutral spelling instead of a real pyproject.toml.
+config = tomllib.loads(Path("pyproject.toml").read_text())
+own = config.get("tool", {}).get("examplebuild", {})
+native = own.get("native", {})
+application = Application(
+    android=own.get("android", {}),
+    values={
+        (distribution, key): value
+        for distribution, by_platform in native.items()
+        for key, value in by_platform.get("android", {}).get("values", {}).items()
+    },
+)
+
+findings = Findings(load_registry())
+sources = discover(closure=closure, findings=findings)   # every sidecar in the closure
+
+integration = read(sources, platform="android", closure=closure, application=application)
+integration.findings.items[:0] = findings.items          # discover()'s own findings, if any
 
 print(integration.report())
 integration.raise_for_errors()                   # blocking findings stop the build
@@ -345,7 +445,7 @@ application's answers.
 ## The command line
 
 ```bash
-python3 -m pip install native-integration     # or -e ".[test]" to work on it
+python3 -m pip install -e ".[test]"     # not on PyPI yet — a checkout is how you get it
 ```
 
 Installing the package puts `native-integration` on the path. It is **not
