@@ -273,3 +273,6 @@ nothing about what it cost to get there.
 | [`findings/phase1-registry.md`](findings/phase1-registry.md) | `contract/v1.toml` — the vocabulary as data, and the three artifacts generated from it |
 | [`findings/phase2-corpus.md`](findings/phase2-corpus.md) | the conformance corpus, its harness, and the cases that were green for the wrong reason |
 | [`findings/phase3-reader.md`](findings/phase3-reader.md) | the reader rewritten against SPEC.md, and the six assertions it cannot verify because it generates nothing |
+| [`findings/phase4-cli.md`](findings/phase4-cli.md) | the command line, and a wheel that could not import the package it shipped |
+| [`findings/phase5-authoring.md`](findings/phase5-authoring.md) | §12.2's authoring procedure, and the check that held it to introducing no rule |
+| [`findings/first-use.md`](findings/first-use.md) | the first hour outside this repository: three defects a green corpus missed, and why an editable install cannot be read |
