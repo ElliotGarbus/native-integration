@@ -233,9 +233,9 @@ requirement you are missing:
 native-integration conformance --profile android -- yourtool build
 ```
 
-The library is about thirty of §8's forty-six requirements. Step 2 is most of
-the other fifteen, and it is work you already do — you are feeding it from a
-validated source instead of from nothing.
+Step 2 is most of what the library does not cover, and it is work you already
+do — you are feeding it from a validated source instead of from nothing.
+[What it is worth](#what-it-is-worth) puts a number on the rest.
 
 ### What the call takes and returns
 
@@ -293,6 +293,18 @@ and a reader produces none — scoring full marks here would have proved nothing
 
 So: the library is how you avoid re-deriving §8 from prose. The corpus is how
 you find out whether you got it right.
+
+The rest of this section is the mechanics, in the order a build tool writes
+them. The samples assume these imports:
+
+```python
+import tomllib
+from pathlib import Path
+
+from native_integration import (
+    Application, Closure, Findings, Origin, discover, load_registry, read,
+)
+```
 
 ### Building a `Closure`
 
@@ -434,10 +446,10 @@ if not integration.ok:                  # <- the line only a build tool can writ
 `read()` writes no file, resolves no coordinate, reaches no network, and imports
 nothing a producer shipped. It raises in one case only: `UnimplementedProfile`,
 when `platform` is not in `profiles`. That is requirement 9 —
-[§8.1](../SPEC.md#81-conformance-is-per-platform) makes conformance per-platform, so an
-Android-only tool is a conforming consumer, and the way it stays one is by
-refusing an iOS build outright rather than producing part of one. Pass the
-profiles you actually implement; the default claims both.
+[§8.1](../SPEC.md#81-conformance-is-per-platform) makes conformance
+per-platform, so an Android-only tool is a conforming consumer, and the way it
+stays one is by refusing an iOS build outright rather than producing part of
+one. Pass the profiles you actually implement; the default claims both.
 
 `contract` (default `"1.0"`) is the specification revision you implement, and
 decides which sidecars are rejected as too new (§4.3).
@@ -511,8 +523,9 @@ of the `ni.req.38` finding, and the thing a reviewer reads.
 
 ### What each omitted argument switches off
 
-Four arguments are optional, and each one omitted narrows what can be checked
-rather than silently weakening a check that still claims to run:
+Four of the optional arguments switch a check off, and each one omitted narrows
+what can be checked rather than silently weakening a check that still claims to
+run:
 
 | Omitted | What stops being checkable |
 | --- | --- |
@@ -755,6 +768,8 @@ reading this package's own syntax tree, and CI fails if it drifts.
 | `advisories` | §8.5's fifteen, none of them blocking |
 | `recording`, `acceptance` | §9 — the record, the delta, and the acceptance gate |
 | `reader` | the order the specification puts all of the above in |
+| `fragments` | a minimal sidecar in correct form for any declaration, generated from the registry — what `explain` prints |
+| `cli` | the command line, and nothing a build tool calls |
 
 ## Three design decisions worth knowing before you adopt it
 
@@ -782,6 +797,8 @@ a file the reader has already refused to interpret, and the one thing the
 application can act on is the refusal.
 
 ## Status
+
+To work on it, install it editable and run the suite:
 
 ```bash
 python3 -m pip install -e ".[test]"
