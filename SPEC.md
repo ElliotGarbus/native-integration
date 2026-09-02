@@ -4156,6 +4156,31 @@ Building the wheel and reading its contents is the check. A sidecar that is
 correct in the source tree and absent from the artifact is the one failure this
 convention cannot report, because there is nothing to report on.
 
+> **Note: an editable install is not readable this way.**
+> [§3.2](#32-resolution) reaches a sidecar through
+> `Distribution.locate_file()` or `Distribution.files`, and a
+> [PEP 660](https://peps.python.org/pep-0660/) editable install answers neither:
+> its `files` lists a `.pth`, a finder module and the `dist-info`, and no
+> sidecar at all. The real location is inside the finder, which the import
+> system reads and [§3.2](#32-resolution) does not — *"nothing is imported,
+> ever"*, because a distribution targeting Android or iOS may not be importable
+> on the build host at all. A consumer therefore reports such a distribution as
+> unreadable, which is [§3.2](#32-resolution) working rather than failing. Two
+> ways round it while authoring: reinstall before each check, or point a
+> validator at the sidecar directory, which reads the file directly and needs no
+> install.
+
+> **Note: a hashed input and a version-control checkout.**
+> [§9.3](#93-hashed-inputs) hashes the sidecar's bytes, and the integration
+> record carries the digest. A version-control system that rewrites line endings
+> on checkout — Git's `core.autocrlf`, on by default on Windows — hands a fresh
+> clone a `native.toml` whose digest is not the one the record was written
+> against, and the next build reports a [§9.1](#91-the-lifecycle) delta for a
+> change nobody made. The report is accurate and its cause is not visible in it,
+> since what it names is an input digest. Pinning the line endings of the
+> sidecar, of everything it references, and of the record is a property of the
+> repository holding them rather than of anything this document can check.
+
 > **Note:** The procedure stops where the specification does. It cannot tell you
 > whether a vendor's SDK needs a permission — that is the vendor's
 > documentation's job — and it does not decide the contribution-versus-action

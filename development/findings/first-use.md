@@ -49,8 +49,12 @@ convenience. The cost lands on the producer's inner loop: every sidecar edit
 needs a reinstall before a consumer sees it, on exactly the workflow
 [§12.2](../../SPEC.md#122-sidecar-authoring-procedure) step 8 prescribes.
 
-**Recorded, not resolved**, under standing rule 3. Three readings are available
-and this reader should not choose between them:
+**Recorded, then resolved by the specification's owner — reading 3.** §12.2's
+step 8 now carries a note saying an editable install is not readable this way,
+and what to do while authoring. It introduces no obligation, and §12.2's own
+check confirms it: no RFC 2119 keyword in the section's own voice.
+
+Three readings were available, and this reader chose between none of them:
 
 1. **Nothing to change.** Reinstalling is the cost of a resolution mechanism
    that never imports, and `native-integration validate <path>` already reads a
@@ -66,8 +70,8 @@ and this reader should not choose between them:
    saying a consumer is not required to support one would settle it, and would
    tell a producer to expect the reinstall rather than discover it.
 
-The third is the cheapest and changes no obligation. It is still a specification
-edit, and belongs to whoever owns the specification.
+The third was taken. It is the cheapest, changes no obligation, and turns a gate
+failure that names something else into something a producer is told to expect.
 
 ## A second observation: a record and CRLF
 
@@ -108,15 +112,11 @@ specification nor a consumer can supply it:
 Anything a declaration references needs the same treatment — contributed Java,
 Kotlin and Swift source are hashed inputs too.
 
-**Where this could go**, if the specification wants it: §12.2's step 8 is about
-confirming what shipped, and this belongs beside it — a producer committing a
-sidecar from Windows and an application committing a record both need the line,
-and both discover it as a gate failure that names something else. It would be a
-note rather than an obligation; a consumer cannot check it, because by the time
-a consumer reads the file the normalization has already happened.
-
-Recorded, not resolved. Adding a note to §12.2 introduces no rule, but §12.2 is
-a specification section and this reader does not edit those.
+**This one landed in §12.2's step 8 too**, as a second note beside the editable
+install. Step 8 is about confirming what shipped, and both traps are discovered
+the same way: as a gate failure naming something other than the cause. Neither
+is an obligation — a consumer cannot check either one, because by the time it
+reads the file the normalization has already happened.
 
 ## The three defects
 
