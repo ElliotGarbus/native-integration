@@ -162,12 +162,27 @@ def test_the_registry_sits_inside_the_package():
     assert (directory / "diagnostics-v1.toml").is_file()
 
 
-def test_the_build_ships_the_registry():
-    manifest = tomllib.loads(
-        (ROOT / "pyproject.toml").read_text(encoding="utf-8")
-    )
+def test_the_build_ships_everything_in_contract():
+    """Every file, not the ones a per-extension glob remembered.
+
+    `contract/` held only `.toml` when this was written, and Phase 5 added
+    `authoring-guide.md` beside them -- which shipped in no wheel, so
+    `native-integration authoring-guide` worked from a checkout and failed from
+    an install. Matching the glob against what is actually in the directory is
+    what would have caught it.
+    """
+    import fnmatch
+
+    manifest = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     patterns = manifest["tool"]["setuptools"]["package-data"]["native_integration"]
-    assert any(pattern.startswith("contract/") for pattern in patterns), (
-        "setuptools includes package data only from inside the package "
-        "directory, and only what package-data names"
+    directory = Path(native_integration.__file__).resolve().parent / "contract"
+    unshipped = [
+        held.name
+        for held in sorted(directory.iterdir())
+        if held.is_file()
+        and not any(fnmatch.fnmatch(f"contract/{held.name}", p) for p in patterns)
+    ]
+    assert not unshipped, (
+        f"{unshipped} sit in contract/ and no package-data pattern names them, "
+        "so they are absent from every wheel"
     )

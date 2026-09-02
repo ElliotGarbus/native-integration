@@ -32,6 +32,7 @@ import subprocess
 import sys
 import re
 import tempfile
+import textwrap
 import tomllib
 import zipfile
 from dataclasses import dataclass
@@ -53,6 +54,30 @@ NON_NORMATIVE = (
     "This tool is not normative. SPEC.md is; where the two disagree, the "
     "specification wins and this is a defect."
 )
+
+
+#: Terminals are eighty columns until proven otherwise, and this output is read
+#: in one. Prose is wrapped rather than printed as one long line: a diagnostic
+#: that has to be scrolled sideways is one an author skims instead of reads.
+WIDTH = 78
+
+
+def wrapped(text: str, indent: str = "  ") -> list[str]:
+    """One paragraph, broken to the terminal, each line already indented."""
+    if not text:
+        return []
+    return [
+        line
+        for paragraph in text.split(chr(10))
+        for line in (
+            textwrap.wrap(
+                paragraph, width=WIDTH, initial_indent=indent,
+                subsequent_indent=indent, break_long_words=False,
+                break_on_hyphens=False,
+            )
+            or [indent.rstrip()]
+        )
+    ]
 
 
 class UsageError(Exception):
@@ -358,8 +383,7 @@ def _render_explanation(about: dict[str, Any]) -> str:
         detail += ", required" if about.get("required") else ", optional"
         lines.append(detail + f", since {about['since']}")
     lines.append("")
-    for paragraph in str(about.get("rule") or "").split("\n"):
-        lines.append(f"  {paragraph}")
+    lines += wrapped(str(about.get("rule") or ""))
     if about.get("values"):
         lines.append("")
         lines.append("  one of: " + ", ".join(f"`{v}`" for v in about["values"]))
@@ -367,11 +391,11 @@ def _render_explanation(about: dict[str, Any]) -> str:
         lines += ["", "  correct form:", ""]
         lines += [f"    {line}" if line else "" for line in about["fragment"].split("\n")]
     elif about.get("no_fragment"):
-        lines += ["", f"  no fragment: {about['no_fragment']}"]
+        lines += [""] + wrapped(f"no fragment: {about['no_fragment']}")
     if about.get("related"):
         lines += ["", "  other rules on this declaration:"]
         lines += [f"    {name}" for name in about["related"]]
-    lines += ["", f"  {NON_NORMATIVE}"]
+    lines += [""] + wrapped(NON_NORMATIVE)
     return "\n".join(lines)
 
 
@@ -456,7 +480,8 @@ def authoring_guide(args: argparse.Namespace) -> int:
         return 0
     print(guide_text())
     print(f"\n  Read it in full at {SPECIFICATION_URL}")
-    print(f"  {NON_NORMATIVE}")
+    for line in wrapped(NON_NORMATIVE):
+        print(line)
     return 0
 
 
@@ -590,7 +615,9 @@ def inspect(args: argparse.Namespace) -> int:
         print(f"  [{platform}]")
         for category, keys in categories.items():
             print(f"    {category}: {', '.join(keys) or '—'}")
-    print(f"\n  {NON_NORMATIVE}")
+    print()
+    for line in wrapped(NON_NORMATIVE):
+        print(line)
     return 0
 
 
@@ -636,17 +663,17 @@ def validate(args: argparse.Namespace) -> int:
     ]
     producer = [f for f in findings if f not in outstanding and f not in unreachable]
     blocking = [f for f in producer if f["severity"] == "blocking"]
-    unchecked.append(
-        "one distribution was read, so every rule that needs the whole "
-        "dependency closure went unchecked: an owned namespace two "
-        "distributions claim, two values targeting one key, one module "
-        "declared twice, and a packaging collision"
-    )
-    unchecked.append(
-        "no application was supplied, so §9.1's acceptance gate was not "
-        "evaluated either — there is no configuration to meet a floor, no "
-        "answer to a value, and no accepted record to compare against"
-    )
+    # One entry per rule rather than two paragraphs. A reader wants to know
+    # *which* rules went unchecked, and a sentence listing four of them buries
+    # each one mid-line.
+    unchecked += [
+        "an owned namespace two distributions claim (§6.1)",
+        "two values targeting one manifest or Info.plist key (§6.8, §7.4)",
+        "one Maven module declared twice, or with two configurations (§6.3)",
+        "a packaging collision between resolved artifacts (§9.7)",
+        "§9.1's acceptance gate: there is no accepted record to compare against",
+        "every floor, value and action: no application supplied an answer (§5)",
+    ]
 
     if args.json:
         print(json.dumps({
@@ -685,9 +712,16 @@ def validate(args: argparse.Namespace) -> int:
         for line in explaining(producer + outstanding):
             print(line)
         print("\n  the whole procedure: native-integration authoring-guide")
+    print(
+        chr(10) + "  not checked here — one sidecar was read, "
+        "with no application:"
+    )
     for note in unchecked:
-        print(f"\n  not checked here: {note}")
-    print(f"\n  {NON_NORMATIVE}")
+        for line in wrapped(note, indent="      "):
+            print(line)
+    print()
+    for line in wrapped(NON_NORMATIVE):
+        print(line)
     return 1 if blocking else 0
 
 

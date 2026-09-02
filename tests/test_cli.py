@@ -155,10 +155,18 @@ def test_validate_separates_what_the_application_owes(capsys):
 
 def test_validate_says_which_rules_it_could_not_reach(capsys):
     """One sidecar cannot exercise a rule about two. Reporting a clean build
-    would be the overstatement §8.5's note names."""
+    would be the overstatement §8.5's note names.
+
+    One entry per rule rather than a paragraph listing several: a reader wants
+    to know *which* went unchecked, and a caller wants to enumerate them.
+    """
     answer = json.loads(run(capsys, "validate", str(EXAMPLE), "--json")[1])
-    assert answer["unchecked"]
-    assert "closure" in answer["unchecked"][0]
+    assert len(answer["unchecked"]) >= 5
+    assert any("owned namespace" in note for note in answer["unchecked"])
+    assert any("9.1" in note for note in answer["unchecked"])
+    assert all(len(note) < 90 for note in answer["unchecked"]), (
+        "each entry is one line in a terminal"
+    )
 
 
 def test_validate_fails_a_sidecar_the_producer_got_wrong(capsys, tmp_path):

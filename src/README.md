@@ -553,7 +553,7 @@ three things rather than one:
 | --- | --- |
 | **findings** | the producer's, and what a failing exit status means |
 | **outstanding** | obligations [§2.2](../SPEC.md#22-how-the-application-answers) gives the *application* — a value only the developer knows, an action only they can acknowledge, a floor only their configuration meets, an export only they can approve, an integration only they can accept. Real requirements, three of which block a real build, and none of them the sidecar's defect |
-| **unchecked** | rules one sidecar cannot exercise at all: an owned namespace two distributions claim, two values targeting one key, one module declared twice, a packaging collision |
+| **unchecked** | rules one sidecar cannot exercise at all, one entry per rule: an owned namespace two distributions claim, two values targeting one key, one module declared twice, a packaging collision, and everything that needs an application's answers |
 
 **Exit status.** `0` when nothing the producer can fix is blocking; `1` when
 something is. An outstanding obligation never fails the run.

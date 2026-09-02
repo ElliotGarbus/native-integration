@@ -46,7 +46,11 @@ where = ["src"]
 # cannot be imported. setuptools includes package data only from inside the
 # package directory, which is why `contract/` lives here rather than beside
 # SPEC.md.
-native_integration = ["py.typed", "contract/*.toml"]
+# Every file in `contract/`, not a per-extension list. The registry is
+# `.toml` and the packaged authoring guide is `.md`, and a glob naming
+# extensions ships whichever ones someone remembered -- which is how
+# `authoring-guide` came to work from a checkout and fail from an install.
+native_integration = ["py.typed", "contract/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
