@@ -69,6 +69,55 @@ and this reader should not choose between them:
 The third is the cheapest and changes no obligation. It is still a specification
 edit, and belongs to whoever owns the specification.
 
+## A second observation: a record and CRLF
+
+Committing the playground found the other trap, and this one bites an
+*application* rather than a producer.
+
+[§9.3](../../SPEC.md#93-hashed-inputs) hashes the sidecar's bytes, and the record
+carries the digest as an `input` fact. Git on Windows normalizes line endings by
+default. So a repository holding both a sidecar and an accepted record hands a
+fresh clone a CRLF `native.toml` whose digest is not the one the record was
+written against:
+
+| | |
+| --- | --- |
+| `native.toml` as committed, LF | `efafe6055093630d` |
+| the same file as a Windows clone checks it out | `6f6a2e63490899c2` |
+| the digest in the committed record | `efafe6055093630d` |
+
+The next build blocks on [§9.1](../../SPEC.md#91-the-lifecycle)'s acceptance
+gate, reporting a delta, for a change nobody made. The report is accurate — the
+bytes really did change — and the cause is invisible from the diagnostic, which
+names an input digest and not a line ending.
+
+**Nothing here is wrong.** Hashing bytes is what makes the record comparable at
+all, and §9.3 chose it over a normalized hash deliberately: a digest over
+canonicalized content is a digest over a canonicalization, and two consumers
+that canonicalize differently agree about nothing. Git is doing what it is
+configured to do.
+
+**The fix is one line in the repository that holds them**, and neither the
+specification nor a consumer can supply it:
+
+```gitattributes
+*.toml   text eol=lf
+*.record text eol=lf
+```
+
+Anything a declaration references needs the same treatment — contributed Java,
+Kotlin and Swift source are hashed inputs too.
+
+**Where this could go**, if the specification wants it: §12.2's step 8 is about
+confirming what shipped, and this belongs beside it — a producer committing a
+sidecar from Windows and an application committing a record both need the line,
+and both discover it as a gate failure that names something else. It would be a
+note rather than an obligation; a consumer cannot check it, because by the time
+a consumer reads the file the normalization has already happened.
+
+Recorded, not resolved. Adding a note to §12.2 introduces no rule, but §12.2 is
+a specification section and this reader does not edit those.
+
 ## The three defects
 
 All three were found by using the tool, and none by the corpus. They share a
