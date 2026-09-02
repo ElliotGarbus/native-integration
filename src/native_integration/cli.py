@@ -692,7 +692,16 @@ def validate(args: argparse.Namespace) -> int:
     def show(entries: list[dict[str, Any]]) -> None:
         for finding in entries:
             print(f"  [{finding['severity']}] ({finding['platform']}) {finding['id']}")
-            print(f"      {finding['message']}")
+            for line in wrapped(finding["message"], indent="      "):
+                print(line)
+            # The detail is what turns a message into an answer. A floor
+            # reported as "below the declared floor" reads as though a value
+            # were too low; its detail says the declared number and that the
+            # application configured nothing, which is a different problem with
+            # a different fix. Dropping it made the reader open the JSON.
+            for note in finding.get("detail", ()):
+                for line in wrapped(note, indent="        "):
+                    print(line)
             if finding.get("where"):
                 print(f"      at {finding['where']}")
             print(f"      native-integration explain {finding['id']}")

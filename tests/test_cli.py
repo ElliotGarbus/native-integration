@@ -452,3 +452,16 @@ def test_a_structural_rule_is_the_producers_whatever_number_it_rolls_up_to(capsy
     reported = [f["id"] for f in answer["findings"]]
     assert any("required-if-present.exported_required" in name for name in reported)
     assert not answer["outstanding"]
+
+
+def test_a_finding_shows_the_detail_that_answers_it(capsys):
+    """A message says what is wrong; the detail says what to do about it.
+
+    "the application's `min_sdk` is below the declared floor" reads as though a
+    configured value were too low. Its detail carries the declared number and
+    says the application configured nothing, which is a different problem with a
+    different fix — and dropping it sent the reader to the JSON to find out.
+    """
+    _, out = run(capsys, "validate", str(EXAMPLE))
+    assert "declared" in out
+    assert "the application configures none" in out
