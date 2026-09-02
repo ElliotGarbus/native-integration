@@ -611,6 +611,19 @@ def compare_records(
     return problems
 
 
+def quoted(text: str, limit: int = 200) -> str:
+    """A consumer's own bytes, safe to put in a report on any terminal.
+
+    What a consumer wrote is untrusted input, and this harness prints its
+    reports to a console whose encoding it does not choose. Echoing the bytes
+    back verbatim moved the failure from the consumer to the harness: a Windows
+    console in cp1252 raises on U+FFFD, so a case that should have read "this is
+    not JSON" became a traceback out of the harness instead.
+    """
+    collapsed = " ".join(text.split())[:limit]
+    return "".join(c if " " <= c <= "~" else "?" for c in collapsed)
+
+
 def run_consumer(command: list[str], case: Case, outputs: Path) -> tuple[int, dict]:
     """Invoke the consumer for one case, and read what it reported.
 
@@ -639,15 +652,41 @@ def run_consumer(command: list[str], case: Case, outputs: Path) -> tuple[int, di
     # U+FFFD before the JSON is parsed, so a consumer could ship bytes this
     # interface says are UTF-8 and never hear about it — most easily in a field
     # nothing reads.
+    #
+    # But the encoding is the *second* thing to say when the answer is not JSON
+    # at all. A tool printing prose for a human on a Windows console emits it in
+    # the console codepage, so the first thing wrong with it is that it is prose
+    # — and being told about byte 78 instead sends its author looking for an
+    # encoding bug in a program that was never answering this interface.
+    stdout = completed.stdout.decode("utf-8", errors="replace")
+    encoding_problem: str | None = None
     try:
         stdout = completed.stdout.decode("utf-8")
     except UnicodeDecodeError as exc:
-        return completed.returncode, {"_malformed": f"stdout is not valid UTF-8: {exc}"}
+        encoding_problem = f"stdout is not valid UTF-8: {exc}"
+
     try:
-        return completed.returncode, json.loads(stdout or "{}")
+        answer = json.loads(stdout or "{}")
     except json.JSONDecodeError:
-        fallback = completed.stderr.decode("utf-8", errors="replace")
-        return completed.returncode, {"_malformed": (stdout or fallback)[:400]}
+        answer = None
+
+    if answer is None:
+        opening = quoted(stdout or "")
+        fallback = quoted(completed.stderr.decode("utf-8", errors="replace"))
+        said = opening or fallback or "(nothing)"
+        detail = (
+            "this interface takes one JSON object on stdout, and got: " + said
+        )
+        if encoding_problem:
+            detail += f". It is also not valid UTF-8 ({encoding_problem})"
+        return completed.returncode, {"_malformed": detail}
+
+    # It parsed, so the bytes matter on their own terms: a consumer answering
+    # this interface in something other than UTF-8 is a defect in the answer
+    # even when the answer is otherwise right.
+    if encoding_problem:
+        return completed.returncode, {"_malformed": encoding_problem}
+    return completed.returncode, answer
 
 
 def diagnostic_ids(entries: object) -> set[str]:

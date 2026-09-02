@@ -26,6 +26,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "conformance"))
 
 import consumer  # noqa: E402
+import run as harness  # noqa: E402
 
 from native_integration import advisories  # noqa: E402
 
@@ -169,3 +170,62 @@ def test_the_harness_reports_no_failure_and_only_the_known_unverified(profile):
 
     # §8.5's note, as the harness applies it: an unverified run is not a pass.
     assert finished.returncode == (1 if unverified else 0), report
+
+
+# -- what the harness says about an answer that is not one --------------------
+# Found by pointing the corpus at a toy build tool that prints prose for a
+# human. It failed all 41 cases, correctly, and said "stdout is not valid
+# UTF-8: … byte 0xa7 in position 78" -- which sends the author of a program that
+# was never answering this interface looking for an encoding bug.
+
+
+class _Completed:
+    def __init__(self, stdout: bytes, stderr: bytes = b"", returncode: int = 0):
+        self.stdout, self.stderr, self.returncode = stdout, stderr, returncode
+
+
+def _answer(monkeypatch, tmp, stdout: bytes, stderr: bytes = b"", code: int = 0):
+    monkeypatch.setattr(
+        harness.subprocess, "run",
+        lambda *a, **k: _Completed(stdout, stderr, code),
+    )
+    case = harness.load_cases("core", {"android"})[0]
+    return harness.run_consumer(["x"], case, tmp)
+
+
+def test_prose_is_reported_as_prose_not_as_an_encoding_error(monkeypatch, tmp_path):
+    """Console-codepage prose is not JSON *and* not UTF-8. The first is the
+    headline: the second says nothing about which mistake was made."""
+    _, reported = _answer(
+        monkeypatch, tmp_path, ("[advisory] " + chr(0xA7) + "6.5 ok").encode("cp1252")
+    )
+    said = reported["_malformed"]
+    assert said.startswith("this interface takes one JSON object on stdout")
+    assert "advisory" in said
+    assert "not valid UTF-8" in said, "the encoding defect is still reported, second"
+
+
+def test_a_json_answer_in_bad_bytes_is_still_an_encoding_defect(monkeypatch, tmp_path):
+    """The strict decode is deliberate: a consumer that ships non-UTF-8 in a
+    field nothing reads should hear about it."""
+    _, reported = _answer(
+        monkeypatch, tmp_path,
+        ('{"outcome": "accept", "why": "' + chr(0xA7) + '6.5"}').encode("cp1252"),
+    )
+    assert reported["_malformed"].startswith("stdout is not valid UTF-8")
+
+
+def test_a_good_answer_is_returned_unchanged(monkeypatch, tmp_path):
+    _, reported = _answer(
+        monkeypatch, tmp_path, b'{"outcome": "accept", "diagnostics": []}'
+    )
+    assert reported == {"outcome": "accept", "diagnostics": []}
+
+
+def test_what_a_consumer_wrote_is_safe_to_print():
+    """The harness prints its report to a console whose encoding it does not
+    choose. Echoing a consumer's bytes back verbatim turned a failed case into
+    a traceback out of the harness on a cp1252 console."""
+    messy = "caf" + chr(233) + " " + chr(0xFFFD) + chr(10) + "  x"
+    assert harness.quoted(messy) == "caf? ? x"
+    assert len(harness.quoted("a" * 500)) == 200
