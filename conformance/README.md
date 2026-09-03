@@ -78,6 +78,10 @@ cases alone would report green over eleven requirements and establish nothing,
 which is the overstatement [§8.5](../SPEC.md#85-advisory-obligations)'s note
 names.
 
+An advisory case sits with the section it enforces, since
+[§8.1](../SPEC.md#81-conformance-is-per-platform) gives advisories no profile of
+their own. There is one so far, `android/S07_permission_reason`.
+
 A core case is therefore compared against `expected/<platform>.record`, one per
 platform. Naming a `record` in `case.toml` overrides that for **every** platform
 the case runs for, so a core case names one only where a single record is right
@@ -211,10 +215,6 @@ Nothing in `resolved.toml` is normative. It is the corpus standing in for a
 resolver, and the digests in it are the fixture's own — no bytes exist for them
 to be computed from.
 
-Profiles follow [§8.1](../SPEC.md#81-conformance-is-per-platform). Advisory
-obligations carry no profile there, so each sits with the section it enforces:
-S1–S4 are core, S5–S9 and S11–S13 Android, S10, S14 and S15 iOS.
-
 ## `case.toml`
 
 Three axes, deliberately. [§8.2](../SPEC.md#82-dispositions-and-what-recording-is-not)
@@ -278,15 +278,11 @@ The pairing is what makes a failure retrievable: the requirement id says which
 obligation went unmet, the precise id says which rule, and an author repairing a
 sidecar wants the second.
 
-An unsatisfied conditional requirement is neither blocking nor advisory
-([§8.2](../SPEC.md#82-dispositions-and-what-recording-is-not)), and says so on
-the axes rather than in a disposition:
-
-```toml
-outcome = "accept"
-state    = "unresolved"
-reported = true
-```
+An unsatisfied *conditional* requirement is neither blocking nor advisory
+([§8.2](../SPEC.md#82-dispositions-and-what-recording-is-not)): the build
+proceeds, and the requirement is recorded as unresolved. A case about one says
+`outcome = "accept"` and compares the record, where the `state=unresolved`
+operand is — no third disposition is invented to carry it.
 
 ### Assertions
 
@@ -372,8 +368,8 @@ pass every case that does not name S7.
 
 ## What is here
 
-Category 1 first, per the work brief: the cases where a non-conforming consumer
-is **dangerous** rather than merely wrong.
+The security-relevant negatives first: the cases where a non-conforming
+consumer is **dangerous** rather than merely wrong.
 
 | Case | Requirement | What a wrong consumer does |
 | --- | --- | --- |
@@ -387,12 +383,16 @@ is **dangerous** rather than merely wrong.
 | `ios/R35_capability_key_contributed` | 35 | grants a capability that then does not work, with no task stated |
 | `android/R41_artifact_feature_undecided` | 41 | lets an artifact make hardware mandatory without the application choosing |
 
-Beyond category 1, **every blocking requirement in all three of §8.1's profiles
-now has a case** — core, Android and iOS — and the core cases are exercised for
-both platforms, so `core + android` and `core + ios` are each a claim the corpus
-can actually check.
+Beyond those, **every blocking requirement a fixture can exercise has a case**
+— thirty of the forty-six, across core, Android and iOS, with the core cases run
+for both platforms so that `core + android` and `core + ios` are each a claim
+the corpus can check. The other sixteen are obligations no input tree can
+express: a prohibition on importing a producer, the contents of a report, a
+bootstrap's own architecture. [`docs/REQUIREMENTS.md`](../docs/REQUIREMENTS.md)
+names how each is discharged instead, and several appear here as *attested*
+assertions — a consumer's own claim, labelled as one.
 
-Four accept cases sit beside them so the corpus is not only negatives:
+Accept cases sit beside the negatives so the corpus is not only refusals:
 `core/R01_dependency_closure` compares a record,
 `android/S07_permission_reason` exercises the advisory axis, and two are the
 other side of a blocking case, which is the only way that case discriminates:
@@ -420,11 +420,13 @@ Two more of that shape were added when the reader's own gate was reviewed:
 ## Running it
 
 ```
-python3 conformance/run.py --profile android -- mytool build --conformance-record
+native-integration conformance --profile android -- mytool build
 ```
 
-That is a whole `core + android` claim: 30 cases, the 15 core ones run against
-an Android closure. Add `--profile ios` for a consumer that builds both.
+or `python3 conformance/run.py` with the same arguments — the command line only
+invokes the harness. That is a whole `core + android` claim: forty-one case
+runs, the nineteen core cases against an Android closure plus the twenty-two
+Android ones. Add `--profile ios` for a consumer that builds both.
 
 `run.py` invokes the consumer once per case with **two** arguments: the case's
 `input/`, and an output directory to write what it produced into. It answers on
