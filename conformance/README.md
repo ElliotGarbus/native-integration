@@ -292,7 +292,10 @@ advisory — which is why it is a separate axis rather than a third disposition.
 
 **Verified** assertions are checked by the harness against what the consumer
 wrote to its output directory. **Attested** ones are the consumer's own claim,
-labelled so that nobody reads testimony as evidence.
+labelled so that nobody reads testimony as evidence. This table is the whole
+vocabulary: a consumer attesting a name outside it is refused, by name, rather
+than ignored — a misspelt attestation that should have matched a case would
+otherwise fail that case as *unverified*, for a reason its author cannot see.
 
 | Assertion | Requirement | |
 | --- | --- | --- |
