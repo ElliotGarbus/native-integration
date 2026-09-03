@@ -728,6 +728,12 @@ def malformed(reported: object) -> str | None:
         not isinstance(v, bool) for v in assertions.values()
     ):
         return "`assertions` is not an object of booleans"
+    unknown = sorted(set(assertions) - KNOWN_ASSERTIONS)
+    if unknown:
+        return (
+            "`assertions` names " + ", ".join(unknown) + ", which README.md's "
+            "table does not define; an attestation nobody reads is worth nothing"
+        )
     if not isinstance(reported.get("record", ""), str):
         return "`record` is not a string"
     return None
@@ -929,6 +935,28 @@ VERIFIED_ASSERTIONS = {
     "view_link_attributes_written_through": verify_view_links_written_through,
     "artifact_feature_decision_applied": verify_feature_decision_applied,
 }
+
+#: Assertions the harness cannot verify and takes as the consumer's word. The
+#: names are README.md's table, and `check_spec.py` holds this list and that
+#: table equal -- so the table is the vocabulary and this is the harness
+#: enforcing it. A name outside both is refused rather than ignored: an
+#: attestation nobody reads is worth nothing, and a misspelt one that should
+#: have matched a case fails that case silently, as "unverified", for a reason
+#: the consumer's author cannot see.
+ATTESTED_ASSERTIONS = (
+    "no_producer_import",
+    "every_diagnostic_names_a_distribution",
+    "instructions_attributed_to_producer",
+    "no_credential_in_record",
+    "no_invented_value",
+    "no_unexported_fallback",
+    "objc_categories_linked",
+    "record_contains",
+    "record_omits",
+    "activity_extends_component_activity",
+    "url_callback_observable",
+)
+KNOWN_ASSERTIONS = frozenset(VERIFIED_ASSERTIONS) | frozenset(ATTESTED_ASSERTIONS)
 
 
 def check(case: Case, exit_code: int, reported: dict, outputs: Path) -> Result:

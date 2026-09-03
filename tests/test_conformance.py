@@ -229,3 +229,27 @@ def test_what_a_consumer_wrote_is_safe_to_print():
     messy = "caf" + chr(233) + " " + chr(0xFFFD) + chr(10) + "  x"
     assert harness.quoted(messy) == "caf? ? x"
     assert len(harness.quoted("a" * 500)) == 200
+
+
+# -- an attestation the corpus does not define ----------------------------------
+# Found by a toy consumer attesting `action_text_reaches_the_report`, a name no
+# case uses. The harness ignored it. A misspelt attestation that should have
+# matched a case fails that case as "unverified", for a reason its author
+# cannot see from the report.
+
+
+def test_an_unknown_attestation_is_refused_by_name():
+    said = harness.malformed({"outcome": "accept", "assertions": {"action_text_reaches_the_report": True}})
+    assert said is not None
+    assert "action_text_reaches_the_report" in said
+
+
+def test_a_documented_attestation_is_accepted():
+    assert harness.malformed({"outcome": "accept", "assertions": {"instructions_attributed_to_producer": True}}) is None
+
+
+def test_the_harness_knows_every_verified_and_attested_name():
+    """The two halves of README.md's table, and nothing outside them."""
+    known = set(harness.VERIFIED_ASSERTIONS) | set(harness.ATTESTED_ASSERTIONS)
+    assert "record_omits" in known, "the one row that names two names two"
+    assert "outcome" not in known, "a case.toml field is not an assertion"

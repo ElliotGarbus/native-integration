@@ -1656,13 +1656,33 @@ check("§12.2 restates guidance and introduces none", problems)
 sys.path.insert(0, str(ROOT / "conformance"))
 import run as conformance_run  # noqa: E402
 
-DOCUMENTED_ASSERTIONS = set(
-    re.findall(
-        r"^\| `([a-z_]+)`",
-        (ROOT / "conformance" / "README.md").read_text(encoding="utf-8"),
-        re.M,
-    )
+# The names README.md's *Assertions* table defines -- and only that table. The
+# earlier parse took the first backticked name of every table row in the file,
+# which swept in case.toml's field names and dropped `record_omits` from the
+# one row that names two. Scoped to the section, and both names on a row.
+_ASSERTIONS_TABLE = re.search(
+    r"^### Assertions$(.*?)^### ",
+    (ROOT / "conformance" / "README.md").read_text(encoding="utf-8"),
+    re.M | re.S,
 )
+assert _ASSERTIONS_TABLE, "conformance/README.md has no ### Assertions section"
+DOCUMENTED_ASSERTIONS = {
+    name
+    for row in re.findall(r"^\| (`[a-z_]+`(?: / `[a-z_]+`)?) \|", _ASSERTIONS_TABLE.group(1), re.M)
+    for name in re.findall(r"`([a-z_]+)`", row)
+}
+
+# --- the assertion vocabulary is one list --------------------------------
+# run.py refuses an attestation it does not know, so the list it knows has to
+# be the list the document defines -- or a documented name would be refused,
+# and a harness-only name would be undocumented.
+problems = []
+_known = set(conformance_run.VERIFIED_ASSERTIONS) | set(conformance_run.ATTESTED_ASSERTIONS)
+for name in sorted(DOCUMENTED_ASSERTIONS - _known):
+    problems.append(f"conformance/README.md's table names `{name}`, which run.py does not know")
+for name in sorted(_known - DOCUMENTED_ASSERTIONS):
+    problems.append(f"run.py knows `{name}`, which conformance/README.md's table does not name")
+check("the assertion vocabulary is one list, in README.md and in run.py", problems)
 
 problems = []
 
