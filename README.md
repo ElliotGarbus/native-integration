@@ -282,25 +282,23 @@ yet.
 The specification is the contract; **the reader** is the part of this
 repository that runs. `src/` is a Python library that does the consumer's
 reading half — discovery, validation, resolution, the record and the delta — so
-that a build tool gets §8's obligations as one call, `read()`, rather than as
-prose to re-derive. It generates nothing: no Gradle file, no Xcode project, no
-manifest. That is where a build tool's own work begins, and why the library
-cannot make one conforming on its own; the [conformance corpus](conformance/README.md)
-is what does that, and it drives a tool's command rather than importing anything.
-The same package installs `native-integration`, the command line, which is how
-a **package author** uses it — `validate` a draft sidecar, `explain` any id a
-failure printed, `authoring-guide` for the procedure — without writing a line
-of Python. [`src/README.md`](src/README.md) is the manual for both halves; it
-opens by saying which half is yours.
+a build tool gets §8's obligations as one call, `read()`, and starts its own
+work where that call stops: generating the project. That is also why the
+library cannot make a build tool conforming by itself; the
+[conformance corpus](conformance/README.md) does that, and drives a tool's
+command rather than importing anything. The same package installs
+`native-integration`, the command line, which is how a **package author** uses
+it without writing Python. [`src/README.md`](src/README.md) is the manual for
+both halves, and opens by saying which half is yours.
 
 | | |
 | --- | --- |
 | [**SPEC.md**](SPEC.md) | the specification. [Appendix A](SPEC.md#appendix-a-a-complete-sidecar) is a whole sidecar, [Appendix B](SPEC.md#appendix-b-declaration-reference) every key it may contain, [§8](SPEC.md#8-consuming-tool-requirements) the consumer's checklist — forty-six requirements in a core profile plus one per platform, so an Android-only tool can conform without implementing Xcode |
 | [`examples/`](examples/) | one integration in full, both halves |
-| [`src/`](src/README.md) | the reference reader — discovery, parsing, validation, resolution, recording. Not a build tool: it writes no project, resolves no coordinate, runs nothing |
+| [`src/`](src/README.md) | the reference reader, and its manual |
 | [`conformance/`](conformance/README.md) | the corpus a consumer is tested against, its harness, and a reference consumer driving the reader in `src/` |
 | [`src/native_integration/contract/`](src/native_integration/contract/) | the machine-readable vocabulary. Appendix B, the JSON schema and the diagnostic ids are all generated from it, and the reader is driven by it at run time — which is why it ships *inside* the package rather than beside SPEC.md |
-| `native-integration` | the command line, from `src/native_integration/cli.py` — `explain` an id, `inspect` or `validate` a sidecar or a wheel, run the `conformance` corpus against a consumer, print the `authoring-guide`. **Not normative**, and it says so in every answer it gives |
+| `native-integration` | the command line — `explain`, `inspect`, `validate`, `conformance`, `authoring-guide`. **Not normative**, and it says so in every answer it gives |
 | [`AGENTS.md`](AGENTS.md) | one page, two playbooks — authoring a sidecar, implementing a consumer. Points at the tools rather than restating the specification |
 | [`development/`](development/) | the first attempt, the rebuild, eighteen sidecars, a forty-SDK survey, and the findings from each round |
 | `tools/`, `tests/` | `check_spec.py` (26 checks over both documents and every example), `toc.py`, `requirements_table.py`, and the reader's suite. All run in CI on every push |

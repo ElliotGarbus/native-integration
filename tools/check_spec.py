@@ -264,6 +264,7 @@ def heading_anchors(text: str) -> set[str]:
 
 
 problems = []
+_ANCHORS_OF: dict[Path, set[str]] = {}
 for label, text, base in (
     ("SPEC.md", NEW, ROOT),
     ("README.md", README, ROOT),
@@ -271,6 +272,11 @@ for label, text, base in (
     ("examples/README.md", (ROOT / "examples/README.md").read_text(encoding="utf-8"), ROOT / "examples"),
     ("development/README.md", (ROOT / "development/README.md").read_text(encoding="utf-8"), ROOT / "development"),
     ("development/PROPOSALS.md", (ROOT / "development/PROPOSALS.md").read_text(encoding="utf-8"), ROOT / "development"),
+    ("src/README.md", (ROOT / "src/README.md").read_text(encoding="utf-8"), ROOT / "src"),
+    ("AGENTS.md", (ROOT / "AGENTS.md").read_text(encoding="utf-8"), ROOT),
+    ("conformance/README.md", (ROOT / "conformance/README.md").read_text(encoding="utf-8"), ROOT / "conformance"),
+    ("conformance/record-format.md", (ROOT / "conformance/record-format.md").read_text(encoding="utf-8"), ROOT / "conformance"),
+    ("docs/REQUIREMENTS.md", (ROOT / "docs/REQUIREMENTS.md").read_text(encoding="utf-8"), ROOT / "docs"),
     *(
         (str(n.relative_to(ROOT)), n.read_text(encoding="utf-8"), n.parent)
         for n in sorted(ROOT.glob("development/examples/**/NOTES.md"))
@@ -283,6 +289,18 @@ for label, text, base in (
     for anchor in sorted(set(re.findall(r"\]\(#([a-z0-9-]+)\)", text))):
         if anchor not in headings:
             problems.append(f"{label} links to #{anchor}, which matches no heading")
+    # A link into *another* document carries an anchor too, and the target
+    # regex above stops at `#`, so until now that half was never read. A
+    # section renamed in SPEC.md left every other document pointing at a
+    # heading that no longer existed, and this check said ok.
+    for target, anchor in sorted(set(re.findall(r"\]\((?!https?:)([^)#\s]+\.md)#([a-z0-9-]+)\)", text))):
+        path = (base / target).resolve()
+        if not path.exists():
+            continue  # reported above, by the target check
+        if path not in _ANCHORS_OF:
+            _ANCHORS_OF[path] = heading_anchors(path.read_text(encoding="utf-8"))
+        if anchor not in _ANCHORS_OF[path]:
+            problems.append(f"{label} links to {target}#{anchor}, which matches no heading there")
 check("relative links and anchors resolve", problems)
 
 # --- 7. sidecars obey the rules the spec states ------------------------------

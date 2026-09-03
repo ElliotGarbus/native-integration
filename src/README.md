@@ -137,7 +137,7 @@ You are making a build tool honor sidecars. **This half is the API, not the
 command line** — the CLI is how you test what you built, and nothing in it is
 something a build tool would shell out to.
 
-**1. Read [§8](../SPEC.md#8-conformance)** — forty-six numbered requirements, a
+**1. Read [§8](../SPEC.md#8-consuming-tool-requirements)** — forty-six numbered requirements, a
 core profile plus one per platform. §8.1 makes conformance per-platform, so an
 Android-only tool can conform without implementing anything for Xcode.
 

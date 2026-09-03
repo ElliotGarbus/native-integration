@@ -141,7 +141,7 @@ SPLIT = {
 
 HEADER = """# Where each consumer obligation lives
 
-Every obligation in [§8 of the specification](../SPEC.md#8-conformance), against
+Every obligation in [§8 of the specification](../SPEC.md#8-consuming-tool-requirements), against
 the code path in [`native_integration`](../src/native_integration/) that
 discharges it.
 

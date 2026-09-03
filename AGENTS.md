@@ -40,7 +40,7 @@ outcome rather than a gap.
 
 You are making a build tool honor sidecars.
 
-1. **Read [§8](SPEC.md#8-conformance)**, which is the whole obligation: forty-six
+1. **Read [§8](SPEC.md#8-consuming-tool-requirements)**, which is the whole obligation: forty-six
    numbered requirements in a core profile plus one per platform. §8.1 makes
    conformance per-platform, so an Android-only tool can conform.
 2. **Run the corpus** rather than writing your own cases:
