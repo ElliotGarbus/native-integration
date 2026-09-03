@@ -341,7 +341,16 @@ def build() -> str:
 
 
 def _prose(text: str) -> str:
-    return " ".join(str(text).split()).replace("**", "").replace("|", "\\|")
+    """One cell of table prose, from a §8 summary written for SPEC.md.
+    
+    The summaries cite sections as `[§6.3](#63-gradle-dependencies)`, which
+    resolves inside SPEC.md and nowhere else. This file lives in `docs/`, so
+    every such link is repointed at `../SPEC.md` -- forty-three of them were
+    dead from the day the table was first generated, and the link check never
+    read this file to say so.
+    """
+    flat = " ".join(str(text).split()).replace("**", "").replace("|", "\\|")
+    return flat.replace("](#", "](../SPEC.md#")
 
 
 def main() -> int:
