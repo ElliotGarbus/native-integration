@@ -279,6 +279,20 @@ yet.
 
 ## The repository
 
+The specification is the contract; **the reader** is the part of this
+repository that runs. `src/` is a Python library that does the consumer's
+reading half — discovery, validation, resolution, the record and the delta — so
+that a build tool gets §8's obligations as one call, `read()`, rather than as
+prose to re-derive. It generates nothing: no Gradle file, no Xcode project, no
+manifest. That is where a build tool's own work begins, and why the library
+cannot make one conforming on its own; the [conformance corpus](conformance/README.md)
+is what does that, and it drives a tool's command rather than importing anything.
+The same package installs `native-integration`, the command line, which is how
+a **package author** uses it — `validate` a draft sidecar, `explain` any id a
+failure printed, `authoring-guide` for the procedure — without writing a line
+of Python. [`src/README.md`](src/README.md) is the manual for both halves; it
+opens by saying which half is yours.
+
 | | |
 | --- | --- |
 | [**SPEC.md**](SPEC.md) | the specification. [Appendix A](SPEC.md#appendix-a-a-complete-sidecar) is a whole sidecar, [Appendix B](SPEC.md#appendix-b-declaration-reference) every key it may contain, [§8](SPEC.md#8-consuming-tool-requirements) the consumer's checklist — forty-six requirements in a core profile plus one per platform, so an Android-only tool can conform without implementing Xcode |
@@ -289,7 +303,7 @@ yet.
 | `native-integration` | the command line, from `src/native_integration/cli.py` — `explain` an id, `inspect` or `validate` a sidecar or a wheel, run the `conformance` corpus against a consumer, print the `authoring-guide`. **Not normative**, and it says so in every answer it gives |
 | [`AGENTS.md`](AGENTS.md) | one page, two playbooks — authoring a sidecar, implementing a consumer. Points at the tools rather than restating the specification |
 | [`development/`](development/) | the first attempt, the rebuild, eighteen sidecars, a forty-SDK survey, and the findings from each round |
-| `tools/`, `tests/` | `check_spec.py` (24 checks over both documents and every example), `toc.py`, `requirements_table.py`, and the reader's suite. All run in CI on every push |
+| `tools/`, `tests/` | `check_spec.py` (26 checks over both documents and every example), `toc.py`, `requirements_table.py`, and the reader's suite. All run in CI on every push |
 
 Each check exists because the corresponding mistake shipped at least once. They
 cover mechanical drift only — a section that contradicts itself still needs a
