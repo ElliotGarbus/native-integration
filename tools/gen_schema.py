@@ -40,7 +40,15 @@ ROOT = Path(__file__).resolve().parent.parent
 REGISTRY = ROOT / "src" / "native_integration" / "contract" / "v1.toml"
 OUTPUT = ROOT / "schema" / "native-integration-v1.schema.json"
 
-SCHEMA_ID = "https://elliotgarbus.github.io/native-integration/native-integration-v1.schema.json"
+# A `$id` need not be dereferenceable, but this one was asserted as a URL and
+# returned 404: GitHub Pages is not enabled for the repository. The raw file
+# on `main` resolves today. It is a moving identifier for a versioned schema,
+# and the freeze-time answer is a tag-pinned URL -- or Pages, if a stable
+# host is wanted. Either way the schema itself does not change.
+SCHEMA_ID = (
+    "https://raw.githubusercontent.com/ElliotGarbus/native-integration/main/"
+    "schema/native-integration-v1.schema.json"
+)
 
 PLATFORMS = ("android", "ios")
 

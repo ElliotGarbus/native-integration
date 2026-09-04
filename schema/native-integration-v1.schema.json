@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://elliotgarbus.github.io/native-integration/native-integration-v1.schema.json",
+  "$id": "https://raw.githubusercontent.com/ElliotGarbus/native-integration/main/schema/native-integration-v1.schema.json",
   "title": "native-integration sidecar, contract 1",
   "description": "Structural validation only. Namespace containment, cross-reference resolution, closure-wide collision detection and path escape are SPEC.md \u00a78's and are not expressible here; passing this schema is not conformance.",
   "type": "object",
