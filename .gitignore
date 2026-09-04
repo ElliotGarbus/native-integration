@@ -2,6 +2,7 @@ __pycache__/
 *.pyc
 .venv/
 dist/
+dist-test/
 build/
 *.egg-info/
 .DS_Store
