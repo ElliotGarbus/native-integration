@@ -136,8 +136,12 @@ the next composition is chosen against the gap.
 > ban, §7.4's ungoverned transitive graph, the undefined containment rules —
 > are fixed in the current text. Where a later example overturned an earlier
 > conclusion, the correction is added **in place** rather than edited away.
-> The `native.toml` files **are** kept current and valid against the
-> specification as it is now. PROPOSALS.md marks what landed and what did not.
+> The `native.toml` files under `development/examples/` are **frozen with the
+> first attempt** and held to its rules, not to SPEC.md as it is now -- rewriting
+> an argument into the vocabulary it produced would destroy the evidence. The
+> exceptions are `mediated-ads` here and `examples/pystripe` above, which are
+> current-model and held to SPEC.md on every check; `tools/check_spec.py`'s
+> `CURRENT_EXAMPLES` is the list. PROPOSALS.md marks what landed and what did not.
 
 ## What held up
 
