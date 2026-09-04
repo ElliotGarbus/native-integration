@@ -120,8 +120,8 @@ validated.
 
 ## Where these live, and why not `examples/`
 
-`examples/` and `development/examples/` hold the first attempt's eighteen
-sidecars, which the reference reader's test suite validates against the first
-attempt's rules. Those keep working. The converted set lives here until the
-reader implements this specification, at which point it graduates and the
-frozen set moves under `development/` with the document it belongs to.
+`development/examples/` holds the first attempt's sidecars, frozen with the
+document they argued for. The reader now implements this specification, so the
+worked pair graduated: `examples/pystripe` is the current-model conversion and
+the only copy of it, on every check. The conversions that stay here are the
+ones with no public counterpart.

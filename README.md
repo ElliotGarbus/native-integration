@@ -241,10 +241,10 @@ it: nearly every gap they found was a missing *table*, the failure the action
 shape exists to end. Seven have since been re-expressed against the current
 model, and none needed a capability it lacks.
 
-[**examples/**](examples/) carries one integration in full, both halves;
-[`development/redesign/examples/pystripe/`](development/redesign/examples/pystripe/)
-is the same pair converted, and reading the two together is the shortest account
-of what changed. Everything else — every sidecar, every round, every finding — is
+[**examples/**](examples/) carries one integration in full, both halves, in
+the current model;
+[`development/redesign/CONVERSION.md`](development/redesign/CONVERSION.md) is
+the account of what changed in converting it from the first attempt. Everything else — every sidecar, every round, every finding — is
 under [**development/**](development/).
 
 ## Getting involved

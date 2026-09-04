@@ -951,9 +951,12 @@ if not REGISTRY["registers"]["capability_keys"].get("closed"):
 check("the registry agrees with SPEC.md's anchors and closed vocabularies", problems)
 
 # --- 18. every current-specification sidecar validates against the schema ----
-# `examples/` is deliberately not here: it still holds the first attempt's
-# sidecar, which `development/redesign/examples/` is the current-model
-# conversion of. See development/findings/phase1-registry.md.
+# The current-specification sidecars: `examples/pystripe` and the worked
+# mediated-ads set, which every rule check above already holds to SPEC.md,
+# plus the conversions still under `development/redesign/examples/`. Until
+# this walked `examples/`, the public example -- the one a stranger copies --
+# was the one the schema never saw, and a second copy of it under redesign/
+# had drifted from it.
 SCHEMA = json.loads((ROOT / "schema" / "native-integration-v1.schema.json").read_text(encoding="utf-8"))
 problems = []
 try:
@@ -964,7 +967,7 @@ try:
 
     sidecars = [
         (str(p.relative_to(ROOT)), tomllib.loads(p.read_text(encoding="utf-8")))
-        for p in sorted((ROOT / "development" / "redesign" / "examples").rglob("native.toml"))
+        for p in sorted([*LIVE, *(ROOT / "development" / "redesign" / "examples").rglob("native.toml")])
     ]
     appendix_a = NEW[NEW.index("## Appendix A") : NEW.index("## Appendix B")]
     for line, body in toml_blocks(appendix_a):
