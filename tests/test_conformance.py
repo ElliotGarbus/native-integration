@@ -156,17 +156,32 @@ def test_the_harness_reports_no_failure_and_only_the_known_unverified(profile):
     assert failed == 0, report
     assert passed, "the profile ran nothing, so it proved nothing"
 
-    # A core case is run once per platform, so `core/R01` appears twice and the
-    # platform stays on the key here to keep the count honest.
-    seen = [
-        (case.rsplit(" [", 1)[0], assertion)
-        for case, assertion in re.findall(
-            r"^UNVERIFIED\s+(\S+(?: \[\w+\])?).*\n\s+assertion (\w+):", report, re.M
-        )
-    ]
+    # Every assertion line under every UNVERIFIED case, not the first one: a
+    # case can go unverified on two assertions at once, and a regex that read
+    # one line after the header counted one and lost the other. A core case
+    # runs once per platform, so `core/R01` appears twice; the platform is
+    # stripped so the set compares, and the run count is checked separately.
+    seen: list[tuple[str, str]] = []
+    runs = 0
+    for block in re.finditer(
+        r"^UNVERIFIED\s+(\S+)(?: \[\w+\])?[^\n]*\n((?:\s+\S[^\n]*\n)*)", report, re.M
+    ):
+        runs += 1
+        for assertion in re.findall(r"^\s+assertion (\w+):", block.group(2), re.M):
+            seen.append((block.group(1), assertion))
     unknown = sorted(set(seen) - UNVERIFIED)
     assert not unknown, f"newly unverified: {unknown}\n{report}"
-    assert unverified == len(seen), report
+    # And the other direction, which the old test never asked: a pin that no
+    # longer goes unverified is a pin that should have been removed -- the
+    # library learned to do something, and the list is the record of what it
+    # cannot. Only the profiles this run selects can be expected here.
+    stale = sorted(
+        (case, assertion) for case, assertion in UNVERIFIED
+        if case.startswith(f"{profile}/") or (profile != "core" and case.startswith("core/"))
+        if (case, assertion) not in set(seen)
+    )
+    assert not stale, f"pinned as unverified but no longer is: {stale}\n{report}"
+    assert unverified == runs, report
 
     # §8.5's note, as the harness applies it: an unverified run is not a pass.
     assert finished.returncode == (1 if unverified else 0), report
