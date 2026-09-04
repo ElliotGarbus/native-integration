@@ -274,3 +274,25 @@ def test_the_harness_knows_every_verified_and_attested_name():
     known = set(harness.VERIFIED_ASSERTIONS) | set(harness.ATTESTED_ASSERTIONS)
     assert "record_omits" in known, "the one row that names two names two"
     assert "outcome" not in known, "a case.toml field is not an assertion"
+
+
+# -- a known failure is not filed as unverified ---------------------------------
+
+
+def test_a_wrong_outcome_fails_even_where_the_case_needs_a_resolution(tmp_path):
+    """A case that needs `resolved.toml` returned UNVERIFIED for a consumer that
+    cannot take one -- before looking at what that consumer had already got
+    wrong. A wrong outcome is a failure whether or not the resolution could be
+    injected, and "could not be checked" is a softer word than it earned."""
+    case = next(
+        c for c in harness.load_cases("core", {"android"})
+        if c.name == "R26_artifact_checksum_mismatch"
+    )
+    assert (case.input_directory / "resolved.toml").exists()
+    answer = {"outcome": "accept", "diagnostics": [], "advisories": [],
+              "assertions": {}, "capabilities": {}, "record": ""}
+    assert case.outcome == "blocking"
+    assert harness.check(case, 0, answer, tmp_path).status == harness.FAIL
+
+    honest = dict(answer, outcome="blocking")
+    assert harness.check(case, 1, honest, tmp_path).status == harness.UNVERIFIED

@@ -1030,11 +1030,15 @@ def check(case: Case, exit_code: int, reported: dict, outputs: Path) -> Result:
     if (case.input_directory / "resolved.toml").exists() and not reported.get(
         "capabilities", {}
     ).get("injected_resolution", False):
-        return Result(
-            case,
-            UNVERIFIED,
-            ["the consumer cannot accept a stated resolution, which this case needs"],
-        )
+        note = "the consumer cannot accept a stated resolution, which this case needs"
+        # What is already known to be wrong stays wrong. A consumer that
+        # reported the wrong outcome, or contradicted it with its exit status,
+        # has failed this case whether or not it can be told a resolution --
+        # and returning UNVERIFIED here filed that known failure under "could
+        # not be checked", which is a softer word than it earned.
+        if problems:
+            return Result(case, FAIL, problems + [note])
+        return Result(case, UNVERIFIED, [note])
 
     # Axis 2 — findings.
     for key in ("diagnostics", "advisories"):
