@@ -301,7 +301,7 @@ both halves, and opens by saying which half is yours.
 | `native-integration` | the command line — `explain`, `inspect`, `validate`, `conformance`, `authoring-guide`. **Not normative**, and it says so in every answer it gives |
 | [`AGENTS.md`](AGENTS.md) | one page, two playbooks — authoring a sidecar, implementing a consumer. Points at the tools rather than restating the specification |
 | [`development/`](development/) | the first attempt, the rebuild, eighteen sidecars, a forty-SDK survey, and the findings from each round |
-| `tools/`, `tests/` | `check_spec.py` (26 checks over both documents and every example), `toc.py`, `requirements_table.py`, and the reader's suite. All run in CI on every push |
+| `tools/`, `tests/` | `check_spec.py` (every consistency check over both documents and every example -- it prints one line per check), `toc.py`, `requirements_table.py`, and the reader's suite. All run in CI on every push |
 
 Each check exists because the corresponding mistake shipped at least once. They
 cover mechanical drift only — a section that contradicts itself still needs a
