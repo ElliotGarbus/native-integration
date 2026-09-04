@@ -517,6 +517,20 @@ a flag or a review, never on every build, because a tool that rewrote it each
 run would have a record and no gate. Pass its text back as `accepted=` next
 time.
 
+The record carries the sidecar's digest, so the repository holding both needs
+one thing this library cannot supply. Git on Windows rewrites line endings on
+checkout by default; a fresh clone then hashes to a different digest than the
+committed record, and the first build blocks on the §9.1 gate for a change
+nobody made. Put this beside the record, in that repository's `.gitattributes`:
+
+```gitattributes
+*.toml   text eol=lf
+*.record text eol=lf
+```
+
+Anything a declaration references — contributed Java, Kotlin, Swift — is a
+hashed input too, and wants the same line.
+
 **`delta` — show what changed.** `added` and `removed` record lines against
 `accepted`, already projected to the half §9.1 gates: a producer's new
 permission is in it, the application's own answers are not. It is the content
