@@ -37,10 +37,13 @@ jobs:
 
   reader:
     name: Reference reader
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        # 3.11 is the floor: tomllib.
+        # 3.11 is the floor: tomllib. Windows is here because a hashed input
+        # and a checkout that rewrites line endings is a Windows-class failure,
+        # and the suite had only ever run where it cannot happen.
+        os: [ubuntu-latest, windows-latest]
         python-version: ["3.11", "3.13"]
     steps:
       - uses: actions/checkout@v7
@@ -48,6 +51,39 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install
-        run: python3 -m pip install -e ".[test]"
+        run: python -m pip install -e ".[test]"
       - name: Test
-        run: python3 -m pytest -q
+        run: python -m pytest -q
+
+  wheel:
+    # The artifact, not the checkout. Twice a file the package needed was not
+    # in the wheel -- the registry, then the packaged authoring guide -- and
+    # every job here installed editable, where a checkout's parent directory
+    # supplied what the wheel lacked. Build it, install it somewhere with no
+    # checkout above it, and run each command once.
+    name: Installed wheel
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Build the wheel
+        run: |
+          python -m pip install build
+          python -m build --wheel --outdir dist
+      - name: Install it into a clean environment, away from the checkout
+        run: |
+          python -m venv /tmp/clean
+          /tmp/clean/bin/python -m pip install dist/*.whl
+      - name: Import, and run each subcommand from the install
+        working-directory: /tmp
+        run: |
+          /tmp/clean/bin/python -c "import native_integration; print(native_integration.__version__)"
+          /tmp/clean/bin/native-integration --version
+          /tmp/clean/bin/native-integration explain ni.req.29 > /dev/null
+          /tmp/clean/bin/native-integration explain android.contributes.r8 --json > /dev/null
+          /tmp/clean/bin/native-integration authoring-guide > /dev/null
+          /tmp/clean/bin/native-integration authoring-guide --template > /dev/null
+          /tmp/clean/bin/native-integration inspect "$GITHUB_WORKSPACE/examples/pystripe" > /dev/null
+          /tmp/clean/bin/native-integration validate "$GITHUB_WORKSPACE/examples/pystripe" --explain-failures
