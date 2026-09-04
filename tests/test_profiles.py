@@ -66,7 +66,7 @@ def test_the_refusal_precedes_any_reading(sources):
     sidecar is opened: a partial resolution that a caller might use is the harm,
     so none is produced."""
     with pytest.raises(UnimplementedProfile) as raised:
-        read([], platform="ios", profiles=("android",))
+        read([], platform="ios", closure=Closure.isolated_environment(), profiles=("android",))
     assert "ios" in str(raised.value)
 
 

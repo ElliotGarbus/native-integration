@@ -523,14 +523,18 @@ of the `ni.req.38` finding, and the thing a reviewer reads.
 
 ### What each omitted argument switches off
 
-Four of the optional arguments switch a check off, and each one omitted narrows
+`closure` is required, and has no default on purpose. `Closure.isolated_environment()`
+is §3.2's allowance — treat everything installed as a candidate — and a caller
+spells it, because as a default it was the easy way to break requirement 1 on a
+fat build host without anyone having chosen to.
+
+Three of the optional arguments switch a check off, and each one omitted narrows
 what can be checked rather than silently weakening a check that still claims to
 run:
 
 | Omitted | What stops being checkable |
 | --- | --- |
 | `application` | every requirement is unanswered, so §5.4's satisfaction rules report against an application that answered nothing |
-| `closure` | §3.2's origin is unknown, so nothing is attributed to the dependency that brought it in |
 | `graph` | §9.4 and §9.7 — what a *resolved* artifact declares, and which artifacts collide on a packaged path |
 | `accepted` | §9.1's gate has no prior record to compare against, and does not fire |
 

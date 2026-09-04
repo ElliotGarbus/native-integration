@@ -121,7 +121,7 @@ def read(
     *,
     platform: str,
     application: Application | None = None,
-    closure: Closure | None = None,
+    closure: Closure,
     graph: Graph | None = None,
     accepted: str | None = None,
     contract: str = "1.0",
@@ -153,7 +153,10 @@ def read(
         )
 
     application = application or Application()
-    closure = closure or Closure.isolated_environment()
+    # No default. `Closure.isolated_environment()` is §3.2's allowance and it
+    # is spelled by the caller, because as a default it was the easy way to
+    # treat everything installed on a fat build host as a candidate -- the
+    # thing requirement 1 exists to forbid -- without anyone having chosen to.
     graph = graph or Graph()
 
     # A caller that ran `discover()` first already holds findings -- requirement
