@@ -95,8 +95,13 @@ class Credential:
     def by_indirection(self) -> bool:
         return self.kind != "literal"
 
-    def __repr__(self) -> str:  # pragma: no cover - keeps a value out of a trace
-        return f"Credential(kind={self.kind!r}, locator={self.locator!r})"
+    def __repr__(self) -> str:
+        # The locator *is* the secret when `kind` is "literal", and a repr
+        # reaches tracebacks, logs and debuggers. It is never printed, for any
+        # kind: an environment variable's name is harmless, but a rule with an
+        # exception is a rule that gets the exception wrong. The comment this
+        # replaced claimed the opposite of what the code did.
+        return f"Credential(kind={self.kind!r}, locator={REDACTED})"
 
 
 @dataclass(frozen=True)
