@@ -123,12 +123,18 @@ def test_every_diagnostic_names_the_distribution_the_case_names(case, platform, 
 #
 # So this shells out to it, and pins the outcome exactly.
 
-#: Every case run the reader cannot answer, and the assertion that stops it.
-#: All six are about generated output, which a reader does not produce. Pinning
-#: the set rather than a count is the point: a case that becomes unverified is a
+#: Every case the reader cannot answer, and each assertion that stops it. All
+#: are about generated output, which a reader does not produce. Pinning the set
+#: rather than a count is the point: a case that becomes unverified is a
 #: regression, and one that stops being unverified needs this list shortened.
+#:
+#: R01 carries two. The test that read this list used to capture one assertion
+#: line per case, so the second sat unverified and unpinned for as long as the
+#: list existed -- found by an external review, and by the test reading every
+#: line at last.
 UNVERIFIED = {
     ("core/R01_dependency_closure", "sidecar_excluded_from_payload"),
+    ("core/R01_dependency_closure", "contributed_source_excluded_from_payload"),
     ("android/R30_view_link_passthrough", "view_link_attributes_written_through"),
     ("android/R41_artifact_feature_decided", "artifact_feature_decision_applied"),
     ("ios/R36_python_module_registered", "python_module_stubs_excluded"),
