@@ -293,7 +293,7 @@ both halves, and opens by saying which half is yours.
 
 | | |
 | --- | --- |
-| [**SPEC.md**](SPEC.md) | the specification. [Appendix A](SPEC.md#appendix-a-a-complete-sidecar) is a whole sidecar, [Appendix B](SPEC.md#appendix-b-declaration-reference) every key it may contain, [§8](SPEC.md#8-consuming-tool-requirements) the consumer's checklist — forty-six requirements in a core profile plus one per platform, so an Android-only tool can conform without implementing Xcode |
+| [**SPEC.md**](SPEC.md) | the specification. [Appendix A](SPEC.md#appendix-a-a-complete-sidecar) is a whole sidecar, [Appendix B](SPEC.md#appendix-b-declaration-reference) every key it may contain, [§8](SPEC.md#8-consuming-tool-requirements) the consumer's checklist — forty-six requirements split by §8.1 into a core profile of twenty-nine plus eleven for Android and six for iOS, so an Android-only tool conforms by meeting forty of them and implementing nothing for Xcode |
 | [`examples/`](examples/) | one integration in full, both halves |
 | [`src/`](src/README.md) | the reference reader, and its manual |
 | [`conformance/`](conformance/README.md) | the corpus a consumer is tested against, its harness, and a reference consumer driving the reader in `src/` |

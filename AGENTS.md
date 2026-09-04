@@ -45,9 +45,9 @@ first-class outcome rather than a gap.
 You are making a build tool honor sidecars.
 
 1. **Read [§8](SPEC.md#8-consuming-tool-requirements)**, which is the whole
-   obligation: forty-six numbered requirements in a core profile plus one per
-   platform. §8.1 makes conformance per-platform, so an Android-only tool can
-   conform.
+   obligation: forty-six numbered requirements, which §8.1 splits into a core
+   profile of twenty-nine plus eleven for Android and six for iOS. Conformance
+   is the core plus at least one platform, so an Android-only tool owes forty.
 2. **Call the reference reader** for the reading half — one call, `read()`, at
    the seam between resolving dependencies and generating the project.
    [`src/README.md`](src/README.md)'s consumer workflow is that seam written

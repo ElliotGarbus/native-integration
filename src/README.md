@@ -137,9 +137,10 @@ You are making a build tool honor sidecars. **This half is the API, not the
 command line** — the CLI is how you test what you built, and nothing in it is
 something a build tool would shell out to.
 
-**1. Read [§8](../SPEC.md#8-consuming-tool-requirements)** — forty-six numbered requirements, a
-core profile plus one per platform. §8.1 makes conformance per-platform, so an
-Android-only tool can conform without implementing anything for Xcode.
+**1. Read [§8](../SPEC.md#8-consuming-tool-requirements)** — forty-six numbered
+requirements, which §8.1 splits into a core profile of twenty-nine plus eleven
+for Android and six for iOS. Conformance is the core plus at least one platform
+profile, so an Android-only tool owes forty and implements nothing for Xcode.
 
 **2. Call `discover()`, then `read()`.** `discover()` is §3's discovery step —
 it walks the entry-point group across installed distributions and returns the
