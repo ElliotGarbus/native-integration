@@ -123,11 +123,24 @@ def _from_wheel(path: Path, into: Path) -> Located:
         # Only the sidecar directory. A wheel's other contents are not this
         # tool's business, and unpacking them would make a wheel's size the
         # cost of asking one question about it.
+        root = into.resolve()
         for name in archive.namelist():
-            if name.startswith(directory + "/") and not name.endswith("/"):
-                target = into / name
-                target.parent.mkdir(parents=True, exist_ok=True)
-                target.write_bytes(archive.read(name))
+            if not name.startswith(directory + "/") or name.endswith("/"):
+                continue
+            # A member's name is untrusted input, and the prefix check above
+            # passes `pkg/_native/../../x` -- which, joined to `into`, writes
+            # outside it. The target is resolved and required to stay inside
+            # the unpack directory; a wheel naming a member that does not is
+            # refused whole, naming the member, since a producer's artifact
+            # that reaches outside itself is not one to read any part of.
+            target = (into / name).resolve()
+            if root != target and root not in target.parents:
+                raise UsageError(
+                    f"{path.name} names a member outside its own tree ({name}); "
+                    "this wheel is not read"
+                )
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(archive.read(name))
 
     module = directory.replace("/", ".")
     distribution, _, version = path.name.split("-")[0], "", ""

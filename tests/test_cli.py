@@ -465,3 +465,22 @@ def test_a_finding_shows_the_detail_that_answers_it(capsys):
     _, out = run(capsys, "validate", str(EXAMPLE))
     assert "declared" in out
     assert "the application configures none" in out
+
+
+def test_a_wheel_member_that_escapes_its_tree_is_refused(tmp_path, monkeypatch):
+    """Zip-slip. `pkg/_native/../../x` passes a prefix check and, joined to the
+    unpack directory, writes outside it. Found by an external review of the
+    authoring path -- `validate a.whl` is the command a producer is told to
+    run -- and proven by a crafted wheel writing a file into the system temp
+    directory before the guard existed."""
+    marker = tmp_path / "ESCAPED.txt"
+    wheel = tmp_path / "pyevil-1.0.0-py3-none-any.whl"
+    with zipfile.ZipFile(wheel, "w") as archive:
+        archive.writestr("pyevil/_native/native.toml", 'contract = "1"' + chr(10))
+        # the unpack directory is created under tmp_path by the test's own
+        # workspace, so two levels up from pyevil/_native/ is tmp_path itself
+        archive.writestr("pyevil/_native/../../../ESCAPED.txt", "zip-slip")
+    monkeypatch.setattr(cli.tempfile, "gettempdir", lambda: str(tmp_path))
+    code = cli.main(["inspect", str(wheel)])
+    assert code == 2
+    assert not marker.exists(), "a member escaped the unpack directory"
