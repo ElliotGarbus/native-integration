@@ -62,6 +62,31 @@ Maven's. `CONVERSION.md` already names the trigger: a private-package case
 arrives, or the key goes. Decide it, rather than freezing a key no sidecar has
 used.
 
+## The follow-up
+
+A second pass found eight more, and rejected four late claims -- a permissive
+closure default, missing Windows and wheel CI, hyphenated wheel filenames,
+conditional actions -- that the current code or the specification disproves.
+Every one of the eight held on verification.
+
+| Finding | What was done |
+| --- | --- |
+| **High.** An empty `outputs/payload/` passed every payload-exclusion assertion: nothing was excluded because nothing was included, and the harness asked only the second question | The harness first requires the payload to carry each closure distribution's own package, outside `_native/`; the three payload cases ship a file there. Shown to fail on an empty payload before being trusted |
+| A malformed artifact or binary-target digest in the injected graph raised `RecordError` out of `read()` | Reported as requirement 26, attributed to the distribution that declared the artifact; the fact is not written |
+| A case needing `resolved.toml` returned *unverified* for a consumer that cannot take one, before looking at the wrong outcome that consumer had already reported | A known failure fails; the capability note is appended to it |
+| The conformance JSON example omitted `outputs` | Shown, and stated as optional -- the harness type-checks it if present and never requires it, which the review had overstated |
+| The unverified pin captured one assertion per case and never noticed a stale pin | Every assertion line under every unverified case, both directions. It found that R01 had carried a second unverified assertion, unpinned, since the list was written |
+| The schema's `$id` returned 404 | Points at the raw file on `main`, which resolves; the freeze-time answer is a tag-pinned URL or a real host |
+| `development/README.md` said all development sidecars are kept current; most are deliberately held to the frozen first attempt | Says which are frozen and which are current, and names the list that decides it |
+| `README.md` counted twenty-six checks; the script runs twenty-seven | No number: the script prints one line per check |
+
+**And one of my own.** Six of these were pushed with four tests failing. The
+chain gated the commit on `pytest | tail`, whose exit status is `tail`'s, and
+the commits were not joined to the proof step that raised. That is the failure
+[`AGENTS.md`](../../AGENTS.md) was written to name, the same week it was
+written, by the same hand. It is recorded rather than amended away, and every
+gate since runs the checked command alone and tests its own exit status.
+
 ## What the review said to keep
 
 > Using the library does not make a tool conforming.

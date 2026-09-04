@@ -280,4 +280,4 @@ nothing about what it cost to get there.
 | [`findings/phase4-cli.md`](findings/phase4-cli.md) | the command line, and a wheel that could not import the package it shipped |
 | [`findings/phase5-authoring.md`](findings/phase5-authoring.md) | §12.2's authoring procedure, and the check that held it to introducing no rule |
 | [`findings/first-use.md`](findings/first-use.md) | the first hour outside this repository: three defects a green corpus missed, and why an editable install cannot be read |
-| [`findings/external-review.md`](findings/external-review.md) | the first reading by someone who did not write this: seven defects acted on, five design comments held open for freeze review |
+| [`findings/external-review.md`](findings/external-review.md) | the first reading by someone who did not write this: fifteen defects over two passes acted on, five design comments held open for freeze review |
