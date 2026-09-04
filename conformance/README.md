@@ -462,7 +462,11 @@ stdout with one JSON object:
   | `<outputs>/manifest.xml` | the effective merged manifest, for an Android case |
 
   A consumer that writes neither reports every verified assertion as
-  **unverified**, which is non-zero — not a pass.
+  **unverified**, which is non-zero — not a pass. A payload that is *empty* is
+  not a pass either: an exclusion checked against nothing passes for free, so
+  the harness first requires the payload to carry each closure distribution's
+  own package — the first segment of its entry point, outside `_native/` — and
+  the fixtures ship a file there for that reason.
 
 The consumer under test supplies the command. Nothing here imports a consumer,
 and nothing here is a consumer.

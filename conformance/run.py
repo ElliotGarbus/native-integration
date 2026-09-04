@@ -916,13 +916,56 @@ def verify_module_stubs_excluded(case: Case, files: list[Path]) -> str | None:
     return None if not offenders else f"the payload carries {offenders[0].name}"
 
 
+def expected_in_payload(case: Case) -> dict[str, str]:
+    """The package each closure distribution ships, which a payload must carry.
+
+    An exclusion check passes on an empty payload for free: nothing was
+    excluded because nothing was included. So before asking what a payload
+    leaves out, the harness asks what it holds -- each distribution in the
+    closure ships a Python package, named by the first segment of its entry
+    point, and a payload that carries none of it is not the payload of this
+    closure. The fixtures put a file in that package for exactly this reason.
+    """
+    closure = tomllib.loads((case.input_directory / "closure.toml").read_text(encoding="utf-8"))
+    return {
+        entry["name"]: str(entry.get("entry_point", "")).split(".")[0]
+        for entry in closure.get("distribution", [])
+        if entry.get("origin") != "not-in-closure" and entry.get("entry_point")
+    }
+
+
+def verify_payload_is_the_closures(case: Case, files: list[Path], outputs: Path) -> str | None:
+    payload = outputs / "payload"
+    present = {p.relative_to(payload).as_posix() for p in files}
+    for distribution, package in expected_in_payload(case).items():
+        carried = [
+            name for name in present
+            if name.startswith(package + "/") and "_native" not in name.split("/")
+        ]
+        if not carried:
+            return (
+                f"the payload carries nothing of {distribution}'s package `{package}` "
+                "outside its sidecar directory, so it is not this closure's payload "
+                "and an exclusion checked against it would pass for free"
+            )
+    return None
+
+
 def against_payload(adapter):
-    """Adapt a payload check to the `(case, outputs)` an adapter is called with."""
+    """Adapt a payload check to the `(case, outputs)` an adapter is called with.
+
+    Two questions in order: is this a payload of the closure at all, and only
+    then, does it exclude what it must. The first is what stops an empty
+    `payload/` from passing every exclusion vacuously.
+    """
 
     def verify(case: Case, outputs: Path) -> str | None:
         files = payload_files(outputs)
         if files is None:
             return Unverifiable("the consumer wrote no payload to inspect")
+        hollow = verify_payload_is_the_closures(case, files, outputs)
+        if hollow:
+            return hollow
         return adapter(case, files)
 
     return verify
