@@ -442,9 +442,13 @@ stdout with one JSON object:
   "advisories": [],
   "assertions": { "no_producer_import": true },
   "capabilities": { "injected_resolution": true },
+  "outputs": "/tmp/case-outputs",
   "record": "build contract 1.0…"
 }
 ```
+
+`outputs` echoes the directory the harness handed the consumer, for a reader
+of the answer; the harness knows the path it gave and does not require the key.
 
 - **`outcome` is the only authority.** A consumer reporting `blocking` and
   exiting 0, or `accept` and exiting non-zero, has contradicted itself — a
