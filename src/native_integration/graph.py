@@ -21,9 +21,10 @@ from typing import Any, Mapping, Sequence
 from .application import Application
 from .findings import Findings
 from .integration import Resolved
-from .recording import Record, digest, normalize_name
+from .recording import RecordError, Record, digest, normalize_name
 
 #: §8.4, by number.
+CHECKSUM = 26
 KEEP = 31
 UNPINNABLE = 33
 FEATURE = 41
@@ -156,7 +157,7 @@ def check(
 ) -> None:
     """Every obligation the graph carries, and the facts it adds to the record."""
     if platform == "android":
-        _artifacts(graph, record)
+        _artifacts(graph, findings, record)
         _declared(graph, application, findings, record, date)
         _keeps(graph, resolved, findings)
         _collisions(graph, application, findings, record, date)
@@ -167,11 +168,41 @@ def check(
 # -- §6.3: the locked graph --------------------------------------------------
 
 
-def _artifacts(graph: Graph, record: Record) -> None:
+def _pinned(value: str, *, what: str, owner: str, findings: Findings) -> str | None:
+    """§9.3's form for a digest the consumer's own resolver reported, or a
+    finding where it is not in that form.
+
+    The graph is the consumer's, not a producer's, so a digest it cannot record
+    is the consumer's data error -- but it arrived inside `read()`, and a
+    `RecordError` escaping from there turned one bad string in a resolution
+    into a traceback with no distribution's name on it. Requirement 26 is the
+    obligation it fails: a checksum that cannot be recorded cannot be verified
+    on the next build.
+    """
+    try:
+        return digest(value)
+    except RecordError as why:
+        findings.requirement(
+            CHECKSUM,
+            owner,
+            message=f"the resolver reported a digest for {what} that cannot be recorded",
+            where="resolved",
+            detail=[str(why)],
+        )
+        return None
+
+
+def _artifacts(graph: Graph, findings: Findings, record: Record) -> None:
     for artifact in graph.artifacts:
+        pinned = _pinned(
+            artifact.sha256, what=artifact.coordinate,
+            owner=artifact.declared_by, findings=findings,
+        )
+        if pinned is None:
+            continue
         record.add(
             "dist", normalize_name(artifact.declared_by), "artifact", artifact.coordinate,
-            sha256=digest(artifact.sha256),
+            sha256=pinned,
             transitive=True if artifact.transitive else None,
         )
 
@@ -425,9 +456,12 @@ def _packages(
             transitive=True if package.transitive else None,
         )
         for name, checksum in package.binary_targets:
+            pinned = _pinned(checksum, what=name, owner=package.declared_by, findings=findings)
+            if pinned is None:
+                continue
             record.add(
                 "dist", normalize_name(package.declared_by), "binary-target", name,
-                checksum=digest(checksum),
+                checksum=pinned,
             )
 
 

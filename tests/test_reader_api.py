@@ -100,3 +100,26 @@ def test_read_without_findings_makes_its_own(source):
     a = read([source], platform="android", closure=Closure.direct("pyvendor"))
     b = read([source], platform="android", closure=Closure.direct("pyvendor"))
     assert a.findings is not b.findings
+
+
+def test_a_malformed_resolver_digest_is_a_finding_not_a_traceback(source):
+    """A digest the consumer's own resolver reported in a form §9.3 cannot
+    record raised `RecordError` out of `read()`: one bad string in a resolution
+    became a traceback with no distribution's name on it. It is requirement
+    26's failure -- a checksum that cannot be recorded cannot be verified --
+    and it is reported as one, attributed to the distribution that declared
+    the artifact."""
+    from native_integration import Artifact, Graph
+
+    graph = Graph(artifacts=(
+        Artifact(coordinate="com.example.vendor:sdk:4.1.0", sha256="not-a-digest",
+                 declared_by="pyvendor"),
+    ))
+    integration = read([source], platform="android", closure=Closure.direct("pyvendor"),
+                       graph=graph,
+                       application=Application(initial_acceptance=Answer(date="2026-09-01")))
+    blocking = [f for f in integration.findings.blocking if f.obligation == "ni.req.26"]
+    assert blocking, integration.report()
+    assert "pyvendor" in blocking[0].distributions
+    assert "not-a-digest" in " ".join(blocking[0].detail)
+    assert not any("artifact com.example.vendor" in line for line in integration.record)
