@@ -129,6 +129,31 @@ one directory listing away: whichever of these two builds first is where it
 will show up, in the ordinary business of two dependencies each declaring what
 they need.
 
+**A full check against all four `requires` floors, not just `target_sdk`,
+sharpens the `min_sdk` rebuttal and surfaces a different gap in
+`deployment_target`.** `min_sdk` is a dedicated, per-app setting on both tools
+— `android.minapi`, `min_os_version` — never derived from a wheel tag, which is
+a stronger answer to "wheel tags already cover this" than pointing at a
+different resolution system: neither tool derives it from anything installable
+at all. That dedicated setting is recent, though. Briefcase's minimums for
+every platform — iOS 13.0, macOS 11.0, Android SDK 24 — were fixed by the
+support package with no override until
+[an April 2025 change](https://github.com/beeware/briefcase/issues/2233);
+before that, a `min_sdk`/`deployment_target` floor in a sidecar had nothing to
+be checked against on that consumer either.
+
+`deployment_target` has no equivalent config surface on Buildozer today.
+`buildozer.spec`'s
+[`ios.*` keys](https://raw.githubusercontent.com/kivy/buildozer/master/buildozer/default.spec)
+cover codesigning, usage-description strings, app extensions, and manifest
+URLs — nothing sets a minimum iOS version, unlike the dedicated
+`android.minapi` on the same file. Buildozer's iOS path runs through kivy-ios,
+a separate toolchain, so the built app has some deployment target; there is
+just no key for an app author to configure it, or for a consumer to check a
+producer's declared floor against. That is not the `target_sdk` shape problem
+— the field is unambiguously floor-shaped — it is a readiness gap in one named
+consumer rather than in the model.
+
 ## The follow-up
 
 A second pass found eight more, and rejected four late claims -- a permissive
