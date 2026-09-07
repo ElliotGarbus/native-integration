@@ -103,6 +103,32 @@ today's floor semantics on the understanding that a genuine conflict is rare
 and will surface as an app that simply doesn't work rather than a build
 failure, or whether it needs its own shape once a case exists.
 
+**And the caution cuts both ways: the two consumers this document names as its
+audience could not honor a `compile_sdk`/`target_sdk` split even if version 1
+offered one.** Checked against both tools' current documentation rather than
+assumed. Buildozer has one knob, `android.api`, commented *"Target Android
+API, should be as high as possible"* — no separate `compileSdkVersion` setting
+exists at all. Briefcase's `target_os_version` is explicit that it sets both at
+once: *"This controls the version of the Android SDK that is used to build
+your app (by setting the `compileSdkVersion`...) and the forwards compatibility
+behavioral changes your app will enable (by setting the `targetSdkVersion`...)"*.
+Both tools expose a separate minimum (`android.minapi`, `min_os_version`);
+neither exposes compile independently of target.
+
+So the conflict this comment describes is not waiting for a hypothetical case —
+it is already latent in both named consumers. A producer needing `compile_sdk
+≥ 34` to satisfy one AAR's metadata check, on either tool, necessarily raises
+`target_sdk` to 34 too, which is exactly the lever that can trip a *different*
+dependency's behavior-gated break. Buildozer's own advice — "should be as high
+as possible" — is the reviewer's `compile_sdk` guidance verbatim, applied to a
+field that also controls `target_sdk`, where "as high as possible" is not
+free. This does not argue for building the floor/ceiling machinery now — a
+consumer that cannot express the distinction has nothing to gain from a
+sidecar that draws one — but it means the real case the reviewer asked for is
+one directory listing away: whichever of these two builds first is where it
+will show up, in the ordinary business of two dependencies each declaring what
+they need.
+
 ## The follow-up
 
 A second pass found eight more, and rejected four late claims -- a permissive
