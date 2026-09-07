@@ -62,6 +62,47 @@ Maven's. `CONVERSION.md` already names the trigger: a private-package case
 arrives, or the key goes. Decide it, rather than freezing a key no sidecar has
 used.
 
+**`target_sdk`'s floor doesn't match how Android enforces it, and composition
+can silently break a dependency.** Raised in feedback relayed by the user
+("`target_sdk` can't be handled as a simple floor... code could depend on
+either the old or the new behavior") and confirmed on inspection. §5.1 treats
+`target_sdk` exactly like `min_sdk` and `compile_sdk`: a minimum, composed by
+maximum across every distribution that declares one. That shape fits the other
+two because Android's own tooling enforces them as floors — a library's
+`minSdkVersion` is checked by manifest merging, and `minCompileSdk` by a
+dedicated AAR-metadata check, both real Gradle failures a dependency can force.
+`target_sdk` has no such mechanism: AGP's manifest merger does not propagate a
+library's `targetSdkVersion` at all, so nothing in Gradle would ever notice or
+enforce a "floor" on it. Vendors asking for `target_sdk ≥ N` are stating a pure
+convention-level claim — "my SDK misbehaves below this" — which is exactly why
+a sidecar needs a place to say it, but says nothing about whether "floor,
+maximum-composed" is the right shape.
+
+It usually isn't, because `target_sdk`-gated behavior changes are real and
+well documented — scoped storage, exact-alarm restrictions, the notification
+permission, foreground service types — and an SDK can break when the
+*application's* `target_sdk` crosses a threshold that SDK never agreed to. Two
+distributions can therefore have genuinely irreconcilable needs: one requires
+`target_sdk ≥ 33` for a capability it depends on, another breaks past `30`.
+§5.1's own caution box already names the danger one distribution's declaration
+poses — "it composes silently upward: a transitive dependency nobody chose can
+raise it" — but its only mitigation is visibility: name the distribution, show
+the highest declared value. Visibility does not help here. Floors-compose-by-
+maximum has no vocabulary to detect that two declared values are in conflict,
+only to combine them, so it would silently pick `33` and break the
+distribution that needed `30` or lower, attributing nothing, because nothing
+told it a conflict existed.
+
+Not a call to build a floor-and-ceiling mechanism now. The same feedback that
+raised this named the right caution about doing so: "I'd need to see some
+realistic use cases before I was convinced this is worth the effort" — and
+version 1 has none on record. What the gap is is a place a real case would land
+with no vocabulary to express it, silently, rather than as a reported
+conflict. Worth a decision before a freeze: whether `target_sdk` should keep
+today's floor semantics on the understanding that a genuine conflict is rare
+and will surface as an app that simply doesn't work rather than a build
+failure, or whether it needs its own shape once a case exists.
+
 ## The follow-up
 
 A second pass found eight more, and rejected four late claims -- a permissive
