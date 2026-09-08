@@ -218,17 +218,6 @@ declarative capability, unlike the range above — only that a `target_sdk`
 floor propagate as an equal `compile_sdk` floor, because the platform rule is
 always true rather than case-dependent.
 
-**Closed.** §5.1 now states the ordering directly — a consumer **MUST**
-additionally fail, naming the distribution, when a declared `target_sdk`
-exceeds the application's configured `compile_sdk`, or when a declared
-`min_sdk` exceeds the application's configured `target_sdk` — and requirement
-12 carries the same clause. `integration.py`'s `_floors()` implements both
-checks (`FLOOR_ORDER`), independent of and in addition to each key's own
-floor. Two conformance cases exercise it: `core/R12_target_exceeds_compile`
-and `core/R12_min_exceeds_target`, each constructed so every key's own floor
-is separately met and only the cross-field ordering fails — proving the gap
-described above is closed rather than merely narrowed.
-
 ## The follow-up
 
 A second pass found eight more, and rejected four late claims -- a permissive

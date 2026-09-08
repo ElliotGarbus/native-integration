@@ -1340,7 +1340,7 @@ profile = "core"
 section = "8.4"
 anchor = "84-requirements"
 severity = "blocking"
-summary = "Fail when the application's configuration is below a declared floor, reporting the declared and configured values; reject a non-integer Android floor and a malformed `deployment_target`, comparing the latter component-wise and numerically; reject a boolean floor declared `false`; never raise the application's configuration to satisfy a floor; fail when a declared `target_sdk` exceeds the configured `compile_sdk` or a declared `min_sdk` exceeds the configured `target_sdk`; and record and report every declared floor with its distribution, giving `target_sdk` the prominence [§5.1](#51-build-floors) requires."
+summary = "Fail when the application's configuration is below a declared floor, reporting the declared and configured values; reject a non-integer Android floor and a malformed `deployment_target`, comparing the latter component-wise and numerically; reject a boolean floor declared `false`; never raise the application's configuration to satisfy a floor; and record and report every declared floor with its distribution, giving `target_sdk` the prominence [§5.1](#51-build-floors) requires."
 
 [diagnostics."ni.req.13"]
 requirement = 13

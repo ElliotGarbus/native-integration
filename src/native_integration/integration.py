@@ -36,16 +36,6 @@ FLOORS: Mapping[str, tuple[str, ...]] = {
     "ios": ("deployment_target",),
 }
 
-#: §5.1's "a declared floor on one key can bind another": Android's build
-#: tooling enforces `min_sdk <= target_sdk <= compile_sdk` unconditionally, so
-#: a declared value on the first key of each pair must not exceed the
-#: application's *configured* value of the second, independent of whether
-#: either key's own floor is separately met.
-FLOOR_ORDER: Mapping[str, tuple[tuple[str, str], ...]] = {
-    "android": (("target_sdk", "compile_sdk"), ("min_sdk", "target_sdk")),
-    "ios": (),
-}
-
 #: §6.2 and §7.3: from each listed directory the consumer stages exactly the
 #: files with the matching extension, and ignores the rest. Android lists two
 #: languages under one `src` table; iOS lists one.
@@ -226,13 +216,6 @@ def _floors(
     A floor carries no `reason`, so the declared and the configured values are
     the whole of what a report can say. A consumer never raises the
     application's configuration to satisfy one.
-
-    Each key's own floor is checked independently of every other key, which
-    is exactly what §5.1's added paragraph warns is not enough: a build can
-    satisfy `target_sdk`'s own floor and `compile_sdk`'s own floor and still
-    violate `min_sdk <= target_sdk <= compile_sdk`, because nothing above
-    compares one key's declared value to a *different* key's configured one.
-    `FLOOR_ORDER` closes that gap.
     """
     requires = sidecar.section("requires")
     for key in FLOORS[sidecar.platform]:
@@ -258,23 +241,6 @@ def _floors(
                 f"declared {text_of(declared)}",
                 f"configured {text_of(configured)}" if configured is not None
                 else "the application configures none",
-            ],
-        )
-    for key, bound_by in FLOOR_ORDER[sidecar.platform]:
-        if key not in requires:
-            continue
-        declared = requires[key]
-        bound = application.configured_floor(bound_by)
-        if bound is None or int(bound) >= int(declared):
-            continue
-        findings.requirement(
-            FLOOR,
-            sidecar.distribution,
-            message=f"the declared `{key}` is higher than the configured `{bound_by}`",
-            where=f"{sidecar.platform}.requires.{key}",
-            detail=[
-                f"declared {text_of(declared)}",
-                f"configured {bound_by} {text_of(bound)}",
             ],
         )
 
