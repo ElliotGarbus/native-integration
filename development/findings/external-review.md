@@ -93,36 +93,57 @@ only to combine them, so it would silently pick `33` and break the
 distribution that needed `30` or lower, attributing nothing, because nothing
 told it a conflict existed.
 
-The natural fix reuses vocabulary the document already has, rather than
-inventing a new mechanism. A range — `target_sdk = { at_least = 30, below =
-34 }`, the same shape [§6.3](../../SPEC.md#63-gradle-dependencies) already uses
-for a Gradle dependency's version — says what a floor cannot: a compatible
-window, not only a minimum. Two distributions declaring incompatible ranges
-intersect to nothing, which fails the build naming both, the same rule
+**Two ways to avoid adding anything new were checked, and both fail — which
+narrows the finding rather than closing it.** Android's own `minSdkVersion ≤
+targetSdkVersion ≤ compileSdkVersion` ordering does not rescue this: an
+application configured `min_sdk=21, target_sdk=33, compile_sdk=35` is entirely
+self-consistent by that rule, and a package that breaks once `target_sdk`
+passes 30 is still broken — the ordering check knows nothing about that
+package's sensitivity, because the information exists nowhere in Gradle's
+world. Routing the constraint through `compile_sdk` instead — capping it at 30
+so `target ≤ compile` drags `target_sdk` down too — works mechanically but
+breaks something else: `compile_sdk` is a whole-application setting, so a cap
+meant to protect one package would collide with any unrelated package needing
+`compile_sdk ≥ 34` for its own AAR-metadata check, misattributing an entirely
+different problem and giving `compile_sdk` a ceiling need it otherwise never
+has — nothing establishes a downside to raising `compile_sdk` on its own, only
+to raising it as a side effect of capping it for someone else's reason.
+
+**Nor should `target_sdk` be removed from `requires` to sidestep the
+question.** The floor case is real: "the app must have opted into behavior my
+SDK assumes" is exactly `min_sdk`'s shape, deterministic to check, and §5.1
+already handles it correctly today. Deleting the field would trade a working,
+attributable check for prose docs or an unchecked action, for the one thing
+`target_sdk` currently does right.
+
+**What's actually in question is narrower than earlier drafts of this finding
+stated it: not whether `target_sdk` belongs in `requires`, but whether a
+*ceiling* belongs beside it — and the case for that is weaker than it was
+argued to be.** Everything said so far is mechanism-level: `target_sdk`-gated
+behavior changes are real and documented, so a conflict of this shape is
+*possible*. No specific, currently-published SDK asking "do not raise
+`target_sdk` past N" has been produced, here or in the feedback that raised
+this — and there is a plausible reason such cases are short-lived rather than
+durable: Play Store policy forces every app toward an ever-rising minimum
+`target_sdk`, so a vendor whose SDK cannot tolerate that pressure has more
+reason to fix the SDK than to publish a standing ceiling. That is a real
+difference from the floor case, and it is exactly the bar the original
+feedback set — "I'd need to see some realistic use cases before I was
+convinced this is worth the effort" — which two rounds of trying to construct
+a substitute out of existing fields have not met.
+
+If a real case does appear, the shape worth reaching for reuses vocabulary the
+document already has rather than inventing new machinery: a range —
+`target_sdk = { at_least = 30, below = 34 }`, the same form
+[§6.3](../../SPEC.md#63-gradle-dependencies) already uses for a Gradle
+dependency's version — with two incompatible ranges failing the build and
+naming both distributions, the same rule
 [§6.3](../../SPEC.md#63-gradle-dependencies) already applies when two
-distributions disagree on `configuration` (requirement 25). Nothing about
-*who* sets the value changes: the application author still configures the one
-real `target_sdk` a build uses, exactly as for every other floor today. Only
-the constraint on that number becomes two-sided.
-
-Only `target_sdk` needs it. `min_sdk` has no plausible upper bound a
-dependency would want — an application's reach into older devices is the
-application's own tradeoff, not something a dependency has a stake in capping.
-Nothing establishes a downside to a higher `compile_sdk` either; it only
-changes what API surface is visible to the compiler, and nothing about the
-running app changes. `target_sdk` is the one field in this table where "as
-high as possible" is actually false for some dependencies, which is why it is
-the one that needs a second bound.
-
-Not proposed for adoption now — version 1 has none of this on record, and the
-same feedback that raised the concern named the right caution about building
-it regardless: "I'd need to see some realistic use cases before I was
-convinced this is worth the effort." What has changed since the finding was
-first written is that "we would not know what to build" is no longer true —
-the shape above costs nothing not already in the vocabulary. Worth a decision
-before a freeze: adopt it once a real case exists, or accept that a genuine
-conflict surfaces as an app that silently does not work, rather than a build
-failure that names it.
+distributions disagree on `configuration` (requirement 25). The application
+author still configures the one real `target_sdk` a build uses, exactly as for
+every other floor today. Recorded here as a sketch, not a proposal — this is
+closer to *not evidenced* than to *open question*, and should be read that way
+before a freeze.
 
 **And the caution cuts both ways: the two consumers this document names as its
 audience could not honor a `compile_sdk`/`target_sdk` split even if version 1
@@ -136,19 +157,22 @@ behavioral changes your app will enable (by setting the `targetSdkVersion`...)"*
 Both tools expose a separate minimum (`android.minapi`, `min_os_version`);
 neither exposes compile independently of target.
 
-So the conflict this comment describes is not waiting for a hypothetical case —
-it is already latent in both named consumers. A producer needing `compile_sdk
-≥ 34` to satisfy one AAR's metadata check, on either tool, necessarily raises
-`target_sdk` to 34 too, which is exactly the lever that can trip a *different*
-dependency's behavior-gated break. Buildozer's own advice — "should be as high
-as possible" — is the reviewer's `compile_sdk` guidance verbatim, applied to a
-field that also controls `target_sdk`, where "as high as possible" is not
-free. This does not argue for building the floor/ceiling machinery now — a
-consumer that cannot express the distinction has nothing to gain from a
-sidecar that draws one — but it means the real case the reviewer asked for is
-one directory listing away: whichever of these two builds first is where it
-will show up, in the ordinary business of two dependencies each declaring what
-they need.
+So the *mechanism* that would produce this conflict is not hypothetical, even
+though a specific pair of colliding SDKs has not been produced: it is already
+latent in both named consumers. A producer needing `compile_sdk ≥ 34` to
+satisfy one AAR's metadata check, on either tool, necessarily raises
+`target_sdk` to 34 too, which is exactly the lever that *could* trip a
+*different* dependency's behavior-gated break, if one existed with that
+sensitivity. Buildozer's own advice — "should be as high as possible" — is the
+reviewer's `compile_sdk` guidance verbatim, applied to a field that also
+controls `target_sdk`, where "as high as possible" is not free. This does not
+argue for building the floor/ceiling machinery now — a consumer that cannot
+express the distinction has nothing to gain from a sidecar that draws one, and
+the case for a ceiling still rests on a sensitivity nobody has published, per
+the section above. What it does mean is that *if* such a case appears, it will
+not need a new tool-side mechanism to matter: the lever these two tools share
+is already there, in the ordinary business of two dependencies each declaring
+what they need.
 
 **A full check against all four `requires` floors, not just `target_sdk`,
 sharpens the `min_sdk` rebuttal and surfaces a different gap in
