@@ -1,0 +1,4 @@
+[build]
+min_sdk = 31
+target_sdk = 30
+compile_sdk = 35

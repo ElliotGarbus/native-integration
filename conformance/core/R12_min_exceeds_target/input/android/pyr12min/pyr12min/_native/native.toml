@@ -1,0 +1,6 @@
+contract = "1"
+
+[android.requires]
+# The application configures min_sdk = 31, which meets this floor exactly — the
+# violation is that 31 exceeds the application's configured target_sdk (30).
+min_sdk = 31

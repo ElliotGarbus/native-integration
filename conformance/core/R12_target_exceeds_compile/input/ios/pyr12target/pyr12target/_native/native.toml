@@ -1,0 +1,6 @@
+contract = "1"
+
+[ios.requires]
+# The application is configured for 16.0. §5.1 compares component-wise and
+# numerically, so 18.0 is higher and the build fails.
+deployment_target = "18.0"

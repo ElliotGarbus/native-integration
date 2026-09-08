@@ -881,6 +881,16 @@ same prominence it gives a repository contribution
 > it, and say which one. What a consumer owes in return is that the highest
 > declared value, and who declared it, are visible rather than inferable.
 
+**A declared floor on one key can bind another.** Android's build tooling
+requires `min_sdk ≤ target_sdk ≤ compile_sdk` unconditionally; a build
+satisfying every floor's own comparison can still violate this ordering,
+because nothing above compares one key's declared value to a different key's
+configured one. A consumer **MUST** additionally fail, naming the
+distribution: when a declared `target_sdk` is higher than the application's
+configured `compile_sdk`, or when a declared `min_sdk` is higher than the
+application's configured `target_sdk` — reporting both values the way an
+unmet floor is reported elsewhere in this section.
+
 ### 5.2 Values
 
 A producer declares a value when the application has a string that the build
@@ -3147,9 +3157,11 @@ A conforming consumer **MUST**:
     reporting the declared and configured values; reject a non-integer Android
     floor and a malformed `deployment_target`, comparing the latter
     component-wise and numerically; reject a boolean floor declared `false`;
-    never raise the application's configuration to satisfy a floor; and record
-    and report every declared floor with its distribution, giving `target_sdk`
-    the prominence [§5.1](#51-build-floors) requires.
+    never raise the application's configuration to satisfy a floor; fail when
+    a declared `target_sdk` exceeds the configured `compile_sdk` or a declared
+    `min_sdk` exceeds the configured `target_sdk`; and record and report every
+    declared floor with its distribution, giving `target_sdk` the prominence
+    [§5.1](#51-build-floors) requires.
 13. Fail when a declared value is unsupplied, never treat a scaffolded
     placeholder as a supplied value, require `key` on every value kind but
     `inline` and reject it on that one, reject an `inline` value that
