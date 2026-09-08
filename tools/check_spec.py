@@ -1880,6 +1880,60 @@ for path in sorted((ROOT / "conformance").glob("*/*/case.toml")):
 check("the conformance corpus obeys its own record format", problems)
 
 
+# --- 21. the plaintext examples name floors the registry still declares ------
+# Every check above that reads a key reads it out of TOML or JSON. §9.2's report
+# is neither: it is prose in an unlabelled fence, rendered the way a consumer
+# would print it, so no parser here has ever looked at the key names in it. A
+# `! TARGET_SDK` line therefore outlived by two commits the declaration it was
+# rendering, and a reader found it by eye rather than a check finding it.
+#
+# Scoped to the SDK-floor family — the names a removal or a rename breaks — and
+# derived from the registry rather than listed here, so it tracks the contract
+# instead of restating it.
+problems = []
+FLOOR_FAMILY = re.compile(r"^(?:[a-z][a-z0-9]*_sdk|deployment_target|core_library_desugaring)$")
+declared_floors = {
+    declaration_id.rsplit(".", 1)[-1]
+    for declaration_id, entry in REGISTRY["declarations"].items()
+    if entry.get("category") == "requires" and entry.get("node") == "field"
+}
+
+
+def unlabelled_fences(text: str) -> list[tuple[int, str]]:
+    """The fences carrying no language, which is where the rendered examples are.
+
+    `fenced()` cannot answer this: with an empty language its opening pattern
+    also matches a *closing* delimiter, so it returns the prose between two
+    TOML blocks as though that were a block. Tracking open/closed over the
+    lines is the only reading that tells an opener from a terminator.
+    """
+    out: list[tuple[int, str]] = []
+    inside, lang, buf, start = False, "", [], 0
+    for number, line in enumerate(text.split("\n"), 1):
+        bare = line.lstrip("> ").rstrip()
+        if bare.startswith("```"):
+            if inside:
+                if lang == "":
+                    out.append((start, "\n".join(buf)))
+                inside = False
+            else:
+                inside, lang, buf, start = True, bare[3:].strip(), [], number
+        elif inside:
+            buf.append(line)
+    return out
+
+
+for start, body in unlabelled_fences(NEW):
+    for token in set(re.findall(r"[A-Za-z][A-Za-z0-9_]*", body)):
+        name = token.lower()
+        if FLOOR_FAMILY.match(name) and name not in declared_floors:
+            problems.append(
+                f"SPEC.md:{start} the example renders `{token}`, which "
+                f"`[<platform>.requires]` no longer declares"
+            )
+check("plaintext examples name only floors the registry declares", sorted(set(problems)))
+
+
 print()
 if failures:
     print(f"{len(failures)} problem(s) found.")

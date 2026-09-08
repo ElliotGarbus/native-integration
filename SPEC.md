@@ -3445,7 +3445,7 @@ analytics-shim 2.1.0  (via some-ui-lib)
 map-sdk 4.1.0  (direct dependency)
   ! REPOSITORY  https://maven.example.com/releases  → groups: com.example.maps
                 authenticated — no credentials configured        ✗ BLOCKING
-  ! TARGET_SDK  requires 34, application is configured for 33     ✗ BLOCKING
+  ! floor       compile_sdk 34  (application: 33)                 ✗ BLOCKING
   = floor       min_sdk 24  (application: 26)
   + dependency  com.example.maps:android:4.1.0
   + from com.example.maps:android:4.1.0 (resolved artifact manifest):
