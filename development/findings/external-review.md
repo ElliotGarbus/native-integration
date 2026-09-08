@@ -93,15 +93,36 @@ only to combine them, so it would silently pick `33` and break the
 distribution that needed `30` or lower, attributing nothing, because nothing
 told it a conflict existed.
 
-Not a call to build a floor-and-ceiling mechanism now. The same feedback that
-raised this named the right caution about doing so: "I'd need to see some
-realistic use cases before I was convinced this is worth the effort" — and
-version 1 has none on record. What the gap is is a place a real case would land
-with no vocabulary to express it, silently, rather than as a reported
-conflict. Worth a decision before a freeze: whether `target_sdk` should keep
-today's floor semantics on the understanding that a genuine conflict is rare
-and will surface as an app that simply doesn't work rather than a build
-failure, or whether it needs its own shape once a case exists.
+The natural fix reuses vocabulary the document already has, rather than
+inventing a new mechanism. A range — `target_sdk = { at_least = 30, below =
+34 }`, the same shape [§6.3](../../SPEC.md#63-gradle-dependencies) already uses
+for a Gradle dependency's version — says what a floor cannot: a compatible
+window, not only a minimum. Two distributions declaring incompatible ranges
+intersect to nothing, which fails the build naming both, the same rule
+[§6.3](../../SPEC.md#63-gradle-dependencies) already applies when two
+distributions disagree on `configuration` (requirement 25). Nothing about
+*who* sets the value changes: the application author still configures the one
+real `target_sdk` a build uses, exactly as for every other floor today. Only
+the constraint on that number becomes two-sided.
+
+Only `target_sdk` needs it. `min_sdk` has no plausible upper bound a
+dependency would want — an application's reach into older devices is the
+application's own tradeoff, not something a dependency has a stake in capping.
+Nothing establishes a downside to a higher `compile_sdk` either; it only
+changes what API surface is visible to the compiler, and nothing about the
+running app changes. `target_sdk` is the one field in this table where "as
+high as possible" is actually false for some dependencies, which is why it is
+the one that needs a second bound.
+
+Not proposed for adoption now — version 1 has none of this on record, and the
+same feedback that raised the concern named the right caution about building
+it regardless: "I'd need to see some realistic use cases before I was
+convinced this is worth the effort." What has changed since the finding was
+first written is that "we would not know what to build" is no longer true —
+the shape above costs nothing not already in the vocabulary. Worth a decision
+before a freeze: adopt it once a real case exists, or accept that a genuine
+conflict surfaces as an app that silently does not work, rather than a build
+failure that names it.
 
 **And the caution cuts both ways: the two consumers this document names as its
 audience could not honor a `compile_sdk`/`target_sdk` split even if version 1
@@ -153,6 +174,25 @@ just no key for an app author to configure it, or for a consumer to check a
 producer's declared floor against. That is not the `target_sdk` shape problem
 — the field is unambiguously floor-shaped — it is a readiness gap in one named
 consumer rather than in the model.
+
+**Independent of whether `target_sdk` ever becomes a range: today's floor
+composition does not account for Android's own ordering rule, and this is
+checkable against the code as it stands.** AGP enforces `minSdkVersion ≤
+targetSdkVersion ≤ compileSdkVersion` unconditionally, for every application,
+regardless of any dependency's involvement. `integration.py`'s `_floors()` and
+`application.py`'s `meets()` check `min_sdk`, `compile_sdk`, and `target_sdk`
+against the application's configured values entirely independently — read the
+functions directly and there is no cross-field logic at all. One distribution
+declaring `target_sdk ≥ 33` and another declaring `compile_sdk ≥ 30`, with the
+application configured to exactly satisfy each floor as declared, passes every
+check this reader performs, while the resulting build fails on `target_sdk
+(33) > compile_sdk (30)` — a Gradle error naming no distribution at all. This
+is a gap in what [§5.1](../../SPEC.md#51-build-floors) requires a consumer to
+check, not only in what this reader happens to check: a consumer implementing
+the letter of §5.1 today has this exact bug. Closing it needs no new
+declarative capability, unlike the range above — only that a `target_sdk`
+floor propagate as an equal `compile_sdk` floor, because the platform rule is
+always true rather than case-dependent.
 
 ## The follow-up
 
