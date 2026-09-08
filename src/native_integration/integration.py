@@ -32,7 +32,7 @@ UNREADABLE = 4
 
 #: §5.1's floors, per platform, in the order §5.1 gives them.
 FLOORS: Mapping[str, tuple[str, ...]] = {
-    "android": ("min_sdk", "compile_sdk", "target_sdk", "core_library_desugaring"),
+    "android": ("min_sdk", "compile_sdk", "core_library_desugaring"),
     "ios": ("deployment_target",),
 }
 

@@ -40,9 +40,6 @@
             "compile_sdk": {
               "type": "integer"
             },
-            "target_sdk": {
-              "type": "integer"
-            },
             "core_library_desugaring": {
               "const": true
             },

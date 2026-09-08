@@ -89,3 +89,12 @@ about reading a sidecar, and the corpus has three cases on it.
   five of the documents, a regex whose `\b` was a mangled byte, a commit gated
   on a piped `tail`. When you add a check, break something and watch it fail
   before you trust it green.
+- **And watching it fail proves only that it is wired up, not that it is
+  right.** A check verified against nothing but its own implementation confirms
+  the two agree, which they will whether or not the rule they share is real. A
+  cross-field SDK ordering rule was invented, written into §5.1 as a **MUST**,
+  implemented, covered by two conformance cases that passed for the wrong
+  reason, and pushed — while Google's build documentation said the opposite in
+  as many words. So: **a claim about an external system needs a citation from
+  that system**, read at the source, before it becomes a requirement. A
+  search-result summary is a lead, not evidence.

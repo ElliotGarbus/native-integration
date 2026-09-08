@@ -820,7 +820,6 @@ Floors are minimums the application's build must meet.
 [android.requires]
 min_sdk = 24
 compile_sdk = 35
-target_sdk = 33                 # optional
 core_library_desugaring = true  # optional
 
 [ios.requires]
@@ -842,8 +841,8 @@ reported with its `reason`, an unmet floor is instead reported with **the
 declared value and the application's configured one**, which is the whole of
 what a reader needs.
 
-**How the iOS and Android kinds compare.** `min_sdk`, `compile_sdk` and
-`target_sdk` **MUST** be TOML integers, and compare as integers. A consumer
+**How the iOS and Android kinds compare.** `min_sdk` and `compile_sdk`
+**MUST** be TOML integers, and compare as integers. A consumer
 **MUST** reject any other type, naming the distribution and the key: `"24"` is
 a string and `24.0` is a float, and a document that accepted either would be
 inviting two consumers to differ over which coercions are allowed. The iOS
@@ -870,16 +869,26 @@ each states a minimum, and the higher one satisfies both. This is deliberately
 unlike [§6.3](#63-gradle-dependencies)'s `configuration`, where two values are
 mutually exclusive spellings of one setting and failing is the only honest
 outcome. A consumer **MUST** record and report every declared floor with the
-distribution that declared it, and **MUST** give a declared `target_sdk` the
-same prominence it gives a repository contribution
-([§6.4](#64-maven-repositories)).
+distribution that declared it.
 
-> **Caution:** `target_sdk` is the reason that last clause exists. It changes
-> behavior across the whole application, in code that has nothing to do with the
-> producer's package, and it composes silently upward: a transitive dependency
-> nobody chose can raise it. Declare it only when a specific behavior depends on
-> it, and say which one. What a consumer owes in return is that the highest
-> declared value, and who declared it, are visible rather than inferable.
+**Why `target_sdk` is not one of these.** Composition by maximum is sound only
+where raising a value cannot invalidate a lower declaration, and `target_sdk`
+does not have that property: raising an application's `targetSdk` opts the
+whole application into additional runtime behavior changes. One package
+requiring `33` for a behavior it depends on, and another that breaks when the
+application targets `35`, cannot both be satisfied by taking the maximum — so
+the rule above would report a build as satisfying every floor while breaking
+the second package. The other keys here are not like this. Raising `min_sdk`
+or `deployment_target` only narrows the device population, which cannot
+invalidate a lower minimum; raising `compile_sdk` compiles against a newer API
+surface, and where that surface is not purely additive the failure is a
+compile error naming the symbol, not a behavior change in production.
+
+A package genuinely can depend on target-gated behavior. Such a dependency is
+declared as an [§5.3](#53-actions) action, which carries the `reason` that a
+requirement of this kind needs and which a floor has no field for — and it is
+the application, not a consumer, that decides its own `targetSdk`. See
+[§11](#11-out-of-scope).
 
 ### 5.2 Values
 
@@ -3148,8 +3157,8 @@ A conforming consumer **MUST**:
     floor and a malformed `deployment_target`, comparing the latter
     component-wise and numerically; reject a boolean floor declared `false`;
     never raise the application's configuration to satisfy a floor; and record
-    and report every declared floor with its distribution, giving `target_sdk`
-    the prominence [§5.1](#51-build-floors) requires.
+    and report every declared floor with its distribution
+    ([§5.1](#51-build-floors)).
 13. Fail when a declared value is unsupplied, never treat a scaffolded
     placeholder as a supplied value, require `key` on every value kind but
     `inline` and reject it on that one, reject an `inline` value that
@@ -3457,7 +3466,7 @@ The shape of that second entry is normative in five respects:
 | Requirement | Why |
 | --- | --- |
 | A repository contribution is set apart, never folded into a list | [§6.4](#64-maven-repositories) |
-| Every declared floor appears with the distribution that declared it, and a declared `target_sdk` is set apart with the same prominence a repository gets | [§5.1](#51-build-floors) — it changes behavior application-wide, and composes silently upward |
+| Every declared floor appears with the distribution that declared it | [§5.1](#51-build-floors) — floors compose by maximum, so the value that binds is one no single sidecar states |
 | Contributions arriving from a **resolved artifact's own manifest** are attributed to that artifact, not to the distribution that declared the coordinate | [§9.4](#94-what-resolved-artifacts-bring-with-them) |
 | An unmet requirement is distinguished from an unresolved **conditional** one | [§5.4](#54-how-a-requirement-is-satisfied) — the first blocks the build, the second is guidance |
 | **What was staged is distinguished from what remains** | the whole point of this convention: the application author needs to see the boundary between work that was done for them and work that is theirs |
@@ -3816,6 +3825,7 @@ genuinely equivalent and both common.
 | **Native runtime lifecycle composition** | No way for a producer to run code at application start, or to participate in an app-delegate callback. Deliberate in version 1, and not on principle — see below |
 | Xcode build settings, compiler and linker flags | Arbitrary build mutation. The exclusion stands for flags in general; [§7.6](#76-objective-c-categories)'s `objc_categories` is the one bounded exception, and it names a behavior rather than passing a flag |
 | Application configuration — *writing* it | The application's own build settings are its own. **Declaring a requirement on it is in scope**, and is what [§5](#5-requirements-on-the-application) is for |
+| A declared **`target_sdk`** floor | Not excluded because it belongs to the application — [§5](#5-requirements-on-the-application) exists to state requirements on things the application owns — but because it is not floor-shaped: raising `targetSdk` opts the whole application into further runtime behavior changes, so [§5.1](#51-build-floors)'s composition by maximum can satisfy one package's minimum while breaking another's. A package depending on target-gated behavior declares an [§5.3](#53-actions) action, which carries the `reason` such a requirement needs. A future version could add a shape with both a floor and a ceiling; it would not be one of these |
 
 **Three accepted limitations, stated together.** Each is a place where a
 determined or careless producer reaches past a rule and version 1 answers with
@@ -4332,9 +4342,8 @@ place: the value kinds of [§5.5](#55-value-kinds), the Gradle configurations of
 | **`[<platform>.requires]` — floors** [§5.1](#51-build-floors) | |
 | `min_sdk` | An Android floor, and a **TOML integer** — `"24"` and `24.0` are rejected. The build fails when the application is lower; the consumer never raises it |
 | `compile_sdk` | An Android floor, on the same terms as `min_sdk` |
-| `target_sdk` | An Android floor, on the same terms. It changes behavior app-wide, so declare it only when a behavior depends on it, and a consumer gives it the prominence a repository contribution gets |
 | `core_library_desugaring` | Optional boolean, and only `true` is valid — a consumer rejects `false`. A floor on a boolean axis: the build fails when the application has not enabled desugaring |
-| `deployment_target` | The iOS floor, and a **TOML string** where the three above are integers. One to three ASCII-decimal components, compared component-wise and numerically with absent components read as zero |
+| `deployment_target` | The iOS floor, and a **TOML string** where `min_sdk` and `compile_sdk` are integers. One to three ASCII-decimal components, compared component-wise and numerically with absent components read as zero |
 | **`[[<platform>.requires.application_value]]`** [§5.2](#52-values) | A string the application supplies and the consumer places |
 | `id` | **Required.** A logical name, unique among the requirements in one platform table; identity is (distribution, platform, `id`) |
 | `kind` | **Required.** Where the consumer writes it. A **closed** set — [§5.5](#55-value-kinds). `info_plist` may not name a usage-description, capability, external-reach or consumer-managed key; `usage_description` may name only a `*UsageDescription` one |

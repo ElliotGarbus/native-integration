@@ -38,11 +38,6 @@ OUTPUT = ROOT / "docs" / "REQUIREMENTS.md"
 #: an oversight.
 BEYOND_THE_READER = {
     6: "the payload is assembled by the build tool, not here",
-    12: "the last clause: which findings a report sets apart is its layout. §5.1 "
-    "asks for a declared `target_sdk` to get the prominence a repository "
-    "contribution gets, and the one standing channel this reader has for that "
-    "is S9's advisory — which an obligation stated as a MUST cannot use, "
-    "because §8.5 lets a consumer decline an advisory",
     20: "the scaffolding clause: an acknowledgement is scaffolded into a file "
     "this reader does not write, so whether it is commented out is decided "
     "where the writing happens",

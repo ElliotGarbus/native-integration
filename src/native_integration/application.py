@@ -108,7 +108,7 @@ class Credential:
 class Application:
     """The application's configuration, and every answer it has given."""
 
-    #: §5.1's Android floors, by key — `min_sdk`, `compile_sdk`, `target_sdk`.
+    #: §5.1's Android floors, by key — `min_sdk` and `compile_sdk`.
     android: Mapping[str, int] = field(default_factory=dict)
     #: §5.1's iOS floor, as the application configures it.
     deployment_target: str = ""

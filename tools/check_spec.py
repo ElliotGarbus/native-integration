@@ -600,7 +600,7 @@ if app_path.exists():
 
     floors = side.get("android", {}).get("requires", {})
     app_android = tool.get("android", {})
-    for key in ("min_sdk", "compile_sdk", "target_sdk"):
+    for key in ("min_sdk", "compile_sdk"):
         if key in floors and app_android.get(key, 0) < floors[key]:
             problems.append(f"app-pyproject.toml {key}={app_android.get(key)} is below pystripe's floor {floors[key]}")
 else:
@@ -792,7 +792,7 @@ def check_v1_sidecar(rel: str, raw: str, doc: dict, problems: list[str]) -> None
                 )
 
     # §5.1 — Android floors are integers; TOML booleans are not
-    for platform, keys in (("android", ("min_sdk", "compile_sdk", "target_sdk")),):
+    for platform, keys in (("android", ("min_sdk", "compile_sdk")),):
         floors = doc.get(platform, {}).get("requires", {})
         for key in keys:
             if key in floors and not (

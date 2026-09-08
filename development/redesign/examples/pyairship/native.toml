@@ -18,9 +18,16 @@ java_namespaces = ["org.pyairship"]
 [android.requires]
 min_sdk = 23
 compile_sdk = 35
-# POST_NOTIFICATIONS is requested at runtime only when targetSdk >= 33; below
-# that a push package's runtime request silently does nothing.
-target_sdk = 33
+
+# Target-gated, so an action rather than a floor: §5.1's floors compose by
+# maximum, which a target the application chooses cannot do safely.
+[[android.requires.application_action]]
+id = "target_api_33"
+summary = "Target Android API 33 or later"
+reason = """\
+POST_NOTIFICATIONS is requested at runtime only when the application targets \
+33 or later. Below that, Android decides when the permission prompt appears \
+and this package's runtime request silently does nothing."""
 
 # --- the app key, taken by the automatable path ------------------------------
 #

@@ -5,8 +5,8 @@
 #
 # Raising it is the dangerous answer, and §5.1 forbids it in as many words. A
 # `min_sdk` the application did not choose changes which devices the application
-# installs on; a `target_sdk` changes behavior across the whole application, in
-# code that has nothing to do with the producer's package.
+# installs on; a `compile_sdk` it did not choose can force the whole project
+# onto tooling the application author never agreed to.
 #
 # A floor carries no `reason` (§5.1), which is why the report has to carry the
 # two numbers instead — they are the whole of what a reader needs.

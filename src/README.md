@@ -344,7 +344,7 @@ one field per row, joined the way requirement 10 fixes.
 
 | Answers | Field | Joined by |
 | --- | --- | --- |
-| a build floor | `android: Mapping[str, int]`, `deployment_target: str`, `core_library_desugaring: bool` | the key itself — `min_sdk`, `compile_sdk`, `target_sdk`, or the one iOS and one boolean floor |
+| a build floor | `android: Mapping[str, int]`, `deployment_target: str`, `core_library_desugaring: bool` | the key itself — `min_sdk`, `compile_sdk`, or the one iOS and one boolean floor |
 | a value | `values: Mapping[tuple[str, str], str]` | `(distribution, id)` |
 | an acknowledged action | `acknowledged: Mapping[tuple[str, str], Answer]` | `(distribution, id)` |
 | a dismissed conditional requirement | `dismissed: Mapping[tuple[str, str], Answer]` | `(distribution, id)` |

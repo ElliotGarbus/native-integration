@@ -115,19 +115,6 @@ anchor = "51-build-floors"
 description = "An Android floor, on the same terms as `min_sdk`"
 example = 35
 
-[declarations."android.requires.target_sdk"]
-node = "field"
-type = "integer"
-category = "requires"
-platform = "android"
-required = false
-merge = "maximum"
-since = "1.0"
-section = "5.1"
-anchor = "51-build-floors"
-description = "An Android floor, on the same terms. It changes behavior app-wide, so declare it only when a behavior depends on it, and a consumer gives it the prominence a repository contribution gets"
-example = 33
-
 [declarations."android.requires.core_library_desugaring"]
 node = "field"
 type = "boolean"
@@ -151,7 +138,7 @@ merge = "maximum"
 since = "1.0"
 section = "5.1"
 anchor = "51-build-floors"
-description = "The iOS floor, and a **TOML string** where the three above are integers. One to three ASCII-decimal components, compared component-wise and numerically with absent components read as zero"
+description = "The iOS floor, and a **TOML string** where `min_sdk` and `compile_sdk` are integers. One to three ASCII-decimal components, compared component-wise and numerically with absent components read as zero"
 example = "15.0"
 
 

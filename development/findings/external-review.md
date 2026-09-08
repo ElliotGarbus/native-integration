@@ -25,9 +25,10 @@ against anything.
 
 ## Design comments, held open for freeze review
 
-None of these is a defect, and none was reversed. Each is a decision the
-specification made; the review's point is that freeze review should re-decide
-them rather than inherit them.
+Each is a decision the specification made; the review's point is that freeze
+review should re-decide them rather than inherit them. One — `target_sdk` —
+has since been re-decided and reversed, and its entry records both the outcome
+and where the reasoning that defended it went wrong.
 
 **Lifecycle composition is the load-bearing deferral.** Push and payments stay
 manual on iOS. Version 1 can state "call this early" as an action; it cannot
@@ -63,7 +64,8 @@ arrives, or the key goes. Decide it, rather than freezing a key no sidecar has
 used.
 
 **`target_sdk`'s floor doesn't match how Android enforces it, and composition
-can silently break a dependency.** Raised in feedback relayed by the user
+can silently break a dependency — REVERSED, see RESOLVED below; the field is
+gone.** Raised in feedback relayed by the user
 ("`target_sdk` can't be handled as a simple floor... code could depend on
 either the old or the new behavior") and confirmed on inspection. §5.1 treats
 `target_sdk` exactly like `min_sdk` and `compile_sdk`: a minimum, composed by
@@ -109,41 +111,45 @@ different problem and giving `compile_sdk` a ceiling need it otherwise never
 has — nothing establishes a downside to raising `compile_sdk` on its own, only
 to raising it as a side effect of capping it for someone else's reason.
 
-**Nor should `target_sdk` be removed from `requires` to sidestep the
-question.** The floor case is real: "the app must have opted into behavior my
-SDK assumes" is exactly `min_sdk`'s shape, deterministic to check, and §5.1
-already handles it correctly today. Deleting the field would trade a working,
-attributable check for prose docs or an unchecked action, for the one thing
-`target_sdk` currently does right.
+**RESOLVED — `target_sdk` is removed from `[<platform>.requires]`, reversing
+what the two paragraphs below this one used to conclude.** Two further reviews
+landed on the same answer independently, and the decisive argument was already
+sitting in the analysis above without being followed to its end: composition by
+maximum is sound only where raising a value cannot invalidate a lower
+declaration. That property holds for `min_sdk` and `deployment_target`, which
+only narrow the device population. It does not hold for `target_sdk`. So the
+defect is not that a *ceiling* is missing — it is that the floor rule §5.1
+states normatively is **false** for this one key, and a consumer implementing
+§5.1 correctly would report a build as satisfying every floor while breaking a
+package that needed a lower target.
 
-**What's actually in question is narrower than earlier drafts of this finding
-stated it: not whether `target_sdk` belongs in `requires`, but whether a
-*ceiling* belongs beside it — and the case for that is weaker than it was
-argued to be.** Everything said so far is mechanism-level: `target_sdk`-gated
-behavior changes are real and documented, so a conflict of this shape is
-*possible*. No specific, currently-published SDK asking "do not raise
-`target_sdk` past N" has been produced, here or in the feedback that raised
-this — and there is a plausible reason such cases are short-lived rather than
-durable: Play Store policy forces every app toward an ever-rising minimum
-`target_sdk`, so a vendor whose SDK cannot tolerate that pressure has more
-reason to fix the SDK than to publish a standing ceiling. That is a real
-difference from the floor case, and it is exactly the bar the original
-feedback set — "I'd need to see some realistic use cases before I was
-convinced this is worth the effort" — which two rounds of trying to construct
-a substitute out of existing fields have not met.
+The internal evidence was in our own text the whole time. §5.1 justifies floors
+carrying no `reason` on the grounds that the declared and configured values
+"are the whole of what a reader needs", and then the caution box told authors
+to declare `target_sdk` only when a specific behavior depends on it "and say
+which one" — with no field in which to say it. A key that needs prose, in a
+category defined by not needing prose, is in the wrong category.
 
-If a real case does appear, the shape worth reaching for reuses vocabulary the
-document already has rather than inventing new machinery: a range —
-`target_sdk = { at_least = 30, below = 34 }`, the same form
-[§6.3](../../SPEC.md#63-gradle-dependencies) already uses for a Gradle
-dependency's version — with two incompatible ranges failing the build and
-naming both distributions, the same rule
-[§6.3](../../SPEC.md#63-gradle-dependencies) already applies when two
-distributions disagree on `configuration` (requirement 25). The application
-author still configures the one real `target_sdk` a build uses, exactly as for
-every other floor today. Recorded here as a sketch, not a proposal — this is
-closer to *not evidenced* than to *open question*, and should be read that way
-before a freeze.
+What was wrong in the reasoning that preceded this, since the conclusion below
+was argued at length and confidently: the floor case was treated as "real and
+already working" because it is deterministic to *check*. Checkability is not
+the test. A check can be deterministic and still enforce an unsound rule, which
+is exactly what this one did. The rebuttal that deleting the field "trades a
+working check for prose" also mis-stated the alternative — §5.3's action
+carries a `reason`, is reported, and is gated on an acknowledgement; it is not
+prose docs.
+
+**Also removed: the range sketch that stood here.** It proposed
+`target_sdk = { at_least = 30, below = 34 }` reusing §6.3's version-range form.
+That remains the right shape *if* a real case ever justifies it, and it is
+recorded in [§11](../../SPEC.md#11-out-of-scope) as such — but it is a
+different requirement shape, not a floor, and belongs in a later version behind
+the evidence the original reviewer asked for.
+
+The real use case survives and is now expressed properly: `pyairship` declared
+`target_sdk = 33` for Android 13 notification-permission timing, which is the
+genuine article. The redesign copy now declares it as an `application_action`
+carrying the reason, which is what that requirement always needed.
 
 **And the caution cuts both ways: the two consumers this document names as its
 audience could not honor a `compile_sdk`/`target_sdk` split even if version 1
@@ -199,24 +205,42 @@ producer's declared floor against. That is not the `target_sdk` shape problem
 — the field is unambiguously floor-shaped — it is a readiness gap in one named
 consumer rather than in the model.
 
-**Independent of whether `target_sdk` ever becomes a range: today's floor
-composition does not account for Android's own ordering rule, and this is
-checkable against the code as it stands.** AGP enforces `minSdkVersion ≤
-targetSdkVersion ≤ compileSdkVersion` unconditionally, for every application,
-regardless of any dependency's involvement. `integration.py`'s `_floors()` and
-`application.py`'s `meets()` check `min_sdk`, `compile_sdk`, and `target_sdk`
-against the application's configured values entirely independently — read the
-functions directly and there is no cross-field logic at all. One distribution
-declaring `target_sdk ≥ 33` and another declaring `compile_sdk ≥ 30`, with the
-application configured to exactly satisfy each floor as declared, passes every
-check this reader performs, while the resulting build fails on `target_sdk
-(33) > compile_sdk (30)` — a Gradle error naming no distribution at all. This
-is a gap in what [§5.1](../../SPEC.md#51-build-floors) requires a consumer to
-check, not only in what this reader happens to check: a consumer implementing
-the letter of §5.1 today has this exact bug. Closing it needs no new
-declarative capability, unlike the range above — only that a `target_sdk`
-floor propagate as an equal `compile_sdk` floor, because the platform rule is
-always true rather than case-dependent.
+**WITHDRAWN, and the worst mistake in this document — a platform rule that
+does not exist was asserted here, implemented, and pushed.** This entry
+previously claimed AGP enforces `minSdkVersion ≤ targetSdkVersion ≤
+compileSdkVersion` unconditionally, called the reader's lack of a cross-field
+check a gap, and that claim was written into §5.1 and requirement 12 as a
+**MUST**, implemented in `_floors()`, covered by two conformance cases, and
+committed (6f9c815, reverted by 9ef8758).
+
+Google's build documentation states the opposite in as many words: *"The value
+of `targetSdk` is not connected to the value of `compileSdk`. For example, you
+can have a value of `targetSdk` that is higher, the same, or lower than
+`compileSdk`."* The `min_sdk ≤ target_sdk` half was unevidenced too — the
+`<uses-sdk>` documentation says only that `targetSdkVersion` defaults to
+`minSdkVersion` when unset. The "minSdkVersion cannot be smaller than version
+declared in library" error that probably seeded the belief is a different
+check: the application's `minSdk` against a *library's*, not against its own
+target.
+
+So the shipped check failed builds Android permits, naming a distribution that
+had done nothing wrong — the inverse of this tool's entire purpose.
+
+Two lessons, both sharper than the one already in `AGENTS.md`:
+
+1. **The conformance cases could not have caught it.** They tested the
+   implementation against the same invented rule the implementation encoded.
+   Both agreed; neither was ever checked against Android. The standing rule
+   covers a check never seen to fail. This one failed correctly, on a condition
+   that should never fail at all — so the rule needs its other half: *a check
+   must be verified against the thing it claims to model, not only against
+   itself.*
+2. **A platform claim needs a platform citation.** The false ordering rule came
+   from a search-result summary, not from vendor documentation, while the
+   claims in this document that held up — Buildozer's `android.api`,
+   Briefcase's `target_os_version`, AAR metadata — were each read at the
+   source. The evidence standard was already known and was not applied
+   uniformly.
 
 ## The follow-up
 
