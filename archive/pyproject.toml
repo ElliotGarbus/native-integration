@@ -34,7 +34,7 @@ test = ["pytest>=7"]
 native-integration = "native_integration.cli:main"
 
 [project.urls]
-Specification = "https://github.com/ElliotGarbus/native-integration/blob/main/SPEC.md"
+Specification = "https://github.com/ElliotGarbus/native-integration/blob/main/archive/SPEC.md"
 Source = "https://github.com/ElliotGarbus/native-integration"
 
 [tool.setuptools.packages.find]

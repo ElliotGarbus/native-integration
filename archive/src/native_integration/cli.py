@@ -424,7 +424,7 @@ def explain(args: argparse.Namespace) -> int:
 #: Where an author can read the whole specification, printed on the skeleton so
 #: that a file copied into another repository still says where it came from.
 SPECIFICATION_URL = (
-    "https://github.com/ElliotGarbus/native-integration/blob/main/SPEC.md"
+    "https://github.com/ElliotGarbus/native-integration/blob/main/archive/SPEC.md"
 )
 
 TEMPLATE = f"""# native.toml — the sidecar for this distribution.
